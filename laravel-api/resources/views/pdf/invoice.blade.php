@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Facture {{ $invoice->number }}</title>
+    <style>
+        body { font-family: DejaVu Sans, sans-serif; font-size: 11px; }
+        h1 { font-size: 16px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #333; padding: 6px; text-align: left; }
+        th { background: #eee; }
+        .header { margin-bottom: 20px; }
+        .meta { margin: 5px 0; color: #555; }
+        .totals { margin-top: 20px; text-align: right; }
+        .text-right { text-align: right; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Facture n° {{ $invoice->number }}</h1>
+        <p class="meta">Date : {{ $invoice->invoice_date->format('d/m/Y') }}</p>
+        @if($invoice->due_date)
+        <p class="meta">Échéance : {{ $invoice->due_date->format('d/m/Y') }}</p>
+        @endif
+        <p class="meta">Client : {{ $invoice->client->name }}</p>
+        @if($invoice->client->address)<p class="meta">{{ $invoice->client->address }}</p>@endif
+        @if($invoice->client->siret)<p class="meta">SIRET : {{ $invoice->client->siret }}</p>@endif
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Désignation</th>
+                <th>Qté</th>
+                <th>Prix unitaire HT</th>
+                <th class="text-right">Total HT</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($invoice->invoiceLines as $line)
+            <tr>
+                <td>{{ $line->description }}</td>
+                <td>{{ $line->quantity }}</td>
+                <td>{{ number_format($line->unit_price, 2, ',', ' ') }} €</td>
+                <td class="text-right">{{ number_format($line->total, 2, ',', ' ') }} €</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+
+    <div class="totals">
+        <p>Total HT : {{ number_format($invoice->amount_ht, 2, ',', ' ') }} €</p>
+        <p>TVA ({{ $invoice->tva_rate }} %) : {{ number_format($invoice->amount_ttc - $invoice->amount_ht, 2, ',', ' ') }} €</p>
+        <p><strong>Total TTC : {{ number_format($invoice->amount_ttc, 2, ',', ' ') }} €</strong></p>
+    </div>
+
+    <p style="margin-top: 30px; font-size: 10px; color: #666;">Document généré par la plateforme Lab BTP.</p>
+</body>
+</html>

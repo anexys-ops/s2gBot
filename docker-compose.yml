@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  api:
+    build: ./services/api
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - BACK_URL=http://back:3001
+      - CALCUL_URL=http://calcul:3002
+      - AUTH_URL=http://auth:3003
+    depends_on:
+      - back
+      - calcul
+      - auth
+
+  back:
+    build: ./services/back
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+
+  calcul:
+    build: ./services/calcul
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+
+  auth:
+    build: ./services/auth
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - JWT_SECRET=change-me-in-production
+
+  front:
+    build:
+      context: ./apps/front
+      args:
+        VITE_API_URL: http://localhost:3000
+    ports:
+      - "5173:80"
+    depends_on:
+      - api

@@ -1,5 +1,7 @@
 # Plateforme s2gBot
 
+**Partage (Git)** : le projet est versionné. Pour pousser sur ton dépôt public : voir [PUSH.md](PUSH.md).
+
 ## Plateforme essais laboratoire BTP (Laravel + React)
 
 Application dédiée aux essais de laboratoire BTP : commandes, échantillons, résultats, rapports PDF et facturation.

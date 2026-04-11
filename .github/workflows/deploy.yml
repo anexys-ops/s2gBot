@@ -1,17 +1,16 @@
-# Déploiement automatique sur ton serveur au push sur la branche principale.
+# Déploiement automatique au push sur main : SSH vers le serveur, git pull,
+# alignement APP_VERSION (.env.docker) puis rebuild Docker (app + web).
 #
-# Configuration GitHub (Settings → Secrets and variables → Actions) :
-#   DEPLOY_HOST      — hôte SSH (ex. mon-labo.fr ou 203.0.113.10)
-#   DEPLOY_USER      — utilisateur SSH (ex. deploy ou www-data)
-#   DEPLOY_SSH_KEY   — clé privée PEM (contenu de id_rsa / clé dédiée déploiement)
-#   DEPLOY_PATH      — chemin absolu du clone git sur le serveur (ex. /var/www/s2gBot)
+# Secrets GitHub (Settings → Secrets and variables → Actions) :
+#   DEPLOY_HOST      — hôte SSH
+#   DEPLOY_USER      — utilisateur SSH (ex. root)
+#   DEPLOY_SSH_KEY   — clé privée PEM (déploiement)
+#   DEPLOY_PATH      — racine du clone git sur le serveur (ex. /opt/s2gBot)
 #
-# Port SSH : ci-dessous port 167 (PRXP010R58). Pour 22, supprime la ligne ou mets port: 22
+# Port SSH : 167 ci-dessous. Pour 22, adapter la clé `port`.
 #
-# Sur le serveur : clone du repo, fichier .env dans laravel-api/, remote git en lecture
-# (clé de déploiement GitHub ou token). Puis : chmod +x scripts/deploy-server.sh
-#
-# Nginx conseillé : servir react-frontend/dist (ou DEPLOY_PUBLIC_HTML) et proxy /api vers PHP (Laravel).
+# Prérequis sur le serveur : DEPLOY_PATH = clone git avec remote en lecture,
+#   fichier .env.docker (non versionné), stack Docker déjà démarrée au moins une fois.
 
 name: Deploy production
 
@@ -48,7 +47,22 @@ jobs:
               exit 1
             fi
             cd "$DEPLOY_PATH"
+            if [ ! -d .git ]; then
+              echo "Erreur: DEPLOY_PATH doit être un dépôt git (git init + remote + fetch une fois)."
+              exit 1
+            fi
             git fetch origin "$DEPLOY_BRANCH"
             git reset --hard "origin/$DEPLOY_BRANCH"
-            chmod +x scripts/deploy-server.sh
-            ./scripts/deploy-server.sh
+            chmod +x scripts/*.sh 2>/dev/null || true
+            if [ -f react-frontend/package.json ] && [ -f .env.docker ]; then
+              PKG_VER="$(grep '"version"' react-frontend/package.json | head -1 | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+              if [ -n "$PKG_VER" ]; then
+                if grep -q '^APP_VERSION=' .env.docker; then
+                  sed -i "s/^APP_VERSION=.*/APP_VERSION=$PKG_VER/" .env.docker
+                else
+                  printf '\nAPP_VERSION=%s\n' "$PKG_VER" >> .env.docker
+                fi
+                echo "→ APP_VERSION=$PKG_VER (.env.docker)"
+              fi
+            fi
+            ./scripts/docker-prod-refresh.sh

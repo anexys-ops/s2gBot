@@ -1,11 +1,11 @@
 ---
 name: maj-prod-s2gbot
 description: >-
-  Met à jour le serveur de production s2gBot (Laravel + React) après validation
-  du dépôt. Déclencher quand l’utilisateur demande une MAJ, mise à jour prod,
-  déploiement production, deploy prod, push prod, ou équivalent. Couvre le
-  workflow GitHub Actions « Deploy production » et le script local
-  scripts/deploy-apps-dev.sh avec deploy.env.
+  Met à jour le serveur de production s2gBot (Docker : Laravel + React). Déclencher
+  sur demande explicite (MAJ prod, deploy, etc.) ou en fin de session quand l’utilisateur
+  veut que chaque modification parte en prod (voir règle s2gbot-sync-prod-on-change).
+  Couvre le workflow GitHub Actions « Deploy production » (push main → git pull +
+  docker-prod-refresh) et le déploiement manuel (tar/SSH ou deploy-apps-dev.sh).
 ---
 
 **SSH / hôte prod** : lire le fichier voisin **`SECRETS.local.md`** (non versionné, listé dans `.gitignore`). S’il est absent sur une machine : copier **`SECRETS.local.example.md`** → `SECRETS.local.md` et le remplir.
@@ -16,7 +16,13 @@ Tu es l’agent chargé d’exécuter ou d’orchestrer la mise à jour **produc
 
 **Serveur de production (s2gBot)** : c’est la machine joignable en **SSH sur le port 167** (voir `port: 167` dans `.github/workflows/deploy.yml`). Quand l’utilisateur dit « prod » ou « serveur de production », il parle de **ce** serveur, pas d’un hôte au port 22 par défaut.
 
-**Configuration infra validée** : stack **Docker** sur le LXC (`/opt/s2gBot`, site sur **port 80**, SSH **167**, etc.). **Ne pas** modifier cette configuration via SSH ni proposer de changements ports / `.env.docker` / Nginx **sans demande explicite**. Déploiement courant = **pousser les fichiers** (`git push` `main`, workflow ou script existant) — voir aussi `.cursor/rules/s2gbot-prod-ssh.mdc`.
+**Configuration infra validée** : stack **Docker** sur le LXC (`/opt/s2gBot`, site sur **port 80**, SSH **167**, etc.). **Ne pas** modifier cette configuration via SSH ni proposer de changements ports / `.env.docker` (sauf ligne `APP_VERSION` gérée par le workflow) / Nginx **sans demande explicite**. Déploiement courant = **`git push` sur `main`** → workflow **Deploy production** (`git pull` + `docker-prod-refresh.sh`) — voir `.cursor/rules/s2gbot-prod-ssh.mdc` et **s2gbot-sync-prod-on-change**.
+
+## Sync immédiate après modifications (attendu utilisateur)
+
+Quand l’utilisateur veut que **chaque changement parte en prod** : après les commits, **`git push origin main`** (le workflow reconstruit les images Docker). Si Actions n’est pas utilisable : sync SSH vers `/opt/s2gBot` puis `./scripts/docker-prod-refresh.sh` (comme avant), sans exposer les secrets.
+
+**Prérequis Actions** : `DEPLOY_PATH` sur le serveur doit être un **clone Git** avec `origin` pointant sur ce dépôt (accès en lecture pour la machine). Sinon le job échoue : initialiser une fois sur le serveur (`git clone` dans `/opt/s2gBot` ou `git init` + `remote` + premier `pull`), conserver `.env.docker` hors dépôt ou restauré après clone.
 
 ## Avant toute chose
 

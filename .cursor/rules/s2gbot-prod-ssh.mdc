@@ -28,10 +28,10 @@ La stack **Docker** sur le LXC (**HTTP sur le port 80**, **SSH public sur le por
 - **Ne pas** changer la configuration serveur (ports, Nginx hôte, `docker-compose`, `.env.docker`, vhosts, pare-feu Proxmox) **sauf si l’utilisateur le demande clairement**.
 - Ne pas « améliorer » ou « harmoniser » l’infra de son propre chef.
 
-## Déploiement courant = pousser le code uniquement
+## Déploiement courant = pousser le code (puis Docker via CI)
 
-- Le flux normal est : **commits + `git push`** sur la branche suivie par la prod (souvent `main`), éventuellement workflow GitHub **Deploy production** ou script **`deploy-apps-dev.sh`** selon ce qui est déjà en place.
-- **Pas** de session SSH pour retoucher la conf quand l’utilisateur dit que ça marche et veut seulement livrer des fichiers.
+- Le flux normal est : **commits + `git push`** sur `main` → workflow **Deploy production** exécute sur le serveur **`git pull`** puis **`./scripts/docker-prod-refresh.sh`** (rebuild `app` + `web`). Voir `.cursor/rules/s2gbot-sync-prod-on-change.mdc` pour le comportement « sync prod après chaque modif ».
+- **Pas** de session SSH pour retoucher la **conf** quand l’utilisateur veut seulement livrer du code ; en secours seulement si GitHub Actions n’est pas disponible.
 
 ## Chemins sur le serveur
 

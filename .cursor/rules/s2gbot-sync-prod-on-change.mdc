@@ -1,0 +1,24 @@
+---
+description: Déployer en prod après modifications applicatives (push + Docker)
+alwaysApply: true
+---
+
+# Synchronisation production après modifications
+
+L’utilisateur souhaite que **toute modification de code destinée à la production** soit **reflétée sur le serveur sans attendre une demande explicite** « déploie ».
+
+## Comportement attendu de l’assistant
+
+1. **À la fin d’une session** où du code applicatif a été modifié (API Laravel, front React, Docker/scripts de déploiement, workflow) et que l’objectif est la prod **ou non limité au local** :
+   - Vérifier `git status` ; **committer** les changements pertinents si ce n’est pas déjà fait (message clair).
+   - **`git push origin main`** pour déclencher le workflow **Deploy production** (déploiement Docker sur le serveur), sauf si l’utilisateur a dit explicitement de ne pas pousser / ne pas toucher à la prod.
+
+2. Si le **push ne peut pas déclencher** le déploiement (pas de réseau, secrets GitHub absents, échec du job) : utiliser le **chemin de secours** documenté dans `.cursor/skills/maj-prod-s2gbot/SKILL.md` (sync SSH + `./scripts/docker-prod-refresh.sh` sur `/opt/s2gBot`), **sans afficher de secrets**.
+
+3. **Ne pas** modifier l’infra validée (ports, `.env.docker` hors `APP_VERSION`, pare-feu) sans ordre explicite — seulement **livrer le code** et **rafraîchir Docker** comme le workflow.
+
+4. Après déploiement : **vérifier** rapidement (ex. `curl …/api/version` ou équivalent) si l’environnement le permet.
+
+## Prérequis côté dépôt / serveur
+
+- Le workflow `.github/workflows/deploy.yml` suppose que **`DEPLOY_PATH` sur le serveur est un clone Git** (`git fetch` + `reset`). Si ce n’est pas le cas, initialiser le dépôt distant une fois (voir SKILL `maj-prod-s2gbot`).

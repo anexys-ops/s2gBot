@@ -1,0 +1,31 @@
+---
+description: s2gBot — incrémenter la version affichée (footer + /api/version) quand le livrable change
+alwaysApply: true
+---
+
+# Version applicative (footer Lab BTP + `GET /api/version`)
+
+## Source de vérité
+
+- **`react-frontend/package.json`** → champ **`version`** (semver). C’est cette valeur qui est injectée dans le **bundle Vite** (`__APP_VERSION__`, footer) et que le workflow **Deploy production** recopie dans **`APP_VERSION`** sur le serveur (voir `.github/workflows/deploy.yml`).
+- **`laravel-api/app/Support/AppVersion.php`** : si `package.json` est illisible dans l’image, le **fallback** `detect()` doit rester aligné sur la dernière version publiée du front (éviter un écart durable avec `1.0.x`).
+
+## Quand incrémenter
+
+À chaque lot de changements **déployable** (fonctionnel ou correctif livré en prod / à valider sur `s2g.apps-dev.fr`), **incrémenter** `react-frontend/package.json` → `version` :
+
+- correctif mineur : patch **`1.0.x` → `1.0.x+1`**
+- lot plus large : au jugement **`1.x.0`** ou **`x.0.0`**
+
+Mettre à jour en même temps les **`version`** en tête de **`react-frontend/package-lock.json`** (racine + entrée `""` dans `packages`).
+
+## Ordre de travail (agent)
+
+1. Après les changements de code prévus pour la prod : **monter la version** dans `package.json` / `package-lock.json` et le **fallback** dans `AppVersion.php` si nécessaire.
+2. **Inclure** ces fichiers dans le **même commit** que le reste (ou commit dédié `chore: bump version 1.0.x` juste avant push).
+3. Si l’utilisateur demande une **MAJ prod** : rappeler que le **footer** et le champ **`api`** de `/api/version` doivent afficher la nouvelle version après déploiement (cache navigateur / build Docker).
+
+## Hors scope
+
+- Ne pas modifier **`APP_VERSION`** dans `.env.docker` versionné (fichier non versionné sur le serveur) : le workflow le **synchronise** depuis `package.json` au déploiement.
+- Ne pas confondre avec la **version Expo** de l’app mobile (autre dépôt / `app.json`).

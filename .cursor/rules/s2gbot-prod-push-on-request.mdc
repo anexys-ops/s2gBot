@@ -1,0 +1,22 @@
+---
+description: Prod s2gBot — pousser / déployer seulement si l’utilisateur le demande
+alwaysApply: true
+---
+
+# Push et production : sur demande explicite
+
+L’utilisateur **modifie le code localement**, puis **demande explicitement** de pousser ou de mettre en prod (ex. « pousse », « push », « mets en prod », « déploie », « MAJ prod »).
+
+## Comportement attendu de l’assistant
+
+1. **Ne pas** exécuter `git push`, ne pas lancer de déploiement SSH ni supposer un déploiement **tant que l’utilisateur ne l’a pas demandé** clairement.
+
+2. **Quand il le demande** : vérifier `git status`, **committer** les changements non versionnés si nécessaire (message clair), puis **`git push origin main`** pour déclencher le workflow **Deploy production** (si configuré). En secours : voir `.cursor/skills/maj-prod-s2gbot/SKILL.md` — **sans afficher de secrets**.
+
+3. **Ne pas** modifier l’infra validée (ports, `.env.docker` hors alignement `APP_VERSION` prévu par le workflow, pare-feu) sans ordre explicite.
+
+4. Après un déploiement demandé par l’utilisateur : **vérifier** si possible (ex. `curl …/api/version`).
+
+## Prérequis côté dépôt / serveur
+
+- Le workflow `.github/workflows/deploy.yml` suppose un **clone Git** dans `DEPLOY_PATH` sur le serveur. Sinon, voir la SKILL `maj-prod-s2gbot`.

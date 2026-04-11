@@ -1,0 +1,74 @@
+# Plateforme Lab BTP — Laravel + React + MySQL
+# Usage :
+#   cp docker/env.docker.example .env.docker
+#   # Éditer .env.docker (APP_URL, mots de passe, APP_KEY optionnel)
+#   docker compose --env-file .env.docker up -d --build
+#   # Première fois : comptes démo
+#   docker compose exec app php artisan db:seed --force
+#
+# Interface : http://localhost:${HTTP_PORT:-8080}
+
+services:
+  db:
+    image: mysql:8.0
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-lab_btp}
+      MYSQL_USER: ${DB_USERNAME:-labbtp}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-labbtp_secret}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_secret_change_me}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD || exit 1']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  app:
+    build:
+      context: ./laravel-api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-lab_btp}
+      DB_USERNAME: ${DB_USERNAME:-labbtp}
+      DB_PASSWORD: ${DB_PASSWORD:-labbtp_secret}
+      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:-localhost,localhost:8080,127.0.0.1,127.0.0.1:8080}
+      SESSION_DRIVER: ${SESSION_DRIVER:-cookie}
+      CACHE_STORE: ${CACHE_STORE:-file}
+      LOG_CHANNEL: ${LOG_CHANNEL:-single}
+      RUN_OPTIMIZE: ${RUN_OPTIMIZE:-1}
+      RUN_SEED: ${RUN_SEED:-0}
+    volumes:
+      - laravel_storage:/var/www/html/storage
+      - laravel_bootstrap_cache:/var/www/html/bootstrap/cache
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+    restart: unless-stopped
+    ports:
+      - '${HTTP_PORT:-8080}:80'
+    depends_on:
+      - app
+
+volumes:
+  mysql_data:
+  laravel_storage:
+  laravel_bootstrap_cache:

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { authApi, clientsApi, sitesApi } from '../api/client'
 import AppVersionFooter from '../components/AppVersionFooter'
+import PublicContextNav from '../components/PublicContextNav'
 
 export default function Register() {
   const [name, setName] = useState('')
@@ -54,7 +55,8 @@ export default function Register() {
   }
 
   return (
-    <div className="container" style={{ maxWidth: 480, marginTop: '3rem' }}>
+    <div className="container" style={{ maxWidth: 480, marginTop: '3rem', width: '100%' }}>
+      <PublicContextNav extraLink={{ to: '/login', label: 'Connexion' }} variant="light" />
       <div className="card">
         <h1 style={{ marginTop: 0 }}>Inscription - Lab BTP</h1>
         <form onSubmit={handleSubmit}>

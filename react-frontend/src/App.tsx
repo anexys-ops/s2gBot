@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
@@ -18,6 +18,7 @@ import Cadrage from './pages/back-office/Cadrage'
 import ExemplesCalculs from './pages/back-office/ExemplesCalculs'
 import GranulometryLab from './pages/back-office/GranulometryLab'
 import ActivityLogPage from './pages/back-office/ActivityLogPage'
+import BackOfficeLayout from './pages/back-office/BackOfficeLayout'
 import GraphiquesEssais from './pages/GraphiquesEssais'
 import CrmHub from './pages/hub/CrmHub'
 import CrmDocuments from './pages/CrmDocuments'
@@ -31,6 +32,7 @@ import SiteFicheTab from './pages/sites/SiteFicheTab'
 import SiteMissionsTab from './pages/sites/SiteMissionsTab'
 import SiteMapTab from './pages/sites/SiteMapTab'
 import ReportPdfTemplates from './pages/ReportPdfTemplates'
+import ModuleConfigurationPage from './pages/back-office/ModuleConfigurationPage'
 import ReportComptaPage from './pages/reports/ReportComptaPage'
 import ReportVentesPage from './pages/reports/ReportVentesPage'
 import ReportDelaiTraitementPage from './pages/reports/ReportDelaiTraitementPage'
@@ -68,17 +70,23 @@ function AppRoutes() {
         <Route path="orders/new" element={<OrderNew />} />
         <Route path="orders/:id" element={<OrderDetail />} />
         <Route path="catalog" element={<Navigate to="/back-office/catalogue-essais" replace />} />
-        <Route path="back-office/catalogue-essais" element={<Catalog />} />
         <Route path="graphiques-essais" element={<GraphiquesEssais />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="devis" element={<Devis />} />
-        <Route path="back-office/pdf" element={<PdfModule />} />
-        <Route path="back-office/modeles-rapports-pdf" element={<ReportPdfTemplates />} />
-        <Route path="back-office/mails" element={<Mails />} />
-        <Route path="back-office/cadrage" element={<Cadrage />} />
-        <Route path="back-office/exemples-calculs" element={<ExemplesCalculs />} />
-        <Route path="back-office/granulometrie" element={<GranulometryLab />} />
-        <Route path="back-office/journal-audit" element={<ActivityLogPage />} />
+        <Route path="back-office" element={<Outlet />}>
+          <Route index element={<Navigate to="catalogue-essais" replace />} />
+          <Route element={<BackOfficeLayout />}>
+            <Route path="catalogue-essais" element={<Catalog />} />
+            <Route path="granulometrie" element={<GranulometryLab />} />
+            <Route path="cadrage" element={<Cadrage />} />
+            <Route path="exemples-calculs" element={<ExemplesCalculs />} />
+            <Route path="journal-audit" element={<ActivityLogPage />} />
+            <Route path="modeles-rapports-pdf" element={<ReportPdfTemplates />} />
+            <Route path="configuration" element={<ModuleConfigurationPage />} />
+            <Route path="pdf" element={<PdfModule />} />
+            <Route path="mails" element={<Mails />} />
+          </Route>
+        </Route>
         <Route path="clients" element={<Clients />} />
         <Route path="clients/:clientId" element={<ClientLayout />}>
           <Route index element={<Navigate to="fiche" replace />} />

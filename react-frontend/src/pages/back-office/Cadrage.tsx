@@ -55,8 +55,7 @@ export default function Cadrage() {
 
   return (
     <div>
-      <h1>LIMS BTP — Cadrage (Semaine 0)</h1>
-      <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>
+      <p style={{ color: '#64748b', marginBottom: '1.5rem', lineHeight: 1.55 }}>
         Objectif : couvrir le flux de bout en bout (demande → prélèvement → essai → résultats → rapport → facturation).
         À clarifier avant de démarrer.
       </p>

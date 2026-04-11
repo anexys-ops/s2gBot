@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [App\Http\Controllers\Api\AuthController::class, 'login']);
 Route::post('/register', [App\Http\Controllers\Api\AuthController::class, 'register']);
+Route::get('/version', [App\Http\Controllers\Api\VersionController::class, 'show']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [App\Http\Controllers\Api\AuthController::class, 'logout']);
@@ -78,4 +79,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('document-pdf-templates', [App\Http\Controllers\Api\DocumentPdfTemplateController::class, 'index']);
     Route::put('document-pdf-templates/{document_pdf_template}', [App\Http\Controllers\Api\DocumentPdfTemplateController::class, 'update']);
+
+    Route::get('extrafield-definitions', [App\Http\Controllers\Api\ExtrafieldDefinitionController::class, 'index']);
+    Route::post('extrafield-definitions', [App\Http\Controllers\Api\ExtrafieldDefinitionController::class, 'store']);
+    Route::put('extrafield-definitions/{extrafield_definition}', [App\Http\Controllers\Api\ExtrafieldDefinitionController::class, 'update']);
+    Route::delete('extrafield-definitions/{extrafield_definition}', [App\Http\Controllers\Api\ExtrafieldDefinitionController::class, 'destroy']);
+    Route::get('extrafield-values', [App\Http\Controllers\Api\ExtrafieldValueController::class, 'index']);
+    Route::put('extrafield-values', [App\Http\Controllers\Api\ExtrafieldValueController::class, 'sync']);
+
+    Route::get('module-settings/{module_key}', [App\Http\Controllers\Api\ModuleSettingController::class, 'show']);
+    Route::put('module-settings/{module_key}', [App\Http\Controllers\Api\ModuleSettingController::class, 'update']);
 });

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { pdfApi, quotesApi, invoicesApi, ordersApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
-import ModuleEntityShell from '../components/module/ModuleEntityShell'
+import PageBackNav from '../components/PageBackNav'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 
 export default function PdfModule() {
@@ -73,31 +73,15 @@ export default function PdfModule() {
 
   if (!isLab) {
     return (
-      <ModuleEntityShell
-        breadcrumbs={[
-          { label: 'Accueil', to: '/' },
-          { label: 'CRM', to: '/crm' },
-          { label: 'Création PDF' },
-        ]}
-        moduleBarLabel="Documents — PDF"
-        title="Création PDF"
-      >
+      <div>
         <p>Accès réservé au laboratoire.</p>
-      </ModuleEntityShell>
+      </div>
     )
   }
 
   return (
-    <ModuleEntityShell
-      breadcrumbs={[
-        { label: 'Accueil', to: '/' },
-        { label: 'CRM', to: '/crm' },
-        { label: 'Création PDF' },
-      ]}
-      moduleBarLabel="Documents — PDF"
-      title="Création de PDF"
-      subtitle="Devis, factures, rapports — filtrez la liste puis générez le document"
-    >
+    <div>
+      <PageBackNav back={{ to: '/crm', label: 'CRM' }} extras={[{ to: '/terrain', label: 'Terrain & labo' }]} />
       <div className="card" style={{ maxWidth: 560 }}>
         <h3 style={{ marginTop: 0 }}>Choisir le type et le document</h3>
         <div className="form-group">
@@ -142,6 +126,6 @@ export default function PdfModule() {
         </button>
         {error && <p className="error">{error}</p>}
       </div>
-    </ModuleEntityShell>
+    </div>
   )
 }

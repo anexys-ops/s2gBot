@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { mailApi, mailTemplatesApi, type MailTemplate } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
+import PageBackNav from '../components/PageBackNav'
 
 export default function Mails() {
   const { user } = useAuth()
@@ -128,16 +129,15 @@ export default function Mails() {
   if (!isLab) {
     return (
       <div>
-        <h1>Gestion des mails</h1>
-        <p>Accès réservé au back office.</p>
+        <p>Accès réservé au laboratoire.</p>
       </div>
     )
   }
 
   return (
-    <div>
-      <h1>Gestion des mails</h1>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+    <div className="mails-page">
+      <PageBackNav back={{ to: '/crm', label: 'CRM' }} extras={[{ to: '/terrain', label: 'Terrain & labo' }]} />
+      <div className="mails-page-grid">
         <div className="card">
           <h3>Envoyer un e-mail</h3>
           <form onSubmit={handleSend}>

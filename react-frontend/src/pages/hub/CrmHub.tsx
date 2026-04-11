@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
+import { OutlineIcon, type HubIconId } from '../../components/OutlineIcons'
 import { useAuth } from '../../contexts/AuthContext'
 
-type Card = { to: string; title: string; desc: string; icon: string }
+type Card = { to: string; title: string; desc: string; icon: HubIconId }
 
 export default function CrmHub() {
   const { user } = useAuth()
@@ -12,28 +13,28 @@ export default function CrmHub() {
       to: '/crm/documents',
       title: 'Documents commerciaux',
       desc: 'Registre devis & factures : recherche, filtres, PDF, lien vers la vue commerciale par client.',
-      icon: '📑',
+      icon: 'documents',
     },
     {
       to: '/clients',
       title: 'Clients',
       desc: 'Fiches tiers (onglets Fiche, Commerce, Documents) ; liste avec filtres de vue et accès fiche en un clic.',
-      icon: '👥',
+      icon: 'users',
     },
     {
       to: '/sites',
       title: 'Chantiers',
       desc: 'Liste avec filtre par client ; fiche chantier, missions, carte OSM.',
-      icon: '🏗️',
+      icon: 'building',
     },
-    { to: '/devis', title: 'Devis', desc: isLab ? 'Propositions commerciales.' : 'Vos devis.', icon: '📝' },
-    { to: '/invoices', title: 'Factures', desc: 'Suivi facturation et paiements.', icon: '💶' },
+    { to: '/devis', title: 'Devis', desc: isLab ? 'Propositions commerciales.' : 'Vos devis.', icon: 'quote' },
+    { to: '/invoices', title: 'Factures', desc: 'Suivi facturation et paiements.', icon: 'invoice' },
   ]
 
   if (isLab) {
     cards.push(
-      { to: '/back-office/mails', title: 'Mails', desc: 'Modèles et envois liés aux dossiers.', icon: '✉️' },
-      { to: '/back-office/pdf', title: 'Création PDF', desc: 'Rapports et documents générés.', icon: '🖨️' },
+      { to: '/back-office/mails', title: 'Mails', desc: 'Modèles et envois liés aux dossiers.', icon: 'mail' },
+      { to: '/back-office/pdf', title: 'Création PDF', desc: 'Rapports et documents générés.', icon: 'printer' },
     )
   }
 
@@ -51,15 +52,17 @@ export default function CrmHub() {
         {cards.map((c) => (
           <Link key={c.to} to={c.to} className="hub-card hub-card--v2">
             <span className="hub-card-v2__icon" aria-hidden>
-              {c.icon}
+              <OutlineIcon id={c.icon} />
             </span>
             <span className="hub-card-title">{c.title}</span>
             <span className="hub-card-desc">{c.desc}</span>
           </Link>
         ))}
       </div>
-      <p className="hub-footnote">
-        <Link to="/terrain">→ Passer à Terrain & laboratoire</Link>
+      <p className="hub-footnote hub-footnote--switch">
+        <Link to="/terrain" className="hub-footnote__link">
+          Passer à Terrain & laboratoire →
+        </Link>
       </p>
     </div>
   )

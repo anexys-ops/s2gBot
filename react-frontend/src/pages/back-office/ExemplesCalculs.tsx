@@ -224,8 +224,7 @@ export default function ExemplesCalculs() {
 
   return (
     <div>
-      <h1>Exemples de calculs BTP</h1>
-      <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>
+      <p style={{ color: '#64748b', marginBottom: '1.5rem', lineHeight: 1.55 }}>
         Formules courantes pour aller vite sans se tromper. Référentiels NF EN, DTU.
       </p>
       {exemples?.map((ex) => (

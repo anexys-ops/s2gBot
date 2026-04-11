@@ -1,4 +1,5 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import PageBackNav from '../components/PageBackNav'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   boreholesApi,
@@ -332,9 +333,10 @@ export default function OrderDetail() {
 
   return (
     <div>
-      <p>
-        <Link to="/orders">← Commandes</Link>
-      </p>
+      <PageBackNav
+        back={{ to: '/orders', label: 'Liste des commandes' }}
+        extras={[{ to: '/terrain', label: 'Terrain & labo' }]}
+      />
       <h1>Commande {order.reference}</h1>
       <p>
         Client : {order.client?.name} — Chantier : {order.site?.name ?? '-'} — Statut :{' '}

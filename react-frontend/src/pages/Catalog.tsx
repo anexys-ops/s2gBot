@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { testTypesApi, type TestType } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import PageBackNav from '../components/PageBackNav'
 import Modal from '../components/Modal'
 import ListTableToolbar from '../components/ListTableToolbar'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
@@ -145,7 +146,7 @@ export default function Catalog() {
 
   return (
     <div>
-      <h1>Catalogue des essais</h1>
+      <PageBackNav back={{ to: '/back-office', label: 'Back office' }} extras={[{ to: '/terrain', label: 'Terrain & labo' }]} />
       <p className="page-lead" style={{ color: '#64748b', marginBottom: '1rem', maxWidth: '42rem' }}>
         Types d&apos;essais, normes, tarifs unitaires et paramètres mesurés (saisie sur les dossiers). Réservé au
         personnel laboratoire pour la mise à jour.

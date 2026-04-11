@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import AppVersionFooter from '../components/AppVersionFooter'
+import PublicContextNav from '../components/PublicContextNav'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -35,6 +36,7 @@ export default function Login() {
       <div className="login-screen-bg" aria-hidden />
       <div className="login-screen-grid" aria-hidden />
       <div className="login-screen-content">
+        <PublicContextNav extraLink={{ to: '/register', label: 'Inscription' }} variant="dark" />
         <div className="login-hero">
           <div className="login-hero-badge">Essais laboratoire</div>
           <h1 className="login-hero-title">Plateforme Lab BTP</h1>

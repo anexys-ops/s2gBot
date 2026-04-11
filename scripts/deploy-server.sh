@@ -21,6 +21,12 @@ if [ -d laravel-api ]; then
 fi
 
 if [ -f laravel-api/artisan ]; then
+  if [ ! -f laravel-api/.env ] && [ -f laravel-api/.env.example ]; then
+    echo "→ Création laravel-api/.env depuis .env.example + APP_KEY"
+    cp laravel-api/.env.example laravel-api/.env
+    (cd laravel-api && php artisan key:generate --force)
+    echo "  Éditez laravel-api/.env (APP_URL, FRONTEND_URL, DB_*, SANCTUM_STATEFUL_DOMAINS, APP_DEBUG=false)."
+  fi
   echo "→ Composer (Laravel)"
   (cd laravel-api && composer install --no-dev --no-interaction --optimize-autoloader)
   echo "→ Migrations"

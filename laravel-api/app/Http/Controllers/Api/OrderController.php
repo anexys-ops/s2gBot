@@ -35,7 +35,10 @@ class OrderController extends Controller
             });
         }
 
-        $orders = $query->orderByDesc('created_at')->paginate(15);
+        $perPage = (int) $request->query('per_page', 15);
+        $perPage = min(100, max(1, $perPage));
+
+        $orders = $query->orderByDesc('created_at')->paginate($perPage);
 
         return response()->json($orders);
     }

@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { statsApi } from '../../api/client'
 
@@ -20,9 +19,6 @@ export default function ReportVentesPage() {
 
   return (
     <div className="report-page">
-      <p className="report-page__back">
-        <Link to="/">← Accueil</Link>
-      </p>
       <header className="report-page__head">
         <p className="hub-kicker">Rapports</p>
         <h1>Statistiques de ventes & rapports</h1>

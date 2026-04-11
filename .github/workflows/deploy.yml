@@ -6,7 +6,7 @@
 #   DEPLOY_SSH_KEY   — clé privée PEM (contenu de id_rsa / clé dédiée déploiement)
 #   DEPLOY_PATH      — chemin absolu du clone git sur le serveur (ex. /var/www/s2gBot)
 #
-# Port SSH non standard : édite ce workflow et ajoute sous « with: » par ex. port: 2222
+# Port SSH : ci-dessous port 167 (PRXP010R58). Pour 22, supprime la ligne ou mets port: 22
 #
 # Sur le serveur : clone du repo, fichier .env dans laravel-api/, remote git en lecture
 # (clé de déploiement GitHub ou token). Puis : chmod +x scripts/deploy-server.sh
@@ -38,6 +38,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 167
           envs: DEPLOY_PATH,DEPLOY_BRANCH
           script_stop: true
           script: |

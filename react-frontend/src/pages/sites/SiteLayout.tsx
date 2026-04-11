@@ -66,8 +66,8 @@ export default function SiteLayout() {
         title="Chantier introuvable"
       >
         <p className="error">{(error as Error)?.message ?? 'Impossible de charger ce chantier.'}</p>
-        <Link to="/sites" className="btn btn-secondary">
-          Retour à la liste
+        <Link to="/sites" className="btn btn-secondary page-action-back">
+          ← Liste chantiers
         </Link>
       </ModuleEntityShell>
     )
@@ -102,8 +102,8 @@ export default function SiteLayout() {
       ]}
       actions={
         <>
-          <Link to="/sites" className="btn btn-secondary btn-sm">
-            Liste
+          <Link to="/sites" className="btn btn-secondary btn-sm page-action-back">
+            ← Liste chantiers
           </Link>
           {isAdmin && (
             <button type="button" className="btn btn-primary btn-sm" onClick={onNew}>

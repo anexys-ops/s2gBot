@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import PageBackNav from '../components/PageBackNav'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ordersApi, clientsApi, sitesApi, testTypesApi } from '../api/client'
 
@@ -75,9 +76,7 @@ export default function OrderNew() {
 
   return (
     <div>
-      <p>
-        <Link to="/orders">← Commandes</Link>
-      </p>
+      <PageBackNav back={{ to: '/orders', label: 'Liste des commandes' }} />
       <h1>Nouvelle commande</h1>
       <form onSubmit={handleSubmit} className="card">
         <div className="form-group">

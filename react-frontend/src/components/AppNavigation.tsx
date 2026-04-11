@@ -21,7 +21,7 @@ export default function AppNavigation() {
   const activityItems: SubItem[] = [
     { to: '/', label: 'Accueil' },
     { to: '/orders', label: 'Commandes' },
-    { to: '/back-office/catalogue-essais', label: 'Catalogue essais' },
+    ...(isLab ? [] : [{ to: '/back-office/catalogue-essais', label: 'Catalogue essais' }]),
     { to: '/graphiques-essais', label: 'Graphiques essais' },
   ]
 
@@ -45,21 +45,10 @@ export default function AppNavigation() {
     { to: '/rapports/delai-chantier', label: 'Délais chantier' },
   ]
 
-  const backOfficeItems: SubItem[] = [
-    { to: '/back-office/catalogue-essais', label: 'Catalogue des essais' },
-    { to: '/back-office/granulometrie', label: 'Granulométrie (D10/D60)' },
-    { to: '/back-office/cadrage', label: 'Cadrage (S0)' },
-    { to: '/back-office/exemples-calculs', label: 'Calculs BTP' },
-    { to: '/back-office/journal-audit', label: 'Journal d’audit' },
-    { to: '/clients', label: 'Clients' },
-    { to: '/sites', label: 'Chantiers' },
-  ]
-
   const groups: MenuGroup[] = [
     { id: 'activity', label: 'Activité', items: activityItems },
     { id: 'reports', label: 'Rapports', items: rapportsItems },
     { id: 'billing', label: 'Facturation & documents', items: facturationItems },
-    ...(isLab ? [{ id: 'backoffice', label: 'Back office', items: backOfficeItems }] : []),
   ]
 
   const closeAll = useCallback(() => {
@@ -122,6 +111,19 @@ export default function AppNavigation() {
               Terrain
             </span>
           </NavLink>
+          {isLab ? (
+            <NavLink
+              to="/back-office"
+              title="Back office — catalogue, granulo, cadrage, clients…"
+              className={({ isActive }) => `nav-mode-link${isActive ? ' nav-mode-link--active' : ''}`}
+              onClick={closeAll}
+            >
+              <span className="nav-mode-link-text-full">Back office</span>
+              <span className="nav-mode-link-text-short" aria-hidden>
+                BO
+              </span>
+            </NavLink>
+          ) : null}
         </div>
 
         <button

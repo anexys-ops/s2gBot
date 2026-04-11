@@ -16,7 +16,6 @@ import {
   Cell,
 } from 'recharts'
 import { pdfApi, statsApi, type StatsEssaisParType } from '../api/client'
-
 const ONGLETS = [
   { id: 'resume', label: 'Résumé' },
   { id: 'exemples', label: 'Exemples (courbes + PDF)' },

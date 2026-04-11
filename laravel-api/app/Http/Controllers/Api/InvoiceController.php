@@ -48,6 +48,10 @@ class InvoiceController extends Controller
             $query->where('status', $status);
         }
 
+        if ($request->filled('client_id')) {
+            $query->where('client_id', (int) $request->query('client_id'));
+        }
+
         $invoices = $query->orderByDesc('invoice_date')->paginate(15);
 
         return response()->json($invoices);

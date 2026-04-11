@@ -22,6 +22,8 @@ type Props = {
   tabs?: ModuleTab[]
   /** Boutons Nouveau / Liste / Modifier / Supprimer */
   actions?: ReactNode
+  /** Classe(s) sur la racine `.module-shell` (ex. défilement horizontal des onglets) */
+  shellClassName?: string
   children: ReactNode
 }
 
@@ -32,10 +34,11 @@ export default function ModuleEntityShell({
   subtitle,
   tabs,
   actions,
+  shellClassName,
   children,
 }: Props) {
   return (
-    <div className="module-shell">
+    <div className={['module-shell', shellClassName].filter(Boolean).join(' ')}>
       <div className="module-shell__bar">
         <span className="module-shell__bar-label">{moduleBarLabel}</span>
       </div>

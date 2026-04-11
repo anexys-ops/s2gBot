@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
 import { reportPdfTemplatesApi, type ReportPdfTemplateRow } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import PageBackNav from '../components/PageBackNav'
 
 export default function ReportPdfTemplates() {
   const { user } = useAuth()
@@ -23,7 +23,7 @@ export default function ReportPdfTemplates() {
   if (!isLab) {
     return (
       <div>
-        <h1>Modèles PDF — rapports</h1>
+        <PageBackNav back={{ to: '/terrain', label: 'Terrain & labo' }} />
         <p>Accès réservé au laboratoire.</p>
       </div>
     )
@@ -36,10 +36,10 @@ export default function ReportPdfTemplates() {
 
   return (
     <div>
-      <p>
-        <Link to="/terrain">← Terrain & laboratoire</Link>
-      </p>
-      <h1>Modèles PDF — rapports d&apos;essais</h1>
+      <PageBackNav
+        back={{ to: '/back-office', label: 'Back office' }}
+        extras={[{ to: '/terrain', label: 'Terrain & labo' }]}
+      />
       <div className="card" style={{ marginBottom: '1rem', fontSize: '0.95rem' }}>
         <p style={{ margin: 0 }}>
           La mise en page des PDF est définie dans les vues Blade Laravel ; cette page permet de choisir le modèle{' '}

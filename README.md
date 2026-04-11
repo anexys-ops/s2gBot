@@ -52,6 +52,14 @@ Les anciens microservices Node (`services/api`, `back`, `calcul`, `auth`) ne son
 
 ---
 
-## Docker
+## Docker (serveur / prod)
 
-Le fichier `docker-compose.yml` à l’ancienne stack a été retiré. Le mode standard est **PHP + Node en local** via `./start.sh`. Pour un déploiement serveur, prévoir reverse proxy, TLS et process manager (voir LAB-BTP-README).
+Stack **MySQL + PHP-FPM + Nginx** (React buildé). Guide : [docker/README.md](docker/README.md).
+
+```bash
+cp docker/env.docker.example .env.docker
+docker compose --env-file .env.docker up -d --build
+docker compose --env-file .env.docker exec app php artisan db:seed --force
+```
+
+En local, `./start.sh` reste possible sans Docker.

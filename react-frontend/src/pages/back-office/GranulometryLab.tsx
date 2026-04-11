@@ -10,7 +10,6 @@ import {
   YAxis,
 } from 'recharts'
 import { btpCalculationsApi, type GranulometryResult } from '../../api/client'
-import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 
 const DEFAULT_ROWS = [
   { opening_mm: '0.063', passing_percent: '5' },
@@ -57,17 +56,7 @@ export default function GranulometryLab() {
   }, [rows])
 
   return (
-    <ModuleEntityShell
-      breadcrumbs={[
-        { label: 'Accueil', to: '/' },
-        { label: 'Terrain & labo', to: '/terrain' },
-        { label: 'Granulométrie' },
-      ]}
-      moduleBarLabel="Laboratoire"
-      title="Granulométrie — indicateurs"
-      subtitle="Interpolation log des tamis (D10, D30, D60) · Cu · Cc — NF EN ISO 17892-4 (usage courant)"
-    >
-      <div className="design-stack">
+    <div className="design-stack">
         <div className="design-card">
           <h3 className="design-card__title">Saisie % passants cumulés</h3>
           <p className="design-card__muted">
@@ -172,6 +161,5 @@ export default function GranulometryLab() {
           </div>
         )}
       </div>
-    </ModuleEntityShell>
   )
 }

@@ -68,8 +68,8 @@ export default function ClientLayout() {
         title="Client introuvable"
       >
         <p className="error">{(error as Error)?.message ?? 'Impossible de charger ce client.'}</p>
-        <Link to="/clients" className="btn btn-secondary">
-          Retour à la liste
+        <Link to="/clients" className="btn btn-secondary page-action-back">
+          ← Liste clients
         </Link>
       </ModuleEntityShell>
     )
@@ -108,8 +108,8 @@ export default function ClientLayout() {
       tabs={tabs}
       actions={
         <>
-          <Link to="/clients" className="btn btn-secondary btn-sm">
-            Liste
+          <Link to="/clients" className="btn btn-secondary btn-sm page-action-back">
+            ← Liste clients
           </Link>
           {isAdmin && (
             <button type="button" className="btn btn-primary btn-sm" onClick={onNew}>

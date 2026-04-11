@@ -195,6 +195,73 @@ export const documentPdfTemplatesApi = {
     api<DocumentPdfTemplateRow>(`/document-pdf-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
 }
 
+export type ExtrafieldEntityType = 'client' | 'site' | 'order' | 'invoice' | 'quote'
+
+export interface ExtrafieldSelectOption {
+  value: string
+  label: string
+}
+
+export interface ExtrafieldDefinitionRow {
+  id: number
+  entity_type: ExtrafieldEntityType
+  code: string
+  label: string
+  field_type: string
+  select_options?: ExtrafieldSelectOption[] | null
+  sort_order: number
+  required: boolean
+}
+
+export const extrafieldDefinitionsApi = {
+  list: (entityType?: ExtrafieldEntityType) =>
+    api<{ data: ExtrafieldDefinitionRow[] }>(
+      entityType ? `/extrafield-definitions?entity_type=${entityType}` : '/extrafield-definitions',
+    ),
+  create: (body: {
+    entity_type: ExtrafieldEntityType
+    code: string
+    label: string
+    field_type: string
+    select_options?: ExtrafieldSelectOption[]
+    sort_order?: number
+    required?: boolean
+  }) => api<ExtrafieldDefinitionRow>('/extrafield-definitions', { method: 'POST', body: JSON.stringify(body) }),
+  update: (
+    id: number,
+    body: Partial<{
+      label: string
+      field_type: string
+      select_options: ExtrafieldSelectOption[] | null
+      sort_order: number
+      required: boolean
+    }>,
+  ) => api<ExtrafieldDefinitionRow>(`/extrafield-definitions/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/extrafield-definitions/${id}`, { method: 'DELETE' }),
+}
+
+export const extrafieldValuesApi = {
+  list: (entityType: ExtrafieldEntityType, entityId: number) =>
+    api<{ data: { definition: ExtrafieldDefinitionRow; value: string | null }[] }>(
+      `/extrafield-values?entity_type=${entityType}&entity_id=${entityId}`,
+    ),
+  sync: (body: { entity_type: ExtrafieldEntityType; entity_id: number; values: Record<string, unknown> }) =>
+    api<{ data: { definition: ExtrafieldDefinitionRow; value: string | null }[] }>('/extrafield-values', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+}
+
+export const moduleSettingsApi = {
+  get: (moduleKey: string) =>
+    api<{ module_key: string; settings: Record<string, unknown> }>(`/module-settings/${moduleKey}`),
+  update: (moduleKey: string, settings: Record<string, unknown>) =>
+    api<{ module_key: string; settings: Record<string, unknown> }>(`/module-settings/${moduleKey}`, {
+      method: 'PUT',
+      body: JSON.stringify({ settings }),
+    }),
+}
+
 export interface ReportPdfTemplateRow {
   id: number
   slug: string
@@ -272,11 +339,12 @@ export const testTypesApi = {
 }
 
 export const ordersApi = {
-  list: (params?: { status?: string; search?: string; page?: number }) => {
+  list: (params?: { status?: string; search?: string; page?: number; per_page?: number }) => {
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)
     if (params?.search) q.set('search', params.search)
     if (params?.page) q.set('page', String(params.page))
+    if (params?.per_page) q.set('per_page', String(params.per_page))
     const s = q.toString()
     return api<LaravelPaginator<Order>>(`/orders${s ? `?${s}` : ''}`)
   },
@@ -334,11 +402,12 @@ export const reportsApi = {
 }
 
 export const invoicesApi = {
-  list: (params?: { search?: string; status?: string; page?: number }) => {
+  list: (params?: { search?: string; status?: string; page?: number; client_id?: number }) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
     if (params?.status) q.set('status', params.status)
     if (params?.page) q.set('page', String(params.page))
+    if (params?.client_id) q.set('client_id', String(params.client_id))
     const s = q.toString()
     return api<LaravelPaginator<Invoice>>(`/invoices${s ? `?${s}` : ''}`)
   },

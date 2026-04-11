@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { statsApi } from '../../api/client'
 
@@ -16,9 +15,6 @@ export default function ReportDelaiChantierPage() {
 
   return (
     <div className="report-page">
-      <p className="report-page__back">
-        <Link to="/">← Accueil</Link>
-      </p>
       <header className="report-page__head">
         <p className="hub-kicker">Rapports</p>
         <h1>Délais chantier & planning</h1>

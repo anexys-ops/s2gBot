@@ -28,18 +28,8 @@ export default function ListTableToolbar({
   extra,
 }: Props) {
   return (
-    <div
-      className="card list-table-toolbar"
-      style={{
-        marginBottom: '1rem',
-        padding: '0.75rem 1rem',
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '0.75rem',
-        alignItems: 'flex-end',
-      }}
-    >
-      <label style={{ flex: '1 1 220px', margin: 0 }}>
+    <div className="card list-table-toolbar" style={{ marginBottom: '1rem', padding: '0.75rem 1rem' }}>
+      <label className="list-table-toolbar__search">
         <span style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem', color: 'var(--muted, #64748b)' }}>
           Recherche
         </span>
@@ -52,11 +42,11 @@ export default function ListTableToolbar({
         />
       </label>
       {statusOptions && onStatusChange && (
-        <label style={{ minWidth: 160, margin: 0 }}>
+        <label className="list-table-toolbar__status">
           <span style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem', color: 'var(--muted, #64748b)' }}>
             Filtre statut
           </span>
-          <select value={statusValue} onChange={(e) => onStatusChange(e.target.value)}>
+          <select value={statusValue} onChange={(e) => onStatusChange(e.target.value)} style={{ width: '100%' }}>
             <option value="">Tous</option>
             {statusOptions.map((o) => (
               <option key={o.value} value={o.value}>
@@ -67,7 +57,7 @@ export default function ListTableToolbar({
         </label>
       )}
       {columns && visibleColumns && onToggleColumn && (
-        <details style={{ minWidth: 200 }}>
+        <details className="list-table-toolbar__columns">
           <summary style={{ cursor: 'pointer', fontSize: '0.9rem' }}>Colonnes affichées</summary>
           <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
             {columns.map((c) => (
@@ -83,7 +73,7 @@ export default function ListTableToolbar({
           </div>
         </details>
       )}
-      {extra}
+      {extra ? <div className="list-table-toolbar__extra">{extra}</div> : null}
     </div>
   )
 }
@@ -99,7 +89,7 @@ export function PaginationBar({
 }) {
   if (lastPage <= 1) return null
   return (
-    <div className="crud-actions" style={{ padding: '0.75rem', justifyContent: 'center', gap: '1rem' }}>
+    <div className="crud-actions pagination-bar">
       <button type="button" className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => onPage(page - 1)}>
         Précédent
       </button>

@@ -1,7 +1,18 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { invoicesApi, ordersApi, pdfApi, type EntityMetaPayload, type Invoice } from '../api/client'
+import {
+  clientsApi,
+  documentPdfTemplatesApi,
+  invoicesApi,
+  moduleSettingsApi,
+  ordersApi,
+  pdfApi,
+  type EntityMetaPayload,
+  type Invoice,
+} from '../api/client'
 import EntityMetaCard from '../components/module/EntityMetaCard'
+import ExtrafieldsForm from '../components/module/ExtrafieldsForm'
+import PageBackNav from '../components/PageBackNav'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
@@ -15,6 +26,14 @@ const STATUS_LABELS: Record<string, string> = {
   sent: 'Envoyée',
   relanced: 'Relancée',
   paid: 'Encaissée',
+}
+
+const DEFAULT_TVA_OPTIONS = [20, 10, 5.5, 0]
+
+function numList(v: unknown): number[] {
+  if (!Array.isArray(v) || v.length === 0) return DEFAULT_TVA_OPTIONS
+  const out = v.map((x) => Number(x)).filter((n) => !Number.isNaN(n))
+  return out.length ? out : DEFAULT_TVA_OPTIONS
 }
 
 export default function Invoices() {
@@ -32,10 +51,12 @@ export default function Invoices() {
     tva_rate: 20,
     travel_fee_ht: 0,
     travel_fee_tva_rate: 20,
+    pdf_template_id: '' as number | '',
   })
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statusFilter, setStatusFilter] = useState('')
+  const [clientFilter, setClientFilter] = useState('')
   const [page, setPage] = useState(1)
   const { visible, toggle } = usePersistedColumnVisibility('invoices', {
     number: true,
@@ -48,19 +69,57 @@ export default function Invoices() {
     actions: true,
   })
 
+  const { data: modInvoices } = useQuery({
+    queryKey: ['module-settings', 'invoices'],
+    queryFn: () => moduleSettingsApi.get('invoices'),
+    enabled: isLab,
+  })
+
+  const tvaOptions = useMemo(() => numList(modInvoices?.settings?.tva_rate_options), [modInvoices])
+  const travelTvaOptions = useMemo(() => numList(modInvoices?.settings?.travel_tva_rate_options), [modInvoices])
+  const tvaOptionsForEdit = useMemo(() => {
+    const base = [...tvaOptions]
+    if (editInvoice && !base.includes(editForm.tva_rate)) base.push(editForm.tva_rate)
+    return [...new Set(base)].sort((a, b) => b - a)
+  }, [tvaOptions, editInvoice, editForm.tva_rate])
+  const travelTvaOptionsForEdit = useMemo(() => {
+    const base = [...travelTvaOptions]
+    if (editInvoice && !base.includes(editForm.travel_fee_tva_rate)) base.push(editForm.travel_fee_tva_rate)
+    return [...new Set(base)].sort((a, b) => b - a)
+  }, [travelTvaOptions, editInvoice, editForm.travel_fee_tva_rate])
+  const orderPickerStatuses = useMemo(() => {
+    const s = modInvoices?.settings?.order_picker_statuses
+    if (Array.isArray(s) && s.length > 0) return s as string[]
+    return ['completed', 'in_progress']
+  }, [modInvoices])
+
+  const { data: clientsList = [] } = useQuery({
+    queryKey: ['clients', 'invoices-toolbar'],
+    queryFn: () => clientsApi.list(),
+    enabled: isLab,
+  })
+
+  const { data: pdfTplData } = useQuery({
+    queryKey: ['document-pdf-templates', 'invoice'],
+    queryFn: () => documentPdfTemplatesApi.list('invoice'),
+    enabled: isLab && !!editInvoice,
+  })
+  const pdfTemplates = pdfTplData?.data ?? []
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['invoices', debouncedSearch, statusFilter, page],
+    queryKey: ['invoices', debouncedSearch, statusFilter, clientFilter, page],
     queryFn: () =>
       invoicesApi.list({
         search: debouncedSearch.trim() || undefined,
         status: statusFilter || undefined,
         page,
+        client_id: clientFilter ? Number(clientFilter) : undefined,
       }),
   })
 
   const { data: ordersData } = useQuery({
     queryKey: ['orders', 'invoice-picker'],
-    queryFn: () => ordersApi.list({ page: 1 }),
+    queryFn: () => ordersApi.list({ page: 1, per_page: 100 }),
     enabled: isLab,
   })
 
@@ -94,15 +153,10 @@ export default function Invoices() {
   })
 
   const orders = ordersData?.data ?? []
+  const pickableOrders = orders.filter((o) => orderPickerStatuses.includes(o.status))
   const invoices = data?.data ?? []
   const lastPage = data?.last_page ?? 1
   const statusOptions = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
-
-  const toggleOrder = (id: number) => {
-    setSelectedOrderIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    )
-  }
 
   const openEdit = (inv: Invoice) => {
     setEditInvoice(inv)
@@ -114,6 +168,7 @@ export default function Invoices() {
       tva_rate: Number(inv.tva_rate),
       travel_fee_ht: Number(inv.travel_fee_ht ?? 0),
       travel_fee_tva_rate: Number(inv.travel_fee_tva_rate ?? 20),
+      pdf_template_id: inv.pdf_template_id ?? '',
     })
   }
 
@@ -126,6 +181,7 @@ export default function Invoices() {
         body: {
           status: editForm.status,
           due_date: editForm.due_date || undefined,
+          pdf_template_id: editForm.pdf_template_id === '' ? undefined : editForm.pdf_template_id,
         },
       })
       return
@@ -140,6 +196,7 @@ export default function Invoices() {
         tva_rate: editForm.tva_rate,
         travel_fee_ht: editForm.travel_fee_ht,
         travel_fee_tva_rate: editForm.travel_fee_tva_rate,
+        pdf_template_id: editForm.pdf_template_id === '' ? undefined : editForm.pdf_template_id,
       },
     })
   }
@@ -149,25 +206,44 @@ export default function Invoices() {
 
   return (
     <div>
+      <PageBackNav
+        back={{ to: '/', label: 'Tableau de bord' }}
+        extras={[
+          { to: '/crm', label: 'CRM' },
+          { to: '/crm/documents', label: 'Documents CRM' },
+          ...(isAdmin ? [{ to: '/back-office/configuration', label: 'Configuration' }] : []),
+        ]}
+      />
       <h1>Factures</h1>
       {isLab && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <h3>Créer une facture à partir de commandes</h3>
-          <p>Sélectionnez une ou plusieurs commandes (même client) :</p>
-          <div style={{ maxHeight: 200, overflow: 'auto', marginBottom: '0.5rem' }}>
-            {orders
-              .filter((o) => o.status === 'completed' || o.status === 'in_progress')
-              .map((o) => (
-                <label key={o.id} style={{ display: 'block' }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedOrderIds.includes(o.id)}
-                    onChange={() => toggleOrder(o.id)}
-                  />{' '}
-                  {o.reference} — {o.client?.name}
-                </label>
+          <p>
+            Sélectionnez une ou plusieurs commandes (même client). Les statuts proposés sont configurables dans le back
+            office → Configuration → Listes par module → Factures.
+          </p>
+          <label className="form-group" style={{ display: 'block', maxWidth: 520 }}>
+            <span style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem' }}>Commandes (liste déroulante multiple)</span>
+            <select
+              multiple
+              className="invoice-orders-multiselect"
+              size={Math.min(12, Math.max(6, pickableOrders.length))}
+              value={selectedOrderIds.map(String)}
+              onChange={(e) => {
+                const selected = Array.from(e.target.selectedOptions, (opt) => Number(opt.value))
+                setSelectedOrderIds(selected)
+              }}
+            >
+              {pickableOrders.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.reference} — {o.client?.name ?? 'Client'} ({o.status})
+                </option>
               ))}
-          </div>
+            </select>
+          </label>
+          {pickableOrders.length === 0 && (
+            <p style={{ color: 'var(--color-muted, #64748b)' }}>Aucune commande ne correspond aux statuts configurés.</p>
+          )}
           <button
             type="button"
             className="btn btn-primary"
@@ -194,6 +270,31 @@ export default function Invoices() {
           setPage(1)
         }}
         statusOptions={statusOptions}
+        extra={
+          isLab ? (
+            <label style={{ minWidth: 200, margin: 0 }}>
+              <span
+                style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem', color: 'var(--color-muted, #64748b)' }}
+              >
+                Client
+              </span>
+              <select
+                value={clientFilter}
+                onChange={(e) => {
+                  setClientFilter(e.target.value)
+                  setPage(1)
+                }}
+              >
+                <option value="">Tous les clients</option>
+                {clientsList.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : undefined
+        }
         columns={[
           { id: 'number', label: 'Numéro' },
           { id: 'client', label: 'Client' },
@@ -299,6 +400,26 @@ export default function Invoices() {
                 onChange={(e) => setEditForm((f) => ({ ...f, due_date: e.target.value }))}
               />
             </div>
+            <div className="form-group">
+              <label>Modèle PDF facture</label>
+              <select
+                value={editForm.pdf_template_id === '' ? '' : String(editForm.pdf_template_id)}
+                onChange={(e) =>
+                  setEditForm((f) => ({
+                    ...f,
+                    pdf_template_id: e.target.value === '' ? '' : Number(e.target.value),
+                  }))
+                }
+              >
+                <option value="">— Par défaut —</option>
+                {pdfTemplates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                    {t.is_default ? ' (défaut)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
             {editInvoice.status === 'draft' && (
               <>
                 <div className="form-group">
@@ -313,14 +434,16 @@ export default function Invoices() {
                 </div>
                 <div className="form-group">
                   <label>TVA (%)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.01}
-                    value={editForm.tva_rate}
+                  <select
+                    value={String(editForm.tva_rate)}
                     onChange={(e) => setEditForm((f) => ({ ...f, tva_rate: Number(e.target.value) }))}
-                  />
+                  >
+                    {tvaOptionsForEdit.map((n) => (
+                      <option key={n} value={n}>
+                        {n} %
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label>Frais déplacement HT</label>
@@ -334,20 +457,22 @@ export default function Invoices() {
                 </div>
                 <div className="form-group">
                   <label>TVA sur déplacement (%)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.01}
-                    value={editForm.travel_fee_tva_rate}
+                  <select
+                    value={String(editForm.travel_fee_tva_rate)}
                     onChange={(e) => setEditForm((f) => ({ ...f, travel_fee_tva_rate: Number(e.target.value) }))}
-                  />
+                  >
+                    {travelTvaOptionsForEdit.map((n) => (
+                      <option key={n} value={n}>
+                        {n} %
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </>
             )}
             {editInvoice.status !== 'draft' && (
               <p style={{ fontSize: '0.9rem', color: '#64748b' }}>
-                Hors brouillon : seuls le statut et l&apos;échéance sont modifiables (aligné API).
+                Hors brouillon : statut, échéance et modèle PDF sont modifiables ; le reste est figé (API).
               </p>
             )}
             {updateMutation.isError && <p className="error">{(updateMutation.error as Error).message}</p>}
@@ -368,6 +493,9 @@ export default function Invoices() {
               isSaving={invoiceMetaMut.isPending}
               saveError={invoiceMetaMut.isError ? (invoiceMetaMut.error as Error).message : null}
             />
+          )}
+          {isAdmin && (
+            <ExtrafieldsForm entityType="invoice" entityId={editInvoice.id} canEdit title="Champs configurés (extrafields)" />
           )}
           </>
         </Modal>

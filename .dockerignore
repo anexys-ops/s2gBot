@@ -1,0 +1,7 @@
+.git
+laravel-api/vendor
+react-frontend/node_modules
+**/.DS_Store
+.run
+*.md
+!README.md

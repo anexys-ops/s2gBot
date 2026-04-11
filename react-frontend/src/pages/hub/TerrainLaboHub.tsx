@@ -1,68 +1,62 @@
 import { Link } from 'react-router-dom'
+import { OutlineIcon, type HubIconId } from '../../components/OutlineIcons'
 import { useAuth } from '../../contexts/AuthContext'
 
-type Card = { to: string; title: string; desc: string; icon: string }
+type Card = { to: string; title: string; desc: string; icon: HubIconId }
 
 export default function TerrainLaboHub() {
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
-  const isAdmin = user?.role === 'lab_admin'
 
   const cards: Card[] = [
     {
       to: '/orders',
       title: 'Commandes & dossiers',
       desc: 'Liste des dossiers : prélèvements, échantillons, statuts.',
-      icon: '📋',
+      icon: 'orders',
     },
     {
       to: '/orders/new',
       title: 'Nouvelle commande',
       desc: 'Créer un dossier depuis le terrain ou le labo.',
-      icon: '➕',
+      icon: 'plus',
     },
-    {
-      to: '/back-office/catalogue-essais',
-      title: 'Catalogue des essais',
-      desc: 'Types d’essais, normes et paramètres.',
-      icon: '🧪',
-    },
-    {
-      to: '/back-office/granulometrie',
-      title: 'Granulométrie',
-      desc: 'Courbe tamis, D10 / D60, Cu et Cc (NF EN ISO 17892-4).',
-      icon: '📊',
-    },
+    ...(isLab
+      ? [
+          {
+            to: '/back-office',
+            title: 'Back office',
+            desc: 'Catalogue essais, granulométrie, cadrage, calculs BTP, journal d’audit, clients, chantiers.',
+            icon: 'lab' as const,
+          },
+        ]
+      : [
+          {
+            to: '/back-office/catalogue-essais',
+            title: 'Catalogue des essais',
+            desc: 'Types d’essais, normes et paramètres.',
+            icon: 'catalog' as const,
+          },
+          {
+            to: '/back-office/granulometrie',
+            title: 'Granulométrie',
+            desc: 'Courbe tamis, D10 / D60, Cu et Cc (NF EN ISO 17892-4).',
+            icon: 'granulo' as const,
+          },
+        ]),
     {
       to: '/graphiques-essais',
       title: 'Graphiques essais',
       desc: 'Visualisation des séries de résultats.',
-      icon: '📈',
+      icon: 'trend',
     },
     {
       to: '/sites',
       title: 'Chantiers & carte',
       desc: 'Missions, forages, lithologie ; onglet Carte (OSM) sur chaque chantier.',
-      icon: '🗺️',
+      icon: 'map',
     },
   ]
-
-  if (isLab) {
-    cards.push(
-      { to: '/back-office/cadrage', title: 'Cadrage (S0)', desc: 'Paramètres et cadrage dossier.', icon: '✅' },
-      { to: '/back-office/exemples-calculs', title: 'Calculs BTP', desc: 'Outils de calcul normes.', icon: '🔢' },
-      { to: '/back-office/journal-audit', title: 'Journal d’audit', desc: 'Piste d’activité (missions, rapports…).', icon: '📜' },
-    )
-  }
-
-  if (isAdmin) {
-    cards.push({
-      to: '/back-office/modeles-rapports-pdf',
-      title: 'Modèles PDF rapports',
-      desc: 'Modèle par défaut pour les rapports générés depuis les commandes.',
-      icon: '📄',
-    })
-  }
 
   return (
     <div className="hub-page hub-page--terrain terrain-touch hub-page--v2">
@@ -78,15 +72,17 @@ export default function TerrainLaboHub() {
         {cards.map((c) => (
           <Link key={c.to} to={c.to} className="hub-card hub-card--terrain hub-card--v2">
             <span className="hub-card-v2__icon" aria-hidden>
-              {c.icon}
+              <OutlineIcon id={c.icon} />
             </span>
             <span className="hub-card-title">{c.title}</span>
             <span className="hub-card-desc">{c.desc}</span>
           </Link>
         ))}
       </div>
-      <p className="hub-footnote">
-        <Link to="/crm">→ Retour au CRM</Link>
+      <p className="hub-footnote hub-footnote--switch">
+        <Link to="/crm" className="hub-footnote__link">
+          Retour au CRM →
+        </Link>
       </p>
     </div>
   )

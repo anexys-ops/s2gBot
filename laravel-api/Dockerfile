@@ -18,8 +18,9 @@ WORKDIR /var/www/html
 
 COPY . .
 
-RUN composer install --no-dev --no-interaction --prefer-dist \
-    && mkdir -p storage/framework/{sessions,views,cache/data} storage/logs bootstrap/cache \
+# Avant composer : package:discover (post-autoload-dump) exige bootstrap/cache présent et inscriptible
+RUN mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache/data storage/logs bootstrap/cache \
+    && composer install --no-dev --no-interaction --prefer-dist \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod +x docker-entrypoint.sh
 

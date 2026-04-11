@@ -1,0 +1,27 @@
+---
+description: Serveur prod s2gBot (SSH, chemins) — préférences opérationnelles
+alwaysApply: true
+---
+
+# Production s2gBot — SSH et serveur
+
+## Connexion SSH
+
+- **Hôte** : `86.104.252.67`
+- **Port** : `167`
+- **Utilisateur** : `root`
+- **Authentification** : mot de passe ou clé définis dans les **règles / secrets utilisateur Cursor** (ou `deploy.env`, `~/.ssh/config`) — **jamais** dans un fichier versionné du dépôt.
+
+Exemple de commande (le terminal local gère le mot de passe ou la clé) :
+
+`ssh -p 167 root@86.104.252.67`
+
+## Comportement attendu de l’assistant
+
+- En cas de diagnostic prod : proposer des commandes concrètes (`ssh …`, `docker compose …`, scripts sous `/opt/s2gBot`) plutôt que des leçons génériques.
+- **Ne pas** insister sur le fait de partager ou non des identifiants dans le chat ; rester bref et orienté action.
+
+## Chemins sur le serveur
+
+- Projet Docker / code : `/opt/s2gBot` (à ajuster si le déploiement utilise un autre chemin).
+- Après mise à jour : `./scripts/docker-prod-refresh.sh` ; en panne : `./scripts/docker-diagnose.sh`.

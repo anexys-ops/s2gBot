@@ -66,3 +66,35 @@ Dans `.env.docker` : `RUN_OPTIMIZE=0`.
 ### Seed au premier boot (optionnel)
 
 `RUN_SEED=1` dans `.env.docker` exécute `db:seed` à chaque démarrage du conteneur **app** — à éviter en prod une fois les données réelles en place.
+
+### Docker (`/opt/s2gBot`) vs Nginx + PHP sur l’hôte (`/var/www/s2gBot`)
+
+Ce sont **deux déploiements distincts** :
+
+| Emplacement | Fichier d’env | Où lancer Artisan |
+|-------------|----------------|-------------------|
+| **Docker** (`docker compose` dans `/opt/s2gBot`) | **`.env.docker`** à la racine | `./scripts/docker-artisan.sh …` (conteneur `app`) |
+| **Hôte** (Nginx + php-fpm, ex. `s2g.apps-dev.fr`) | **`laravel-api/.env`** sous `/var/www/...` | `cd …/laravel-api && php artisan …` |
+
+Si tu utilises **uniquement Docker** sur le serveur, **`php artisan` dans `/var/www/s2gBot`** ne met **pas** à jour l’app dans les conteneurs.
+
+Après **changement de `.env.docker`**, il faut **recréer** le service `app` pour recharger les variables, puis recacher la config :
+
+```bash
+./scripts/docker-env-apply.sh
+```
+
+Ou à la main : `docker compose --env-file .env.docker up -d --force-recreate app`
+
+### Après une mise à jour du code (prod)
+
+Les caches Laravel vivent dans le volume **`laravel_bootstrap_cache`** ; le front buildé est dans l’image **web**. Après un `git pull` (ou un déploiement qui ne reconstruit pas les images), exécuter sur le serveur :
+
+```bash
+cd /chemin/vers/s2gBot
+./scripts/docker-prod-refresh.sh
+```
+
+Cela exécute `php artisan optimize:clear` dans **app**, puis `docker compose up -d --build --force-recreate app web` (la base **db** n’est pas recréée). Au redémarrage, `docker-entrypoint.sh` relance migrations et régénère les caches si `RUN_OPTIMIZE=1`.
+
+En cas de problème après déploiement : `./scripts/docker-diagnose.sh` (sur le serveur, même répertoire que `.env.docker`) — à copier sur la machine si le dépôt n’est pas à jour, puis coller la sortie pour analyse.

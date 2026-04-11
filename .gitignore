@@ -2,6 +2,7 @@ node_modules
 dist
 .env
 deploy.env
+.cursor/skills/maj-prod-s2gbot/SECRETS.local.md
 .env.local
 .env.*.local
 *.log

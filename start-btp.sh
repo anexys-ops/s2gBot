@@ -55,13 +55,17 @@ elif command -v npm >/dev/null 2>&1; then
   (cd react-frontend && npm install --silent && npm run dev) &
   FRONT_PID=$!
 else
-  echo "npm non trouvé. Installez Node.js pour lancer le front BTP."
+  echo "npm non trouvé. Installez Node.js 18+ pour lancer le front BTP (Vite), ou servez react-frontend/dist en prod (Nginx / Docker)."
 fi
 
 echo ""
-echo "  → Application (CRM + Terrain & labo) : http://localhost:5173"
-echo "     · CRM : http://localhost:5173/crm"
-echo "     · Terrain & labo : http://localhost:5173/terrain"
+if command -v npm >/dev/null 2>&1; then
+  echo "  → Application (CRM + Terrain & labo) : http://localhost:5173"
+  echo "     · CRM : http://localhost:5173/crm"
+  echo "     · Terrain & labo : http://localhost:5173/terrain"
+else
+  echo "  → Application : non disponible sans Node/npm (pas de serveur sur le port 5173)."
+fi
 echo "  → API Laravel : http://localhost:8000"
 echo ""
 echo "Pour injecter uniquement le seed plus tard : ./scripts/seed-btp.sh"

@@ -60,19 +60,28 @@ fi
 
 # --- Front unique (react-frontend)
 BTP_PORT=5173
+FRONT_STARTED=0
 if [ -d "react-frontend" ] && command -v npm >/dev/null 2>&1; then
   (cd react-frontend && npm install --silent 2>/dev/null) || true
   echo "Démarrage front plateforme ($BTP_PORT)..."
   (cd react-frontend && nohup npm run dev -- --port "$BTP_PORT" >> "$RUN_DIR/react.log" 2>&1 & echo $! >> "$RUN_DIR/pids")
+  FRONT_STARTED=1
+elif [ -d "react-frontend" ]; then
+  echo "ATTENTION : npm / Node.js introuvable — le front Vite (port $BTP_PORT) n'est pas démarré."
+  echo "  Installez Node.js 18+ (paquet officiel ou NodeSource), ou servez react-frontend/dist via Nginx / Docker (voir README.md, docker/README.md)."
 fi
 
 echo ""
 echo "=============================================="
 echo "  Plateforme unifiée — services en arrière-plan"
 echo "=============================================="
-echo "  → Application (CRM + Terrain & labo) : http://localhost:$BTP_PORT"
-IP=$(ifconfig 2>/dev/null | grep 'inet ' | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
-[ -n "$IP" ] && echo "                                       http://$IP:$BTP_PORT"
+if [ "$FRONT_STARTED" = 1 ]; then
+  echo "  → Application (CRM + Terrain & labo) : http://localhost:$BTP_PORT"
+  IP=$(ifconfig 2>/dev/null | grep 'inet ' | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
+  [ -n "$IP" ] && echo "                                       http://$IP:$BTP_PORT"
+else
+  echo "  → Application (Vite) : non démarrée — installez Node.js ou utilisez le build de prod (Docker / Nginx)."
+fi
 [ -n "$PHP_BIN" ] && echo "  → API Laravel                        : http://localhost:8000"
 echo ""
 echo "  Après connexion : accueil, ou directement /crm et /terrain (deux onglets possibles)."

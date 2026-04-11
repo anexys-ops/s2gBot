@@ -110,19 +110,28 @@ server {
         return 200 "nginx-ok\n";
     }
 
-    location /api {
-        try_files \$uri /index.php?\$is_args\$args;
+    # API / Sanctum : FastCGI direct vers index.php (REQUEST_URI inchangée — évite try_files + boucles 301 selon le chemin réseau)
+    location ^~ /api {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_pass unix:${fpm};
+        fastcgi_read_timeout 120s;
     }
 
-    location /sanctum {
-        try_files \$uri /index.php?\$is_args\$args;
+    location ^~ /sanctum {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_pass unix:${fpm};
+        fastcgi_read_timeout 120s;
     }
 
     location / {
         try_files \$uri \$uri/ /index.html;
     }
 
-    location ~ \.php\$ {
+    location = /index.php {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:${fpm};
         fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
@@ -170,19 +179,27 @@ server {
         return 200 "nginx-ok\n";
     }
 
-    location /api {
-        try_files \$uri /index.php?\$is_args\$args;
+    location ^~ /api {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_pass unix:${fpm};
+        fastcgi_read_timeout 120s;
     }
 
-    location /sanctum {
-        try_files \$uri /index.php?\$is_args\$args;
+    location ^~ /sanctum {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_pass unix:${fpm};
+        fastcgi_read_timeout 120s;
     }
 
     location / {
         try_files \$uri \$uri/ /index.html;
     }
 
-    location ~ \.php\$ {
+    location = /index.php {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:${fpm};
         fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
@@ -260,3 +277,5 @@ systemctl reload nginx
 
 echo "==> Nginx rechargé : $SITE_PATH → $WEB_ROOT (php-fpm $FPM_SOCK)"
 echo "    Test local : curl -sS -m 3 http://127.0.0.1/_nginx_ok -H 'Host: ${DOMAIN}'"
+echo "    Depuis le même LAN que le serveur : si https://${DOMAIN} boucle en 301, utilisez le DNS interne"
+echo "    ou une entrée /etc/hosts vers l’IP LAN du serveur (NAT hairpin / double passage)."

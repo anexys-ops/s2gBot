@@ -35,4 +35,24 @@ class BtpCalculationController extends Controller
 
         return response()->json(['resultat' => $resultat]);
     }
+
+    /**
+     * Courbe granulométrique : D10, D30, D60, Cu, Cc (interpolation log des tamis).
+     */
+    public function granulometry(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'points' => 'required|array|min:2',
+            'points.*.opening_mm' => 'required|numeric|min:0.000001',
+            'points.*.passing_percent' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $result = BtpCalculationService::granulometryIndicators($validated['points']);
+
+        if ($result === null) {
+            return response()->json(['message' => 'Points invalides ou insuffisants pour interpoler.'], 422);
+        }
+
+        return response()->json($result);
+    }
 }

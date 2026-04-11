@@ -16,6 +16,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('client-addresses/{client_address}', [App\Http\Controllers\Api\ClientAddressController::class, 'update']);
     Route::delete('client-addresses/{client_address}', [App\Http\Controllers\Api\ClientAddressController::class, 'destroy']);
     Route::apiResource('sites', App\Http\Controllers\Api\SiteController::class);
+    Route::get('sites/{site}/missions', [App\Http\Controllers\Api\MissionController::class, 'index']);
+    Route::post('sites/{site}/missions', [App\Http\Controllers\Api\MissionController::class, 'store']);
+    Route::get('missions/{mission}', [App\Http\Controllers\Api\MissionController::class, 'show']);
+    Route::patch('missions/{mission}', [App\Http\Controllers\Api\MissionController::class, 'update']);
+    Route::delete('missions/{mission}', [App\Http\Controllers\Api\MissionController::class, 'destroy']);
+    Route::get('missions/{mission}/boreholes', [App\Http\Controllers\Api\BoreholeController::class, 'index']);
+    Route::post('missions/{mission}/boreholes', [App\Http\Controllers\Api\BoreholeController::class, 'store']);
+    Route::get('boreholes/{borehole}', [App\Http\Controllers\Api\BoreholeController::class, 'show']);
+    Route::patch('boreholes/{borehole}', [App\Http\Controllers\Api\BoreholeController::class, 'update']);
+    Route::delete('boreholes/{borehole}', [App\Http\Controllers\Api\BoreholeController::class, 'destroy']);
+    Route::get('boreholes/{borehole}/lithology-layers', [App\Http\Controllers\Api\LithologyLayerController::class, 'index']);
+    Route::post('boreholes/{borehole}/lithology-layers', [App\Http\Controllers\Api\LithologyLayerController::class, 'store']);
+    Route::get('lithology-layers/{lithology_layer}', [App\Http\Controllers\Api\LithologyLayerController::class, 'show']);
+    Route::patch('lithology-layers/{lithology_layer}', [App\Http\Controllers\Api\LithologyLayerController::class, 'update']);
+    Route::delete('lithology-layers/{lithology_layer}', [App\Http\Controllers\Api\LithologyLayerController::class, 'destroy']);
     Route::apiResource('test-types', App\Http\Controllers\Api\TestTypeController::class);
     Route::apiResource('orders', App\Http\Controllers\Api\OrderController::class);
     Route::get('orders/{order}/samples', [App\Http\Controllers\Api\SampleController::class, 'index']);
@@ -26,6 +41,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('orders/{order}/reports', [App\Http\Controllers\Api\ReportController::class, 'index']);
     Route::get('reports/{report}/download', [App\Http\Controllers\Api\ReportController::class, 'download']);
     Route::post('reports/{report}/sign', [App\Http\Controllers\Api\ReportController::class, 'sign']);
+    Route::post('reports/{report}/submit-review', [App\Http\Controllers\Api\ReportController::class, 'submitReview']);
+    Route::post('reports/{report}/approve-review', [App\Http\Controllers\Api\ReportController::class, 'approveReview']);
     Route::get('report-pdf-templates', [App\Http\Controllers\Api\ReportPdfTemplateController::class, 'index']);
     Route::put('report-pdf-templates/{report_pdf_template}', [App\Http\Controllers\Api\ReportPdfTemplateController::class, 'update']);
     Route::get('report-form-definitions', [App\Http\Controllers\Api\ReportFormDefinitionController::class, 'index']);
@@ -45,7 +62,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('cadrage', [App\Http\Controllers\Api\CadrageController::class, 'update']);
     Route::get('btp-calculations/exemples', [App\Http\Controllers\Api\BtpCalculationController::class, 'exemples']);
     Route::post('btp-calculations/calculer', [App\Http\Controllers\Api\BtpCalculationController::class, 'calculer']);
+    Route::post('btp-calculations/granulometry', [App\Http\Controllers\Api\BtpCalculationController::class, 'granulometry']);
+    Route::get('activity-logs', [App\Http\Controllers\Api\ActivityLogController::class, 'index']);
     Route::get('stats/essais', [App\Http\Controllers\Api\StatsController::class, 'essais']);
+    Route::get('stats/dashboard', [App\Http\Controllers\Api\StatsController::class, 'dashboard']);
 
     Route::get('attachments', [App\Http\Controllers\Api\AttachmentController::class, 'index']);
     Route::post('attachments', [App\Http\Controllers\Api\AttachmentController::class, 'store']);

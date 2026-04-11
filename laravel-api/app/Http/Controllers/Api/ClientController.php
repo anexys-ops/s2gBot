@@ -45,6 +45,7 @@ class ClientController extends Controller
             'email' => 'nullable|email',
             'phone' => 'nullable|string|max:50',
             'siret' => 'nullable|string|max:20',
+            'meta' => 'nullable|array',
         ]);
 
         $client = Client::create($validated);
@@ -77,6 +78,7 @@ class ClientController extends Controller
             'email' => 'nullable|email',
             'phone' => 'nullable|string|max:50',
             'siret' => 'nullable|string|max:20',
+            'meta' => 'nullable|array',
         ]);
 
         $client->update($validated);

@@ -1,15 +1,23 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
-import { clientsApi, sitesApi, type Site } from '../../api/client'
+import { clientsApi, sitesApi, type EntityMetaPayload, type Site } from '../../api/client'
+import EntityMetaCard from '../../components/module/EntityMetaCard'
 import Modal from '../../components/Modal'
 import type { SiteOutletContext } from './SiteLayout'
 
-const emptyForm = (s: Site): Partial<Site> => ({
+function strCoord(v: unknown): string {
+  if (v === null || v === undefined || v === '') return ''
+  return String(v)
+}
+
+const emptyForm = (s: Site): Partial<Site> & { latitude?: string; longitude?: string } => ({
   client_id: s.client_id,
   name: s.name,
   address: s.address ?? '',
   reference: s.reference ?? '',
+  latitude: strCoord(s.latitude),
+  longitude: strCoord(s.longitude),
   travel_fee_quote_ht: Number(s.travel_fee_quote_ht ?? 0),
   travel_fee_invoice_ht: Number(s.travel_fee_invoice_ht ?? 0),
   travel_fee_label: s.travel_fee_label ?? '',
@@ -49,6 +57,14 @@ export default function SiteFicheTab() {
     },
   })
 
+  const metaMut = useMutation({
+    mutationFn: (meta: EntityMetaPayload) => sitesApi.update(siteId, { meta }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['site', siteId], updated)
+      queryClient.invalidateQueries({ queryKey: ['sites'] })
+    },
+  })
+
   const openEdit = () => {
     setForm(emptyForm(site))
     setModalOpen(true)
@@ -57,7 +73,16 @@ export default function SiteFicheTab() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name?.trim() || !form.client_id) return
-    updateMut.mutate(form)
+    const latStr = String((form as { latitude?: string }).latitude ?? '').trim()
+    const lngStr = String((form as { longitude?: string }).longitude ?? '').trim()
+    const latitude = latStr === '' ? undefined : Number(latStr.replace(',', '.'))
+    const longitude = lngStr === '' ? undefined : Number(lngStr.replace(',', '.'))
+    const { latitude: _a, longitude: _b, ...rest } = form as Record<string, unknown>
+    updateMut.mutate({
+      ...(rest as Partial<Site>),
+      latitude: latStr === '' || !Number.isFinite(latitude) ? undefined : latitude,
+      longitude: lngStr === '' || !Number.isFinite(longitude) ? undefined : longitude,
+    })
   }
 
   return (
@@ -89,6 +114,14 @@ export default function SiteFicheTab() {
             <dd>{site.address?.trim() ? site.address : '—'}</dd>
           </div>
           <div>
+            <dt>Latitude (WGS84)</dt>
+            <dd>{site.latitude != null && String(site.latitude).trim() !== '' ? site.latitude : '—'}</dd>
+          </div>
+          <div>
+            <dt>Longitude (WGS84)</dt>
+            <dd>{site.longitude != null && String(site.longitude).trim() !== '' ? site.longitude : '—'}</dd>
+          </div>
+          <div>
             <dt>Forfait déplacement devis (HT)</dt>
             <dd>{Number(site.travel_fee_quote_ht ?? 0).toFixed(2)} €</dd>
           </div>
@@ -102,6 +135,14 @@ export default function SiteFicheTab() {
           </div>
         </dl>
       </div>
+
+      <EntityMetaCard
+        meta={site.meta}
+        editable={isAdmin}
+        onSave={isAdmin ? (meta) => metaMut.mutateAsync(meta) : undefined}
+        isSaving={metaMut.isPending}
+        saveError={metaMut.isError ? (metaMut.error as Error).message : null}
+      />
 
       {modalOpen && isAdmin && (
         <Modal title="Modifier le chantier" onClose={() => setModalOpen(false)}>
@@ -132,6 +173,26 @@ export default function SiteFicheTab() {
             <div className="form-group">
               <label>Adresse</label>
               <textarea value={form.address ?? ''} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} rows={2} />
+            </div>
+            <div className="form-group">
+              <label>Latitude (WGS84, optionnel — centre carte)</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="ex. 48.8566"
+                value={(form as { latitude?: string }).latitude ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, latitude: e.target.value }))}
+              />
+            </div>
+            <div className="form-group">
+              <label>Longitude (WGS84, optionnel)</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="ex. 2.3522"
+                value={(form as { longitude?: string }).longitude ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, longitude: e.target.value }))}
+              />
             </div>
             <div className="form-group">
               <label>Libellé frais déplacement</label>

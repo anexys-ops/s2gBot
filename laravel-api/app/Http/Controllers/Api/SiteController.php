@@ -47,6 +47,9 @@ class SiteController extends Controller
             'travel_fee_quote_ht' => 'nullable|numeric|min:0',
             'travel_fee_invoice_ht' => 'nullable|numeric|min:0',
             'travel_fee_label' => 'nullable|string|max:255',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'meta' => 'nullable|array',
         ]);
 
         $site = Site::create($validated);
@@ -81,6 +84,9 @@ class SiteController extends Controller
             'travel_fee_quote_ht' => 'nullable|numeric|min:0',
             'travel_fee_invoice_ht' => 'nullable|numeric|min:0',
             'travel_fee_label' => 'nullable|string|max:255',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'meta' => 'nullable|array',
         ]);
 
         $site->update($validated);

@@ -7,6 +7,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Report extends Model
 {
+    public const REVIEW_DRAFT = 'draft';
+
+    public const REVIEW_PENDING = 'pending_review';
+
+    public const REVIEW_APPROVED = 'approved';
+
     protected $fillable = [
         'order_id',
         'pdf_template_id',
@@ -18,6 +24,9 @@ class Report extends Model
         'signer_name',
         'signature_image_data',
         'generated_at',
+        'review_status',
+        'reviewed_at',
+        'reviewed_by_user_id',
     ];
 
     protected function casts(): array
@@ -25,6 +34,7 @@ class Report extends Model
         return [
             'generated_at' => 'datetime',
             'signed_at' => 'datetime',
+            'reviewed_at' => 'datetime',
             'form_data' => 'array',
         ];
     }
@@ -42,5 +52,10 @@ class Report extends Model
     public function signedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'signed_by_user_id');
+    }
+
+    public function reviewedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by_user_id');
     }
 }

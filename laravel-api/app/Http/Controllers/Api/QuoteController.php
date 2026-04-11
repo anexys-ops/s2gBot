@@ -83,6 +83,7 @@ class QuoteController extends Controller
             'travel_fee_ht' => 'nullable|numeric|min:0',
             'travel_fee_tva_rate' => 'nullable|numeric|min:0|max:100',
             'apply_site_travel' => 'nullable|boolean',
+            'meta' => 'nullable|array',
         ], self::LINE_RULES));
 
         $number = 'DEV-'.Carbon::now()->format('Ymd').'-'.str_pad((string) (Quote::count() + 1), 4, '0', STR_PAD_LEFT);
@@ -118,6 +119,7 @@ class QuoteController extends Controller
             'pdf_template_id' => $validated['pdf_template_id'] ?? null,
             'status' => Quote::STATUS_DRAFT,
             'notes' => $validated['notes'] ?? null,
+            'meta' => $validated['meta'] ?? null,
         ]);
 
         $this->syncQuoteLines($quote, $validated['lines'], $defaultTva);
@@ -156,6 +158,7 @@ class QuoteController extends Controller
                 'status' => ['sometimes', $statusRule],
                 'notes' => 'nullable|string',
                 'pdf_template_id' => 'nullable|exists:document_pdf_templates,id',
+                'meta' => 'nullable|array',
             ]);
             $quote->fill($validated);
             $quote->save();
@@ -185,6 +188,7 @@ class QuoteController extends Controller
             'travel_fee_ht' => 'nullable|numeric|min:0',
             'travel_fee_tva_rate' => 'nullable|numeric|min:0|max:100',
             'apply_site_travel' => 'nullable|boolean',
+            'meta' => 'nullable|array',
         ], [
             'lines' => 'sometimes|array|min:1',
             'lines.*.description' => 'required_with:lines|string|max:500',

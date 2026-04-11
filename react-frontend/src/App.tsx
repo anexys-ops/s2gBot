@@ -16,6 +16,8 @@ import PdfModule from './pages/PdfModule'
 import Mails from './pages/Mails'
 import Cadrage from './pages/back-office/Cadrage'
 import ExemplesCalculs from './pages/back-office/ExemplesCalculs'
+import GranulometryLab from './pages/back-office/GranulometryLab'
+import ActivityLogPage from './pages/back-office/ActivityLogPage'
 import GraphiquesEssais from './pages/GraphiquesEssais'
 import CrmHub from './pages/hub/CrmHub'
 import CrmDocuments from './pages/CrmDocuments'
@@ -26,7 +28,13 @@ import ClientCommerceTab from './pages/clients/ClientCommerceTab'
 import ClientDocumentsTab from './pages/clients/ClientDocumentsTab'
 import SiteLayout from './pages/sites/SiteLayout'
 import SiteFicheTab from './pages/sites/SiteFicheTab'
+import SiteMissionsTab from './pages/sites/SiteMissionsTab'
+import SiteMapTab from './pages/sites/SiteMapTab'
 import ReportPdfTemplates from './pages/ReportPdfTemplates'
+import ReportComptaPage from './pages/reports/ReportComptaPage'
+import ReportVentesPage from './pages/reports/ReportVentesPage'
+import ReportDelaiTraitementPage from './pages/reports/ReportDelaiTraitementPage'
+import ReportDelaiChantierPage from './pages/reports/ReportDelaiChantierPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -49,6 +57,10 @@ function AppRoutes() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="rapports/compta" element={<ReportComptaPage />} />
+        <Route path="rapports/ventes" element={<ReportVentesPage />} />
+        <Route path="rapports/delai-traitement" element={<ReportDelaiTraitementPage />} />
+        <Route path="rapports/delai-chantier" element={<ReportDelaiChantierPage />} />
         <Route path="crm" element={<CrmHub />} />
         <Route path="crm/documents" element={<CrmDocuments />} />
         <Route path="terrain" element={<TerrainLaboHub />} />
@@ -65,6 +77,8 @@ function AppRoutes() {
         <Route path="back-office/mails" element={<Mails />} />
         <Route path="back-office/cadrage" element={<Cadrage />} />
         <Route path="back-office/exemples-calculs" element={<ExemplesCalculs />} />
+        <Route path="back-office/granulometrie" element={<GranulometryLab />} />
+        <Route path="back-office/journal-audit" element={<ActivityLogPage />} />
         <Route path="clients" element={<Clients />} />
         <Route path="clients/:clientId" element={<ClientLayout />}>
           <Route index element={<Navigate to="fiche" replace />} />
@@ -77,6 +91,8 @@ function AppRoutes() {
         <Route path="sites/:siteId" element={<SiteLayout />}>
           <Route index element={<Navigate to="fiche" replace />} />
           <Route path="fiche" element={<SiteFicheTab />} />
+          <Route path="missions" element={<SiteMissionsTab />} />
+          <Route path="carte" element={<SiteMapTab />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

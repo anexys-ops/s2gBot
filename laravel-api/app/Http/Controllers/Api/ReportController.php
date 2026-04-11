@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Report;
+use App\Services\ActivityLogger;
 use App\Services\ReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ReportController extends Controller
 {
     public function __construct(
-        private ReportService $reportService
+        private ReportService $reportService,
+        private ActivityLogger $activityLogger
     ) {}
 
     public function index(Request $request, Order $order): JsonResponse
@@ -28,7 +30,7 @@ class ReportController extends Controller
         }
 
         $reports = $order->reports()
-            ->with(['pdfTemplate', 'signedByUser'])
+            ->with(['pdfTemplate', 'signedByUser', 'reviewedByUser'])
             ->orderByDesc('generated_at')
             ->get();
 
@@ -59,7 +61,12 @@ class ReportController extends Controller
             $validated['form_data'] ?? null,
         );
 
-        return response()->json($report->load('pdfTemplate'), 201);
+        $this->activityLogger->log($user, 'report.generated', $report, [
+            'order_id' => $order->id,
+            'filename' => $report->filename,
+        ]);
+
+        return response()->json($report->load(['pdfTemplate', 'reviewedByUser']), 201);
     }
 
     public function sign(Request $request, Report $report): JsonResponse
@@ -80,7 +87,11 @@ class ReportController extends Controller
             $validated['signature_image_data'] ?? null,
         );
 
-        return response()->json($updated->load(['pdfTemplate', 'signedByUser']));
+        $this->activityLogger->log($request->user(), 'report.signed', $updated, [
+            'signer_name' => $validated['signer_name'],
+        ]);
+
+        return response()->json($updated->load(['pdfTemplate', 'signedByUser', 'reviewedByUser']));
     }
 
     public function download(Request $request, Report $report): StreamedResponse|JsonResponse
@@ -103,5 +114,46 @@ class ReportController extends Controller
             $report->filename,
             ['Content-Type' => 'application/pdf']
         );
+    }
+
+    public function submitReview(Request $request, Report $report): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        if ($report->review_status !== Report::REVIEW_DRAFT) {
+            return response()->json(['message' => 'Seul un rapport en brouillon peut être soumis pour validation.'], 422);
+        }
+
+        $report->update(['review_status' => Report::REVIEW_PENDING]);
+        $this->activityLogger->log($request->user(), 'report.submitted_for_review', $report->fresh(), [
+            'order_id' => $report->order_id,
+        ]);
+
+        return response()->json($report->fresh()->load(['pdfTemplate', 'signedByUser', 'reviewedByUser']));
+    }
+
+    public function approveReview(Request $request, Report $report): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        if ($report->review_status !== Report::REVIEW_PENDING) {
+            return response()->json(['message' => 'Seul un rapport en attente de validation peut être approuvé.'], 422);
+        }
+
+        $report->update([
+            'review_status' => Report::REVIEW_APPROVED,
+            'reviewed_at' => now(),
+            'reviewed_by_user_id' => $request->user()->id,
+        ]);
+
+        $this->activityLogger->log($request->user(), 'report.approved', $report->fresh(), [
+            'order_id' => $report->order_id,
+        ]);
+
+        return response()->json($report->fresh()->load(['pdfTemplate', 'signedByUser', 'reviewedByUser']));
     }
 }

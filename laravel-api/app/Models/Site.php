@@ -15,10 +15,13 @@ class Site extends Model
         'client_id',
         'name',
         'address',
+        'latitude',
+        'longitude',
         'reference',
         'travel_fee_quote_ht',
         'travel_fee_invoice_ht',
         'travel_fee_label',
+        'meta',
     ];
 
     protected function casts(): array
@@ -26,6 +29,9 @@ class Site extends Model
         return [
             'travel_fee_quote_ht' => 'decimal:2',
             'travel_fee_invoice_ht' => 'decimal:2',
+            'latitude' => 'decimal:7',
+            'longitude' => 'decimal:7',
+            'meta' => 'array',
         ];
     }
 
@@ -42,5 +48,10 @@ class Site extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function missions(): HasMany
+    {
+        return $this->hasMany(Mission::class);
     }
 }

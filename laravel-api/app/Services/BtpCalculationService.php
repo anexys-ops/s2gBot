@@ -219,4 +219,79 @@ class BtpCalculationService
             default => null,
         };
     }
+
+    /**
+     * Courbe granulométrique — % passants cumulés vs ouverture de tamis (mm).
+     * D10, D30, D60 par interpolation linéaire sur log10(d) (NF EN ISO 17892-4, pratique courante).
+     * Cu = D60/D10, Cc = D30²/(D60×D10).
+     *
+     * @param  array<int, array{opening_mm: float, passing_percent: float}>  $points
+     * @return array{d10: ?float, d30: ?float, d60: ?float, cu: ?float, cc: ?float}|null
+     */
+    public static function granulometryIndicators(array $points): ?array
+    {
+        $clean = [];
+        foreach ($points as $row) {
+            $d = (float) ($row['opening_mm'] ?? 0);
+            $p = (float) ($row['passing_percent'] ?? 0);
+            if ($d > 0 && $p >= 0 && $p <= 100) {
+                $clean[] = ['opening_mm' => $d, 'passing_percent' => $p];
+            }
+        }
+        if (count($clean) < 2) {
+            return null;
+        }
+        usort($clean, fn ($a, $b) => $a['opening_mm'] <=> $b['opening_mm']);
+
+        $d10 = self::interpolateOpeningForPassingPercent($clean, 10.0);
+        $d30 = self::interpolateOpeningForPassingPercent($clean, 30.0);
+        $d60 = self::interpolateOpeningForPassingPercent($clean, 60.0);
+
+        $cu = ($d10 !== null && $d10 > 0 && $d60 !== null) ? round($d60 / $d10, 3) : null;
+        $cc = ($d10 !== null && $d10 > 0 && $d30 !== null && $d60 !== null)
+            ? round(($d30 * $d30) / ($d60 * $d10), 3)
+            : null;
+
+        return [
+            'd10' => $d10,
+            'd30' => $d30,
+            'd60' => $d60,
+            'cu' => $cu,
+            'cc' => $cc,
+        ];
+    }
+
+    /**
+     * @param  array<int, array{opening_mm: float, passing_percent: float}>  $sortedByOpeningAsc
+     */
+    private static function interpolateOpeningForPassingPercent(array $sortedByOpeningAsc, float $passTarget): ?float
+    {
+        $n = count($sortedByOpeningAsc);
+        for ($i = 0; $i < $n - 1; $i++) {
+            $p0 = $sortedByOpeningAsc[$i]['passing_percent'];
+            $p1 = $sortedByOpeningAsc[$i + 1]['passing_percent'];
+            $d0 = $sortedByOpeningAsc[$i]['opening_mm'];
+            $d1 = $sortedByOpeningAsc[$i + 1]['opening_mm'];
+            if ($d0 <= 0 || $d1 <= 0) {
+                continue;
+            }
+            $minP = min($p0, $p1);
+            $maxP = max($p0, $p1);
+            if ($passTarget + 1e-9 < $minP || $passTarget - 1e-9 > $maxP) {
+                continue;
+            }
+            if (abs($p1 - $p0) < 1e-9) {
+                continue;
+            }
+            $t = ($passTarget - $p0) / ($p1 - $p0);
+            $t = max(0.0, min(1.0, $t));
+            $logd0 = log10($d0);
+            $logd1 = log10($d1);
+            $logd = $logd0 + $t * ($logd1 - $logd0);
+
+            return round(pow(10, $logd), 6);
+        }
+
+        return null;
+    }
 }

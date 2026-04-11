@@ -17,7 +17,15 @@ class Client extends Model
         'email',
         'phone',
         'siret',
+        'meta',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'meta' => 'array',
+        ];
+    }
 
     public function addresses(): HasMany
     {

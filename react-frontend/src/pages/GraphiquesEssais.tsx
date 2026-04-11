@@ -255,7 +255,7 @@ export default function GraphiquesEssais() {
                     cx="50%"
                     cy="50%"
                     outerRadius={90}
-                    label={({ name, value }) => `${name}: ${value}`}
+                    label={({ name, value }: { name?: string; value?: number }) => `${name ?? ''}: ${value ?? ''}`}
                   >
                     {dataPie.map((_, i) => (
                       <Cell key={i} fill={COULEURS[i % COULEURS.length]} />

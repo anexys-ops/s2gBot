@@ -1,3 +1,5 @@
+import { enqueueOfflineRequest } from '../lib/offlineQueue'
+
 const API_BASE = '/api'
 
 function getToken(): string | null {
@@ -17,6 +19,16 @@ export async function api<T>(
   if (token) {
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`
   }
+
+  const method = (options.method ?? 'GET').toUpperCase()
+  if (typeof navigator !== 'undefined' && !navigator.onLine && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const bodyStr = typeof options.body === 'string' ? options.body : null
+    enqueueOfflineRequest(`${API_BASE}${path}`, method, bodyStr)
+    throw new Error(
+      'Hors ligne : la requête est en file d’attente locale. Elle pourra être rejouée manuellement ou après reconnexion (fonction expérimentale).',
+    )
+  }
+
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
   if (res.status === 401) {
     localStorage.removeItem('token')
@@ -279,11 +291,20 @@ export const ordersApi = {
     api<Report>(`/orders/${orderId}/reports`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
 }
 
+export type SampleWriteBody = {
+  order_item_id: number
+  reference: string
+  notes?: string
+  borehole_id?: number | null
+  depth_top_m?: number | null
+  depth_bottom_m?: number | null
+}
+
 export const samplesApi = {
   get: (id: number) => api<Sample>(`/samples/${id}`),
-  create: (body: { order_item_id: number; reference: string; notes?: string }) =>
-    api<Sample>('/samples', { method: 'POST', body: JSON.stringify(body) }),
-  update: (id: number, body: Partial<Sample>) => api<Sample>(`/samples/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  create: (body: SampleWriteBody) => api<Sample>('/samples', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: number, body: Partial<SampleWriteBody> & Partial<Pick<Sample, 'status'>>) =>
+    api<Sample>(`/samples/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/samples/${id}`, { method: 'DELETE' }),
   results: (sampleId: number, results: Array<{ test_type_param_id: number; value: string }>) =>
     api<Sample>(`/samples/${sampleId}/results`, { method: 'POST', body: JSON.stringify({ results }) }),
@@ -292,6 +313,10 @@ export const samplesApi = {
 export const reportsApi = {
   sign: (reportId: number, body: { signer_name: string; signature_image_data?: string }) =>
     api<Report>(`/reports/${reportId}/sign`, { method: 'POST', body: JSON.stringify(body) }),
+  submitReview: (reportId: number) =>
+    api<Report>(`/reports/${reportId}/submit-review`, { method: 'POST', body: '{}' }),
+  approveReview: (reportId: number) =>
+    api<Report>(`/reports/${reportId}/approve-review`, { method: 'POST', body: '{}' }),
   download: async (reportId: number) => {
     const token = getToken()
     const res = await fetch(`${API_BASE}/reports/${reportId}/download`, {
@@ -367,6 +392,42 @@ export const btpCalculationsApi = {
       method: 'POST',
       body: JSON.stringify({ id, valeurs }),
     }),
+  granulometry: (points: Array<{ opening_mm: number; passing_percent: number }>) =>
+    api<GranulometryResult>('/btp-calculations/granulometry', {
+      method: 'POST',
+      body: JSON.stringify({ points }),
+    }),
+}
+
+export interface GranulometryResult {
+  d10: number | null
+  d30: number | null
+  d60: number | null
+  cu: number | null
+  cc: number | null
+}
+
+export interface ActivityLogRow {
+  id: number
+  user_id?: number | null
+  action: string
+  subject_type?: string | null
+  subject_id?: number | null
+  properties?: Record<string, unknown> | null
+  ip_address?: string | null
+  created_at: string
+  user?: { id: number; name: string }
+}
+
+export const activityLogsApi = {
+  list: (params?: { subject_type?: string; subject_id?: number; limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.subject_type) q.set('subject_type', params.subject_type)
+    if (params?.subject_id != null) q.set('subject_id', String(params.subject_id))
+    if (params?.limit) q.set('limit', String(params.limit))
+    const s = q.toString()
+    return api<ActivityLogRow[]>(`/activity-logs${s ? `?${s}` : ''}`)
+  },
 }
 
 export interface StatsEssaisParType {
@@ -398,6 +459,52 @@ export interface StatsEssaisPayload {
 
 export const statsApi = {
   essais: () => api<StatsEssaisPayload>('/stats/essais'),
+  dashboard: () => api<DashboardStatsPayload>('/stats/dashboard'),
+}
+
+/** Métadonnées métier : indicateurs (valeurs suivies) et champs libres. */
+export type EntityMetaPayload = {
+  indicateurs?: Record<string, string>
+  champs_perso?: Record<string, string>
+}
+
+export interface DashboardStatsPayload {
+  counts: {
+    clients: number
+    sites: number
+    orders: number
+    orders_by_status: Record<string, number>
+    quotes: number
+    quotes_by_status: Record<string, number>
+    invoices: number
+    invoices_by_status: Record<string, number>
+    reports_total: number
+    reports_pending_review: number
+    reports_approved: number
+    samples_total: number
+    samples_by_status: Record<string, number>
+  }
+  amounts: {
+    invoices_ttc_total: number
+    invoices_ttc_paid: number
+    invoices_ttc_unpaid: number
+    quotes_open_ttc: number
+  }
+  delays: {
+    order_to_first_report_days_avg: number | null
+    order_to_first_report_days_median: number | null
+    order_to_first_report_sample_size: number
+    order_delivery_cycle_days_avg: number | null
+    order_delivery_cycle_days_median: number | null
+    order_delivery_cycle_sample_size: number
+    quote_to_site_delivery_days_avg: number | null
+    quote_to_site_delivery_days_median: number | null
+    quote_planning_sample_size: number
+    sample_reception_days_avg: number | null
+    sample_reception_days_median: number | null
+    sample_reception_sample_size: number
+  }
+  ca_par_mois: Array<{ mois: string; ca_ttc: number }>
 }
 
 export interface QuoteLine {
@@ -433,6 +540,7 @@ export interface Quote {
   pdf_template_id?: number
   status: string
   notes?: string
+  meta?: EntityMetaPayload | null
   client?: Client
   site?: Site
   billing_address?: ClientAddress
@@ -451,7 +559,7 @@ export const quotesApi = {
   },
   get: (id: number) => api<Quote>(`/quotes/${id}`),
   create: (body: QuoteCreateBody) => api<Quote>('/quotes', { method: 'POST', body: JSON.stringify(body) }),
-  update: (id: number, body: Partial<QuoteCreateBody> & { status?: string }) =>
+  update: (id: number, body: Partial<QuoteCreateBody> & { status?: string; meta?: EntityMetaPayload | null }) =>
     api<Quote>(`/quotes/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/quotes/${id}`, { method: 'DELETE' }),
 }
@@ -608,6 +716,7 @@ export interface Client {
   email?: string
   phone?: string
   siret?: string
+  meta?: EntityMetaPayload | null
   sites?: Site[]
 }
 
@@ -616,11 +725,87 @@ export interface Site {
   client_id: number
   name: string
   address?: string
+  latitude?: number | string | null
+  longitude?: number | string | null
   reference?: string
   travel_fee_quote_ht?: number
   travel_fee_invoice_ht?: number
   travel_fee_label?: string
+  meta?: EntityMetaPayload | null
   client?: Client
+}
+
+/** Mission géotechnique sur un chantier (terrain / forages). */
+export interface Mission {
+  id: number
+  site_id: number
+  reference?: string | null
+  title?: string | null
+  mission_status?: string | null
+  maitre_ouvrage_name?: string | null
+  maitre_ouvrage_email?: string | null
+  maitre_ouvrage_phone?: string | null
+  notes?: string | null
+  meta?: EntityMetaPayload | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface Borehole {
+  id: number
+  mission_id: number
+  code?: string | null
+  latitude?: number | string | null
+  longitude?: number | string | null
+  ground_level_m?: number | string | null
+  notes?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface LithologyLayer {
+  id: number
+  borehole_id: number
+  depth_from_m?: number | string | null
+  depth_to_m?: number | string | null
+  description?: string | null
+  rqd?: number | string | null
+  sort_order?: number | null
+  created_at?: string
+  updated_at?: string
+}
+
+export const missionsApi = {
+  list: (siteId: number) => api<Mission[]>(`/sites/${siteId}/missions`),
+  create: (siteId: number, body: Partial<Mission>) =>
+    api<Mission>(`/sites/${siteId}/missions`, { method: 'POST', body: JSON.stringify(body) }),
+  get: (id: number) => api<Mission>(`/missions/${id}`),
+  update: (id: number, body: Partial<Mission>) =>
+    api<Mission>(`/missions/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/missions/${id}`, { method: 'DELETE' }),
+}
+
+export const boreholesApi = {
+  list: (missionId: number) => api<Borehole[]>(`/missions/${missionId}/boreholes`),
+  create: (missionId: number, body: Partial<Borehole>) =>
+    api<Borehole>(`/missions/${missionId}/boreholes`, { method: 'POST', body: JSON.stringify(body) }),
+  get: (id: number) => api<Borehole>(`/boreholes/${id}`),
+  update: (id: number, body: Partial<Borehole>) =>
+    api<Borehole>(`/boreholes/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/boreholes/${id}`, { method: 'DELETE' }),
+}
+
+export const lithologyLayersApi = {
+  list: (boreholeId: number) => api<LithologyLayer[]>(`/boreholes/${boreholeId}/lithology-layers`),
+  create: (boreholeId: number, body: Partial<LithologyLayer>) =>
+    api<LithologyLayer>(`/boreholes/${boreholeId}/lithology-layers`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  get: (id: number) => api<LithologyLayer>(`/lithology-layers/${id}`),
+  update: (id: number, body: Partial<LithologyLayer>) =>
+    api<LithologyLayer>(`/lithology-layers/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/lithology-layers/${id}`, { method: 'DELETE' }),
 }
 
 export interface TestTypeParam {
@@ -660,6 +845,7 @@ export interface Order {
   billing_address_id?: number
   delivery_address_id?: number
   notes?: string
+  meta?: EntityMetaPayload | null
   client?: Client
   site?: Site
   order_items?: OrderItem[]
@@ -681,8 +867,12 @@ export interface Sample {
   received_at?: string
   status: string
   notes?: string
+  borehole_id?: number | null
+  depth_top_m?: number | string | null
+  depth_bottom_m?: number | string | null
   order_item?: OrderItem
   test_results?: TestResult[]
+  borehole?: Borehole
 }
 
 export interface TestResult {
@@ -705,8 +895,12 @@ export interface Report {
   signer_name?: string | null
   signature_image_data?: string | null
   signed_by_user_id?: number | null
+  review_status?: string | null
+  reviewed_at?: string | null
+  reviewed_by_user_id?: number | null
   pdf_template?: ReportPdfTemplateRow
   signed_by_user?: { id: number; name: string }
+  reviewed_by_user?: { id: number; name: string }
 }
 
 export interface Invoice {
@@ -730,6 +924,7 @@ export interface Invoice {
   delivery_address_id?: number
   pdf_template_id?: number
   status: string
+  meta?: EntityMetaPayload | null
   client?: Client
   orders?: Order[]
   invoice_lines?: InvoiceLine[]

@@ -107,6 +107,7 @@ class OrderController extends Controller
             'orderItems.samples.testResults.testTypeParam',
             'reports.pdfTemplate',
             'reports.signedByUser',
+            'reports.reviewedByUser',
         ]);
 
         return response()->json($order);
@@ -130,6 +131,7 @@ class OrderController extends Controller
                 'status' => 'sometimes|in:draft,submitted,in_progress,completed',
                 'billing_address_id' => 'nullable|exists:client_addresses,id',
                 'delivery_address_id' => 'nullable|exists:client_addresses,id',
+                'meta' => 'nullable|array',
             ]);
             $order->update($validated);
 
@@ -147,6 +149,7 @@ class OrderController extends Controller
             'order_date' => 'sometimes|date',
             'notes' => 'nullable|string',
             'status' => 'sometimes|in:draft,submitted',
+            'meta' => 'nullable|array',
         ]);
 
         $order->update($validated);

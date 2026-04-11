@@ -54,6 +54,7 @@ class Invoice extends Model
         'delivery_address_id',
         'pdf_template_id',
         'status',
+        'meta',
     ];
 
     protected function casts(): array
@@ -72,6 +73,7 @@ class Invoice extends Model
             'shipping_tva_rate' => 'decimal:2',
             'travel_fee_ht' => 'decimal:2',
             'travel_fee_tva_rate' => 'decimal:2',
+            'meta' => 'array',
         ];
     }
 

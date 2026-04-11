@@ -27,6 +27,9 @@ class ReportService
             'filename' => $filename,
             'form_data' => $formData,
             'generated_at' => now(),
+            'review_status' => Report::REVIEW_DRAFT,
+            'reviewed_at' => null,
+            'reviewed_by_user_id' => null,
         ]);
 
         $this->writePdfToDisk($order, $report, $template->blade_view, $formData);

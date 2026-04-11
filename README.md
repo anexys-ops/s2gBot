@@ -8,6 +8,7 @@ Tout passe par **Laravel 11** (API) + **React 18** (interface unique) :
 
 - **Backend** : [laravel-api/](laravel-api/) — REST, Sanctum, SQLite / MySQL / PostgreSQL  
 - **Frontend** : [react-frontend/](react-frontend/) — Vite, React Router, React Query  
+- **Mobile (stores)** : [apps/lab-btp-mobile/](apps/lab-btp-mobile/) — Expo, API Sanctum (iOS / Android)  
 
 Dans l’interface, deux espaces métier coexistent (même URL, onglets distincts possibles) :
 

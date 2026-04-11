@@ -21,6 +21,14 @@ DEPLOY_PORT="${DEPLOY_PORT:-22}"
 DEPLOY_USER="${DEPLOY_USER:-root}"
 REMOTE_PATH="${REMOTE_PATH:-/var/www/s2gBot}"
 
+# Placeholders — évite rsync/ssh vers un hôte fictif.
+if [[ "$DEPLOY_HOST" == *'.example.com' ]] || [[ "$DEPLOY_HOST" == 'CHANGEME' ]] || [[ "$DEPLOY_HOST" == 'REMPLACER_PAR_IP_OU_HOSTNAME' ]]; then
+  echo "ERREUR: DEPLOY_HOST=$DEPLOY_HOST est encore un placeholder." >&2
+  echo "Éditez deploy.env : mettez l’IP ou le vrai nom DNS du serveur (ex. 203.0.113.10 ou app.mondomaine.fr)." >&2
+  echo "Astuce : ne collez pas les lignes de commentaire « # … » dans le terminal comme des commandes." >&2
+  exit 1
+fi
+
 remote_ssh() {
   if [ -n "${SSH_IDENTITY_FILE:-}" ]; then
     ssh -i "$SSH_IDENTITY_FILE" -p "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" "$@"
@@ -65,4 +73,4 @@ REMOTE
 
 echo ""
 echo "Terminé. Nginx : voir scripts/nginx-s2g.apps-dev.fr.example.conf"
-echo "APP_URL et FRONTEND_URL = https://s2g.apps-dev.fr"
+echo "Sur le serveur : APP_URL et FRONTEND_URL dans laravel-api/.env = votre URL publique HTTPS."

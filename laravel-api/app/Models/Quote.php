@@ -65,6 +65,7 @@ class Quote extends Model
         'pdf_template_id',
         'status',
         'notes',
+        'meta',
     ];
 
     protected function casts(): array
@@ -83,6 +84,7 @@ class Quote extends Model
             'shipping_tva_rate' => 'decimal:2',
             'travel_fee_ht' => 'decimal:2',
             'travel_fee_tva_rate' => 'decimal:2',
+            'meta' => 'array',
         ];
     }
 

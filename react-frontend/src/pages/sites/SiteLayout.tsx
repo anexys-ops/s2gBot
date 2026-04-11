@@ -95,7 +95,11 @@ export default function SiteLayout() {
       moduleBarLabel="Projets — Chantiers"
       title={site.name}
       subtitle={site.reference ? `Réf. ${site.reference} · #${site.id}` : `Réf. chantier #${site.id}`}
-      tabs={[{ to: `${base}/fiche`, label: 'Fiche chantier', end: true }]}
+      tabs={[
+        { to: `${base}/fiche`, label: 'Fiche chantier', end: true },
+        { to: `${base}/missions`, label: 'Missions & forages' },
+        { to: `${base}/carte`, label: 'Carte' },
+      ]}
       actions={
         <>
           <Link to="/sites" className="btn btn-secondary btn-sm">

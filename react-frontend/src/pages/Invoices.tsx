@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { invoicesApi, ordersApi, pdfApi, type Invoice } from '../api/client'
+import { invoicesApi, ordersApi, pdfApi, type EntityMetaPayload, type Invoice } from '../api/client'
+import EntityMetaCard from '../components/module/EntityMetaCard'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
@@ -76,6 +77,14 @@ export default function Invoices() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       setEditInvoice(null)
+    },
+  })
+
+  const invoiceMetaMut = useMutation({
+    mutationFn: ({ id, meta }: { id: number; meta: EntityMetaPayload }) => invoicesApi.update(id, { meta }),
+    onSuccess: (updated, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      setEditInvoice((prev) => (prev && prev.id === variables.id ? updated : prev))
     },
   })
 
@@ -260,6 +269,7 @@ export default function Invoices() {
 
       {editInvoice && (
         <Modal title={`Modifier ${editInvoice.number}`} onClose={() => setEditInvoice(null)}>
+          <>
           <form onSubmit={submitEdit}>
             <div className="form-group">
               <label>Statut</label>
@@ -350,6 +360,16 @@ export default function Invoices() {
               </button>
             </div>
           </form>
+          {isAdmin && (
+            <EntityMetaCard
+              meta={editInvoice.meta}
+              editable
+              onSave={(meta) => invoiceMetaMut.mutateAsync({ id: editInvoice.id, meta })}
+              isSaving={invoiceMetaMut.isPending}
+              saveError={invoiceMetaMut.isError ? (invoiceMetaMut.error as Error).message : null}
+            />
+          )}
+          </>
         </Modal>
       )}
     </div>

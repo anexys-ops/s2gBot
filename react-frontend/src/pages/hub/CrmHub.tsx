@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 
-type Card = { to: string; title: string; desc: string }
+type Card = { to: string; title: string; desc: string; icon: string }
 
 export default function CrmHub() {
   const { user } = useAuth()
@@ -12,36 +12,47 @@ export default function CrmHub() {
       to: '/crm/documents',
       title: 'Documents commerciaux',
       desc: 'Registre devis & factures : recherche, filtres, PDF, lien vers la vue commerciale par client.',
+      icon: '📑',
     },
     {
       to: '/clients',
       title: 'Clients',
       desc: 'Fiches tiers (onglets Fiche, Commerce, Documents) ; liste avec filtres de vue et accès fiche en un clic.',
+      icon: '👥',
     },
-    { to: '/sites', title: 'Chantiers', desc: 'Liste avec filtre par client ; fiche chantier (barre d’actions CRUD comme sur les tiers).' },
-    { to: '/devis', title: 'Devis', desc: isLab ? 'Propositions commerciales.' : 'Vos devis.' },
-    { to: '/invoices', title: 'Factures', desc: 'Suivi facturation et paiements.' },
+    {
+      to: '/sites',
+      title: 'Chantiers',
+      desc: 'Liste avec filtre par client ; fiche chantier, missions, carte OSM.',
+      icon: '🏗️',
+    },
+    { to: '/devis', title: 'Devis', desc: isLab ? 'Propositions commerciales.' : 'Vos devis.', icon: '📝' },
+    { to: '/invoices', title: 'Factures', desc: 'Suivi facturation et paiements.', icon: '💶' },
   ]
 
   if (isLab) {
     cards.push(
-      { to: '/back-office/mails', title: 'Mails', desc: 'Modèles et envois liés aux dossiers.' },
-      { to: '/back-office/pdf', title: 'Création PDF', desc: 'Rapports et documents générés.' },
+      { to: '/back-office/mails', title: 'Mails', desc: 'Modèles et envois liés aux dossiers.', icon: '✉️' },
+      { to: '/back-office/pdf', title: 'Création PDF', desc: 'Rapports et documents générés.', icon: '🖨️' },
     )
   }
 
   return (
-    <div className="hub-page hub-page--crm">
-      <header className="hub-header">
+    <div className="hub-page hub-page--crm hub-page--v2">
+      <header className="hub-header hub-header--v2">
+        <p className="hub-kicker">Relation client</p>
         <h1>CRM — commercial & relation client</h1>
         <p className="hub-lead">
-          Espace dédié aux commerciaux et au suivi client : devis, chantiers, facturation et
-          communications. Même compte que le reste de la plateforme.
+          Devis, chantiers, facturation et communications. Navigation cohérente avec l’espace terrain &
+          laboratoire.
         </p>
       </header>
-      <div className="hub-grid">
+      <div className="hub-grid hub-grid--v2">
         {cards.map((c) => (
-          <Link key={c.to} to={c.to} className="hub-card">
+          <Link key={c.to} to={c.to} className="hub-card hub-card--v2">
+            <span className="hub-card-v2__icon" aria-hidden>
+              {c.icon}
+            </span>
             <span className="hub-card-title">{c.title}</span>
             <span className="hub-card-desc">{c.desc}</span>
           </Link>

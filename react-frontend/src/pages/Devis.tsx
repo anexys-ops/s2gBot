@@ -10,8 +10,10 @@ import {
   type ClientAddress,
   type DocumentPdfTemplateRow,
   type QuoteCreateBody,
+  type EntityMetaPayload,
   type Site,
 } from '../api/client'
+import EntityMetaCard from '../components/module/EntityMetaCard'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
@@ -167,6 +169,14 @@ export default function Devis() {
       queryClient.invalidateQueries({ queryKey: ['quote', editingId] })
       setEditingId(null)
       setForm(emptyForm())
+    },
+  })
+
+  const quoteMetaMut = useMutation({
+    mutationFn: ({ id, meta }: { id: number; meta: EntityMetaPayload }) => quotesApi.update(id, { meta }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['quotes'] })
+      queryClient.invalidateQueries({ queryKey: ['quote', variables.id] })
     },
   })
 
@@ -396,28 +406,39 @@ export default function Devis() {
           {!editQuote ? (
             <p>Chargement…</p>
           ) : (
-            <form onSubmit={handleSubmitEdit}>
-              <QuoteFormFields
-                form={form}
-                setForm={setForm}
-                clients={clients}
-                sites={sites}
-                addresses={addressesForm}
-                quoteTemplates={quoteTemplates}
-                addLine={addLine}
-                updateLine={updateLine}
-                removeLine={removeLine}
-              />
-              {updateMutation.isError && <p className="error">{(updateMutation.error as Error).message}</p>}
-              <div className="crud-actions" style={{ marginTop: '1rem' }}>
-                <button type="submit" className="btn btn-primary" disabled={updateMutation.isPending}>
-                  Enregistrer
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={() => setEditingId(null)}>
-                  Annuler
-                </button>
-              </div>
-            </form>
+            <>
+              <form onSubmit={handleSubmitEdit}>
+                <QuoteFormFields
+                  form={form}
+                  setForm={setForm}
+                  clients={clients}
+                  sites={sites}
+                  addresses={addressesForm}
+                  quoteTemplates={quoteTemplates}
+                  addLine={addLine}
+                  updateLine={updateLine}
+                  removeLine={removeLine}
+                />
+                {updateMutation.isError && <p className="error">{(updateMutation.error as Error).message}</p>}
+                <div className="crud-actions" style={{ marginTop: '1rem' }}>
+                  <button type="submit" className="btn btn-primary" disabled={updateMutation.isPending}>
+                    Enregistrer
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setEditingId(null)}>
+                    Annuler
+                  </button>
+                </div>
+              </form>
+              {isLab && (
+                <EntityMetaCard
+                  meta={editQuote.meta}
+                  editable
+                  onSave={(meta) => quoteMetaMut.mutateAsync({ id: editQuote.id, meta })}
+                  isSaving={quoteMetaMut.isPending}
+                  saveError={quoteMetaMut.isError ? (quoteMetaMut.error as Error).message : null}
+                />
+              )}
+            </>
           )}
         </Modal>
       )}

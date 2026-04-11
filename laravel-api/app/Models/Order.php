@@ -28,6 +28,7 @@ class Order extends Model
         'notes',
         'billing_address_id',
         'delivery_address_id',
+        'meta',
     ];
 
     protected function casts(): array
@@ -35,6 +36,7 @@ class Order extends Model
         return [
             'order_date' => 'date',
             'delivery_date' => 'date',
+            'meta' => 'array',
         ];
     }
 

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
-import { clientsApi, type Client } from '../../api/client'
+import { clientsApi, type Client, type EntityMetaPayload } from '../../api/client'
+import EntityMetaCard from '../../components/module/EntityMetaCard'
 import Modal from '../../components/Modal'
 import type { ClientOutletContext } from './ClientLayout'
 
@@ -38,6 +39,15 @@ export default function ClientFicheTab() {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       queryClient.invalidateQueries({ queryKey: ['client-commercial', clientId] })
       setModalOpen(false)
+    },
+  })
+
+  const metaMut = useMutation({
+    mutationFn: (meta: EntityMetaPayload) => clientsApi.update(clientId, { meta }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['client', clientId], updated)
+      queryClient.invalidateQueries({ queryKey: ['clients'] })
+      queryClient.invalidateQueries({ queryKey: ['client-commercial', clientId] })
     },
   })
 
@@ -85,6 +95,14 @@ export default function ClientFicheTab() {
           </div>
         </dl>
       </div>
+
+      <EntityMetaCard
+        meta={client.meta}
+        editable={isAdmin}
+        onSave={isAdmin ? (meta) => metaMut.mutateAsync(meta) : undefined}
+        isSaving={metaMut.isPending}
+        saveError={metaMut.isError ? (metaMut.error as Error).message : null}
+      />
 
       {modalOpen && isAdmin && (
         <Modal title="Modifier le client" onClose={() => setModalOpen(false)}>

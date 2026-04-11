@@ -1,16 +1,21 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
+  boreholesApi,
+  missionsApi,
   ordersApi,
   reportsApi,
   samplesApi,
   reportPdfTemplatesApi,
   reportFormDefinitionsApi,
+  type Borehole,
+  type EntityMetaPayload,
 } from '../api/client'
+import EntityMetaCard from '../components/module/EntityMetaCard'
 import { useAuth } from '../contexts/AuthContext'
 import { useState, useEffect, useMemo } from 'react'
 import Modal from '../components/Modal'
-import type { Order, Report, Sample } from '../api/client'
+import type { Order, Report, Sample, SampleWriteBody } from '../api/client'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
@@ -20,6 +25,33 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const SAMPLE_STATUS = ['pending', 'received', 'in_progress', 'tested', 'validated'] as const
+
+type BoreholeOption = Borehole & { mission_label: string }
+
+function numOrEmpty(v: unknown): string {
+  if (v === null || v === undefined || v === '') return ''
+  return String(v)
+}
+
+function parseOptNumber(s: string): number | undefined {
+  const t = s.trim()
+  if (t === '') return undefined
+  const n = Number(t)
+  return Number.isFinite(n) ? n : undefined
+}
+
+function reviewStatusLabel(code: string | null | undefined): string {
+  switch (code) {
+    case 'draft':
+      return 'Brouillon'
+    case 'pending_review':
+      return 'Attente validation'
+    case 'approved':
+      return 'Validé'
+    default:
+      return code?.trim() ? code : '—'
+  }
+}
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>()
@@ -31,7 +63,15 @@ export default function OrderDetail() {
   const [selectedSample, setSelectedSample] = useState<number | null>(null)
   const [resultValues, setResultValues] = useState<Record<number, string>>({})
   const [sampleModal, setSampleModal] = useState<Sample | 'new' | null>(null)
-  const [sampleForm, setSampleForm] = useState({ reference: '', status: 'pending', notes: '', order_item_id: 0 })
+  const [sampleForm, setSampleForm] = useState({
+    reference: '',
+    status: 'pending',
+    notes: '',
+    order_item_id: 0,
+    borehole_id: '' as number | '',
+    depth_top_m: '',
+    depth_bottom_m: '',
+  })
   const [orderEdit, setOrderEdit] = useState({ order_date: '', notes: '', status: '' })
   const [pdfTemplateId, setPdfTemplateId] = useState<number | ''>('')
   const [formDefId, setFormDefId] = useState<number | ''>('')
@@ -44,6 +84,24 @@ export default function OrderDetail() {
     queryKey: ['order', id],
     queryFn: () => ordersApi.get(Number(id)),
     enabled: !!id && id !== 'new',
+  })
+
+  const orderSiteId = order?.site_id
+  const { data: siteBoreholes = [] } = useQuery({
+    queryKey: ['site-boreholes-flat', orderSiteId],
+    queryFn: async () => {
+      const missions = await missionsApi.list(orderSiteId!)
+      const out: BoreholeOption[] = []
+      for (const m of missions) {
+        const missionLabel = m.reference?.trim() || m.title?.trim() || `Mission #${m.id}`
+        const bhs = await boreholesApi.list(m.id)
+        for (const b of bhs) {
+          out.push({ ...b, mission_label: missionLabel })
+        }
+      }
+      return out
+    },
+    enabled: !!orderSiteId,
   })
 
   const { data: tplRes } = useQuery({
@@ -119,6 +177,16 @@ export default function OrderDetail() {
     },
   })
 
+  const submitReviewMut = useMutation({
+    mutationFn: (reportId: number) => reportsApi.submitReview(reportId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
+  })
+
+  const approveReviewMut = useMutation({
+    mutationFn: (reportId: number) => reportsApi.approveReview(reportId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
+  })
+
   const resultMutation = useMutation({
     mutationFn: ({ sampleId, results }: { sampleId: number; results: Array<{ test_type_param_id: number; value: string }> }) =>
       samplesApi.results(sampleId, results),
@@ -130,8 +198,14 @@ export default function OrderDetail() {
   })
 
   const orderUpdateMut = useMutation({
-    mutationFn: (body: Partial<Pick<Order, 'order_date' | 'notes' | 'status' | 'site_id'>>) =>
-      ordersApi.update(Number(id), body),
+    mutationFn: (
+      body: Partial<Pick<Order, 'order_date' | 'notes' | 'status' | 'site_id'>> & { meta?: EntityMetaPayload | null },
+    ) => ordersApi.update(Number(id), body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
+  })
+
+  const orderMetaMut = useMutation({
+    mutationFn: (meta: EntityMetaPayload) => ordersApi.update(Number(id), { meta }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
   })
 
@@ -141,7 +215,13 @@ export default function OrderDetail() {
   })
 
   const sampleUpdateMut = useMutation({
-    mutationFn: ({ sampleId, body }: { sampleId: number; body: Partial<Sample> }) => samplesApi.update(sampleId, body),
+    mutationFn: ({
+      sampleId,
+      body,
+    }: {
+      sampleId: number
+      body: Partial<SampleWriteBody> & Partial<Pick<Sample, 'status'>>
+    }) => samplesApi.update(sampleId, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order', id] })
       setSampleModal(null)
@@ -154,6 +234,9 @@ export default function OrderDetail() {
         order_item_id: sampleForm.order_item_id,
         reference: sampleForm.reference,
         notes: sampleForm.notes || undefined,
+        borehole_id: sampleForm.borehole_id === '' ? undefined : Number(sampleForm.borehole_id),
+        depth_top_m: parseOptNumber(sampleForm.depth_top_m),
+        depth_bottom_m: parseOptNumber(sampleForm.depth_bottom_m),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order', id] })
@@ -207,12 +290,23 @@ export default function OrderDetail() {
       status: s.status,
       notes: s.notes ?? '',
       order_item_id: s.order_item_id,
+      borehole_id: s.borehole_id ?? '',
+      depth_top_m: numOrEmpty(s.depth_top_m),
+      depth_bottom_m: numOrEmpty(s.depth_bottom_m),
     })
     setSampleModal(s)
   }
 
   const openNewSample = (orderItemId: number) => {
-    setSampleForm({ reference: '', status: 'pending', notes: '', order_item_id: orderItemId })
+    setSampleForm({
+      reference: '',
+      status: 'pending',
+      notes: '',
+      order_item_id: orderItemId,
+      borehole_id: '',
+      depth_top_m: '',
+      depth_bottom_m: '',
+    })
     setSampleModal('new')
   }
 
@@ -228,6 +322,9 @@ export default function OrderDetail() {
           reference: sampleForm.reference,
           status: sampleForm.status,
           notes: sampleForm.notes || undefined,
+          borehole_id: sampleForm.borehole_id === '' ? null : Number(sampleForm.borehole_id),
+          depth_top_m: parseOptNumber(sampleForm.depth_top_m),
+          depth_bottom_m: parseOptNumber(sampleForm.depth_bottom_m),
         },
       })
     }
@@ -293,6 +390,14 @@ export default function OrderDetail() {
           {orderUpdateMut.isError && <p className="error">{(orderUpdateMut.error as Error).message}</p>}
         </div>
       )}
+
+      <EntityMetaCard
+        meta={order.meta}
+        editable={!!isLab}
+        onSave={isLab ? (meta) => orderMetaMut.mutateAsync(meta) : undefined}
+        isSaving={orderMetaMut.isPending}
+        saveError={orderMetaMut.isError ? (orderMetaMut.error as Error).message : null}
+      />
 
       <div className="crud-actions" style={{ marginBottom: '1rem' }}>
         {canDeleteOrder && (
@@ -407,6 +512,14 @@ export default function OrderDetail() {
                 <span>
                   {r.filename}
                   {r.pdf_template?.name ? ` — ${r.pdf_template.name}` : ''}
+                  <span className={`report-review-pill report-review-pill--${r.review_status ?? 'draft'}`}>
+                    {reviewStatusLabel(r.review_status)}
+                  </span>
+                  {r.review_status === 'approved' && r.reviewed_by_user?.name ? (
+                    <span style={{ marginLeft: '0.35rem', fontSize: '0.8rem', color: '#64748b' }}>
+                      par {r.reviewed_by_user.name}
+                    </span>
+                  ) : null}
                   {r.signed_at ? (
                     <span style={{ marginLeft: '0.5rem', fontSize: '0.85rem', color: 'var(--ok, #15803d)' }}>
                       Signé ({r.signer_name ?? '—'})
@@ -419,6 +532,26 @@ export default function OrderDetail() {
                 {isLab && !r.signed_at && (
                   <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSignModal(r)}>
                     Signer
+                  </button>
+                )}
+                {isLab && r.review_status === 'draft' && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={submitReviewMut.isPending}
+                    onClick={() => submitReviewMut.mutate(r.id)}
+                  >
+                    Soumettre pour validation
+                  </button>
+                )}
+                {isAdmin && r.review_status === 'pending_review' && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={approveReviewMut.isPending}
+                    onClick={() => approveReviewMut.mutate(r.id)}
+                  >
+                    Approuver (ingénieur)
                   </button>
                 )}
               </li>
@@ -617,6 +750,47 @@ export default function OrderDetail() {
               <label>Notes</label>
               <textarea value={sampleForm.notes} onChange={(e) => setSampleForm((f) => ({ ...f, notes: e.target.value }))} rows={2} />
             </div>
+            {!!orderSiteId && siteBoreholes.length > 0 && (
+              <>
+                <div className="form-group">
+                  <label>Forage (optionnel)</label>
+                  <select
+                    value={sampleForm.borehole_id === '' ? '' : String(sampleForm.borehole_id)}
+                    onChange={(e) =>
+                      setSampleForm((f) => ({
+                        ...f,
+                        borehole_id: e.target.value === '' ? '' : Number(e.target.value),
+                      }))
+                    }
+                  >
+                    <option value="">—</option>
+                    {siteBoreholes.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.code?.trim() || `Forage #${b.id}`} ({b.mission_label})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Profondeur prélèvement — haut (m), optionnel</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={sampleForm.depth_top_m}
+                    onChange={(e) => setSampleForm((f) => ({ ...f, depth_top_m: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Profondeur prélèvement — bas (m), optionnel</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={sampleForm.depth_bottom_m}
+                    onChange={(e) => setSampleForm((f) => ({ ...f, depth_bottom_m: e.target.value }))}
+                  />
+                </div>
+              </>
+            )}
             {(sampleUpdateMut.isError || sampleCreateMut.isError) && (
               <p className="error">{(sampleUpdateMut.error || sampleCreateMut.error)?.message}</p>
             )}

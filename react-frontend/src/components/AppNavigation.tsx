@@ -38,16 +38,26 @@ export default function AppNavigation() {
         { to: '/invoices', label: 'Factures' },
       ]
 
+  const rapportsItems: SubItem[] = [
+    { to: '/rapports/compta', label: 'Rapport compta' },
+    { to: '/rapports/ventes', label: 'Stats ventes & rapports' },
+    { to: '/rapports/delai-traitement', label: 'Délais de traitement' },
+    { to: '/rapports/delai-chantier', label: 'Délais chantier' },
+  ]
+
   const backOfficeItems: SubItem[] = [
     { to: '/back-office/catalogue-essais', label: 'Catalogue des essais' },
+    { to: '/back-office/granulometrie', label: 'Granulométrie (D10/D60)' },
     { to: '/back-office/cadrage', label: 'Cadrage (S0)' },
     { to: '/back-office/exemples-calculs', label: 'Calculs BTP' },
+    { to: '/back-office/journal-audit', label: 'Journal d’audit' },
     { to: '/clients', label: 'Clients' },
     { to: '/sites', label: 'Chantiers' },
   ]
 
   const groups: MenuGroup[] = [
     { id: 'activity', label: 'Activité', items: activityItems },
+    { id: 'reports', label: 'Rapports', items: rapportsItems },
     { id: 'billing', label: 'Facturation & documents', items: facturationItems },
     ...(isLab ? [{ id: 'backoffice', label: 'Back office', items: backOfficeItems }] : []),
   ]

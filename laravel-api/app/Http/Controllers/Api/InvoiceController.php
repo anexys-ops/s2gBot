@@ -108,6 +108,7 @@ class InvoiceController extends Controller
             'lines.*.unit_price' => 'required_with:lines|numeric|min:0',
             'lines.*.tva_rate' => 'nullable|numeric|min:0|max:100',
             'lines.*.discount_percent' => 'nullable|numeric|min:0|max:100',
+            'meta' => 'nullable|array',
         ]);
 
         $tvaRate = $validated['tva_rate'] ?? 20;
@@ -132,6 +133,7 @@ class InvoiceController extends Controller
             'delivery_address_id' => $validated['delivery_address_id'] ?? null,
             'pdf_template_id' => $validated['pdf_template_id'] ?? null,
             'status' => $validated['status'] ?? Invoice::STATUS_DRAFT,
+            'meta' => $validated['meta'] ?? null,
         ]);
 
         if (! empty($validated['lines'])) {
@@ -195,6 +197,7 @@ class InvoiceController extends Controller
                 'status' => ['sometimes', $statusRule],
                 'due_date' => 'nullable|date',
                 'pdf_template_id' => 'nullable|exists:document_pdf_templates,id',
+                'meta' => 'nullable|array',
             ]);
             $invoice->update($validated);
 
@@ -227,6 +230,7 @@ class InvoiceController extends Controller
             'lines.*.unit_price' => 'required_with:lines|numeric|min:0',
             'lines.*.tva_rate' => 'nullable|numeric|min:0|max:100',
             'lines.*.discount_percent' => 'nullable|numeric|min:0|max:100',
+            'meta' => 'nullable|array',
         ]);
 
         $invoice->fill(collect($validated)->except('lines')->toArray());

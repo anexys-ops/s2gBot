@@ -85,6 +85,19 @@ export default function Catalog() {
     onError: (err: Error) => window.alert(err.message),
   })
 
+  const list = Array.isArray(types) ? types : []
+  const needle = debouncedSearch.trim().toLowerCase()
+  const filtered = useMemo(() => {
+    if (!needle) return list
+    return list.filter(
+      (t) =>
+        t.name.toLowerCase().includes(needle) ||
+        (t.norm ?? '').toLowerCase().includes(needle) ||
+        (t.unit ?? '').toLowerCase().includes(needle) ||
+        (t.params?.some((p) => p.name.toLowerCase().includes(needle)) ?? false),
+    )
+  }, [list, needle])
+
   const closeModal = () => {
     setModal(null)
     setEditingId(null)
@@ -129,19 +142,6 @@ export default function Catalog() {
 
   if (isLoading) return <p>Chargement...</p>
   if (error) return <p className="error">Erreur : {String(error)}</p>
-
-  const list = types ?? []
-  const needle = debouncedSearch.trim().toLowerCase()
-  const filtered = useMemo(() => {
-    if (!needle) return list
-    return list.filter(
-      (t) =>
-        t.name.toLowerCase().includes(needle) ||
-        (t.norm ?? '').toLowerCase().includes(needle) ||
-        (t.unit ?? '').toLowerCase().includes(needle) ||
-        (t.params?.some((p) => p.name.toLowerCase().includes(needle)) ?? false),
-    )
-  }, [list, needle])
 
   return (
     <div>

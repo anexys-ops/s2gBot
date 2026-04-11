@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Quote;
+use App\Models\Site;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -19,7 +20,7 @@ class AttachmentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order'])],
+            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order', 'site'])],
             'attachable_id' => 'required|integer',
         ]);
 
@@ -34,13 +35,9 @@ class AttachmentController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if (! $request->user()->isLab()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
-
         $validated = $request->validate([
             'file' => 'required|file|max:15360',
-            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order'])],
+            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order', 'site'])],
             'attachable_id' => 'required|integer',
         ]);
 
@@ -107,6 +104,7 @@ class AttachmentController extends Controller
             'quote' => Quote::class,
             'invoice' => Invoice::class,
             'order' => Order::class,
+            'site' => Site::class,
             default => Client::class,
         };
     }
@@ -122,6 +120,11 @@ class AttachmentController extends Controller
         if (($model instanceof Quote || $model instanceof Invoice || $model instanceof Order)
             && ($user->isClient() || $user->isSiteContact())
             && isset($model->client_id)
+            && (int) $model->client_id === (int) $user->client_id) {
+            return true;
+        }
+        if ($model instanceof Site
+            && ($user->isClient() || $user->isSiteContact())
             && (int) $model->client_id === (int) $user->client_id) {
             return true;
         }

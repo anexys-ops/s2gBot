@@ -102,4 +102,20 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('module-settings/{module_key}', [App\Http\Controllers\Api\ModuleSettingController::class, 'show']);
     Route::put('module-settings/{module_key}', [App\Http\Controllers\Api\ModuleSettingController::class, 'update']);
+
+    // App mobile laboratoire / terrain — dossiers (mesures + photos)
+    Route::prefix('mobile/dossiers')->group(function () {
+        Route::get('{kind}/{id}/measure-forms', [App\Http\Controllers\Api\Mobile\MobileDossierController::class, 'measureForms'])
+            ->where('kind', 'order|site')
+            ->whereNumber('id');
+        Route::post('{kind}/{id}/measure-submissions', [App\Http\Controllers\Api\Mobile\MobileDossierController::class, 'storeMeasureSubmission'])
+            ->where('kind', 'order|site')
+            ->whereNumber('id');
+        Route::get('{kind}/{id}/photos', [App\Http\Controllers\Api\Mobile\MobileDossierController::class, 'photos'])
+            ->where('kind', 'order|site')
+            ->whereNumber('id');
+        Route::post('{kind}/{id}/photos', [App\Http\Controllers\Api\Mobile\MobileDossierController::class, 'storePhotoMeta'])
+            ->where('kind', 'order|site')
+            ->whereNumber('id');
+    });
 });

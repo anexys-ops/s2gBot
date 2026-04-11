@@ -17,6 +17,7 @@ class AuthController extends Controller
         $request->validate([
             'email' => 'required|email',
             'password' => 'required',
+            'device_name' => 'nullable|string|max:255',
         ]);
 
         if (! Auth::attempt($request->only('email', 'password'))) {
@@ -24,8 +25,10 @@ class AuthController extends Controller
         }
 
         $user = Auth::user();
-        $user->tokens()->where('name', 'spa')->delete();
-        $token = $user->createToken('spa')->plainTextToken;
+        $device = $request->input('device_name');
+        $tokenName = is_string($device) && trim($device) !== '' ? trim($device) : 'spa';
+        $user->tokens()->where('name', $tokenName)->delete();
+        $token = $user->createToken($tokenName)->plainTextToken;
 
         $user->load(['client', 'site', 'accessGroups']);
         $payload = $user->toArray();

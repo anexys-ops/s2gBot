@@ -29,7 +29,45 @@ a { color: #2563eb; text-decoration: none; }
 a:hover { text-decoration: underline; }
 input, select, textarea, button { font: inherit; }
 .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
-.main-content { padding-top: 1.25rem; padding-bottom: 2rem; }
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell__main {
+  flex: 1 0 auto;
+}
+
+.main-content {
+  padding-top: 1.25rem;
+  padding-bottom: 2rem;
+}
+
+.app-version-footer {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding: 0.65rem 1rem 1rem;
+  text-align: center;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--color-muted, #64748b);
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  background: linear-gradient(180deg, transparent 0%, var(--color-surface-2, #f8fafc) 35%);
+}
+
+.app-version-footer__inner {
+  display: inline-block;
+  max-width: min(100%, 52rem);
+  word-break: break-word;
+}
+
+.app-version-footer--auth {
+  margin-top: 0;
+  background: rgba(15, 23, 42, 0.35);
+  border-top-color: rgba(148, 163, 184, 0.25);
+  color: rgba(226, 232, 240, 0.75);
+}
 .card {
   background: var(--color-surface);
   border-radius: var(--radius-lg);

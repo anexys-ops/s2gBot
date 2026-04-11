@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { getOfflineQueueLength } from '../lib/offlineQueue'
 import AppNavigation from './AppNavigation'
+import AppVersionFooter from './AppVersionFooter'
 
 export default function Layout() {
   const [online, setOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true))
@@ -29,7 +30,7 @@ export default function Layout() {
   }, [])
 
   return (
-    <>
+    <div className="app-shell">
       <AppNavigation />
       {!online && (
         <div className="app-offline-banner" role="status">
@@ -43,9 +44,10 @@ export default function Layout() {
           {queueN} requête(s) en attente de synchronisation (stockage local).
         </div>
       )}
-      <main className="container main-content">
+      <main className="container main-content app-shell__main">
         <Outlet />
       </main>
-    </>
+      <AppVersionFooter variant="app" />
+    </div>
   )
 }

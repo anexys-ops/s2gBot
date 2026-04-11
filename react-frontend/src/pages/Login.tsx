@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import AppVersionFooter from '../components/AppVersionFooter'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -116,6 +117,7 @@ export default function Login() {
           <p className="login-hint">Compte démo : admin@lab.local — mot de passe : password</p>
         </div>
       </div>
+      <AppVersionFooter variant="auth" />
     </div>
   )
 }

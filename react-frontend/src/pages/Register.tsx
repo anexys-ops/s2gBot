@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { authApi, clientsApi, sitesApi } from '../api/client'
+import AppVersionFooter from '../components/AppVersionFooter'
 
 export default function Register() {
   const [name, setName] = useState('')
@@ -118,6 +119,7 @@ export default function Register() {
           <Link to="/login">Déjà un compte ? Connexion</Link>
         </p>
       </div>
+      <AppVersionFooter variant="app" />
     </div>
   )
 }

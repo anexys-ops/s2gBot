@@ -78,6 +78,9 @@ services:
     build:
       context: .
       dockerfile: docker/nginx/Dockerfile
+      args:
+        # Pied de page Vite (__APP_GIT_SHA__) ; sinon « dev » si absent (build sans .git).
+        GIT_COMMIT_SHORT: ${GIT_COMMIT_SHORT:-}
     restart: unless-stopped
     ports:
       - '${HTTP_PORT:-8080}:80'

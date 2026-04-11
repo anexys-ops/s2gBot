@@ -33,15 +33,17 @@ jobs:
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           DEPLOY_BRANCH: ${{ github.ref_name }}
+          GIT_SHA_FULL: ${{ github.sha }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 167
-          envs: DEPLOY_PATH,DEPLOY_BRANCH
+          envs: DEPLOY_PATH,DEPLOY_BRANCH,GIT_SHA_FULL
           script_stop: true
           script: |
             set -euo pipefail
+            export GIT_COMMIT_SHORT="${GIT_SHA_FULL:0:7}"
             if [ -z "${DEPLOY_PATH:-}" ] || [ -z "${DEPLOY_BRANCH:-}" ]; then
               echo "DEPLOY_PATH ou branche manquant (secrets GitHub ?)"
               exit 1

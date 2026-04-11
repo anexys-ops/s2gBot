@@ -13,6 +13,11 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+# SHA court pour le build du front (docker/nginx/Dockerfile → Vite). Priorité : env déjà défini, puis dépôt git local.
+if [ -z "${GIT_COMMIT_SHORT:-}" ] && [ -d "$ROOT/.git" ]; then
+  GIT_COMMIT_SHORT="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || true)"
+  export GIT_COMMIT_SHORT
+fi
 ENV_FILE="${ENV_DOCKER_FILE:-.env.docker}"
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Fichier introuvable : $ENV_FILE (ex. cp docker/env.docker.example .env.docker)"

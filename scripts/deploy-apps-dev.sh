@@ -43,13 +43,32 @@ else
   RSYNC_E="ssh -p ${DEPLOY_PORT} -o StrictHostKeyChecking=accept-new"
 fi
 
-RSYNC_CODE=(rsync -az --delete -e "$RSYNC_E" --exclude .git --exclude node_modules --exclude .env)
+# Sync complet du monorepo (applications mobiles, scripts, workflows, front source + dist buildé).
+# Protège sur le serveur : .env Laravel, storage, bootstrap/cache (pas d’écrasement ni suppression).
+RSYNC_APP=(
+  rsync -az --delete
+  -e "$RSYNC_E"
+  --exclude '.git/'
+  --exclude 'node_modules/'
+  --exclude 'laravel-api/vendor/'
+  --exclude 'deploy.env'
+  --exclude '.cursor/'
+  --exclude 'laravel-api/.env'
+  --filter 'protect laravel-api/.env'
+  --filter 'protect laravel-api/storage/'
+  --filter 'protect laravel-api/bootstrap/cache/'
+)
+
 echo "==> Build react-frontend (production)"
 (cd react-frontend && npm ci && npm run build)
 
-echo "==> Sync Laravel (sans vendor) — public/ côté serveur aligné sur le dépôt (souvent index.php seul)"
-"${RSYNC_CODE[@]}" "$ROOT/laravel-api/" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_PATH/laravel-api/"
-echo "==> Copie du build Vite dans public/ (protect index.php Laravel, --delete pour anciens assets)"
+echo "==> Création du répertoire distant $REMOTE_PATH (si besoin)"
+remote_ssh "mkdir -p '$REMOTE_PATH'"
+
+echo "==> Sync dépôt complet vers $REMOTE_PATH (hors .git, node_modules, vendor ; .env & storage préservés)"
+"${RSYNC_APP[@]}" "$ROOT/" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_PATH/"
+
+echo "==> Copie du build Vite dans laravel-api/public/ (protect index.php Laravel, --delete pour anciens assets)"
 rsync -az --delete -e "$RSYNC_E" \
   --filter 'protect index.php' \
   "$ROOT/react-frontend/dist/" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_PATH/laravel-api/public/"

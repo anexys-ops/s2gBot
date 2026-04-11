@@ -16,6 +16,7 @@ class QuoteController extends Controller
 {
     private const LINE_RULES = [
         'lines' => 'required|array|min:1',
+        'lines.*.commercial_offering_id' => 'nullable|exists:commercial_offerings,id',
         'lines.*.description' => 'required|string|max:500',
         'lines.*.quantity' => 'required|integer|min:1',
         'lines.*.unit_price' => 'required|numeric|min:0',
@@ -29,7 +30,7 @@ class QuoteController extends Controller
         $query = Quote::query()->with([
             'client',
             'site',
-            'quoteLines',
+            'quoteLines.commercialOffering',
             'billingAddress',
             'deliveryAddress',
             'pdfTemplate',
@@ -126,7 +127,7 @@ class QuoteController extends Controller
         $this->recalculateQuoteTotals($quote);
 
         return response()->json($quote->fresh()->load([
-            'client', 'site', 'quoteLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
+            'client', 'site', 'quoteLines.commercialOffering', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
         ]), 201);
     }
 
@@ -141,7 +142,7 @@ class QuoteController extends Controller
         }
 
         return response()->json($quote->load([
-            'client', 'site', 'quoteLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate', 'attachments',
+            'client', 'site', 'quoteLines.commercialOffering', 'billingAddress', 'deliveryAddress', 'pdfTemplate', 'attachments',
         ]));
     }
 
@@ -164,7 +165,7 @@ class QuoteController extends Controller
             $quote->save();
 
             return response()->json($quote->fresh()->load([
-                'client', 'site', 'quoteLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
+                'client', 'site', 'quoteLines.commercialOffering', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
             ]));
         }
 
@@ -191,6 +192,7 @@ class QuoteController extends Controller
             'meta' => 'nullable|array',
         ], [
             'lines' => 'sometimes|array|min:1',
+            'lines.*.commercial_offering_id' => 'nullable|exists:commercial_offerings,id',
             'lines.*.description' => 'required_with:lines|string|max:500',
             'lines.*.quantity' => 'required_with:lines|integer|min:1',
             'lines.*.unit_price' => 'required_with:lines|numeric|min:0',
@@ -218,7 +220,7 @@ class QuoteController extends Controller
         $this->recalculateQuoteTotals($quote);
 
         return response()->json($quote->fresh()->load([
-            'client', 'site', 'quoteLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
+            'client', 'site', 'quoteLines.commercialOffering', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
         ]));
     }
 
@@ -248,6 +250,7 @@ class QuoteController extends Controller
             );
             QuoteLine::create([
                 'quote_id' => $quote->id,
+                'commercial_offering_id' => isset($line['commercial_offering_id']) ? (int) $line['commercial_offering_id'] : null,
                 'description' => $line['description'],
                 'quantity' => (int) $line['quantity'],
                 'unit_price' => $line['unit_price'],

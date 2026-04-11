@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
+import { canManageAppConfig } from '../../lib/settingsAccess'
 
 type PageMeta = { title: string; subtitle: string; crumb: string }
 
@@ -11,6 +12,12 @@ function metaForPath(pathname: string): PageMeta {
       title: 'Catalogue des essais',
       subtitle: 'Types d’essais, normes, tarifs unitaires et paramètres mesurés sur les dossiers.',
       crumb: 'Catalogue essais',
+    }
+  if (pathname.includes('/catalogue-commercial'))
+    return {
+      title: 'Catalogue commercial',
+      subtitle: 'Produits et prestations : prix d’achat, prix de vente, TVA, stock — alimentation des lignes de devis.',
+      crumb: 'Catalogue commercial',
     }
   if (pathname.includes('/granulometrie'))
     return {
@@ -71,12 +78,14 @@ export default function BackOfficeLayout() {
   const { user } = useAuth()
   const { pathname } = useLocation()
   const isAdmin = user?.role === 'lab_admin'
+  const canAppConfig = canManageAppConfig(user)
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
 
   const meta = useMemo(() => metaForPath(pathname), [pathname])
 
   const tabs = [
     { to: '/back-office/catalogue-essais', label: 'Catalogue essais', end: true as const },
+    { to: '/back-office/catalogue-commercial', label: 'Catalogue commercial', end: true as const },
     { to: '/back-office/granulometrie', label: 'Granulométrie', end: true as const },
     { to: '/back-office/cadrage', label: 'Cadrage (S0)', end: true as const },
     { to: '/back-office/exemples-calculs', label: 'Calculs BTP', end: true as const },
@@ -89,12 +98,8 @@ export default function BackOfficeLayout() {
           { to: '/back-office/mails', label: 'Mails', end: true as const },
         ]
       : []),
-    ...(isAdmin
-      ? [
-          { to: '/back-office/modeles-rapports-pdf', label: 'Modèles PDF rapports', end: true as const },
-          { to: '/back-office/configuration', label: 'Configuration', end: true as const },
-        ]
-      : []),
+    ...(isAdmin ? [{ to: '/back-office/modeles-rapports-pdf', label: 'Modèles PDF rapports', end: true as const }] : []),
+    ...(canAppConfig ? [{ to: '/back-office/configuration', label: 'Configuration', end: true as const }] : []),
   ]
 
   return (

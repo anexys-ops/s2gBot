@@ -9,10 +9,12 @@ return [
     'env' => env('APP_ENV', 'production'),
     'debug' => (bool) env('APP_DEBUG', false),
     'url' => env('APP_URL', 'http://localhost'),
-    'timezone' => 'Europe/Paris',
+    'timezone' => env('APP_TIMEZONE', 'Africa/Casablanca'),
     'locale' => 'fr',
     'fallback_locale' => 'en',
     'faker_locale' => 'fr_FR',
+    /** Libellé monnaie affiché sur PDF et documents (dirham marocain, ISO MAD). */
+    'currency_display' => env('APP_CURRENCY_DISPLAY', 'DH'),
     'key' => env('APP_KEY'),
     'cipher' => 'AES-256-CBC',
     'maintenance' => [

@@ -1,12 +1,18 @@
-# Plateforme Lab BTP — Laravel + React + MySQL
+# Plateforme Lab BTP — 3 services Docker
+#
+#   web  : Nginx (SPA React) + proxy FastCGI vers l’API sur /api, /sanctum, /up
+#   app  : PHP-FPM 8.4 + Laravel (API REST)
+#   db   : MySQL 8 (données ; joignable depuis app sur le hostname « db »)
+#
 # Usage :
 #   cp docker/env.docker.example .env.docker
-#   # Éditer .env.docker (APP_URL, mots de passe, APP_KEY optionnel)
+#   # Éditer .env.docker (APP_URL, mots de passe, APP_KEY, MYSQL_PUBLISH_PORT si besoin)
 #   docker compose --env-file .env.docker up -d --build
 #   # Première fois : comptes démo
 #   docker compose exec app php artisan db:seed --force
 #
-# Interface : http://localhost:${HTTP_PORT:-8080}
+# Interface : http://localhost:${HTTP_PORT:-8080} — API : même origine, préfixes /api et /sanctum
+# MySQL sur l’hôte (loopback) : 127.0.0.1:${MYSQL_PUBLISH_PORT:-33060} → conteneur :3306
 
 services:
   db:
@@ -18,6 +24,9 @@ services:
       MYSQL_USER: ${DB_USERNAME:-labbtp}
       MYSQL_PASSWORD: ${DB_PASSWORD:-labbtp_secret}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_secret_change_me}
+    ports:
+      # Accès admin / sauvegarde depuis la machine hôte uniquement (pas d’écoute publique).
+      - '127.0.0.1:${MYSQL_PUBLISH_PORT:-33060}:3306'
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -57,6 +66,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'php artisan db:show --quiet > /dev/null 2>&1 || exit 1']
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
 
   web:
     build:
@@ -66,7 +81,8 @@ services:
     ports:
       - '${HTTP_PORT:-8080}:80'
     depends_on:
-      - app
+      app:
+        condition: service_healthy
 
 volumes:
   mysql_data:

@@ -1,9 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { statsApi } from '../../api/client'
-
-function euros(n: number) {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n)
-}
+import { formatMoney } from '../../lib/appLocale'
 
 export default function ReportVentesPage() {
   const { data, isLoading, error } = useQuery({
@@ -34,7 +31,7 @@ export default function ReportVentesPage() {
         </div>
         <div className="report-kpi report-kpi--accent">
           <span className="report-kpi__label">Montant TTC devis ouverts</span>
-          <strong className="report-kpi__value">{euros(amounts.quotes_open_ttc)}</strong>
+          <strong className="report-kpi__value">{formatMoney(amounts.quotes_open_ttc)}</strong>
         </div>
         <div className="report-kpi">
           <span className="report-kpi__label">Commandes</span>

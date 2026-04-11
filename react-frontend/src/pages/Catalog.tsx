@@ -7,6 +7,7 @@ import Modal from '../components/Modal'
 import ListTableToolbar from '../components/ListTableToolbar'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
+import { MONEY_UNIT_LABEL } from '../lib/appLocale'
 
 type ParamRow = { id?: number; name: string; unit: string; expected_type: string }
 
@@ -178,7 +179,7 @@ export default function Catalog() {
               {visible.name !== false && <th>Nom</th>}
               {visible.norm !== false && <th>Norme</th>}
               {visible.unit !== false && <th>Unité</th>}
-              {visible.price !== false && <th>Tarif unitaire (€)</th>}
+              {visible.price !== false && <th>Tarif unitaire ({MONEY_UNIT_LABEL})</th>}
               {visible.params !== false && <th>Paramètres</th>}
               {canManageCatalog && visible.actions !== false && <th>Actions</th>}
             </tr>
@@ -241,7 +242,7 @@ export default function Catalog() {
               <input value={form.unit} onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))} />
             </div>
             <div className="form-group">
-              <label>Tarif unitaire (€) *</label>
+              <label>Tarif unitaire ({MONEY_UNIT_LABEL}) *</label>
               <input
                 type="number"
                 min={0}

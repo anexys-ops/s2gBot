@@ -55,8 +55,8 @@
             <tr>
                 <td>{{ $line->description }}</td>
                 <td>{{ $line->quantity }}</td>
-                <td>{{ number_format($line->unit_price, 2, ',', ' ') }} €</td>
-                <td class="text-right">{{ number_format($line->total, 2, ',', ' ') }} €</td>
+                <td>{{ number_format($line->unit_price, 2, ',', ' ') }} {{ $currencyLabel }}</td>
+                <td class="text-right">{{ number_format($line->total, 2, ',', ' ') }} {{ $currencyLabel }}</td>
             </tr>
             @endforeach
         </tbody>
@@ -64,14 +64,14 @@
 
     <div class="totals">
         @if((float)($quote->discount_percent ?? 0) > 0 || (float)($quote->discount_amount ?? 0) > 0)
-        <p>Remise : {{ number_format((float)($quote->discount_percent ?? 0), 2, ',', ' ') }} % @if((float)($quote->discount_amount ?? 0) > 0) — {{ number_format($quote->discount_amount, 2, ',', ' ') }} € HT @endif</p>
+        <p>Remise : {{ number_format((float)($quote->discount_percent ?? 0), 2, ',', ' ') }} % @if((float)($quote->discount_amount ?? 0) > 0) — {{ number_format($quote->discount_amount, 2, ',', ' ') }} {{ $currencyLabel }} HT @endif</p>
         @endif
         @if((float)($quote->shipping_amount_ht ?? 0) > 0)
-        <p>Port / livraison HT : {{ number_format($quote->shipping_amount_ht, 2, ',', ' ') }} €</p>
+        <p>Port / livraison HT : {{ number_format($quote->shipping_amount_ht, 2, ',', ' ') }} {{ $currencyLabel }}</p>
         @endif
-        <p>Total HT : {{ number_format($quote->amount_ht, 2, ',', ' ') }} €</p>
-        <p>TVA (global {{ $quote->tva_rate }} %) : {{ number_format($quote->amount_ttc - $quote->amount_ht, 2, ',', ' ') }} €</p>
-        <p><strong>Total TTC : {{ number_format($quote->amount_ttc, 2, ',', ' ') }} €</strong></p>
+        <p>Total HT : {{ number_format($quote->amount_ht, 2, ',', ' ') }} {{ $currencyLabel }}</p>
+        <p>TVA (global {{ $quote->tva_rate }} %) : {{ number_format($quote->amount_ttc - $quote->amount_ht, 2, ',', ' ') }} {{ $currencyLabel }}</p>
+        <p><strong>Total TTC : {{ number_format($quote->amount_ttc, 2, ',', ' ') }} {{ $currencyLabel }}</strong></p>
     </div>
 
     @if($quote->notes)

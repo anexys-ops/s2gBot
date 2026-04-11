@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\PermissionCatalog;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -19,6 +21,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
         'password',
         'role',
         'client_id',
@@ -46,6 +49,71 @@ class User extends Authenticatable
     public function site()
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function accessGroups(): BelongsToMany
+    {
+        return $this->belongsToMany(AccessGroup::class, 'access_group_user')->withTimestamps();
+    }
+
+    /**
+     * Capacité métier (groupes). Les administrateurs laboratoire ont tout.
+     */
+    public function hasCapability(string $permission): bool
+    {
+        if ($this->isLabAdmin()) {
+            return true;
+        }
+
+        $groups = $this->relationLoaded('accessGroups')
+            ? $this->accessGroups
+            : $this->accessGroups()->get();
+
+        foreach ($groups as $group) {
+            $perms = $group->permissions ?? [];
+            if (! is_array($perms)) {
+                continue;
+            }
+            if (in_array(PermissionCatalog::ALL_MARKER, $perms, true)) {
+                return true;
+            }
+            if (in_array($permission, $perms, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Liste des clés de permission effectives (fusion groupes, sans doublons).
+     *
+     * @return list<string>
+     */
+    public function effectivePermissionKeys(): array
+    {
+        if ($this->isLabAdmin()) {
+            return PermissionCatalog::keys();
+        }
+
+        $this->loadMissing('accessGroups');
+        $out = [];
+        foreach ($this->accessGroups as $group) {
+            $perms = $group->permissions ?? [];
+            if (! is_array($perms)) {
+                continue;
+            }
+            if (in_array(PermissionCatalog::ALL_MARKER, $perms, true)) {
+                return PermissionCatalog::keys();
+            }
+            foreach ($perms as $p) {
+                if (is_string($p)) {
+                    $out[$p] = true;
+                }
+            }
+        }
+
+        return array_keys($out);
     }
 
     public function isLabAdmin(): bool

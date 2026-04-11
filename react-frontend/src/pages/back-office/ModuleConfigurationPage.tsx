@@ -8,6 +8,7 @@ import {
   type ExtrafieldSelectOption,
 } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
+import { canManageAppConfig } from '../../lib/settingsAccess'
 import Modal from '../../components/Modal'
 
 const ENTITY_TABS: { type: ExtrafieldEntityType; label: string }[] = [
@@ -44,7 +45,7 @@ type MainTab = 'extrafields' | 'modules'
 
 export default function ModuleConfigurationPage() {
   const { user } = useAuth()
-  const isAdmin = user?.role === 'lab_admin'
+  const canConfigure = canManageAppConfig(user)
   const queryClient = useQueryClient()
   const [mainTab, setMainTab] = useState<MainTab>('extrafields')
   const [entityTab, setEntityTab] = useState<ExtrafieldEntityType>('invoice')
@@ -54,7 +55,7 @@ export default function ModuleConfigurationPage() {
   const { data: defsRes, isLoading } = useQuery({
     queryKey: ['extrafield-definitions', entityTab],
     queryFn: () => extrafieldDefinitionsApi.list(entityTab),
-    enabled: isAdmin,
+    enabled: canConfigure,
   })
 
   const definitions = defsRes?.data ?? []
@@ -64,8 +65,8 @@ export default function ModuleConfigurationPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['extrafield-definitions'] }),
   })
 
-  if (!isAdmin) {
-    return <p className="error">Réservé aux administrateurs laboratoire.</p>
+  if (!canConfigure) {
+    return <p className="error">Réservé aux administrateurs ou aux comptes avec le droit « configuration ».</p>
   }
 
   return (

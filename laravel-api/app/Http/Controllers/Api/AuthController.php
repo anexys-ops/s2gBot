@@ -27,8 +27,12 @@ class AuthController extends Controller
         $user->tokens()->where('name', 'spa')->delete();
         $token = $user->createToken('spa')->plainTextToken;
 
+        $user->load(['client', 'site', 'accessGroups']);
+        $payload = $user->toArray();
+        $payload['effective_permissions'] = $user->effectivePermissionKeys();
+
         return response()->json([
-            'user' => $user->load(['client', 'site']),
+            'user' => $payload,
             'token' => $token,
             'token_type' => 'Bearer',
         ]);
@@ -56,8 +60,12 @@ class AuthController extends Controller
 
         $token = $user->createToken('spa')->plainTextToken;
 
+        $user->load(['client', 'site', 'accessGroups']);
+        $payload = $user->toArray();
+        $payload['effective_permissions'] = $user->effectivePermissionKeys();
+
         return response()->json([
-            'user' => $user->load(['client', 'site']),
+            'user' => $payload,
             'token' => $token,
             'token_type' => 'Bearer',
         ], 201);
@@ -72,6 +80,10 @@ class AuthController extends Controller
 
     public function user(Request $request): JsonResponse
     {
-        return response()->json($request->user()->load(['client', 'site']));
+        $u = $request->user()->load(['client', 'site', 'accessGroups']);
+        $data = $u->toArray();
+        $data['effective_permissions'] = $u->effectivePermissionKeys();
+
+        return response()->json($data);
     }
 }

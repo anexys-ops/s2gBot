@@ -65,6 +65,90 @@ export const authApi = {
   user: () => api<User>('/user'),
 }
 
+export interface ApiTokenRow {
+  id: number
+  name: string
+  last_used_at: string | null
+  created_at: string
+  is_spa: boolean
+}
+
+export interface AccessGroupRow {
+  id: number
+  name: string
+  slug: string
+  description?: string | null
+  permissions?: string[] | null
+  users_count?: number
+}
+
+export const accountApi = {
+  updateProfile: (body: { name?: string; email?: string; phone?: string | null }) =>
+    api<User>('/user/profile', { method: 'PUT', body: JSON.stringify(body) }),
+  updatePassword: (body: { current_password: string; password: string; password_confirmation: string }) =>
+    api<{ message: string }>('/user/password', { method: 'PUT', body: JSON.stringify(body) }),
+  listApiTokens: () => api<{ data: ApiTokenRow[] }>('/user/api-tokens'),
+  createApiToken: (name: string) =>
+    api<{ token: string; token_type: string; name: string; message: string }>('/user/api-tokens', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+  revokeApiToken: (tokenId: number) => api(`/user/api-tokens/${tokenId}`, { method: 'DELETE' }),
+}
+
+export const permissionsCatalogApi = {
+  get: () => api<{ permissions: Record<string, string> }>('/permissions/catalog'),
+}
+
+export const adminUsersApi = {
+  list: (params?: { search?: string; page?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    if (params?.page) q.set('page', String(params.page))
+    const s = q.toString()
+    return api<LaravelPaginator<User>>(`/admin/users${s ? `?${s}` : ''}`)
+  },
+  get: (id: number) => api<User>(`/admin/users/${id}`),
+  create: (body: {
+    name: string
+    email: string
+    password: string
+    phone?: string | null
+    role: string
+    client_id?: number | null
+    site_id?: number | null
+    access_group_ids?: number[]
+  }) => api<User>('/admin/users', { method: 'POST', body: JSON.stringify(body) }),
+  update: (
+    id: number,
+    body: Partial<{
+      name: string
+      email: string
+      password: string
+      phone: string | null
+      role: string
+      client_id: number | null
+      site_id: number | null
+      access_group_ids: number[]
+    }>,
+  ) => api<User>(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/admin/users/${id}`, { method: 'DELETE' }),
+}
+
+export const accessGroupsApi = {
+  list: () => api<{ data: AccessGroupRow[] }>('/admin/access-groups'),
+  get: (id: number) => api<AccessGroupRow & { users?: Pick<User, 'id' | 'name' | 'email' | 'role'>[] }>(
+    `/admin/access-groups/${id}`,
+  ),
+  create: (body: { name: string; slug?: string; description?: string | null; permissions?: string[] }) =>
+    api<AccessGroupRow>('/admin/access-groups', { method: 'POST', body: JSON.stringify(body) }),
+  update: (
+    id: number,
+    body: Partial<{ name: string; slug: string; description: string | null; permissions: string[] }>,
+  ) => api<AccessGroupRow>(`/admin/access-groups/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/admin/access-groups/${id}`, { method: 'DELETE' }),
+}
+
 export const clientsApi = {
   list: (params?: { search?: string }) => {
     const q = new URLSearchParams()
@@ -576,8 +660,44 @@ export interface DashboardStatsPayload {
   ca_par_mois: Array<{ mois: string; ca_ttc: number }>
 }
 
+export interface CommercialOffering {
+  id: number
+  code: string | null
+  name: string
+  description: string | null
+  kind: 'product' | 'service'
+  unit: string | null
+  purchase_price_ht: number
+  sale_price_ht: number
+  default_tva_rate: number
+  stock_quantity: number
+  track_stock: boolean
+  active: boolean
+}
+
+export const commercialOfferingsApi = {
+  list: (params?: { search?: string; kind?: string; active_only?: boolean; per_page?: number; page?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    if (params?.kind) q.set('kind', params.kind)
+    if (params?.active_only) q.set('active_only', '1')
+    if (params?.per_page) q.set('per_page', String(params.per_page))
+    if (params?.page) q.set('page', String(params.page))
+    const s = q.toString()
+    return api<LaravelPaginator<CommercialOffering>>(`/commercial-offerings${s ? `?${s}` : ''}`)
+  },
+  get: (id: number) => api<CommercialOffering>(`/commercial-offerings/${id}`),
+  create: (body: Partial<CommercialOffering> & { name: string; kind: 'product' | 'service' }) =>
+    api<CommercialOffering>('/commercial-offerings', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: number, body: Partial<CommercialOffering>) =>
+    api<CommercialOffering>(`/commercial-offerings/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/commercial-offerings/${id}`, { method: 'DELETE' }),
+}
+
 export interface QuoteLine {
   id?: number
+  commercial_offering_id?: number | null
+  commercial_offering?: CommercialOffering | null
   description: string
   quantity: number
   unit_price: number
@@ -653,6 +773,7 @@ export interface QuoteCreateBody {
   pdf_template_id?: number
   notes?: string
   lines: Array<{
+    commercial_offering_id?: number | null
     description: string
     quantity: number
     unit_price: number
@@ -761,11 +882,14 @@ export interface User {
   id: number
   name: string
   email: string
+  phone?: string | null
   role: string
   client_id?: number
   site_id?: number
   client?: Client
   site?: Site
+  access_groups?: AccessGroupRow[]
+  effective_permissions?: string[]
 }
 
 export interface RegisterBody {
@@ -782,9 +906,20 @@ export interface Client {
   id: number
   name: string
   address?: string
+  city?: string | null
+  postal_code?: string | null
   email?: string
   phone?: string
+  whatsapp?: string | null
   siret?: string
+  /** Maroc — Identifiant Commun de l’Entreprise */
+  ice?: string | null
+  rc?: string | null
+  patente?: string | null
+  if_number?: string | null
+  legal_form?: string | null
+  cnss_employer?: string | null
+  capital_social?: number | string | null
   meta?: EntityMetaPayload | null
   sites?: Site[]
 }

@@ -1,9 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { statsApi } from '../../api/client'
-
-function euros(n: number) {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n)
-}
+import { formatMoney } from '../../lib/appLocale'
 
 export default function ReportComptaPage() {
   const { data, isLoading, error } = useQuery({
@@ -31,19 +28,19 @@ export default function ReportComptaPage() {
       <div className="report-kpi-grid">
         <div className="report-kpi">
           <span className="report-kpi__label">Factures TTC (périmètre)</span>
-          <strong className="report-kpi__value">{euros(amounts.invoices_ttc_total)}</strong>
+          <strong className="report-kpi__value">{formatMoney(amounts.invoices_ttc_total)}</strong>
         </div>
         <div className="report-kpi">
           <span className="report-kpi__label">Encaissé (statut payée)</span>
-          <strong className="report-kpi__value">{euros(amounts.invoices_ttc_paid)}</strong>
+          <strong className="report-kpi__value">{formatMoney(amounts.invoices_ttc_paid)}</strong>
         </div>
         <div className="report-kpi report-kpi--accent">
           <span className="report-kpi__label">Reste à encaisser</span>
-          <strong className="report-kpi__value">{euros(amounts.invoices_ttc_unpaid)}</strong>
+          <strong className="report-kpi__value">{formatMoney(amounts.invoices_ttc_unpaid)}</strong>
         </div>
         <div className="report-kpi">
           <span className="report-kpi__label">Pipeline devis (hors clos)</span>
-          <strong className="report-kpi__value">{euros(amounts.quotes_open_ttc)}</strong>
+          <strong className="report-kpi__value">{formatMoney(amounts.quotes_open_ttc)}</strong>
         </div>
         <div className="report-kpi">
           <span className="report-kpi__label">Nombre de factures</span>
@@ -64,10 +61,10 @@ export default function ReportComptaPage() {
                   <div
                     className="report-bar-fill"
                     style={{ width: `${(row.ca_ttc / maxCa) * 100}%` }}
-                    title={euros(row.ca_ttc)}
+                    title={formatMoney(row.ca_ttc)}
                   />
                 </div>
-                <span className="report-bar-value">{euros(row.ca_ttc)}</span>
+                <span className="report-bar-value">{formatMoney(row.ca_ttc)}</span>
               </div>
             ))}
           </div>

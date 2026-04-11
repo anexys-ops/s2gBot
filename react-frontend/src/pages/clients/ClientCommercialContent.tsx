@@ -9,12 +9,25 @@ import {
   type ClientAddress,
 } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
+import { INVOICE_STATUS_LABELS, QUOTE_STATUS_LABELS } from '../../lib/commercialStatusLabels'
+import { formatMoney } from '../../lib/appLocale'
 
 const ADDR_TYPES: Record<string, string> = {
   billing: 'Facturation',
   delivery: 'Livraison',
   site: 'Chantier',
   headquarters: 'Siège',
+}
+
+function statusBreakdown(
+  record: Record<string, number> | undefined,
+  labels: Record<string, string>,
+): { key: string; label: string; count: number }[] {
+  if (!record) return []
+  return Object.entries(record)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => ({ key: k, label: labels[k] ?? k, count: n }))
 }
 
 type Props = { clientId: number }
@@ -28,7 +41,7 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
     line1: '',
     city: '',
     postal_code: '',
-    country: 'FR',
+    country: 'MA',
     is_default: false,
   })
   const [linkForm, setLinkForm] = useState({
@@ -49,7 +62,7 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
     mutationFn: () => clientAddressesApi.create(id, newAddr),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['client-commercial', id] })
-      setNewAddr({ type: 'billing', line1: '', city: '', postal_code: '', country: 'FR', is_default: false })
+      setNewAddr({ type: 'billing', line1: '', city: '', postal_code: '', country: 'MA', is_default: false })
     },
   })
 
@@ -70,30 +83,103 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
   if (error || !data) return <p className="error">{(error as Error)?.message ?? 'Erreur'}</p>
 
   const { client, quotes, invoices, stats, document_links: docLinks } = data
+  const quoteRows = statusBreakdown(stats.quotes_by_status, QUOTE_STATUS_LABELS)
+  const invoiceRows = statusBreakdown(stats.invoices_by_status, INVOICE_STATUS_LABELS)
 
   return (
     <>
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <h2 style={{ marginTop: 0 }}>Synthèse</h2>
-        <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
-          <li>
-            <strong>Montant dû (TTC)</strong> : {stats.amount_due_ttc.toFixed(2)} € (factures non payées, hors
-            brouillon)
-          </li>
-          <li>
-            <strong>Total facturé (TTC)</strong> : {stats.total_invoiced_ttc.toFixed(2)} €
-          </li>
-          <li>
-            <strong>Total devis (TTC)</strong> : {stats.total_quotes_ttc.toFixed(2)} €
-          </li>
-          <li>
-            <strong>Devis ouverts</strong> : {stats.open_quotes_count}
-          </li>
-        </ul>
-        <p style={{ marginTop: '0.75rem', fontSize: '0.9rem', color: '#64748b' }}>
-          Répartition devis : {JSON.stringify(stats.quotes_by_status)} — Factures :{' '}
-          {JSON.stringify(stats.invoices_by_status)}
-        </p>
+      <div className="card client-synthese" style={{ marginBottom: '1rem' }}>
+        <h2 className="client-synthese__title">Synthèse</h2>
+        <table className="client-synthese-kpi">
+          <tbody>
+            <tr>
+              <th scope="row">Montant dû (TTC)</th>
+              <td>
+                <span className="client-synthese-kpi__value client-synthese-kpi__value--accent">
+                  {formatMoney(stats.amount_due_ttc)}
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">Total facturé (TTC)</th>
+              <td className="client-synthese-kpi__value">{formatMoney(stats.total_invoiced_ttc)}</td>
+            </tr>
+            <tr>
+              <th scope="row">Total devis (TTC)</th>
+              <td className="client-synthese-kpi__value">{formatMoney(stats.total_quotes_ttc)}</td>
+            </tr>
+            <tr>
+              <th scope="row">Devis ouverts</th>
+              <td className="client-synthese-kpi__value">{stats.open_quotes_count}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="client-synthese__note">Montant dû : factures non payées, hors brouillon.</p>
+
+        <div className="client-synthese-split">
+          <div className="client-synthese-split__col">
+            <h3 className="client-synthese-split__heading">Répartition — devis</h3>
+            <div className="client-synthese-table-wrap">
+              <table className="client-synthese-status">
+                <thead>
+                  <tr>
+                    <th scope="col">Statut</th>
+                    <th scope="col" className="client-synthese-status__num">
+                      Effectif
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quoteRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={2} className="client-synthese-status__empty">
+                        Aucun devis dans ces statuts
+                      </td>
+                    </tr>
+                  ) : (
+                    quoteRows.map((row) => (
+                      <tr key={row.key}>
+                        <td>{row.label}</td>
+                        <td className="client-synthese-status__num">{row.count}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="client-synthese-split__col">
+            <h3 className="client-synthese-split__heading">Répartition — factures</h3>
+            <div className="client-synthese-table-wrap">
+              <table className="client-synthese-status">
+                <thead>
+                  <tr>
+                    <th scope="col">Statut</th>
+                    <th scope="col" className="client-synthese-status__num">
+                      Effectif
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoiceRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={2} className="client-synthese-status__empty">
+                        Aucune facture dans ces statuts
+                      </td>
+                    </tr>
+                  ) : (
+                    invoiceRows.map((row) => (
+                      <tr key={row.key}>
+                        <td>{row.label}</td>
+                        <td className="client-synthese-status__num">{row.count}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: '1rem' }}>
@@ -215,7 +301,7 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
                 <td>{q.number}</td>
                 <td>{new Date(q.quote_date).toLocaleDateString('fr-FR')}</td>
                 <td>{q.status}</td>
-                <td>{Number(q.amount_ttc).toFixed(2)} €</td>
+                <td>{formatMoney(Number(q.amount_ttc))}</td>
                 <td>
                   <button type="button" className="btn btn-secondary btn-sm" onClick={() => pdfApi.generate('quote', q.id, q.pdf_template_id)}>
                     Télécharger
@@ -245,7 +331,7 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
                 <td>{inv.number}</td>
                 <td>{new Date(inv.invoice_date).toLocaleDateString('fr-FR')}</td>
                 <td>{inv.status}</td>
-                <td>{Number(inv.amount_ttc).toFixed(2)} €</td>
+                <td>{formatMoney(Number(inv.amount_ttc))}</td>
                 <td>
                   <button
                     type="button"

@@ -33,6 +33,12 @@ export default function CrmHub() {
 
   if (isLab) {
     cards.push(
+      {
+        to: '/back-office/catalogue-commercial',
+        title: 'Catalogue commercial',
+        desc: 'Produits et prestations : PA / PV HT, TVA, stock ; alimentation des lignes de devis.',
+        icon: 'catalog',
+      },
       { to: '/back-office/mails', title: 'Mails', desc: 'Modèles et envois liés aux dossiers.', icon: 'mail' },
       { to: '/back-office/pdf', title: 'Création PDF', desc: 'Rapports et documents générés.', icon: 'printer' },
     )

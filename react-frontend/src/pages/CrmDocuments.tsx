@@ -7,6 +7,7 @@ import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibil
 import { invoicesApi, pdfApi, quotesApi, type Invoice, type Quote } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
+import { formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
 
 const QUOTE_STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
@@ -166,7 +167,7 @@ export default function CrmDocuments() {
                 {visible.number !== false && <th>N°</th>}
                 {visible.date !== false && <th>Date</th>}
                 {visible.status !== false && <th>Statut</th>}
-                {visible.ttc !== false && <th>TTC</th>}
+                {visible.ttc !== false && <th>TTC ({MONEY_UNIT_LABEL})</th>}
                 {visible.pdf !== false && <th>PDF</th>}
                 {isLab && visible.crm !== false && <th>Fiche</th>}
               </tr>
@@ -178,7 +179,7 @@ export default function CrmDocuments() {
                   {visible.number !== false && <td>{q.number}</td>}
                   {visible.date !== false && <td>{new Date(q.quote_date).toLocaleDateString('fr-FR')}</td>}
                   {visible.status !== false && <td>{QUOTE_STATUS_LABELS[q.status] ?? q.status}</td>}
-                  {visible.ttc !== false && <td>{Number(q.amount_ttc).toFixed(2)} €</td>}
+                  {visible.ttc !== false && <td>{formatMoney(Number(q.amount_ttc))}</td>}
                   {visible.pdf !== false && (
                     <td>
                       <button
@@ -211,7 +212,7 @@ export default function CrmDocuments() {
                 {visible.number !== false && <th>N°</th>}
                 {visible.date !== false && <th>Date</th>}
                 {visible.status !== false && <th>Statut</th>}
-                {visible.ttc !== false && <th>TTC</th>}
+                {visible.ttc !== false && <th>TTC ({MONEY_UNIT_LABEL})</th>}
                 {visible.pdf !== false && <th>PDF</th>}
                 {isLab && visible.crm !== false && <th>Fiche</th>}
               </tr>
@@ -223,7 +224,7 @@ export default function CrmDocuments() {
                   {visible.number !== false && <td>{inv.number}</td>}
                   {visible.date !== false && <td>{new Date(inv.invoice_date).toLocaleDateString('fr-FR')}</td>}
                   {visible.status !== false && <td>{INVOICE_STATUS_LABELS[inv.status] ?? inv.status}</td>}
-                  {visible.ttc !== false && <td>{Number(inv.amount_ttc).toFixed(2)} €</td>}
+                  {visible.ttc !== false && <td>{formatMoney(Number(inv.amount_ttc))}</td>}
                   {visible.pdf !== false && (
                     <td>
                       <button

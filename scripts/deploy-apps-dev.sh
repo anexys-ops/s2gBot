@@ -154,6 +154,7 @@ if [ "${DEPLOY_FOR_TESTS:-0}" = "1" ]; then
   "$PHP_BIN" artisan view:clear 2>/dev/null || true
 else
   "$PHP_BIN" artisan config:cache
+  "$PHP_BIN" artisan route:clear
   "$PHP_BIN" artisan route:cache
   "$PHP_BIN" artisan view:cache
 fi

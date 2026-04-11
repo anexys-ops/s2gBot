@@ -1,4 +1,12 @@
 import { useEffect, useState } from 'react'
+import {
+  SUPPORT_EMAIL,
+  SUPPORT_EMAIL_HREF,
+  SUPPORT_SITE_HREF,
+  SUPPORT_SITE_LABEL,
+  SUPPORT_WHATSAPP_E164,
+  SUPPORT_WHATSAPP_HREF,
+} from '../config/support'
 
 type Variant = 'app' | 'auth'
 
@@ -88,6 +96,18 @@ export default function AppVersionFooter({ variant = 'app', dock = false }: Prop
       <div className="app-version-footer__inner">
         <div className={statusClass} role="status" aria-live="polite">
           {statusText}
+        </div>
+        <div className="app-version-footer__line app-version-footer__line--support">
+          Support :{' '}
+          <a href={SUPPORT_SITE_HREF} target="_blank" rel="noopener noreferrer">
+            {SUPPORT_SITE_LABEL}
+          </a>
+          {' · '}
+          <a href={SUPPORT_WHATSAPP_HREF} target="_blank" rel="noopener noreferrer">
+            WhatsApp {SUPPORT_WHATSAPP_E164}
+          </a>
+          {' · '}
+          <a href={SUPPORT_EMAIL_HREF}>{SUPPORT_EMAIL}</a>
         </div>
         <div className="app-version-footer__line app-version-footer__line--detail">{frontLabel}</div>
         <div className="app-version-footer__line app-version-footer__line--api">{apiLabel}</div>

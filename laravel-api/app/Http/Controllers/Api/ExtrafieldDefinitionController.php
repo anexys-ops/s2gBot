@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ExtrafieldDefinition;
+use App\Support\PermissionCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -26,7 +27,7 @@ class ExtrafieldDefinitionController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $this->canConfigure($request)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -69,7 +70,7 @@ class ExtrafieldDefinitionController extends Controller
 
     public function update(Request $request, ExtrafieldDefinition $extrafieldDefinition): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $this->canConfigure($request)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -99,12 +100,19 @@ class ExtrafieldDefinitionController extends Controller
 
     public function destroy(Request $request, ExtrafieldDefinition $extrafieldDefinition): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $this->canConfigure($request)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
         $extrafieldDefinition->delete();
 
         return response()->json(null, 204);
+    }
+
+    private function canConfigure(Request $request): bool
+    {
+        $u = $request->user();
+
+        return $u->isLabAdmin() || $u->hasCapability(PermissionCatalog::CONFIG_MANAGE);
     }
 }

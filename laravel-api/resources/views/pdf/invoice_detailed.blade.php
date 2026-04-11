@@ -60,10 +60,10 @@
             <tr>
                 <td>{{ $line->description }}</td>
                 <td class="text-right">{{ $line->quantity }}</td>
-                <td class="text-right">{{ number_format($line->unit_price, 2, ',', ' ') }} €</td>
+                <td class="text-right">{{ number_format($line->unit_price, 2, ',', ' ') }} {{ $currencyLabel }}</td>
                 <td class="text-right">{{ number_format($line->discount_percent, 2, ',', ' ') }}</td>
                 <td class="text-right">{{ number_format($line->tva_rate, 2, ',', ' ') }}</td>
-                <td class="text-right">{{ number_format($line->total, 2, ',', ' ') }} €</td>
+                <td class="text-right">{{ number_format($line->total, 2, ',', ' ') }} {{ $currencyLabel }}</td>
             </tr>
             @endforeach
         </tbody>
@@ -71,13 +71,13 @@
 
     <div class="totals">
         @if((float)$invoice->discount_percent > 0 || (float)$invoice->discount_amount > 0)
-        <p>Remise document : {{ number_format($invoice->discount_percent, 2, ',', ' ') }} % @if((float)$invoice->discount_amount > 0) + {{ number_format($invoice->discount_amount, 2, ',', ' ') }} € HT @endif</p>
+        <p>Remise document : {{ number_format($invoice->discount_percent, 2, ',', ' ') }} % @if((float)$invoice->discount_amount > 0) + {{ number_format($invoice->discount_amount, 2, ',', ' ') }} {{ $currencyLabel }} HT @endif</p>
         @endif
         @if((float)$invoice->shipping_amount_ht > 0)
-        <p>Frais de port / livraison HT : {{ number_format($invoice->shipping_amount_ht, 2, ',', ' ') }} € (TVA {{ number_format($invoice->shipping_tva_rate, 2, ',', ' ') }} %)</p>
+        <p>Frais de port / livraison HT : {{ number_format($invoice->shipping_amount_ht, 2, ',', ' ') }} {{ $currencyLabel }} (TVA {{ number_format($invoice->shipping_tva_rate, 2, ',', ' ') }} %)</p>
         @endif
-        <p><strong>Total HT :</strong> {{ number_format($invoice->amount_ht, 2, ',', ' ') }} €</p>
-        <p><strong>Total TTC :</strong> {{ number_format($invoice->amount_ttc, 2, ',', ' ') }} €</p>
+        <p><strong>Total HT :</strong> {{ number_format($invoice->amount_ht, 2, ',', ' ') }} {{ $currencyLabel }}</p>
+        <p><strong>Total TTC :</strong> {{ number_format($invoice->amount_ttc, 2, ',', ' ') }} {{ $currencyLabel }}</p>
     </div>
 
     @if(isset($template) && $template)

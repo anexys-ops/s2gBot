@@ -128,6 +128,9 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->call(MailTemplateSeeder::class);
+        $this->call(CommercialOfferingSeeder::class);
         $this->call(DemoEssaisGraphiquesSeeder::class);
+        $this->call(DemoFullDatasetSeeder::class);
+        $this->call(DemoMarocExamplesSeeder::class);
     }
 }

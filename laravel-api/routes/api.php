@@ -10,6 +10,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [App\Http\Controllers\Api\AuthController::class, 'logout']);
     Route::get('/user', [App\Http\Controllers\Api\AuthController::class, 'user']);
 
+    Route::put('user/profile', [App\Http\Controllers\Api\AccountController::class, 'updateProfile']);
+    Route::put('user/password', [App\Http\Controllers\Api\AccountController::class, 'updatePassword']);
+    Route::get('user/api-tokens', [App\Http\Controllers\Api\AccountController::class, 'listApiTokens']);
+    Route::post('user/api-tokens', [App\Http\Controllers\Api\AccountController::class, 'createApiToken']);
+    Route::delete('user/api-tokens/{tokenId}', [App\Http\Controllers\Api\AccountController::class, 'revokeApiToken'])->whereNumber('tokenId');
+    Route::get('permissions/catalog', [App\Http\Controllers\Api\AccountController::class, 'permissionCatalog']);
+
+    Route::prefix('admin')->group(function () {
+        Route::apiResource('users', App\Http\Controllers\Api\UserManagementController::class);
+        Route::apiResource('access-groups', App\Http\Controllers\Api\AccessGroupController::class);
+    });
+
     Route::apiResource('clients', App\Http\Controllers\Api\ClientController::class);
     Route::get('clients/{client}/commercial-overview', [App\Http\Controllers\Api\ClientCommercialController::class, 'overview']);
     Route::get('clients/{client}/addresses', [App\Http\Controllers\Api\ClientAddressController::class, 'index']);
@@ -50,6 +62,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('invoices/from-orders', [App\Http\Controllers\Api\InvoiceController::class, 'fromOrders']);
     Route::apiResource('invoices', App\Http\Controllers\Api\InvoiceController::class);
     Route::apiResource('quotes', App\Http\Controllers\Api\QuoteController::class);
+    Route::apiResource('commercial-offerings', App\Http\Controllers\Api\CommercialOfferingController::class);
     Route::get('pdf/templates', [App\Http\Controllers\Api\PdfController::class, 'templates']);
     Route::post('pdf/generate', [App\Http\Controllers\Api\PdfController::class, 'generate']);
     Route::get('pdf/examples/{slug}', [App\Http\Controllers\Api\ExamplePdfController::class, 'download']);

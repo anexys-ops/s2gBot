@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
 import { clientsApi, sitesApi, type EntityMetaPayload, type Site } from '../../api/client'
+import { useAuth } from '../../contexts/AuthContext'
 import EntityMetaCard from '../../components/module/EntityMetaCard'
 import Modal from '../../components/Modal'
 import type { SiteOutletContext } from './SiteLayout'
+import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import SiteMiniMap from '../../components/maps/SiteMiniMap'
 
 function strCoord(v: unknown): string {
   if (v === null || v === undefined || v === '') return ''
@@ -25,6 +28,8 @@ const emptyForm = (s: Site): Partial<Site> & { latitude?: string; longitude?: st
 
 export default function SiteFicheTab() {
   const { siteId, site, isAdmin } = useOutletContext<SiteOutletContext>()
+  const { user } = useAuth()
+  const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const [modalOpen, setModalOpen] = useState(false)
@@ -70,6 +75,10 @@ export default function SiteFicheTab() {
     setModalOpen(true)
   }
 
+  const mapLat = site.latitude != null ? Number(site.latitude) : NaN
+  const mapLng = site.longitude != null ? Number(site.longitude) : NaN
+  const hasSiteMap = Number.isFinite(mapLat) && Number.isFinite(mapLng)
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name?.trim() || !form.client_id) return
@@ -99,6 +108,14 @@ export default function SiteFicheTab() {
               Fiche client
             </Link>
           ) : null}
+          {isLab ? (
+            <Link
+              to={`/devis/nouveau?client_id=${site.client_id}&site_id=${site.id}`}
+              className="btn btn-primary btn-sm"
+            >
+              Nouveau devis (ce chantier)
+            </Link>
+          ) : null}
         </div>
         <dl className="module-fiche-grid">
           <div>
@@ -123,11 +140,11 @@ export default function SiteFicheTab() {
           </div>
           <div>
             <dt>Forfait déplacement devis (HT)</dt>
-            <dd>{Number(site.travel_fee_quote_ht ?? 0).toFixed(2)} €</dd>
+            <dd>{formatMoney(Number(site.travel_fee_quote_ht ?? 0))}</dd>
           </div>
           <div>
             <dt>Forfait déplacement facture (HT)</dt>
-            <dd>{Number(site.travel_fee_invoice_ht ?? 0).toFixed(2)} €</dd>
+            <dd>{formatMoney(Number(site.travel_fee_invoice_ht ?? 0))}</dd>
           </div>
           <div style={{ gridColumn: '1 / -1' }}>
             <dt>Libellé frais déplacement</dt>
@@ -135,6 +152,10 @@ export default function SiteFicheTab() {
           </div>
         </dl>
       </div>
+
+      {hasSiteMap ? (
+        <SiteMiniMap siteId={siteId} siteName={site.name} latitude={mapLat} longitude={mapLng} />
+      ) : null}
 
       <EntityMetaCard
         meta={site.meta}
@@ -179,7 +200,7 @@ export default function SiteFicheTab() {
               <input
                 type="text"
                 inputMode="decimal"
-                placeholder="ex. 48.8566"
+                placeholder="ex. 33.5731"
                 value={(form as { latitude?: string }).latitude ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, latitude: e.target.value }))}
               />
@@ -189,7 +210,7 @@ export default function SiteFicheTab() {
               <input
                 type="text"
                 inputMode="decimal"
-                placeholder="ex. 2.3522"
+                placeholder="ex. -7.5898"
                 value={(form as { longitude?: string }).longitude ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, longitude: e.target.value }))}
               />
@@ -202,7 +223,7 @@ export default function SiteFicheTab() {
               />
             </div>
             <div className="form-group">
-              <label>Forfait déplacement devis (€ HT)</label>
+              <label>Forfait déplacement devis ({MONEY_UNIT_LABEL} HT)</label>
               <input
                 type="number"
                 min={0}
@@ -212,7 +233,7 @@ export default function SiteFicheTab() {
               />
             </div>
             <div className="form-group">
-              <label>Forfait déplacement facture (€ HT)</label>
+              <label>Forfait déplacement facture ({MONEY_UNIT_LABEL} HT)</label>
               <input
                 type="number"
                 min={0}

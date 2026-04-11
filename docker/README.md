@@ -1,6 +1,14 @@
 # Déploiement Docker (production / serveur)
 
-Stack : **Nginx** (SPA React + proxy) · **PHP-FPM 8.2** (Laravel) · **MySQL 8**.
+Trois services dans `docker-compose.yml` :
+
+| Service | Rôle |
+|--------|------|
+| **web** | Nginx : fichiers React + proxy FastCGI vers Laravel pour `/api`, `/sanctum`, `/up` |
+| **app** | PHP-FPM 8.4 + Laravel (API) ; parle à MySQL via le hostname Docker `db` |
+| **db** | MySQL 8 (persistance volume `mysql_data`) |
+
+Stack : **Nginx** · **PHP-FPM 8.4** (Laravel / API) · **MySQL 8**.
 
 ## Démarrage rapide
 
@@ -13,6 +21,10 @@ docker compose --env-file .env.docker up -d --build
 ```
 
 Interface : `http://localhost:8080` (ou le port `HTTP_PORT` défini dans `.env.docker`).
+
+**API** : même URL et port que l’interface ; préfixes HTTP `/api/...`, `/sanctum/...`, santé `/up`.
+
+**MySQL depuis l’hôte** (administration locale au serveur, pas exposé sur Internet si vous gardez `127.0.0.1`) : `127.0.0.1:${MYSQL_PUBLISH_PORT:-33060}` (utilisateur / mot de passe = `DB_USERNAME` / `DB_PASSWORD` dans `.env.docker`). Depuis un autre poste : tunnel SSH puis client MySQL sur ce port.
 
 ### Comptes démo
 

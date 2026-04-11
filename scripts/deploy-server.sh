@@ -31,8 +31,8 @@ if [ -f laravel-api/artisan ]; then
   (cd laravel-api && composer install --no-dev --no-interaction --optimize-autoloader)
   echo "→ Migrations"
   (cd laravel-api && php artisan migrate --force)
-  echo "→ Optimisation Laravel"
-  (cd laravel-api && php artisan optimize)
+  echo "→ Optimisation Laravel (route:clear évite un cache de routes obsolète si api.php a changé)"
+  (cd laravel-api && php artisan route:clear && php artisan optimize)
 fi
 
 if [ -f react-frontend/package.json ]; then

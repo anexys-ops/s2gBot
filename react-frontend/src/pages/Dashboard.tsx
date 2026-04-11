@@ -4,37 +4,14 @@ import { useQuery } from '@tanstack/react-query'
 import { OutlineIcon } from '../components/OutlineIcons'
 import { useAuth } from '../contexts/AuthContext'
 import { statsApi, type DashboardStatsPayload } from '../api/client'
-
-function euros(n: number) {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n)
-}
+import { INVOICE_STATUS_LABELS, QUOTE_STATUS_LABELS } from '../lib/commercialStatusLabels'
+import { formatMoney } from '../lib/appLocale'
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
   submitted: 'Envoyée',
   in_progress: 'En cours',
   completed: 'Terminée',
-}
-
-const QUOTE_STATUS_LABELS: Record<string, string> = {
-  draft: 'Brouillon',
-  validated: 'Validé',
-  signed: 'Signé',
-  sent: 'Envoyé',
-  relanced: 'Relancé',
-  lost: 'Perdu',
-  invoiced: 'Facturé',
-  accepted: 'Accepté',
-  rejected: 'Refusé',
-}
-
-const INVOICE_STATUS_LABELS: Record<string, string> = {
-  draft: 'Brouillon',
-  validated: 'Validée',
-  signed: 'Signée',
-  sent: 'Envoyée',
-  relanced: 'Relancée',
-  paid: 'Encaissée',
 }
 
 const SAMPLE_STATUS_LABELS: Record<string, string> = {
@@ -173,7 +150,7 @@ function renderKpiDetail(id: KpiId, dash: DashboardStatsPayload) {
           )}
           <p className="dashboard-kpi-detail__meta">
             Montant TTC des devis encore ouverts (hors facturés / perdus / refusés) :{' '}
-            <strong>{euros(dash.amounts.quotes_open_ttc)}</strong>
+            <strong>{formatMoney(dash.amounts.quotes_open_ttc)}</strong>
           </p>
           <Link to="/devis" className="btn btn-secondary btn-sm dashboard-kpi-detail__action">
             Liste des devis
@@ -215,7 +192,7 @@ function renderKpiDetail(id: KpiId, dash: DashboardStatsPayload) {
             Détail des statuts dans la tuile <strong>Devis</strong>.
           </p>
           <p className="dashboard-kpi-detail__meta">
-            Montant : <strong>{euros(dash.amounts.quotes_open_ttc)}</strong>
+            Montant : <strong>{formatMoney(dash.amounts.quotes_open_ttc)}</strong>
           </p>
           <Link to="/devis" className="btn btn-secondary btn-sm">
             Voir les devis
@@ -228,16 +205,16 @@ function renderKpiDetail(id: KpiId, dash: DashboardStatsPayload) {
           <h3 className="dashboard-kpi-detail__title">Chiffre d’affaires facturé</h3>
           <ul className="dashboard-kpi-detail__list">
             <li>
-              Total facturé TTC (toutes factures) : <strong>{euros(dash.amounts.invoices_ttc_total)}</strong>
+              Total facturé TTC (toutes factures) : <strong>{formatMoney(dash.amounts.invoices_ttc_total)}</strong>
             </li>
             <li>
-              Déjà encaissé (statut payé) : <strong>{euros(dash.amounts.invoices_ttc_paid)}</strong>
+              Déjà encaissé (statut payé) : <strong>{formatMoney(dash.amounts.invoices_ttc_paid)}</strong>
             </li>
             <li>
-              Reste à encaisser : <strong>{euros(dash.amounts.invoices_ttc_unpaid)}</strong>
+              Reste à encaisser : <strong>{formatMoney(dash.amounts.invoices_ttc_unpaid)}</strong>
             </li>
             <li>
-              Devis ouverts (TTC) : <strong>{euros(dash.amounts.quotes_open_ttc)}</strong>
+              Devis ouverts (TTC) : <strong>{formatMoney(dash.amounts.quotes_open_ttc)}</strong>
             </li>
           </ul>
           <p className="dashboard-kpi-detail__text">
@@ -258,13 +235,13 @@ function renderKpiDetail(id: KpiId, dash: DashboardStatsPayload) {
           </p>
           <ul className="dashboard-kpi-detail__list">
             <li>
-              Encaissé : <strong>{euros(dash.amounts.invoices_ttc_paid)}</strong>
+              Encaissé : <strong>{formatMoney(dash.amounts.invoices_ttc_paid)}</strong>
             </li>
             <li>
-              Total facturé TTC : <strong>{euros(dash.amounts.invoices_ttc_total)}</strong>
+              Total facturé TTC : <strong>{formatMoney(dash.amounts.invoices_ttc_total)}</strong>
             </li>
             <li>
-              Reste à encaisser : <strong>{euros(dash.amounts.invoices_ttc_unpaid)}</strong>
+              Reste à encaisser : <strong>{formatMoney(dash.amounts.invoices_ttc_unpaid)}</strong>
             </li>
           </ul>
           <Link to="/invoices" className="btn btn-secondary btn-sm">
@@ -281,7 +258,7 @@ function renderKpiDetail(id: KpiId, dash: DashboardStatsPayload) {
           </p>
           <ul className="dashboard-kpi-detail__list">
             <li>
-              Impayé / à encaisser : <strong>{euros(dash.amounts.invoices_ttc_unpaid)}</strong>
+              Impayé / à encaisser : <strong>{formatMoney(dash.amounts.invoices_ttc_unpaid)}</strong>
             </li>
             <li>
               Détail par statut (nombre de factures) : voir tuile <strong>Volume factures</strong> dans l’onglet Commerce.
@@ -465,8 +442,8 @@ export default function Dashboard() {
     <div className="dashboard-home dashboard-home--v2">
       <header className="dashboard-hero">
         <p className="hub-kicker">Lab BTP</p>
-        <h1>Bienvenue, {user?.name}</h1>
-        <p className="dashboard-tagline">
+      <h1>Bienvenue, {user?.name}</h1>
+      <p className="dashboard-tagline">
           Indicateurs par métier (commerce, compta, labo) : cliquez une tuile pour afficher le détail, les répartitions et
           les liens utiles.
         </p>
@@ -535,7 +512,7 @@ export default function Dashboard() {
                 <KpiTile
                   id="pipeline_quotes_ttc"
                   label="Pipeline devis TTC"
-                  value={euros(dash.amounts.quotes_open_ttc)}
+                  value={formatMoney(dash.amounts.quotes_open_ttc)}
                   accent
                   selected={openKpi === 'pipeline_quotes_ttc'}
                   onToggle={toggleKpi}
@@ -562,7 +539,7 @@ export default function Dashboard() {
                 <KpiTile
                   id="ca_ttc"
                   label="CA facturé TTC"
-                  value={euros(dash.amounts.invoices_ttc_total)}
+                  value={formatMoney(dash.amounts.invoices_ttc_total)}
                   accent
                   selected={openKpi === 'ca_ttc'}
                   onToggle={toggleKpi}
@@ -570,14 +547,14 @@ export default function Dashboard() {
                 <KpiTile
                   id="encaisse"
                   label="Encaissé"
-                  value={euros(dash.amounts.invoices_ttc_paid)}
+                  value={formatMoney(dash.amounts.invoices_ttc_paid)}
                   selected={openKpi === 'encaisse'}
                   onToggle={toggleKpi}
                 />
                 <KpiTile
                   id="impayes"
                   label="Reste à encaisser"
-                  value={euros(dash.amounts.invoices_ttc_unpaid)}
+                  value={formatMoney(dash.amounts.invoices_ttc_unpaid)}
                   selected={openKpi === 'impayes'}
                   onToggle={toggleKpi}
                 />
@@ -601,7 +578,7 @@ export default function Dashboard() {
                               style={{ width: `${(row.ca_ttc / maxCa) * 100}%` }}
                             />
                           </div>
-                          <span className="report-bar-value">{euros(row.ca_ttc)}</span>
+                          <span className="report-bar-value">{formatMoney(row.ca_ttc)}</span>
                         </div>
                       ))
                     })()}

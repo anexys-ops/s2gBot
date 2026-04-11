@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ExtrafieldDefinition;
+use App\Support\PermissionCatalog;
 use App\Models\ExtrafieldValue;
 use App\Services\ExtrafieldSyncService;
 use Illuminate\Http\JsonResponse;
@@ -33,7 +34,8 @@ class ExtrafieldValueController extends Controller
 
     public function sync(Request $request): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        $u = $request->user();
+        if (! $u->isLabAdmin() && ! $u->hasCapability(PermissionCatalog::CONFIG_MANAGE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 

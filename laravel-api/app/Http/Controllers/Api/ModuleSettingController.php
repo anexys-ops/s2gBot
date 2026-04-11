@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ModuleSetting;
+use App\Support\PermissionCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -28,7 +29,8 @@ class ModuleSettingController extends Controller
 
     public function update(Request $request, string $moduleKey): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        $u = $request->user();
+        if (! $u->isLabAdmin() && ! $u->hasCapability(PermissionCatalog::CONFIG_MANAGE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 

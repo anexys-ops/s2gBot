@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, Outlet, useNavigate, useParams } from 'react-router-dom'
+import ClientLocationMap from '../../components/clients/ClientLocationMap'
+import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { clientsApi, type Client } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
-import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 
 export type ClientOutletContext = {
   clientId: number
@@ -134,7 +135,14 @@ export default function ClientLayout() {
         </>
       }
     >
-      <Outlet context={ctx} />
+      <div className="client-detail-layout">
+        <div className="client-detail-layout__main">
+          <Outlet context={ctx} />
+        </div>
+        <aside className="client-detail-layout__aside" aria-label="Carte et localisation">
+          <ClientLocationMap client={client} />
+        </aside>
+      </div>
     </ModuleEntityShell>
   )
 }

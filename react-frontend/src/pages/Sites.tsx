@@ -8,6 +8,7 @@ import ListTableToolbar from '../components/ListTableToolbar'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
+import { MONEY_UNIT_LABEL } from '../lib/appLocale'
 
 const emptyForm: Partial<Site> = {
   client_id: 0,
@@ -305,7 +306,7 @@ export default function Sites() {
               />
             </div>
             <div className="form-group">
-              <label>Forfait déplacement estimé — devis (€ HT)</label>
+              <label>Forfait déplacement estimé — devis ({MONEY_UNIT_LABEL} HT)</label>
               <input
                 type="number"
                 min={0}
@@ -315,7 +316,7 @@ export default function Sites() {
               />
             </div>
             <div className="form-group">
-              <label>Forfait déplacement — facturation (€ HT)</label>
+              <label>Forfait déplacement — facturation ({MONEY_UNIT_LABEL} HT)</label>
               <input
                 type="number"
                 min={0}

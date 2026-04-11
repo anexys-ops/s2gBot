@@ -16,7 +16,9 @@ export default function OrderNew() {
   const [siteId, setSiteId] = useState<number | ''>('')
   const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10))
   const [notes, setNotes] = useState('')
-  const [items, setItems] = useState<OrderItemRow[]>([{ test_type_id: 0, quantity: 1 }])
+  const [items, setItems] = useState<OrderItemRow[]>(() =>
+    Array.from({ length: 5 }, () => ({ test_type_id: 0, quantity: 1 })),
+  )
   const [clients, setClients] = useState<Array<{ id: number; name: string }>>([])
   const [sites, setSites] = useState<Array<{ id: number; name: string; client_id: number }>>([])
   const [testTypes, setTestTypes] = useState<Array<{ id: number; name: string }>>([])
@@ -60,6 +62,10 @@ export default function OrderNew() {
 
   function addRow() {
     setItems((prev) => [...prev, { test_type_id: 0, quantity: 1 }])
+  }
+
+  function addRows(n: number) {
+    setItems((prev) => [...prev, ...Array.from({ length: n }, () => ({ test_type_id: 0, quantity: 1 }))])
   }
 
   function removeRow(index: number) {
@@ -109,7 +115,10 @@ export default function OrderNew() {
           <label>Notes</label>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
         </div>
-        <h3>Lignes d'essais</h3>
+        <h3>Lignes d&apos;essais</h3>
+        <p className="text-muted" style={{ fontSize: '0.88rem', marginBottom: '0.5rem' }}>
+          Plusieurs lignes vides pour préparer un dossier ; seules les lignes avec un type d&apos;essai choisi sont enregistrées.
+        </p>
         {items.map((row, index) => (
           <div key={index} style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '0.5rem' }}>
             <select
@@ -135,9 +144,14 @@ export default function OrderNew() {
             </button>
           </div>
         ))}
-        <button type="button" className="btn btn-secondary" onClick={addRow} style={{ marginBottom: '1rem' }}>
-          Ajouter une ligne
-        </button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+          <button type="button" className="btn btn-secondary" onClick={addRow}>
+            + 1 ligne
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => addRows(5)}>
+            + 5 lignes
+          </button>
+        </div>
         {createMutation.isError && (
           <p className="error">{(createMutation.error as Error).message}</p>
         )}

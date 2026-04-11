@@ -14,9 +14,19 @@ class Client extends Model
     protected $fillable = [
         'name',
         'address',
+        'city',
+        'postal_code',
         'email',
         'phone',
+        'whatsapp',
         'siret',
+        'ice',
+        'rc',
+        'patente',
+        'if_number',
+        'legal_form',
+        'cnss_employer',
+        'capital_social',
         'meta',
     ];
 
@@ -24,6 +34,7 @@ class Client extends Model
     {
         return [
             'meta' => 'array',
+            'capital_social' => 'decimal:2',
         ];
     }
 

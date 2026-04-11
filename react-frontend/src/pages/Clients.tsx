@@ -7,23 +7,42 @@ import Modal from '../components/Modal'
 import ListTableToolbar from '../components/ListTableToolbar'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
+import ClientMoroccoFormFields from '../components/clients/ClientMoroccoFormFields'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
+
+function parseCapital(v: Client['capital_social']): number | undefined {
+  if (v === undefined || v === null || v === '') return undefined
+  const n = Number(v)
+  return Number.isFinite(n) ? n : undefined
+}
 
 const emptyForm: Partial<Client> = {
   name: '',
   address: '',
+  city: '',
+  postal_code: '',
   email: '',
   phone: '',
+  whatsapp: '',
   siret: '',
+  ice: '',
+  rc: '',
+  patente: '',
+  if_number: '',
+  legal_form: '',
+  cnss_employer: '',
+  capital_social: undefined,
 }
 
-type ViewFilter = 'all' | 'with_siret' | 'missing_email' | 'missing_phone'
+type ViewFilter = 'all' | 'with_siret' | 'with_ice' | 'missing_email' | 'missing_phone' | 'missing_ice'
 
 const VIEW_LABELS: Record<ViewFilter, string> = {
   all: 'Tous les tiers',
   with_siret: 'SIRET renseigné',
+  with_ice: 'ICE renseigné',
   missing_email: 'Sans email',
   missing_phone: 'Sans téléphone',
+  missing_ice: 'Sans ICE',
 }
 
 export default function Clients() {
@@ -43,7 +62,9 @@ export default function Clients() {
     name: true,
     email: true,
     phone: true,
-    siret: true,
+    city: true,
+    ice: true,
+    siret: false,
     commercial: true,
     actions: true,
   })
@@ -98,20 +119,40 @@ export default function Clients() {
     setForm({
       name: c.name,
       address: c.address ?? '',
+      city: c.city ?? '',
+      postal_code: c.postal_code ?? '',
       email: c.email ?? '',
       phone: c.phone ?? '',
+      whatsapp: c.whatsapp ?? '',
       siret: c.siret ?? '',
+      ice: c.ice ?? '',
+      rc: c.rc ?? '',
+      patente: c.patente ?? '',
+      if_number: c.if_number ?? '',
+      legal_form: c.legal_form ?? '',
+      cnss_employer: c.cnss_employer ?? '',
+      capital_social: parseCapital(c.capital_social),
     })
     setModal('edit')
+  }
+
+  const normalizeBody = (f: Partial<Client>): Partial<Client> => {
+    const cap = f.capital_social
+    const capital_social =
+      cap === undefined || cap === null || cap === ('' as unknown) || Number.isNaN(Number(cap))
+        ? null
+        : Number(cap)
+    return { ...f, capital_social } as Partial<Client>
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name?.trim()) return
+    const body = normalizeBody(form)
     if (modal === 'create') {
-      createMut.mutate(form)
+      createMut.mutate(body)
     } else if (modal === 'edit' && editingId) {
-      updateMut.mutate({ id: editingId, body: form })
+      updateMut.mutate({ id: editingId, body })
     }
   }
 
@@ -120,8 +161,10 @@ export default function Clients() {
   const list = useMemo(() => {
     return rawList.filter((c) => {
       if (viewFilter === 'with_siret') return !!(c.siret && String(c.siret).trim())
+      if (viewFilter === 'with_ice') return !!(c.ice && String(c.ice).trim())
       if (viewFilter === 'missing_email') return !c.email?.trim()
       if (viewFilter === 'missing_phone') return !c.phone?.trim()
+      if (viewFilter === 'missing_ice') return !(c.ice && String(c.ice).trim())
       return true
     })
   }, [rawList, viewFilter])
@@ -182,12 +225,14 @@ export default function Clients() {
       <ListTableToolbar
         searchValue={searchInput}
         onSearchChange={setSearchInput}
-        searchPlaceholder="Nom, email, SIRET…"
+        searchPlaceholder="Nom, email, ICE, RC, ville…"
         columns={[
           { id: 'name', label: 'Nom' },
           { id: 'email', label: 'Email' },
-          { id: 'phone', label: 'Téléphone' },
-          { id: 'siret', label: 'SIRET' },
+          { id: 'phone', label: 'Téléphone / WhatsApp' },
+          { id: 'city', label: 'Ville' },
+          { id: 'ice', label: 'ICE' },
+          { id: 'siret', label: 'SIRET / autre' },
           ...(isLab ? [{ id: 'commercial', label: 'Commerce (fiche)' }] : []),
           ...(isAdmin ? [{ id: 'actions', label: 'Actions' }] : []),
         ]}
@@ -212,8 +257,10 @@ export default function Clients() {
             <tr>
               {visible.name !== false && <th>Nom</th>}
               {visible.email !== false && <th>Email</th>}
-              {visible.phone !== false && <th>Téléphone</th>}
-              {visible.siret !== false && <th>SIRET</th>}
+              {visible.phone !== false && <th>Téléphone / WhatsApp</th>}
+              {visible.city !== false && <th>Ville</th>}
+              {visible.ice !== false && <th>ICE</th>}
+              {visible.siret !== false && <th>SIRET / autre</th>}
               {isLab && visible.commercial !== false && <th>Commerce</th>}
               {isAdmin && visible.actions !== false && <th>Actions</th>}
             </tr>
@@ -237,8 +284,19 @@ export default function Clients() {
                   </td>
                 )}
                 {visible.email !== false && <td>{c.email ?? '-'}</td>}
-                {visible.phone !== false && <td>{c.phone ?? '-'}</td>}
-                {visible.siret !== false && <td>{c.siret ?? '-'}</td>}
+                {visible.phone !== false && (
+                  <td>
+                    <div>{c.phone?.trim() ? c.phone : '—'}</div>
+                    {c.whatsapp?.trim() && (
+                      <div style={{ fontSize: '0.85em', opacity: 0.9 }} title="WhatsApp">
+                        WA {c.whatsapp}
+                      </div>
+                    )}
+                  </td>
+                )}
+                {visible.city !== false && <td>{c.city?.trim() ? c.city : '—'}</td>}
+                {visible.ice !== false && <td>{c.ice?.trim() ? c.ice : '—'}</td>}
+                {visible.siret !== false && <td>{c.siret?.trim() ? c.siret : '—'}</td>}
                 {isLab && visible.commercial !== false && (
                   <td>
                     <Link className="btn btn-secondary btn-sm" to={`/clients/${c.id}/commerce`} onClick={(e) => e.stopPropagation()}>
@@ -279,21 +337,14 @@ export default function Clients() {
               <input value={form.name ?? ''} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
             </div>
             <div className="form-group">
-              <label>Adresse</label>
+              <label>Adresse (rue, quartier…)</label>
               <input value={form.address ?? ''} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
             </div>
             <div className="form-group">
               <label>Email</label>
               <input type="email" value={form.email ?? ''} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
             </div>
-            <div className="form-group">
-              <label>Téléphone</label>
-              <input value={form.phone ?? ''} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label>SIRET</label>
-              <input value={form.siret ?? ''} onChange={(e) => setForm((f) => ({ ...f, siret: e.target.value }))} />
-            </div>
+            <ClientMoroccoFormFields form={form} setForm={setForm} />
             {(createMut.isError || updateMut.isError) && (
               <p className="error">{(createMut.error || updateMut.error)?.message}</p>
             )}

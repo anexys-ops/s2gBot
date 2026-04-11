@@ -37,6 +37,13 @@ import ReportComptaPage from './pages/reports/ReportComptaPage'
 import ReportVentesPage from './pages/reports/ReportVentesPage'
 import ReportDelaiTraitementPage from './pages/reports/ReportDelaiTraitementPage'
 import ReportDelaiChantierPage from './pages/reports/ReportDelaiChantierPage'
+import QuoteEditorPage from './pages/QuoteEditorPage'
+import CommercialCatalogPage from './pages/CommercialCatalogPage'
+import SettingsLayout from './pages/settings/SettingsLayout'
+import SettingsAccountPage from './pages/settings/SettingsAccountPage'
+import SettingsSecurityPage from './pages/settings/SettingsSecurityPage'
+import SettingsUsersPage from './pages/settings/SettingsUsersPage'
+import SettingsGroupsPage from './pages/settings/SettingsGroupsPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -72,11 +79,14 @@ function AppRoutes() {
         <Route path="catalog" element={<Navigate to="/back-office/catalogue-essais" replace />} />
         <Route path="graphiques-essais" element={<GraphiquesEssais />} />
         <Route path="invoices" element={<Invoices />} />
+        <Route path="devis/nouveau" element={<QuoteEditorPage />} />
+        <Route path="devis/:quoteId/editer" element={<QuoteEditorPage />} />
         <Route path="devis" element={<Devis />} />
         <Route path="back-office" element={<Outlet />}>
           <Route index element={<Navigate to="catalogue-essais" replace />} />
           <Route element={<BackOfficeLayout />}>
             <Route path="catalogue-essais" element={<Catalog />} />
+            <Route path="catalogue-commercial" element={<CommercialCatalogPage />} />
             <Route path="granulometrie" element={<GranulometryLab />} />
             <Route path="cadrage" element={<Cadrage />} />
             <Route path="exemples-calculs" element={<ExemplesCalculs />} />
@@ -101,6 +111,13 @@ function AppRoutes() {
           <Route path="fiche" element={<SiteFicheTab />} />
           <Route path="missions" element={<SiteMissionsTab />} />
           <Route path="carte" element={<SiteMapTab />} />
+        </Route>
+        <Route path="settings" element={<SettingsLayout />}>
+          <Route index element={<Navigate to="compte" replace />} />
+          <Route path="compte" element={<SettingsAccountPage />} />
+          <Route path="securite" element={<SettingsSecurityPage />} />
+          <Route path="utilisateurs" element={<SettingsUsersPage />} />
+          <Route path="groupes" element={<SettingsGroupsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

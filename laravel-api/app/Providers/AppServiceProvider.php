@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -14,6 +15,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        View::share('currencyLabel', config('app.currency_display', 'DH'));
+
         Gate::policy(\App\Models\Order::class, \App\Policies\OrderPolicy::class);
         Gate::policy(\App\Models\Invoice::class, \App\Policies\InvoicePolicy::class);
         Gate::policy(\App\Models\Report::class, \App\Policies\ReportPolicy::class);

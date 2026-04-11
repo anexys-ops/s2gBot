@@ -18,6 +18,7 @@ import Modal from '../components/Modal'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
+import { formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
@@ -315,8 +316,8 @@ export default function Invoices() {
               {visible.number !== false && <th>Numéro</th>}
               {visible.client !== false && <th>Client</th>}
               {visible.date !== false && <th>Date</th>}
-              {visible.ttc !== false && <th>Montant TTC (€)</th>}
-              {visible.travel !== false && <th>Dépl. HT</th>}
+              {visible.ttc !== false && <th>Montant TTC ({MONEY_UNIT_LABEL})</th>}
+              {visible.travel !== false && <th>Dépl. HT ({MONEY_UNIT_LABEL})</th>}
               {visible.status !== false && <th>Statut</th>}
               {isLab && visible.pdf !== false && <th>PDF</th>}
               {isAdmin && visible.actions !== false && <th>Actions</th>}
@@ -328,8 +329,8 @@ export default function Invoices() {
                 {visible.number !== false && <td>{inv.number}</td>}
                 {visible.client !== false && <td>{inv.client?.name}</td>}
                 {visible.date !== false && <td>{new Date(inv.invoice_date).toLocaleDateString('fr-FR')}</td>}
-                {visible.ttc !== false && <td>{Number(inv.amount_ttc).toFixed(2)}</td>}
-                {visible.travel !== false && <td>{Number(inv.travel_fee_ht ?? 0).toFixed(2)}</td>}
+                {visible.ttc !== false && <td>{formatMoney(Number(inv.amount_ttc))}</td>}
+                {visible.travel !== false && <td>{formatMoney(Number(inv.travel_fee_ht ?? 0))}</td>}
                 {visible.status !== false && <td>{STATUS_LABELS[inv.status] ?? inv.status}</td>}
                 {isLab && visible.pdf !== false && (
                   <td>
@@ -423,7 +424,7 @@ export default function Invoices() {
             {editInvoice.status === 'draft' && (
               <>
                 <div className="form-group">
-                  <label>Montant HT (€)</label>
+                  <label>Montant HT ({MONEY_UNIT_LABEL})</label>
                   <input
                     type="number"
                     min={0}

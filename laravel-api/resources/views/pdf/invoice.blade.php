@@ -53,8 +53,8 @@
             <tr>
                 <td>{{ $line->description }}</td>
                 <td>{{ $line->quantity }}</td>
-                <td>{{ number_format($line->unit_price, 2, ',', ' ') }} €</td>
-                <td class="text-right">{{ number_format($line->total, 2, ',', ' ') }} €</td>
+                <td>{{ number_format($line->unit_price, 2, ',', ' ') }} {{ $currencyLabel }}</td>
+                <td class="text-right">{{ number_format($line->total, 2, ',', ' ') }} {{ $currencyLabel }}</td>
             </tr>
             @endforeach
         </tbody>
@@ -62,14 +62,14 @@
 
     <div class="totals">
         @if((float)($invoice->discount_percent ?? 0) > 0 || (float)($invoice->discount_amount ?? 0) > 0)
-        <p>Remise : {{ number_format((float)($invoice->discount_percent ?? 0), 2, ',', ' ') }} % @if((float)($invoice->discount_amount ?? 0) > 0) — {{ number_format($invoice->discount_amount, 2, ',', ' ') }} € HT @endif</p>
+        <p>Remise : {{ number_format((float)($invoice->discount_percent ?? 0), 2, ',', ' ') }} % @if((float)($invoice->discount_amount ?? 0) > 0) — {{ number_format($invoice->discount_amount, 2, ',', ' ') }} {{ $currencyLabel }} HT @endif</p>
         @endif
         @if((float)($invoice->shipping_amount_ht ?? 0) > 0)
-        <p>Port / livraison HT : {{ number_format($invoice->shipping_amount_ht, 2, ',', ' ') }} €</p>
+        <p>Port / livraison HT : {{ number_format($invoice->shipping_amount_ht, 2, ',', ' ') }} {{ $currencyLabel }}</p>
         @endif
-        <p>Total HT : {{ number_format($invoice->amount_ht, 2, ',', ' ') }} €</p>
-        <p>TVA (global {{ $invoice->tva_rate }} %) : {{ number_format($invoice->amount_ttc - $invoice->amount_ht, 2, ',', ' ') }} €</p>
-        <p><strong>Total TTC : {{ number_format($invoice->amount_ttc, 2, ',', ' ') }} €</strong></p>
+        <p>Total HT : {{ number_format($invoice->amount_ht, 2, ',', ' ') }} {{ $currencyLabel }}</p>
+        <p>TVA (global {{ $invoice->tva_rate }} %) : {{ number_format($invoice->amount_ttc - $invoice->amount_ht, 2, ',', ' ') }} {{ $currencyLabel }}</p>
+        <p><strong>Total TTC : {{ number_format($invoice->amount_ttc, 2, ',', ' ') }} {{ $currencyLabel }}</strong></p>
     </div>
 
     <p style="margin-top: 30px; font-size: 10px; color: #666;">Document généré par la plateforme Lab BTP.</p>

@@ -78,6 +78,8 @@ Ce sont **deux déploiements distincts** :
 
 Si tu utilises **uniquement Docker** sur le serveur, **`php artisan` dans `/var/www/s2gBot`** ne met **pas** à jour l’app dans les conteneurs.
 
+Pour **supprimer** l’ancien déploiement hôte (Nginx + PHP + `/var/www/s2gBot`) et ne garder que Docker : **`scripts/server-strip-to-docker-only.sh`** (à lancer une fois sur le serveur, en root — voir avertissements dans le script).
+
 Après **changement de `.env.docker`**, il faut **recréer** le service `app` pour recharger les variables, puis recacher la config :
 
 ```bash

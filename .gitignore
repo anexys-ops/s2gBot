@@ -1,6 +1,7 @@
 node_modules
 dist
 .env
+deploy.env
 .env.local
 .env.*.local
 *.log
@@ -20,3 +21,5 @@ laravel-api/storage/framework/views/*
 .idea
 .vscode
 *.pid
+laravel-api/bootstrap/cache/*.php
+*.tsbuildinfo

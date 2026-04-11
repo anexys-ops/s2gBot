@@ -1,13 +1,17 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { pdfApi, quotesApi, invoicesApi, ordersApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import ModuleEntityShell from '../components/module/ModuleEntityShell'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 
 export default function PdfModule() {
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const [type, setType] = useState<string>('quote')
   const [resourceId, setResourceId] = useState<string>('')
+  const [docSearch, setDocSearch] = useState('')
+  const debouncedDocSearch = useDebouncedValue(docSearch, 200)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -47,6 +51,12 @@ export default function PdfModule() {
         ? invoices.map((i) => ({ id: i.id, label: `${i.number} - ${i.client?.name}` }))
         : orders.map((o) => ({ id: o.id, label: `${o.reference} - ${o.client?.name}` }))
 
+  const filteredOptions = useMemo(() => {
+    const q = debouncedDocSearch.trim().toLowerCase()
+    if (!q) return options
+    return options.filter((o) => o.label.toLowerCase().includes(q))
+  }, [options, debouncedDocSearch])
+
   const handleGenerate = async () => {
     const id = Number(resourceId)
     if (!id) return
@@ -63,49 +73,75 @@ export default function PdfModule() {
 
   if (!isLab) {
     return (
-      <div>
-        <h1>Création PDF</h1>
-        <p>Accès réservé au back office.</p>
-      </div>
+      <ModuleEntityShell
+        breadcrumbs={[
+          { label: 'Accueil', to: '/' },
+          { label: 'CRM', to: '/crm' },
+          { label: 'Création PDF' },
+        ]}
+        moduleBarLabel="Documents — PDF"
+        title="Création PDF"
+      >
+        <p>Accès réservé au laboratoire.</p>
+      </ModuleEntityShell>
     )
   }
 
   return (
-    <div>
-      <h1>Création de PDF</h1>
-      <p>Générez un document PDF (devis, facture ou rapport d&apos;essais).</p>
-      <div className="card" style={{ maxWidth: 500 }}>
-        <h3>Choisir le type et le document</h3>
-        <label>
-          Type de document
-          <select value={type} onChange={(e) => { setType(e.target.value); setResourceId('') }}>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>{t.label}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Document
+    <ModuleEntityShell
+      breadcrumbs={[
+        { label: 'Accueil', to: '/' },
+        { label: 'CRM', to: '/crm' },
+        { label: 'Création PDF' },
+      ]}
+      moduleBarLabel="Documents — PDF"
+      title="Création de PDF"
+      subtitle="Devis, factures, rapports — filtrez la liste puis générez le document"
+    >
+      <div className="card" style={{ maxWidth: 560 }}>
+        <h3 style={{ marginTop: 0 }}>Choisir le type et le document</h3>
+        <div className="form-group">
+          <label>Type de document</label>
           <select
-            value={resourceId}
-            onChange={(e) => setResourceId(e.target.value)}
+            value={type}
+            onChange={(e) => {
+              setType(e.target.value)
+              setResourceId('')
+              setDocSearch('')
+            }}
           >
-            <option value="">— Choisir —</option>
-            {options.map((o) => (
-              <option key={o.id} value={o.id}>{o.label}</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
             ))}
           </select>
-        </label>
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={!resourceId || loading}
-          onClick={handleGenerate}
-        >
+        </div>
+        <div className="form-group">
+          <label>Filtrer les documents (vue liste)</label>
+          <input
+            type="search"
+            value={docSearch}
+            onChange={(e) => setDocSearch(e.target.value)}
+            placeholder="N°, client, référence…"
+          />
+        </div>
+        <div className="form-group">
+          <label>Document ({filteredOptions.length} proposition(s))</label>
+          <select value={resourceId} onChange={(e) => setResourceId(e.target.value)}>
+            <option value="">— Choisir —</option>
+            {filteredOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button type="button" className="btn btn-primary" disabled={!resourceId || loading} onClick={handleGenerate}>
           {loading ? 'Génération...' : 'Télécharger le PDF'}
         </button>
         {error && <p className="error">{error}</p>}
       </div>
-    </div>
+    </ModuleEntityShell>
   )
 }

@@ -1,20 +1,25 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { mailApi } from '../api/client'
+import { mailApi, mailTemplatesApi, type MailTemplate } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import Modal from '../components/Modal'
 
 export default function Mails() {
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
+  const isAdmin = user?.role === 'lab_admin'
   const [to, setTo] = useState('')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState<number | ''>('')
+  const [tplModal, setTplModal] = useState<'create' | 'edit' | null>(null)
+  const [tplForm, setTplForm] = useState({ name: '', subject: '', body: '', description: '' })
+  const [editingTplId, setEditingTplId] = useState<number | null>(null)
   const queryClient = useQueryClient()
 
-  const { data: templatesData } = useQuery({
+  const { data: templatesData, isLoading: tplLoading } = useQuery({
     queryKey: ['mail-templates'],
-    queryFn: () => mailApi.templates(),
+    queryFn: () => mailTemplatesApi.list(),
     enabled: isLab,
   })
 
@@ -34,6 +39,42 @@ export default function Mails() {
       setBody('')
       setSelectedTemplate('')
     },
+  })
+
+  const createTplMut = useMutation({
+    mutationFn: () =>
+      mailTemplatesApi.create({
+        name: tplForm.name.trim(),
+        subject: tplForm.subject,
+        body: tplForm.body,
+        description: tplForm.description || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mail-templates'] })
+      setTplModal(null)
+      setTplForm({ name: '', subject: '', body: '', description: '' })
+    },
+  })
+
+  const updateTplMut = useMutation({
+    mutationFn: () =>
+      mailTemplatesApi.update(editingTplId!, {
+        name: tplForm.name.trim(),
+        subject: tplForm.subject,
+        body: tplForm.body,
+        description: tplForm.description || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mail-templates'] })
+      setTplModal(null)
+      setEditingTplId(null)
+      setTplForm({ name: '', subject: '', body: '', description: '' })
+    },
+  })
+
+  const deleteTplMut = useMutation({
+    mutationFn: (id: number) => mailTemplatesApi.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mail-templates'] }),
   })
 
   const templates = templatesData?.data ?? []
@@ -60,6 +101,30 @@ export default function Mails() {
     })
   }
 
+  const openCreateTpl = () => {
+    setEditingTplId(null)
+    setTplForm({ name: '', subject: '', body: '', description: '' })
+    setTplModal('create')
+  }
+
+  const openEditTpl = (t: MailTemplate) => {
+    setEditingTplId(t.id)
+    setTplForm({
+      name: t.name,
+      subject: t.subject,
+      body: t.body,
+      description: t.description ?? '',
+    })
+    setTplModal('edit')
+  }
+
+  const submitTpl = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!tplForm.name.trim() || !tplForm.subject || !tplForm.body) return
+    if (tplModal === 'create') createTplMut.mutate()
+    else if (tplModal === 'edit' && editingTplId) updateTplMut.mutate()
+  }
+
   if (!isLab) {
     return (
       <div>
@@ -76,8 +141,8 @@ export default function Mails() {
         <div className="card">
           <h3>Envoyer un e-mail</h3>
           <form onSubmit={handleSend}>
-            <label>
-              Modèle (optionnel)
+            <div className="form-group">
+              <label>Modèle (optionnel)</label>
               <select
                 value={selectedTemplate}
                 onChange={(e) => {
@@ -87,12 +152,14 @@ export default function Mails() {
               >
                 <option value="">— Aucun —</option>
                 {templates.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
                 ))}
               </select>
-            </label>
-            <label>
-              Destinataire *
+            </div>
+            <div className="form-group">
+              <label>Destinataire *</label>
               <input
                 type="email"
                 value={to}
@@ -100,58 +167,62 @@ export default function Mails() {
                 required
                 placeholder="email@exemple.fr"
               />
-            </label>
-            <label>
-              Objet *
-              <input
-                type="text"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                required
-              />
-            </label>
-            <label>
-              Message *
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                rows={6}
-                required
-              />
-            </label>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={sendMutation.isPending || !to || !subject || !body}
-            >
+            </div>
+            <div className="form-group">
+              <label>Objet *</label>
+              <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label>Message *</label>
+              <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} required />
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={sendMutation.isPending || !to || !subject || !body}>
               {sendMutation.isPending ? 'Envoi...' : 'Envoyer'}
             </button>
-            {sendMutation.isError && (
-              <p className="error">{(sendMutation.error as Error).message}</p>
-            )}
+            {sendMutation.isError && <p className="error">{(sendMutation.error as Error).message}</p>}
             {sendMutation.isSuccess && <p style={{ color: 'green' }}>E-mail envoyé.</p>}
           </form>
         </div>
         <div className="card">
-          <h3>Modèles disponibles</h3>
+          <div className="crud-actions" style={{ marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0, flex: 1 }}>Modèles</h3>
+            {isAdmin && (
+              <button type="button" className="btn btn-primary btn-sm" onClick={openCreateTpl}>
+                Nouveau modèle
+              </button>
+            )}
+          </div>
+          {tplLoading && <p>Chargement…</p>}
           <ul style={{ listStyle: 'none', padding: 0 }}>
             {templates.map((t) => (
               <li key={t.id} style={{ marginBottom: '0.75rem' }}>
                 <strong>{t.name}</strong>
                 {t.description && <span style={{ color: '#666', marginLeft: '0.5rem' }}>— {t.description}</span>}
-                <br />
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ marginTop: '0.25rem' }}
-                  onClick={() => applyTemplate(t.id)}
-                >
-                  Utiliser ce modèle
-                </button>
+                <div className="crud-actions" style={{ marginTop: '0.35rem' }}>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => applyTemplate(t.id)}>
+                    Utiliser
+                  </button>
+                  {isAdmin && (
+                    <>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEditTpl(t)}>
+                        Modifier
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm btn-danger-outline"
+                        onClick={() => {
+                          if (window.confirm(`Supprimer le modèle « ${t.name} » ?`)) deleteTplMut.mutate(t.id)
+                        }}
+                      >
+                        Supprimer
+                      </button>
+                    </>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
-          {templates.length === 0 && <p>Aucun modèle.</p>}
+          {!tplLoading && templates.length === 0 && <p>Aucun modèle.</p>}
         </div>
       </div>
       <div className="card" style={{ marginTop: '1.5rem' }}>
@@ -188,6 +259,58 @@ export default function Mails() {
         </table>
         {logs.length === 0 && <p style={{ padding: '1rem' }}>Aucun envoi enregistré.</p>}
       </div>
+
+      {tplModal && isAdmin && (
+        <Modal title={tplModal === 'create' ? 'Nouveau modèle' : 'Modifier le modèle'} onClose={() => setTplModal(null)}>
+          <form onSubmit={submitTpl}>
+            <div className="form-group">
+              <label>Identifiant (unique) *</label>
+              <input
+                value={tplForm.name}
+                onChange={(e) => setTplForm((f) => ({ ...f, name: e.target.value }))}
+                required
+                disabled={tplModal === 'edit'}
+                placeholder="ex. devis_envoye"
+              />
+            </div>
+            <div className="form-group">
+              <label>Description</label>
+              <input
+                value={tplForm.description}
+                onChange={(e) => setTplForm((f) => ({ ...f, description: e.target.value }))}
+              />
+            </div>
+            <div className="form-group">
+              <label>Objet *</label>
+              <input
+                value={tplForm.subject}
+                onChange={(e) => setTplForm((f) => ({ ...f, subject: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Corps *</label>
+              <textarea
+                value={tplForm.body}
+                onChange={(e) => setTplForm((f) => ({ ...f, body: e.target.value }))}
+                rows={8}
+                required
+              />
+            </div>
+            {(createTplMut.isError || updateTplMut.isError) && (
+              <p className="error">{(createTplMut.error || updateTplMut.error)?.message}</p>
+            )}
+            <div className="crud-actions">
+              <button type="submit" className="btn btn-primary" disabled={createTplMut.isPending || updateTplMut.isPending}>
+                Enregistrer
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setTplModal(null)}>
+                Annuler
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   )
 }

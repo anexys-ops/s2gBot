@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Order extends Model
 {
@@ -23,13 +24,17 @@ class Order extends Model
         'user_id',
         'status',
         'order_date',
+        'delivery_date',
         'notes',
+        'billing_address_id',
+        'delivery_address_id',
     ];
 
     protected function casts(): array
     {
         return [
             'order_date' => 'date',
+            'delivery_date' => 'date',
         ];
     }
 
@@ -41,6 +46,16 @@ class Order extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function billingAddress(): BelongsTo
+    {
+        return $this->belongsTo(ClientAddress::class, 'billing_address_id');
+    }
+
+    public function deliveryAddress(): BelongsTo
+    {
+        return $this->belongsTo(ClientAddress::class, 'delivery_address_id');
     }
 
     public function user(): BelongsTo
@@ -56,5 +71,10 @@ class Order extends Model
     public function reports(): HasMany
     {
         return $this->hasMany(Report::class);
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
     }
 }

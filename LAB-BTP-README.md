@@ -2,24 +2,66 @@
 
 Application de gestion des essais de laboratoire BTP : commandes, échantillons, résultats, rapports PDF et facturation.
 
+**Une seule interface web** (`react-frontend/`) avec deux espaces : **CRM** (`/crm`) et **Terrain & laboratoire** (`/terrain`) — ouvrables en parallèle dans deux onglets.
+
 ## Structure
 
 - **laravel-api/** — API REST Laravel 11 (Sanctum, MySQL/PostgreSQL)
-- **react-frontend/** — Interface React 18 (Vite, React Router, React Query)
+- **react-frontend/** — Interface React 18 unique (Vite, React Router, React Query)
+
+Pour comparer cette approche avec un **module Dolibarr** (ERP + labo) : [docs/DOLIBARR-VS-PLATEFORME-BTP.md](docs/DOLIBARR-VS-PLATEFORME-BTP.md).
 
 ## Prérequis
 
-- PHP 8.2+, Composer
-- Node.js 18+, npm ou pnpm
-- MySQL 8 ou PostgreSQL 15
+- Node.js 18+ (déjà là si tu as lancé `./install-env.sh`)
+- Pour le backend BTP : PHP 8.2+ et Composer (voir ci‑dessous), ou Docker
+- Base de données : MySQL/PostgreSQL **ou** SQLite (aucune install pour SQLite)
 
-## Relance et seed
+## Démarrage rapide (Mac sans PHP ni MySQL)
 
-Pour **voir les modifications** et **injecter le seed** en une fois :
+Si **php**, **brew** et **composer** ne sont pas reconnus dans le Terminal :
+
+**1. Installer PHP et Composer (une fois)**  
+Dans le Terminal, à la racine du projet :
 
 ```bash
-# Migrations + seed (nécessite PHP et composer install dans laravel-api)
+cd /Users/admin/Documents/s2gBot
+chmod +x scripts/install-php-mac.sh
+./scripts/install-php-mac.sh
+```
+
+Le script installe Homebrew si besoin, puis PHP et Composer. Tu peux avoir à entrer ton mot de passe Mac.
+
+**2. Tout configurer avec SQLite (sans MySQL)**  
+Dans le **même** terminal, après l’étape 1 :
+
+```bash
+chmod +x scripts/setup-btp-sqlite.sh
+./scripts/setup-btp-sqlite.sh
+```
+
+Cela crée la base SQLite, installe les dépendances Laravel, lance les migrations et le seed.
+
+**3. Lancer l’appli**
+
+```bash
+./start-btp.sh
+```
+
+Puis ouvre http://localhost:5173 et connecte-toi avec **admin@lab.local** / **password**.
+
+---
+
+## Relance et seed (déjà configuré)
+
+Une fois PHP et la base en place :
+
+```bash
+# Avec PHP en local
 ./scripts/seed-btp.sh
+
+# Ou avec Docker
+./scripts/seed-btp-docker.sh
 ```
 
 Pour lancer la plateforme BTP (Laravel + React) puis seed si possible :
@@ -52,7 +94,7 @@ npm install
 npm run dev
 ```
 
-Frontend : http://localhost:5173
+Frontend : http://localhost:5173 (ou 5174 si 5173 est pris). Si la page ne s'affiche pas : essayez **http://127.0.0.1:5174** dans un navigateur ; en remote, utilisez l'IP affichée par Vite.
 
 Configurer le proxy dans `vite.config.ts` si l’API n’est pas sur le même hôte (target: `http://localhost:8000`).
 

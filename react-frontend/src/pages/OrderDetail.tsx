@@ -1,8 +1,16 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ordersApi, reportsApi, samplesApi } from '../api/client'
+import {
+  ordersApi,
+  reportsApi,
+  samplesApi,
+  reportPdfTemplatesApi,
+  reportFormDefinitionsApi,
+} from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import Modal from '../components/Modal'
+import type { Order, Report, Sample } from '../api/client'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
@@ -11,14 +19,26 @@ const STATUS_LABELS: Record<string, string> = {
   completed: 'Terminée',
 }
 
+const SAMPLE_STATUS = ['pending', 'received', 'in_progress', 'tested', 'validated'] as const
+
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
+  const isAdmin = user?.role === 'lab_admin'
   const [selectedSample, setSelectedSample] = useState<number | null>(null)
   const [resultValues, setResultValues] = useState<Record<number, string>>({})
+  const [sampleModal, setSampleModal] = useState<Sample | 'new' | null>(null)
+  const [sampleForm, setSampleForm] = useState({ reference: '', status: 'pending', notes: '', order_item_id: 0 })
+  const [orderEdit, setOrderEdit] = useState({ order_date: '', notes: '', status: '' })
+  const [pdfTemplateId, setPdfTemplateId] = useState<number | ''>('')
+  const [formDefId, setFormDefId] = useState<number | ''>('')
+  const [formFieldValues, setFormFieldValues] = useState<Record<string, string>>({})
+  const [signModal, setSignModal] = useState<Report | null>(null)
+  const [signerName, setSignerName] = useState('')
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | undefined>(undefined)
 
   const { data: order, isLoading, error } = useQuery({
     queryKey: ['order', id],
@@ -26,10 +46,76 @@ export default function OrderDetail() {
     enabled: !!id && id !== 'new',
   })
 
+  const { data: tplRes } = useQuery({
+    queryKey: ['report-pdf-templates'],
+    queryFn: () => reportPdfTemplatesApi.list(),
+    enabled: !!id && id !== 'new' && isLab,
+  })
+
+  const { data: formDefsRes } = useQuery({
+    queryKey: ['report-form-definitions'],
+    queryFn: () => reportFormDefinitionsApi.list(),
+    enabled: !!id && id !== 'new' && isLab,
+  })
+
+  const pdfTemplates = tplRes?.data ?? []
+  const formDefs = formDefsRes?.data ?? []
+
+  const selectedFormDef = useMemo(() => formDefs.find((d) => d.id === formDefId), [formDefs, formDefId])
+
+  useEffect(() => {
+    if (pdfTemplateId !== '' || !pdfTemplates.length) return
+    const def = pdfTemplates.find((t) => t.is_default) ?? pdfTemplates[0]
+    setPdfTemplateId(def.id)
+  }, [pdfTemplates, pdfTemplateId])
+
+  useEffect(() => {
+    if (formDefId !== '' || !formDefs.length) return
+    setFormDefId(formDefs[0].id)
+  }, [formDefs, formDefId])
+
+  useEffect(() => {
+    if (!selectedFormDef) {
+      setFormFieldValues({})
+      return
+    }
+    setFormFieldValues((prev) => {
+      const next: Record<string, string> = {}
+      for (const f of selectedFormDef.fields) {
+        next[f.key] = prev[f.key] ?? ''
+      }
+      return next
+    })
+  }, [selectedFormDef])
+
   const reportMutation = useMutation({
-    mutationFn: () => ordersApi.generateReport(Number(id)),
+    mutationFn: () => {
+      const tid = pdfTemplateId === '' ? undefined : Number(pdfTemplateId)
+      const form_data: Record<string, unknown> = {}
+      selectedFormDef?.fields.forEach((f) => {
+        const raw = formFieldValues[f.key]?.trim() ?? ''
+        if (raw === '') return
+        form_data[f.key] = f.type === 'number' ? Number(raw) : raw
+      })
+      return ordersApi.generateReport(Number(id), {
+        pdf_template_id: tid,
+        form_data: Object.keys(form_data).length ? form_data : undefined,
+      })
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
+  })
+
+  const signMutation = useMutation({
+    mutationFn: (payload: { reportId: number; signer_name: string; signature_image_data?: string }) =>
+      reportsApi.sign(payload.reportId, {
+        signer_name: payload.signer_name,
+        signature_image_data: payload.signature_image_data,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order', id] })
+      setSignModal(null)
+      setSignerName('')
+      setSignatureDataUrl(undefined)
     },
   })
 
@@ -42,6 +128,53 @@ export default function OrderDetail() {
       setResultValues({})
     },
   })
+
+  const orderUpdateMut = useMutation({
+    mutationFn: (body: Partial<Pick<Order, 'order_date' | 'notes' | 'status' | 'site_id'>>) =>
+      ordersApi.update(Number(id), body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
+  })
+
+  const orderDeleteMut = useMutation({
+    mutationFn: () => ordersApi.delete(Number(id)),
+    onSuccess: () => navigate('/orders'),
+  })
+
+  const sampleUpdateMut = useMutation({
+    mutationFn: ({ sampleId, body }: { sampleId: number; body: Partial<Sample> }) => samplesApi.update(sampleId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order', id] })
+      setSampleModal(null)
+    },
+  })
+
+  const sampleCreateMut = useMutation({
+    mutationFn: () =>
+      samplesApi.create({
+        order_item_id: sampleForm.order_item_id,
+        reference: sampleForm.reference,
+        notes: sampleForm.notes || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order', id] })
+      setSampleModal(null)
+    },
+  })
+
+  const sampleDeleteMut = useMutation({
+    mutationFn: (sampleId: number) => samplesApi.delete(sampleId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
+  })
+
+  useEffect(() => {
+    if (order) {
+      setOrderEdit({
+        order_date: order.order_date?.slice(0, 10) ?? '',
+        notes: order.notes ?? '',
+        status: order.status,
+      })
+    }
+  }, [order])
 
   if (id === 'new') {
     navigate('/orders/new')
@@ -63,6 +196,43 @@ export default function OrderDetail() {
   const sample = order.order_items?.flatMap((oi) => oi.samples ?? []).find((s) => s.id === selectedSample)
   const params = sample?.order_item?.test_type?.params ?? []
 
+  const canDeleteOrder =
+    isAdmin ||
+    (order.status === 'draft' &&
+      (user?.role === 'lab_technician' || (user?.role === 'client' && order.client_id === user.client_id)))
+
+  const openEditSample = (s: Sample) => {
+    setSampleForm({
+      reference: s.reference,
+      status: s.status,
+      notes: s.notes ?? '',
+      order_item_id: s.order_item_id,
+    })
+    setSampleModal(s)
+  }
+
+  const openNewSample = (orderItemId: number) => {
+    setSampleForm({ reference: '', status: 'pending', notes: '', order_item_id: orderItemId })
+    setSampleModal('new')
+  }
+
+  const submitSampleForm = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (sampleModal === 'new') {
+      if (!sampleForm.reference.trim()) return
+      sampleCreateMut.mutate()
+    } else if (sampleModal && typeof sampleModal === 'object') {
+      sampleUpdateMut.mutate({
+        sampleId: sampleModal.id,
+        body: {
+          reference: sampleForm.reference,
+          status: sampleForm.status,
+          notes: sampleForm.notes || undefined,
+        },
+      })
+    }
+  }
+
   return (
     <div>
       <p>
@@ -70,37 +240,187 @@ export default function OrderDetail() {
       </p>
       <h1>Commande {order.reference}</h1>
       <p>
-        Client : {order.client?.name} — Chantier : {order.site?.name ?? '-'} — Statut : {STATUS_LABELS[order.status] ?? order.status}
+        Client : {order.client?.name} — Chantier : {order.site?.name ?? '-'} — Statut :{' '}
+        {STATUS_LABELS[order.status] ?? order.status}
       </p>
       <p>Date : {new Date(order.order_date).toLocaleDateString('fr-FR')}</p>
 
       {isLab && (
-        <div style={{ marginBottom: '1rem' }}>
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <h2 style={{ marginTop: 0 }}>Modifier la commande</h2>
+          <div className="form-group">
+            <label>Date</label>
+            <input
+              type="date"
+              value={orderEdit.order_date}
+              onChange={(e) => setOrderEdit((o) => ({ ...o, order_date: e.target.value }))}
+            />
+          </div>
+          <div className="form-group">
+            <label>Notes</label>
+            <textarea
+              value={orderEdit.notes}
+              onChange={(e) => setOrderEdit((o) => ({ ...o, notes: e.target.value }))}
+              rows={2}
+            />
+          </div>
+          <div className="form-group">
+            <label>Statut</label>
+            <select
+              value={orderEdit.status}
+              onChange={(e) => setOrderEdit((o) => ({ ...o, status: e.target.value }))}
+            >
+              <option value="draft">Brouillon</option>
+              <option value="submitted">Envoyée</option>
+              <option value="in_progress">En cours</option>
+              <option value="completed">Terminée</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={orderUpdateMut.isPending}
+            onClick={() =>
+              orderUpdateMut.mutate({
+                order_date: orderEdit.order_date,
+                notes: orderEdit.notes,
+                status: orderEdit.status,
+              })
+            }
+          >
+            {orderUpdateMut.isPending ? 'Enregistrement…' : 'Enregistrer les modifications'}
+          </button>
+          {orderUpdateMut.isError && <p className="error">{(orderUpdateMut.error as Error).message}</p>}
+        </div>
+      )}
+
+      <div className="crud-actions" style={{ marginBottom: '1rem' }}>
+        {canDeleteOrder && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-danger-outline"
+            onClick={() => {
+              if (window.confirm('Supprimer cette commande ?')) orderDeleteMut.mutate()
+            }}
+            disabled={orderDeleteMut.isPending}
+          >
+            Supprimer la commande
+          </button>
+        )}
+      </div>
+
+      {isLab && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <h2 style={{ marginTop: 0 }}>Générer un rapport PDF</h2>
+          <p style={{ fontSize: '0.9rem', color: 'var(--muted, #64748b)' }}>
+            Choisissez un modèle PDF et un formulaire métier (données terrain). La même structure s&apos;applique à tous les services via les définitions côté API.
+          </p>
+          {isAdmin && (
+            <p style={{ fontSize: '0.85rem' }}>
+              <Link to="/back-office/modeles-rapports-pdf">Configurer les modèles PDF des rapports (défaut, libellés)</Link>
+            </p>
+          )}
+          <div className="form-group">
+            <label>Modèle PDF</label>
+            <select
+              value={pdfTemplateId === '' ? '' : String(pdfTemplateId)}
+              onChange={(e) => setPdfTemplateId(e.target.value ? Number(e.target.value) : '')}
+            >
+              {pdfTemplates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                  {t.is_default ? ' (défaut)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Formulaire / service</label>
+            <select
+              value={formDefId === '' ? '' : String(formDefId)}
+              onChange={(e) => setFormDefId(e.target.value ? Number(e.target.value) : '')}
+            >
+              {formDefs.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {selectedFormDef && selectedFormDef.fields.length > 0 && (
+            <div style={{ marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1rem' }}>Données du formulaire</h3>
+              {selectedFormDef.fields.map((f) => (
+                <div key={f.key} className="form-group">
+                  <label>{f.label}</label>
+                  {f.type === 'textarea' ? (
+                    <textarea
+                      rows={2}
+                      value={formFieldValues[f.key] ?? ''}
+                      onChange={(e) => setFormFieldValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                    />
+                  ) : (
+                    <input
+                      type={f.type === 'number' ? 'number' : 'text'}
+                      value={formFieldValues[f.key] ?? ''}
+                      onChange={(e) => setFormFieldValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {pdfTemplates.length === 0 && (
+            <p className="error" style={{ fontSize: '0.9rem' }}>
+              Aucun modèle PDF configuré (migrations / table <code>report_pdf_templates</code>).
+            </p>
+          )}
           <button
             type="button"
             className="btn btn-primary"
             onClick={() => reportMutation.mutate()}
-            disabled={reportMutation.isPending}
+            disabled={reportMutation.isPending || pdfTemplateId === '' || pdfTemplates.length === 0}
           >
-            {reportMutation.isPending ? 'Génération...' : 'Générer rapport PDF'}
+            {reportMutation.isPending ? 'Génération…' : 'Générer le rapport'}
           </button>
+          {reportMutation.isError && <p className="error">{(reportMutation.error as Error).message}</p>}
         </div>
       )}
 
       <div className="card">
-        <h2>Rapports</h2>
+        <h2>Rapports générés</h2>
         {order.reports?.length ? (
-          <ul>
+          <ul style={{ listStyle: 'none', padding: 0 }}>
             {order.reports.map((r) => (
-              <li key={r.id}>
-                {r.filename}{' '}
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => reportsApi.download(r.id)}
-                >
+              <li
+                key={r.id}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem',
+                  alignItems: 'center',
+                  marginBottom: '0.75rem',
+                  paddingBottom: '0.75rem',
+                  borderBottom: '1px solid var(--border, #e2e8f0)',
+                }}
+              >
+                <span>
+                  {r.filename}
+                  {r.pdf_template?.name ? ` — ${r.pdf_template.name}` : ''}
+                  {r.signed_at ? (
+                    <span style={{ marginLeft: '0.5rem', fontSize: '0.85rem', color: 'var(--ok, #15803d)' }}>
+                      Signé ({r.signer_name ?? '—'})
+                    </span>
+                  ) : null}
+                </span>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => reportsApi.download(r.id)}>
                   Télécharger
                 </button>
+                {isLab && !r.signed_at && (
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSignModal(r)}>
+                    Signer
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -113,7 +433,16 @@ export default function OrderDetail() {
         <h2>Lignes et échantillons</h2>
         {order.order_items?.map((item) => (
           <div key={item.id} style={{ marginBottom: '1.5rem' }}>
-            <h3>{item.test_type?.name} (×{item.quantity})</h3>
+            <div className="crud-actions" style={{ marginBottom: '0.5rem' }}>
+              <h3 style={{ margin: 0, flex: 1 }}>
+                {item.test_type?.name} (×{item.quantity})
+              </h3>
+              {isLab && (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => openNewSample(item.id)}>
+                  + Échantillon
+                </button>
+              )}
+            </div>
             <table>
               <thead>
                 <tr>
@@ -129,20 +458,36 @@ export default function OrderDetail() {
                     <td>{s.status}</td>
                     {isLab && (
                       <td>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => {
-                            setSelectedSample(s.id)
-                            const vals: Record<number, string> = {}
-                            s.test_results?.forEach((tr) => {
-                              if (tr.test_type_param_id) vals[tr.test_type_param_id] = tr.value
-                            })
-                            setResultValues(vals)
-                          }}
-                        >
-                          Saisir résultats
-                        </button>
+                        <div className="crud-actions">
+                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEditSample(s)}>
+                            Modifier
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              setSelectedSample(s.id)
+                              const vals: Record<number, string> = {}
+                              s.test_results?.forEach((tr) => {
+                                if (tr.test_type_param_id) vals[tr.test_type_param_id] = tr.value
+                              })
+                              setResultValues(vals)
+                            }}
+                          >
+                            Résultats
+                          </button>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm btn-danger-outline"
+                              onClick={() => {
+                                if (window.confirm('Supprimer cet échantillon ?')) sampleDeleteMut.mutate(s.id)
+                              }}
+                            >
+                              Suppr.
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -158,7 +503,9 @@ export default function OrderDetail() {
           <h3>Saisie des résultats</h3>
           {params.map((p) => (
             <div key={p.id} className="form-group">
-              <label>{p.name} {p.unit ? `(${p.unit})` : ''}</label>
+              <label>
+                {p.name} {p.unit ? `(${p.unit})` : ''}
+              </label>
               <input
                 value={resultValues[p.id] ?? ''}
                 onChange={(e) => setResultValues((prev) => ({ ...prev, [p.id]: e.target.value }))}
@@ -172,6 +519,117 @@ export default function OrderDetail() {
             Annuler
           </button>
         </div>
+      )}
+
+      {signModal && (
+        <Modal
+          title="Signer le rapport"
+          onClose={() => {
+            setSignModal(null)
+            setSignerName('')
+            setSignatureDataUrl(undefined)
+          }}
+        >
+          <p style={{ fontSize: '0.9rem', color: 'var(--muted, #64748b)' }}>
+            Le PDF sera régénéré avec le bloc signature. Image optionnelle (fichier léger recommandé, limite API ~60 ko en base64).
+          </p>
+          <div className="form-group">
+            <label>Nom du signataire *</label>
+            <input value={signerName} onChange={(e) => setSignerName(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label>Image de signature (optionnel)</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                const reader = new FileReader()
+                reader.onload = () => {
+                  const s = String(reader.result || '')
+                  if (s.length > 60000) {
+                    window.alert("Image trop volumineuse après encodage ; choisissez un fichier plus petit ou laissez vide.")
+                    return
+                  }
+                  setSignatureDataUrl(s)
+                }
+                reader.readAsDataURL(file)
+              }}
+            />
+          </div>
+          {signMutation.isError && <p className="error">{(signMutation.error as Error).message}</p>}
+          <div className="crud-actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={signMutation.isPending || !signerName.trim()}
+              onClick={() =>
+                signMutation.mutate({
+                  reportId: signModal.id,
+                  signer_name: signerName.trim(),
+                  signature_image_data: signatureDataUrl,
+                })
+              }
+            >
+              {signMutation.isPending ? 'Signature…' : 'Valider la signature'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setSignModal(null)
+                setSignerName('')
+                setSignatureDataUrl(undefined)
+              }}
+            >
+              Annuler
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {sampleModal && (
+        <Modal title={sampleModal === 'new' ? 'Nouvel échantillon' : "Modifier l'échantillon"} onClose={() => setSampleModal(null)}>
+          <form onSubmit={submitSampleForm}>
+            <div className="form-group">
+              <label>Référence *</label>
+              <input
+                value={sampleForm.reference}
+                onChange={(e) => setSampleForm((f) => ({ ...f, reference: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Statut</label>
+              <select
+                value={sampleForm.status}
+                onChange={(e) => setSampleForm((f) => ({ ...f, status: e.target.value }))}
+              >
+                {SAMPLE_STATUS.map((st) => (
+                  <option key={st} value={st}>
+                    {st}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Notes</label>
+              <textarea value={sampleForm.notes} onChange={(e) => setSampleForm((f) => ({ ...f, notes: e.target.value }))} rows={2} />
+            </div>
+            {(sampleUpdateMut.isError || sampleCreateMut.isError) && (
+              <p className="error">{(sampleUpdateMut.error || sampleCreateMut.error)?.message}</p>
+            )}
+            <div className="crud-actions">
+              <button type="submit" className="btn btn-primary" disabled={sampleUpdateMut.isPending || sampleCreateMut.isPending}>
+                Enregistrer
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setSampleModal(null)}>
+                Annuler
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   )

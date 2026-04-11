@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Client extends Model
 {
@@ -17,6 +18,16 @@ class Client extends Model
         'phone',
         'siret',
     ];
+
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(ClientAddress::class);
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
+    }
 
     public function sites(): HasMany
     {

@@ -49,6 +49,29 @@
     @endforeach
     @endforeach
 
+    @php $fd = $formData ?? []; @endphp
+    @if(!empty($fd))
+    <h2 style="margin-top: 20px;">Formulaire terrain / service</h2>
+    <table>
+        <thead><tr><th>Champ</th><th>Valeur</th></tr></thead>
+        <tbody>
+        @foreach($fd as $k => $v)
+            <tr><td>{{ is_string($k) ? $k : '—' }}</td><td>{{ is_scalar($v) ? $v : json_encode($v) }}</td></tr>
+        @endforeach
+        </tbody>
+    </table>
+    @endif
+
+    @if(isset($report) && $report->signed_at)
+    <div style="margin-top: 40px; border-top: 1px solid #333; padding-top: 16px;">
+        <p><strong>Signé électroniquement</strong> le {{ $report->signed_at->format('d/m/Y H:i') }}</p>
+        @if($report->signer_name)<p>Signataire : {{ $report->signer_name }}</p>@endif
+        @if($report->signature_image_data)
+        <p><img src="{{ $report->signature_image_data }}" alt="Signature" style="max-height: 80px; max-width: 280px;" /></p>
+        @endif
+    </div>
+    @endif
+
     <p style="margin-top: 30px; font-size: 10px; color: #666;">Document généré automatiquement par la plateforme Lab BTP.</p>
 </body>
 </html>

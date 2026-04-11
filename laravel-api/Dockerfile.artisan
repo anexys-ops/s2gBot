@@ -1,0 +1,16 @@
+# Image pour exécuter artisan (migrate, seed) sans PHP en local
+FROM php:8.2-cli
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git unzip \
+    libzip-dev \
+    default-mysql-client \
+    && docker-php-ext-install pdo_mysql zip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+WORKDIR /app
+
+# Pas d'ENTRYPOINT pour pouvoir lancer composer ou php artisan
+CMD ["php", "artisan", "--help"]

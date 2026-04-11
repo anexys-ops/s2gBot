@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Arrête tous les services lancés par relaunch.sh
+# Arrête les services lancés par relaunch.sh (et libère les ports de la plateforme unifiée).
 
 cd "$(dirname "$0")"
 RUN_DIR=".run"
@@ -13,8 +13,7 @@ if [ -f "$RUN_DIR/pids" ]; then
   rm -f "$RUN_DIR/pids"
 fi
 
-# Libérer les ports au cas où
-for port in 3000 3001 3002 3003 5173 5174 8000; do
+for port in 5173 5174 8000; do
   pid=$(lsof -ti ":$port" 2>/dev/null || true)
   if [ -n "$pid" ]; then
     kill -9 $pid 2>/dev/null || true

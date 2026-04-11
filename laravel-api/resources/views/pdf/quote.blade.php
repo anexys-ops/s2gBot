@@ -18,12 +18,24 @@
 <body>
     <div class="header">
         <h1>Devis n° {{ $quote->number }}</h1>
-        <p class="meta">Date : {{ $quote->quote_date->format('d/m/Y') }}</p>
+        <p class="meta">Date devis : {{ $quote->quote_date->format('d/m/Y') }}</p>
+        @if($quote->order_date ?? null)
+        <p class="meta">Date de commande : {{ $quote->order_date->format('d/m/Y') }}</p>
+        @endif
+        @if($quote->site_delivery_date ?? null)
+        <p class="meta">Livraison chantier : {{ $quote->site_delivery_date->format('d/m/Y') }}</p>
+        @endif
         @if($quote->valid_until)
         <p class="meta">Valide jusqu'au : {{ $quote->valid_until->format('d/m/Y') }}</p>
         @endif
+        <p class="meta">Statut : {{ $quote->status }}</p>
         <p class="meta">Client : {{ $quote->client->name }}</p>
-        @if($quote->client->address)<p class="meta">{{ $quote->client->address }}</p>@endif
+        @if($quote->billingAddress ?? null)
+        <p class="meta">Facturation : {{ $quote->billingAddress->labelFormatted() }}</p>
+        @elseif($quote->client->address)<p class="meta">{{ $quote->client->address }}</p>@endif
+        @if($quote->deliveryAddress ?? null)
+        <p class="meta">Livraison : {{ $quote->deliveryAddress->labelFormatted() }}</p>
+        @endif
         @if($quote->site)
         <p class="meta">Chantier : {{ $quote->site->name }}</p>
         @endif
@@ -51,8 +63,14 @@
     </table>
 
     <div class="totals">
+        @if((float)($quote->discount_percent ?? 0) > 0 || (float)($quote->discount_amount ?? 0) > 0)
+        <p>Remise : {{ number_format((float)($quote->discount_percent ?? 0), 2, ',', ' ') }} % @if((float)($quote->discount_amount ?? 0) > 0) — {{ number_format($quote->discount_amount, 2, ',', ' ') }} € HT @endif</p>
+        @endif
+        @if((float)($quote->shipping_amount_ht ?? 0) > 0)
+        <p>Port / livraison HT : {{ number_format($quote->shipping_amount_ht, 2, ',', ' ') }} €</p>
+        @endif
         <p>Total HT : {{ number_format($quote->amount_ht, 2, ',', ' ') }} €</p>
-        <p>TVA ({{ $quote->tva_rate }} %) : {{ number_format($quote->amount_ttc - $quote->amount_ht, 2, ',', ' ') }} €</p>
+        <p>TVA (global {{ $quote->tva_rate }} %) : {{ number_format($quote->amount_ttc - $quote->amount_ht, 2, ',', ' ') }} €</p>
         <p><strong>Total TTC : {{ number_format($quote->amount_ttc, 2, ',', ' ') }} €</strong></p>
     </div>
 

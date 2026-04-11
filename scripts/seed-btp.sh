@@ -4,6 +4,9 @@
 set -e
 cd "$(dirname "$0")/.."
 
+# Ajouter chemins courants (Homebrew, Docker Desktop sur Mac)
+export PATH="/opt/homebrew/bin:/usr/local/bin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
+
 # Trouver php (PATH ou Homebrew)
 PHP_BIN=""
 if command -v php >/dev/null 2>&1; then

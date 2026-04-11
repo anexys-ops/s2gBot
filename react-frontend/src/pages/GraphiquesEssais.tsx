@@ -15,14 +15,47 @@ import {
   Pie,
   Cell,
 } from 'recharts'
-import { statsApi, type StatsEssaisParType } from '../api/client'
+import { pdfApi, statsApi, type StatsEssaisParType } from '../api/client'
 
 const ONGLETS = [
   { id: 'resume', label: 'Résumé' },
+  { id: 'exemples', label: 'Exemples (courbes + PDF)' },
   { id: 'beton', label: 'Béton' },
   { id: 'granulats', label: 'Granulats' },
   { id: 'sols', label: 'Sols' },
   { id: 'tous', label: 'Tous les essais' },
+]
+
+/** Mêmes points que l’API `ExamplePdfController` (PDF téléchargeable identique au schéma). */
+const EXEMPLE_COMPRESSION = [
+  { palier: 0, sigma: 0 },
+  { palier: 1, sigma: 8.2 },
+  { palier: 2, sigma: 16.5 },
+  { palier: 3, sigma: 24.1 },
+  { palier: 4, sigma: 30.8 },
+  { palier: 5, sigma: 35.2 },
+  { palier: 6, sigma: 37.9 },
+  { palier: 7, sigma: 39.1 },
+  { palier: 8, sigma: 39.6 },
+]
+
+const EXEMPLE_GRANULO = [
+  { tamis: '16 mm', passant: 100 },
+  { tamis: '8 mm', passant: 92 },
+  { tamis: '4 mm', passant: 78 },
+  { tamis: '2 mm', passant: 58 },
+  { tamis: '1 mm', passant: 38 },
+  { tamis: '0,5 mm', passant: 22 },
+  { tamis: '0,25 mm', passant: 12 },
+  { tamis: '0,125 mm', passant: 5 },
+  { tamis: '0,063 mm', passant: 1.5 },
+]
+
+const EXEMPLE_SYNTHESE_ROWS = [
+  { essai: 'Compression béton C25/30', norme: 'NF EN 12390-3', resultat: 'Rc = 38,2 MPa', conformite: 'Conforme' },
+  { essai: 'Module de finesse', norme: 'NF EN 933-1', resultat: 'MF = 3,25', conformite: 'Conforme' },
+  { essai: 'Teneur en eau', norme: 'NF EN ISO 17892-1', resultat: 'W = 14,8 %', conformite: 'Conforme' },
+  { essai: 'CBR à 2,5 mm', norme: 'NF EN 13286-47', resultat: 'CBR = 42 %', conformite: 'Conforme' },
 ]
 
 const COULEURS = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2']
@@ -35,6 +68,8 @@ function filtreParOnglet(parType: StatsEssaisParType[], ongletId: string): Stats
 
 export default function GraphiquesEssais() {
   const [onglet, setOnglet] = useState('resume')
+  const [pdfLoading, setPdfLoading] = useState<string | null>(null)
+  const [pdfErr, setPdfErr] = useState<string | null>(null)
   const { data, isLoading, error } = useQuery({
     queryKey: ['stats-essais'],
     queryFn: () => statsApi.essais(),
@@ -79,6 +114,132 @@ export default function GraphiquesEssais() {
           </button>
         ))}
       </div>
+
+      {onglet === 'exemples' && (
+        <>
+          <p style={{ color: '#64748b', marginBottom: '1rem' }}>
+            Données fictives à visée pédagogique. Les PDF reprennent les mêmes jeux de valeurs.
+          </p>
+          {pdfErr && <p className="error" style={{ marginBottom: '0.75rem' }}>{pdfErr}</p>}
+
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <h3 style={{ margin: 0 }}>Courbe type — compression béton (σ en MPa)</h3>
+              <button
+                type="button"
+                className="btn"
+                disabled={!!pdfLoading}
+                onClick={async () => {
+                  setPdfErr(null)
+                  setPdfLoading('compression')
+                  try {
+                    await pdfApi.downloadExample('compression')
+                  } catch (e) {
+                    setPdfErr(String(e instanceof Error ? e.message : e))
+                  } finally {
+                    setPdfLoading(null)
+                  }
+                }}
+              >
+                {pdfLoading === 'compression' ? 'Téléchargement…' : 'Télécharger le PDF'}
+              </button>
+            </div>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={EXEMPLE_COMPRESSION} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="palier" name="Palier" label={{ value: 'Palier de charge', position: 'insideBottom', offset: -4 }} />
+                <YAxis label={{ value: 'σ (MPa)', angle: -90, position: 'insideLeft' }} />
+                <Tooltip formatter={(v: number) => [`${v} MPa`, 'Contrainte']} />
+                <Legend />
+                <Line type="monotone" dataKey="sigma" stroke="#2563eb" strokeWidth={2} dot name="σ (MPa)" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <h3 style={{ margin: 0 }}>Courbe granulométrique — % passant cumulé</h3>
+              <button
+                type="button"
+                className="btn"
+                disabled={!!pdfLoading}
+                onClick={async () => {
+                  setPdfErr(null)
+                  setPdfLoading('granulometrie')
+                  try {
+                    await pdfApi.downloadExample('granulometrie')
+                  } catch (e) {
+                    setPdfErr(String(e instanceof Error ? e.message : e))
+                  } finally {
+                    setPdfLoading(null)
+                  }
+                }}
+              >
+                {pdfLoading === 'granulometrie' ? 'Téléchargement…' : 'Télécharger le PDF'}
+              </button>
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={EXEMPLE_GRANULO} margin={{ top: 8, right: 16, left: 8, bottom: 48 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="tamis" angle={-30} textAnchor="end" height={56} interval={0} fontSize={11} />
+                <YAxis domain={[0, 100]} label={{ value: '% passant', angle: -90, position: 'insideLeft' }} />
+                <Tooltip formatter={(v: number) => [`${v} %`, 'Passant']} />
+                <Legend />
+                <Line type="monotone" dataKey="passant" stroke="#059669" strokeWidth={2} dot name="% passant" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="card">
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <h3 style={{ margin: 0 }}>Synthèse d&apos;essais (aperçu)</h3>
+              <button
+                type="button"
+                className="btn"
+                disabled={!!pdfLoading}
+                onClick={async () => {
+                  setPdfErr(null)
+                  setPdfLoading('synthese')
+                  try {
+                    await pdfApi.downloadExample('synthese-essais')
+                  } catch (e) {
+                    setPdfErr(String(e instanceof Error ? e.message : e))
+                  } finally {
+                    setPdfLoading(null)
+                  }
+                }}
+              >
+                {pdfLoading === 'synthese' ? 'Téléchargement…' : 'Télécharger le PDF'}
+              </button>
+            </div>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
+              Tableau récapitulatif type rapport ; le PDF reprend la mise en page complète.
+            </p>
+            <div style={{ overflowX: 'auto' }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Essai</th>
+                    <th>Norme</th>
+                    <th>Résultat</th>
+                    <th>Appréciation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {EXEMPLE_SYNTHESE_ROWS.map((row) => (
+                    <tr key={row.essai}>
+                      <td>{row.essai}</td>
+                      <td>{row.norme}</td>
+                      <td>{row.resultat}</td>
+                      <td>{row.conformite}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
       {onglet === 'resume' && (
         <>

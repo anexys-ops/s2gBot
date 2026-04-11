@@ -30,6 +30,14 @@ export async function api<T>(
   return data as T
 }
 
+export type LaravelPaginator<T> = {
+  data: T[]
+  current_page: number
+  last_page: number
+  per_page: number
+  total: number
+}
+
 export const authApi = {
   login: (email: string, password: string) =>
     api<{ user: User; token: string }>('/login', {
@@ -46,35 +54,219 @@ export const authApi = {
 }
 
 export const clientsApi = {
-  list: () => api<Client[]>('/clients'),
+  list: (params?: { search?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    const s = q.toString()
+    return api<Client[]>(`/clients${s ? `?${s}` : ''}`)
+  },
   get: (id: number) => api<Client>(`/clients/${id}`),
   create: (body: Partial<Client>) => api<Client>('/clients', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: Partial<Client>) => api<Client>(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/clients/${id}`, { method: 'DELETE' }),
+  commercialOverview: (id: number) => api<ClientCommercialOverview>(`/clients/${id}/commercial-overview`),
+}
+
+export interface ClientAddress {
+  id: number
+  client_id: number
+  type: string
+  label?: string
+  line1: string
+  line2?: string
+  postal_code?: string
+  city?: string
+  country?: string
+  is_default?: boolean
+}
+
+export interface Attachment {
+  id: number
+  path: string
+  original_filename: string
+  mime_type?: string
+  size_bytes: number
+  uploaded_by?: number
+}
+
+export interface CommercialDocumentLink {
+  id: number
+  source_type: string
+  source_id: number
+  target_type: string
+  target_id: number
+  relation: string
+}
+
+export interface DocumentPdfTemplateRow {
+  id: number
+  document_type: string
+  slug: string
+  name: string
+  blade_view: string
+  is_default: boolean
+}
+
+export const clientAddressesApi = {
+  list: (clientId: number) => api<ClientAddress[]>(`/clients/${clientId}/addresses`),
+  create: (clientId: number, body: Partial<ClientAddress>) =>
+    api<ClientAddress>(`/clients/${clientId}/addresses`, { method: 'POST', body: JSON.stringify(body) }),
+  update: (addressId: number, body: Partial<ClientAddress>) =>
+    api<ClientAddress>(`/client-addresses/${addressId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (addressId: number) => api(`/client-addresses/${addressId}`, { method: 'DELETE' }),
+}
+
+export const attachmentsApi = {
+  list: (attachableType: string, attachableId: number) =>
+    api<Attachment[]>(`/attachments?attachable_type=${attachableType}&attachable_id=${attachableId}`),
+  async upload(file: File, attachableType: string, attachableId: number): Promise<Attachment> {
+    const token = getToken()
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('attachable_type', attachableType)
+    fd.append('attachable_id', String(attachableId))
+    const res = await fetch(`${API_BASE}/attachments`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}`, Accept: 'application/json' } : { Accept: 'application/json' },
+      body: fd,
+    })
+    if (res.status === 401) {
+      localStorage.removeItem('token')
+      window.location.href = '/login'
+      throw new Error('Unauthorized')
+    }
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.message || `Erreur ${res.status}`)
+    return data as Attachment
+  },
+  delete: (id: number) => api(`/attachments/${id}`, { method: 'DELETE' }),
+  download: async (attachmentId: number, filename: string) => {
+    const token = getToken()
+    const res = await fetch(`${API_BASE}/attachments/${attachmentId}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (res.status === 401) {
+      localStorage.removeItem('token')
+      window.location.href = '/login'
+      throw new Error('Unauthorized')
+    }
+    if (!res.ok) throw new Error('Téléchargement impossible')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+}
+
+export const commercialLinksApi = {
+  list: (documentType: string, documentId: number) =>
+    api<CommercialDocumentLink[]>(`/commercial-links?document_type=${documentType}&document_id=${documentId}`),
+  create: (body: {
+    source_type: string
+    source_id: number
+    target_type: string
+    target_id: number
+    relation: string
+  }) => api<CommercialDocumentLink>('/commercial-links', { method: 'POST', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/commercial-links/${id}`, { method: 'DELETE' }),
+}
+
+export const documentPdfTemplatesApi = {
+  list: (documentType?: string) =>
+    api<{ data: DocumentPdfTemplateRow[] }>(
+      documentType ? `/document-pdf-templates?document_type=${documentType}` : '/document-pdf-templates'
+    ),
+  setDefault: (id: number, body: { is_default?: boolean; name?: string }) =>
+    api<DocumentPdfTemplateRow>(`/document-pdf-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+}
+
+export interface ReportPdfTemplateRow {
+  id: number
+  slug: string
+  name: string
+  blade_view: string
+  is_default: boolean
+}
+
+export const reportPdfTemplatesApi = {
+  list: () => api<{ data: ReportPdfTemplateRow[] }>('/report-pdf-templates'),
+  update: (id: number, body: { is_default?: boolean; name?: string }) =>
+    api<ReportPdfTemplateRow>(`/report-pdf-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+}
+
+export interface ReportFormFieldDef {
+  key: string
+  label: string
+  type: string
+}
+
+export interface ReportFormDefinitionRow {
+  id: number
+  slug: string
+  name: string
+  service_key?: string | null
+  fields: ReportFormFieldDef[]
+  active: boolean
+}
+
+export const reportFormDefinitionsApi = {
+  list: (serviceKey?: string) => {
+    const q = serviceKey ? `?service_key=${encodeURIComponent(serviceKey)}` : ''
+    return api<{ data: ReportFormDefinitionRow[] }>(`/report-form-definitions${q}`)
+  },
 }
 
 export const sitesApi = {
-  list: () => api<Site[]>('/sites'),
+  list: (params?: { search?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    const s = q.toString()
+    return api<Site[]>(`/sites${s ? `?${s}` : ''}`)
+  },
   get: (id: number) => api<Site>(`/sites/${id}`),
   create: (body: Partial<Site>) => api<Site>('/sites', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: Partial<Site>) => api<Site>(`/sites/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/sites/${id}`, { method: 'DELETE' }),
 }
 
+export type TestTypeParamInput = { id?: number; name: string; unit?: string; expected_type?: string }
+
 export const testTypesApi = {
   list: () => api<TestType[]>('/test-types'),
   get: (id: number) => api<TestType>(`/test-types/${id}`),
-  create: (body: Partial<TestType> & { params?: Array<{ name: string; unit?: string; expected_type?: string }> }) =>
-    api<TestType>('/test-types', { method: 'POST', body: JSON.stringify(body) }),
-  update: (id: number, body: Partial<TestType>) =>
-    api<TestType>(`/test-types/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  create: (body: {
+    name: string
+    norm?: string
+    unit?: string
+    unit_price: number
+    thresholds?: Record<string, number>
+    params?: TestTypeParamInput[]
+  }) => api<TestType>('/test-types', { method: 'POST', body: JSON.stringify(body) }),
+  update: (
+    id: number,
+    body: {
+      name?: string
+      norm?: string
+      unit?: string
+      unit_price?: number
+      thresholds?: Record<string, number>
+      params?: TestTypeParamInput[]
+    },
+  ) => api<TestType>(`/test-types/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/test-types/${id}`, { method: 'DELETE' }),
 }
 
 export const ordersApi = {
-  list: (params?: { status?: string }) => {
-    const q = params?.status ? `?status=${params.status}` : ''
-    return api<{ data: Order[] }>(`/orders${q}`)
+  list: (params?: { status?: string; search?: string; page?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.search) q.set('search', params.search)
+    if (params?.page) q.set('page', String(params.page))
+    const s = q.toString()
+    return api<LaravelPaginator<Order>>(`/orders${s ? `?${s}` : ''}`)
   },
   get: (id: number) => api<Order>(`/orders/${id}`),
   create: (body: OrderCreateBody) => api<Order>('/orders', { method: 'POST', body: JSON.stringify(body) }),
@@ -83,17 +275,23 @@ export const ordersApi = {
   samples: (orderId: number) => api<Sample[]>(`/orders/${orderId}/samples`),
   reports: (orderId: number) => api<Report[]>(`/orders/${orderId}/reports`),
   results: (orderId: number) => api<Sample[]>(`/orders/${orderId}/results`),
-  generateReport: (orderId: number) => api<Report>(`/orders/${orderId}/reports`, { method: 'POST' }),
+  generateReport: (orderId: number, body?: { pdf_template_id?: number; form_data?: Record<string, unknown> }) =>
+    api<Report>(`/orders/${orderId}/reports`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
 }
 
 export const samplesApi = {
   get: (id: number) => api<Sample>(`/samples/${id}`),
+  create: (body: { order_item_id: number; reference: string; notes?: string }) =>
+    api<Sample>('/samples', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: Partial<Sample>) => api<Sample>(`/samples/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/samples/${id}`, { method: 'DELETE' }),
   results: (sampleId: number, results: Array<{ test_type_param_id: number; value: string }>) =>
     api<Sample>(`/samples/${sampleId}/results`, { method: 'POST', body: JSON.stringify({ results }) }),
 }
 
 export const reportsApi = {
+  sign: (reportId: number, body: { signer_name: string; signature_image_data?: string }) =>
+    api<Report>(`/reports/${reportId}/sign`, { method: 'POST', body: JSON.stringify(body) }),
   download: async (reportId: number) => {
     const token = getToken()
     const res = await fetch(`${API_BASE}/reports/${reportId}/download`, {
@@ -111,7 +309,14 @@ export const reportsApi = {
 }
 
 export const invoicesApi = {
-  list: () => api<{ data: Invoice[] }>('/invoices'),
+  list: (params?: { search?: string; status?: string; page?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    if (params?.status) q.set('status', params.status)
+    if (params?.page) q.set('page', String(params.page))
+    const s = q.toString()
+    return api<LaravelPaginator<Invoice>>(`/invoices${s ? `?${s}` : ''}`)
+  },
   get: (id: number) => api<Invoice>(`/invoices/${id}`),
   fromOrders: (orderIds: number[], clientId?: number) =>
     api<Invoice>('/invoices/from-orders', {
@@ -200,6 +405,8 @@ export interface QuoteLine {
   description: string
   quantity: number
   unit_price: number
+  tva_rate?: number
+  discount_percent?: number
   total?: number
 }
 
@@ -209,22 +416,42 @@ export interface Quote {
   client_id: number
   site_id?: number
   quote_date: string
+  order_date?: string
+  site_delivery_date?: string
   valid_until?: string
   amount_ht: number
   amount_ttc: number
   tva_rate: number
+  discount_percent?: number
+  discount_amount?: number
+  shipping_amount_ht?: number
+  shipping_tva_rate?: number
+  travel_fee_ht?: number
+  travel_fee_tva_rate?: number
+  billing_address_id?: number
+  delivery_address_id?: number
+  pdf_template_id?: number
   status: string
   notes?: string
   client?: Client
   site?: Site
+  billing_address?: ClientAddress
+  delivery_address?: ClientAddress
   quote_lines?: QuoteLine[]
 }
 
 export const quotesApi = {
-  list: () => api<{ data: Quote[] }>('/quotes'),
+  list: (params?: { search?: string; status?: string; page?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    if (params?.status) q.set('status', params.status)
+    if (params?.page) q.set('page', String(params.page))
+    const s = q.toString()
+    return api<LaravelPaginator<Quote>>(`/quotes${s ? `?${s}` : ''}`)
+  },
   get: (id: number) => api<Quote>(`/quotes/${id}`),
   create: (body: QuoteCreateBody) => api<Quote>('/quotes', { method: 'POST', body: JSON.stringify(body) }),
-  update: (id: number, body: Partial<QuoteCreateBody>) =>
+  update: (id: number, body: Partial<QuoteCreateBody> & { status?: string }) =>
     api<Quote>(`/quotes/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/quotes/${id}`, { method: 'DELETE' }),
 }
@@ -233,24 +460,67 @@ export interface QuoteCreateBody {
   client_id: number
   site_id?: number
   quote_date: string
+  order_date?: string
+  site_delivery_date?: string
   valid_until?: string
   tva_rate?: number
+  discount_percent?: number
+  discount_amount?: number
+  shipping_amount_ht?: number
+  shipping_tva_rate?: number
+  travel_fee_ht?: number
+  travel_fee_tva_rate?: number
+  apply_site_travel?: boolean
+  billing_address_id?: number
+  delivery_address_id?: number
+  pdf_template_id?: number
   notes?: string
-  lines: Array<{ description: string; quantity: number; unit_price: number }>
+  lines: Array<{
+    description: string
+    quantity: number
+    unit_price: number
+    tva_rate?: number
+    discount_percent?: number
+  }>
 }
 
 export const pdfApi = {
   templates: () => api<{ data: PdfTemplate[] }>('/pdf/templates'),
-  generate: async (type: string, id: number) => {
+  downloadExample: async (slug: string) => {
+    const token = getToken()
+    const res = await fetch(`${API_BASE}/pdf/examples/${slug}`, {
+      headers: {
+        Accept: 'application/pdf',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    })
+    if (res.status === 401) {
+      localStorage.removeItem('token')
+      window.location.href = '/login'
+      throw new Error('Unauthorized')
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || 'Téléchargement impossible')
+    }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `exemple-${slug}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+  generate: async (type: string, id: number, templateId?: number) => {
     const token = getToken()
     const res = await fetch(`${API_BASE}/pdf/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Accept: 'application/json',
+        Accept: 'application/pdf,*/*',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ type, id }),
+      body: JSON.stringify({ type, id, template_id: templateId }),
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -301,6 +571,15 @@ export const mailApi = {
     api<{ message: string }>('/mail/send', { method: 'POST', body: JSON.stringify(body) }),
 }
 
+export const mailTemplatesApi = {
+  list: () => api<{ data: MailTemplate[] }>('/mail-templates'),
+  create: (body: { name: string; subject: string; body: string; description?: string }) =>
+    api<MailTemplate>('/mail-templates', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: number, body: Partial<{ name: string; subject: string; body: string; description: string }>) =>
+    api<MailTemplate>(`/mail-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/mail-templates/${id}`, { method: 'DELETE' }),
+}
+
 export interface User {
   id: number
   name: string
@@ -338,6 +617,9 @@ export interface Site {
   name: string
   address?: string
   reference?: string
+  travel_fee_quote_ht?: number
+  travel_fee_invoice_ht?: number
+  travel_fee_label?: string
   client?: Client
 }
 
@@ -374,6 +656,9 @@ export interface Order {
   site_id?: number
   status: string
   order_date: string
+  delivery_date?: string
+  billing_address_id?: number
+  delivery_address_id?: number
   notes?: string
   client?: Client
   site?: Site
@@ -411,9 +696,17 @@ export interface TestResult {
 export interface Report {
   id: number
   order_id: number
+  pdf_template_id?: number
   file_path: string
   filename: string
   generated_at: string
+  form_data?: Record<string, unknown>
+  signed_at?: string | null
+  signer_name?: string | null
+  signature_image_data?: string | null
+  signed_by_user_id?: number | null
+  pdf_template?: ReportPdfTemplateRow
+  signed_by_user?: { id: number; name: string }
 }
 
 export interface Invoice {
@@ -421,14 +714,27 @@ export interface Invoice {
   number: string
   client_id: number
   invoice_date: string
+  order_date?: string
+  site_delivery_date?: string
   due_date?: string
   amount_ht: number
   amount_ttc: number
   tva_rate: number
+  discount_percent?: number
+  discount_amount?: number
+  shipping_amount_ht?: number
+  shipping_tva_rate?: number
+  travel_fee_ht?: number
+  travel_fee_tva_rate?: number
+  billing_address_id?: number
+  delivery_address_id?: number
+  pdf_template_id?: number
   status: string
   client?: Client
   orders?: Order[]
   invoice_lines?: InvoiceLine[]
+  billing_address?: ClientAddress
+  delivery_address?: ClientAddress
 }
 
 export interface InvoiceLine {
@@ -436,5 +742,22 @@ export interface InvoiceLine {
   description: string
   quantity: number
   unit_price: number
+  tva_rate?: number
+  discount_percent?: number
   total: number
+}
+
+export interface ClientCommercialOverview {
+  client: Client & { addresses?: ClientAddress[]; attachments?: Attachment[] }
+  quotes: Quote[]
+  invoices: Invoice[]
+  stats: {
+    quotes_by_status: Record<string, number>
+    invoices_by_status: Record<string, number>
+    amount_due_ttc: number
+    total_invoiced_ttc: number
+    total_quotes_ttc: number
+    open_quotes_count: number
+  }
+  document_links: CommercialDocumentLink[]
 }

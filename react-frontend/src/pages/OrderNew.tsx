@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ordersApi, clientsApi, sitesApi, testTypesApi } from '../api/client'
-import { useAuth } from '../contexts/AuthContext'
 
 interface OrderItemRow {
   test_type_id: number
@@ -12,7 +11,6 @@ interface OrderItemRow {
 export default function OrderNew() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { user } = useAuth()
   const [clientId, setClientId] = useState<number | ''>('')
   const [siteId, setSiteId] = useState<number | ''>('')
   const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10))

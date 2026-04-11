@@ -16,7 +16,18 @@ class Site extends Model
         'name',
         'address',
         'reference',
+        'travel_fee_quote_ht',
+        'travel_fee_invoice_ht',
+        'travel_fee_label',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'travel_fee_quote_ht' => 'decimal:2',
+            'travel_fee_invoice_ht' => 'decimal:2',
+        ];
+    }
 
     public function client(): BelongsTo
     {

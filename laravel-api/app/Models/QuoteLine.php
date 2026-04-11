@@ -12,6 +12,8 @@ class QuoteLine extends Model
         'description',
         'quantity',
         'unit_price',
+        'tva_rate',
+        'discount_percent',
         'total',
     ];
 
@@ -20,6 +22,8 @@ class QuoteLine extends Model
         return [
             'quantity' => 'integer',
             'unit_price' => 'decimal:2',
+            'tva_rate' => 'decimal:2',
+            'discount_percent' => 'decimal:2',
             'total' => 'decimal:2',
         ];
     }

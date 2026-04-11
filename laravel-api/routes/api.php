@@ -10,6 +10,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [App\Http\Controllers\Api\AuthController::class, 'user']);
 
     Route::apiResource('clients', App\Http\Controllers\Api\ClientController::class);
+    Route::get('clients/{client}/commercial-overview', [App\Http\Controllers\Api\ClientCommercialController::class, 'overview']);
+    Route::get('clients/{client}/addresses', [App\Http\Controllers\Api\ClientAddressController::class, 'index']);
+    Route::post('clients/{client}/addresses', [App\Http\Controllers\Api\ClientAddressController::class, 'store']);
+    Route::put('client-addresses/{client_address}', [App\Http\Controllers\Api\ClientAddressController::class, 'update']);
+    Route::delete('client-addresses/{client_address}', [App\Http\Controllers\Api\ClientAddressController::class, 'destroy']);
     Route::apiResource('sites', App\Http\Controllers\Api\SiteController::class);
     Route::apiResource('test-types', App\Http\Controllers\Api\TestTypeController::class);
     Route::apiResource('orders', App\Http\Controllers\Api\OrderController::class);
@@ -20,12 +25,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('orders/{order}/reports', [App\Http\Controllers\Api\ReportController::class, 'generate']);
     Route::get('orders/{order}/reports', [App\Http\Controllers\Api\ReportController::class, 'index']);
     Route::get('reports/{report}/download', [App\Http\Controllers\Api\ReportController::class, 'download']);
+    Route::post('reports/{report}/sign', [App\Http\Controllers\Api\ReportController::class, 'sign']);
+    Route::get('report-pdf-templates', [App\Http\Controllers\Api\ReportPdfTemplateController::class, 'index']);
+    Route::put('report-pdf-templates/{report_pdf_template}', [App\Http\Controllers\Api\ReportPdfTemplateController::class, 'update']);
+    Route::get('report-form-definitions', [App\Http\Controllers\Api\ReportFormDefinitionController::class, 'index']);
     Route::post('invoices/from-orders', [App\Http\Controllers\Api\InvoiceController::class, 'fromOrders']);
     Route::apiResource('invoices', App\Http\Controllers\Api\InvoiceController::class);
     Route::apiResource('quotes', App\Http\Controllers\Api\QuoteController::class);
     Route::get('pdf/templates', [App\Http\Controllers\Api\PdfController::class, 'templates']);
     Route::post('pdf/generate', [App\Http\Controllers\Api\PdfController::class, 'generate']);
+    Route::get('pdf/examples/{slug}', [App\Http\Controllers\Api\ExamplePdfController::class, 'download']);
     Route::get('mail/templates', [App\Http\Controllers\Api\MailController::class, 'templates']);
+    Route::apiResource('mail-templates', App\Http\Controllers\Api\MailTemplateController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::get('mail/logs', [App\Http\Controllers\Api\MailController::class, 'logs']);
     Route::post('mail/send', [App\Http\Controllers\Api\MailController::class, 'send']);
 
@@ -35,4 +46,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('btp-calculations/exemples', [App\Http\Controllers\Api\BtpCalculationController::class, 'exemples']);
     Route::post('btp-calculations/calculer', [App\Http\Controllers\Api\BtpCalculationController::class, 'calculer']);
     Route::get('stats/essais', [App\Http\Controllers\Api\StatsController::class, 'essais']);
+
+    Route::get('attachments', [App\Http\Controllers\Api\AttachmentController::class, 'index']);
+    Route::post('attachments', [App\Http\Controllers\Api\AttachmentController::class, 'store']);
+    Route::get('attachments/{attachment}/download', [App\Http\Controllers\Api\AttachmentController::class, 'download']);
+    Route::delete('attachments/{attachment}', [App\Http\Controllers\Api\AttachmentController::class, 'destroy']);
+
+    Route::get('commercial-links', [App\Http\Controllers\Api\CommercialDocumentLinkController::class, 'index']);
+    Route::post('commercial-links', [App\Http\Controllers\Api\CommercialDocumentLinkController::class, 'store']);
+    Route::delete('commercial-links/{commercial_document_link}', [App\Http\Controllers\Api\CommercialDocumentLinkController::class, 'destroy']);
+
+    Route::get('document-pdf-templates', [App\Http\Controllers\Api\DocumentPdfTemplateController::class, 'index']);
+    Route::put('document-pdf-templates/{document_pdf_template}', [App\Http\Controllers\Api\DocumentPdfTemplateController::class, 'update']);
 });

@@ -28,6 +28,13 @@ class OrderController extends Controller
             $query->where('status', $status);
         }
 
+        if ($search = trim((string) $request->query('search', ''))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('reference', 'like', '%'.$search.'%')
+                    ->orWhere('notes', 'like', '%'.$search.'%');
+            });
+        }
+
         $orders = $query->orderByDesc('created_at')->paginate(15);
 
         return response()->json($orders);
@@ -93,7 +100,14 @@ class OrderController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $order->load(['client', 'site', 'orderItems.testType.params', 'orderItems.samples.testResults.testTypeParam', 'reports']);
+        $order->load([
+            'client',
+            'site',
+            'orderItems.testType.params',
+            'orderItems.samples.testResults.testTypeParam',
+            'reports.pdfTemplate',
+            'reports.signedByUser',
+        ]);
 
         return response()->json($order);
     }
@@ -107,6 +121,23 @@ class OrderController extends Controller
         if ($user->isSiteContact() && $order->client_id !== $user->client_id) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
+        if ($user->isLab()) {
+            $validated = $request->validate([
+                'site_id' => 'nullable|exists:sites,id',
+                'order_date' => 'sometimes|date',
+                'delivery_date' => 'nullable|date',
+                'notes' => 'nullable|string',
+                'status' => 'sometimes|in:draft,submitted,in_progress,completed',
+                'billing_address_id' => 'nullable|exists:client_addresses,id',
+                'delivery_address_id' => 'nullable|exists:client_addresses,id',
+            ]);
+            $order->update($validated);
+
+            return response()->json($order->load([
+                'client', 'site', 'billingAddress', 'deliveryAddress', 'orderItems.testType', 'orderItems.samples',
+            ]));
+        }
+
         if ($order->status !== Order::STATUS_DRAFT) {
             return response()->json(['message' => 'Seules les commandes brouillon peuvent être modifiées'], 422);
         }

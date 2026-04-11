@@ -18,12 +18,24 @@
 <body>
     <div class="header">
         <h1>Facture n° {{ $invoice->number }}</h1>
-        <p class="meta">Date : {{ $invoice->invoice_date->format('d/m/Y') }}</p>
+        <p class="meta">Date facture : {{ $invoice->invoice_date->format('d/m/Y') }}</p>
+        @if($invoice->order_date ?? null)
+        <p class="meta">Date de commande : {{ $invoice->order_date->format('d/m/Y') }}</p>
+        @endif
+        @if($invoice->site_delivery_date ?? null)
+        <p class="meta">Livraison chantier : {{ $invoice->site_delivery_date->format('d/m/Y') }}</p>
+        @endif
         @if($invoice->due_date)
         <p class="meta">Échéance : {{ $invoice->due_date->format('d/m/Y') }}</p>
         @endif
+        <p class="meta">Statut : {{ $invoice->status }}</p>
         <p class="meta">Client : {{ $invoice->client->name }}</p>
-        @if($invoice->client->address)<p class="meta">{{ $invoice->client->address }}</p>@endif
+        @if($invoice->billingAddress ?? null)
+        <p class="meta">Facturation : {{ $invoice->billingAddress->labelFormatted() }}</p>
+        @elseif($invoice->client->address)<p class="meta">{{ $invoice->client->address }}</p>@endif
+        @if($invoice->deliveryAddress ?? null)
+        <p class="meta">Livraison : {{ $invoice->deliveryAddress->labelFormatted() }}</p>
+        @endif
         @if($invoice->client->siret)<p class="meta">SIRET : {{ $invoice->client->siret }}</p>@endif
     </div>
 
@@ -49,8 +61,14 @@
     </table>
 
     <div class="totals">
+        @if((float)($invoice->discount_percent ?? 0) > 0 || (float)($invoice->discount_amount ?? 0) > 0)
+        <p>Remise : {{ number_format((float)($invoice->discount_percent ?? 0), 2, ',', ' ') }} % @if((float)($invoice->discount_amount ?? 0) > 0) — {{ number_format($invoice->discount_amount, 2, ',', ' ') }} € HT @endif</p>
+        @endif
+        @if((float)($invoice->shipping_amount_ht ?? 0) > 0)
+        <p>Port / livraison HT : {{ number_format($invoice->shipping_amount_ht, 2, ',', ' ') }} €</p>
+        @endif
         <p>Total HT : {{ number_format($invoice->amount_ht, 2, ',', ' ') }} €</p>
-        <p>TVA ({{ $invoice->tva_rate }} %) : {{ number_format($invoice->amount_ttc - $invoice->amount_ht, 2, ',', ' ') }} €</p>
+        <p>TVA (global {{ $invoice->tva_rate }} %) : {{ number_format($invoice->amount_ttc - $invoice->amount_ht, 2, ',', ' ') }} €</p>
         <p><strong>Total TTC : {{ number_format($invoice->amount_ttc, 2, ',', ' ') }} €</strong></p>
     </div>
 

@@ -27,7 +27,10 @@ class ReportController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $reports = $order->reports()->orderByDesc('generated_at')->get();
+        $reports = $order->reports()
+            ->with(['pdfTemplate', 'signedByUser'])
+            ->orderByDesc('generated_at')
+            ->get();
 
         return response()->json($reports);
     }
@@ -45,9 +48,39 @@ class ReportController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $report = $this->reportService->generate($order);
+        $validated = $request->validate([
+            'pdf_template_id' => 'nullable|integer|exists:report_pdf_templates,id',
+            'form_data' => 'nullable|array',
+        ]);
 
-        return response()->json($report, 201);
+        $report = $this->reportService->generate(
+            $order,
+            $validated['pdf_template_id'] ?? null,
+            $validated['form_data'] ?? null,
+        );
+
+        return response()->json($report->load('pdfTemplate'), 201);
+    }
+
+    public function sign(Request $request, Report $report): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $validated = $request->validate([
+            'signer_name' => 'required|string|max:255',
+            'signature_image_data' => 'nullable|string|max:65000',
+        ]);
+
+        $updated = $this->reportService->applySignature(
+            $report,
+            (int) $request->user()->id,
+            $validated['signer_name'],
+            $validated['signature_image_data'] ?? null,
+        );
+
+        return response()->json($updated->load(['pdfTemplate', 'signedByUser']));
     }
 
     public function download(Request $request, Report $report): StreamedResponse|JsonResponse

@@ -20,6 +20,14 @@ class ClientController extends Controller
             $query->where('id', $user->client_id);
         }
 
+        if ($search = trim((string) $request->query('search', ''))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('email', 'like', '%'.$search.'%')
+                    ->orWhere('siret', 'like', '%'.$search.'%');
+            });
+        }
+
         $clients = $query->orderBy('name')->get();
 
         return response()->json($clients);

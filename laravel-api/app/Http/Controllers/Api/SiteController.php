@@ -20,6 +20,14 @@ class SiteController extends Controller
             $query->where('client_id', $user->client_id);
         }
 
+        if ($search = trim((string) $request->query('search', ''))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('reference', 'like', '%'.$search.'%')
+                    ->orWhere('address', 'like', '%'.$search.'%');
+            });
+        }
+
         $sites = $query->orderBy('name')->get();
 
         return response()->json($sites);
@@ -36,6 +44,9 @@ class SiteController extends Controller
             'name' => 'required|string|max:255',
             'address' => 'nullable|string',
             'reference' => 'nullable|string|max:100',
+            'travel_fee_quote_ht' => 'nullable|numeric|min:0',
+            'travel_fee_invoice_ht' => 'nullable|numeric|min:0',
+            'travel_fee_label' => 'nullable|string|max:255',
         ]);
 
         $site = Site::create($validated);
@@ -67,6 +78,9 @@ class SiteController extends Controller
             'name' => 'sometimes|string|max:255',
             'address' => 'nullable|string',
             'reference' => 'nullable|string|max:100',
+            'travel_fee_quote_ht' => 'nullable|numeric|min:0',
+            'travel_fee_invoice_ht' => 'nullable|numeric|min:0',
+            'travel_fee_label' => 'nullable|string|max:255',
         ]);
 
         $site->update($validated);

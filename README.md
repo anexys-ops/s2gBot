@@ -1,63 +1,56 @@
-# Plateforme s2gBot
+# Plateforme s2gBot — laboratoire géotechnique / BTP
 
-**Partage (Git)** : le projet est versionné. Pour pousser sur ton dépôt public : voir [PUSH.md](PUSH.md).
+**Partage (Git)** : voir [PUSH.md](PUSH.md).
 
-## Plateforme essais laboratoire BTP (Laravel + React)
+## Une seule application web
 
-Application dédiée aux essais de laboratoire BTP : commandes, échantillons, résultats, rapports PDF et facturation.
+Tout passe par **Laravel 11** (API) + **React 18** (interface unique) :
 
-- **Backend** : [laravel-api/](laravel-api/) — API REST Laravel 11, Sanctum, MySQL/PostgreSQL
-- **Frontend** : [react-frontend/](react-frontend/) — React 18, Vite, React Router, React Query
+- **Backend** : [laravel-api/](laravel-api/) — REST, Sanctum, SQLite / MySQL / PostgreSQL  
+- **Frontend** : [react-frontend/](react-frontend/) — Vite, React Router, React Query  
 
-Voir [LAB-BTP-README.md](LAB-BTP-README.md) pour l’installation et le démarrage.
+Dans l’interface, deux espaces métier coexistent (même URL, onglets distincts possibles) :
+
+| Espace | URL | Usage |
+|--------|-----|--------|
+| **CRM** | http://localhost:5173/crm | Clients, chantiers, devis, factures, mails, PDF |
+| **Terrain & labo** | http://localhost:5173/terrain | Commandes, saisie mesures (détail dossier), catalogue, graphiques, calculs |
+
+Documentation détaillée : [LAB-BTP-README.md](LAB-BTP-README.md).  
+Démarrage express : [DEMARRAGE-BTP.md](DEMARRAGE-BTP.md).  
+Comparaison Dolibarr : [docs/DOLIBARR-VS-PLATEFORME-BTP.md](docs/DOLIBARR-VS-PLATEFORME-BTP.md).
 
 ---
 
-## Microservices (existant)
-
-Plateforme composée de 5 microservices :
-
-| Service | Port | Rôle |
-|--------|------|------|
-| **api** | 3000 | API Gateway — point d’entrée unique, routage vers back, calcul, auth |
-| **back** | 3001 | Backend métier — logique applicative, données |
-| **calcul** | 3002 | Service de calcul — opérations et traitements numériques |
-| **auth** | 3003 | Authentification — tokens JWT, login |
-| **front** | 5173 | Frontend — interface React (Vite) |
-
-## Démarrage rapide
-
-### Avec Docker
+## Démarrage rapide (recommandé)
 
 ```bash
-docker compose up --build
+./start.sh
 ```
 
-- API : http://localhost:3000  
-- Front : http://localhost:5173  
-
-### En local (développement)
+ou :
 
 ```bash
-# Terminal 1 - API
-cd services/api && npm install && npm run dev
-
-# Terminal 2 - Back
-cd services/back && npm install && npm run dev
-
-# Terminal 3 - Calcul
-cd services/calcul && npm install && npm run dev
-
-# Terminal 4 - Auth
-cd services/auth && npm install && npm run dev
-
-# Terminal 5 - Front
-cd apps/front && npm install && npm run dev
+./start-btp.sh
 ```
 
-## Endpoints (via Gateway http://localhost:3000)
+Puis ouvrir **http://localhost:5173** (compte démo : `admin@lab.local` / `password`).
 
-- `GET /health` — santé du gateway
-- `GET /api/back/items` — ex. ressources du back
-- `POST /api/calcul/sum` — ex. calcul (body: `{ "a", "b" }`)
-- `POST /api/auth/login` — login (body: `{ "email", "password" }`)
+En arrière-plan avec logs dans `.run/` :
+
+```bash
+./relaunch.sh
+./stop.sh
+```
+
+---
+
+## Dossier `services/` (Node)
+
+Les anciens microservices Node (`services/api`, `back`, `calcul`, `auth`) ne sont **plus** lancés par les scripts par défaut. La plateforme produit repose sur **laravel-api** + **react-frontend**. Vous pouvez conserver ce dossier comme référence ou le retirer du dépôt si vous n’en avez plus l’usage.
+
+---
+
+## Docker
+
+Le fichier `docker-compose.yml` à l’ancienne stack a été retiré. Le mode standard est **PHP + Node en local** via `./start.sh`. Pour un déploiement serveur, prévoir reverse proxy, TLS et process manager (voir LAB-BTP-README).

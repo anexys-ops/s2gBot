@@ -63,3 +63,14 @@ docker compose --env-file .env.docker exec app php artisan db:seed --force
 ```
 
 En local, `./start.sh` reste possible sans Docker.
+
+---
+
+## Déploiement production (serveur SSH port **167**)
+
+Pour ce projet, le **serveur de production** est celui atteint en **SSH sur le port 167** (configuré dans [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) pour le job *Deploy production*).
+
+- **Via Git** : un `git push` sur `main` déclenche GitHub Actions, qui se connecte à ce serveur en **port 167**, met à jour le dépôt sur le disque (`DEPLOY_PATH`) et exécute `scripts/deploy-server.sh`.
+- **Depuis ta machine** : copier `scripts/deploy-apps-dev.example.env` vers `deploy.env`, renseigner l’hôte et **`DEPLOY_PORT=167`**, puis lancer `./scripts/deploy-apps-dev.sh` (voir commentaires dans l’exemple d’env).
+
+**Versions footer (automatique)** : le numéro **API** suit **`react-frontend/package.json`** si `APP_VERSION` est vide dans `.env` ; les scripts **`deploy-server.sh`** et **`deploy-apps-dev.sh`** mettent à jour `APP_VERSION` dans `.env` à chaque déploiement. Le **commit** affiché sur le front est injecté via **`GIT_COMMIT_SHORT`** pendant le build sur le serveur. Après un déploiement, un **hard refresh** (ou mise à jour du service worker) peut être nécessaire pour voir le nouveau bundle.

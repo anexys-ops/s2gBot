@@ -10,18 +10,27 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8')) as { version: string }
 
+/**
+ * SHA court affiché dans le footer. Ordre : CI GitHub, variable injectée par deploy-server.sh,
+ * puis git à la racine du dépôt (pas react-frontend seul — évite « local » si .git est seulement à la racine).
+ */
 function buildGitShortSha(): string {
   const gh = process.env.GITHUB_SHA
   if (typeof gh === 'string' && gh.length >= 7) {
     return gh.slice(0, 7)
   }
+  const injected = process.env.GIT_COMMIT_SHORT ?? process.env.VITE_GIT_COMMIT_SHORT
+  if (typeof injected === 'string' && /^[a-f0-9]{7,40}$/i.test(injected.trim())) {
+    return injected.trim().slice(0, 7)
+  }
+  const repoRoot = resolve(__dirname, '..')
   try {
     return execSync('git rev-parse --short HEAD', {
       encoding: 'utf-8',
-      cwd: __dirname,
+      cwd: repoRoot,
     }).trim()
   } catch {
-    return 'local'
+    return 'dev'
   }
 }
 

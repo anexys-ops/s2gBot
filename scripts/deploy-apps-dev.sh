@@ -144,6 +144,24 @@ if ! grep -qE '^APP_KEY=base64:.+' .env 2>/dev/null; then
   echo "→ Génération APP_KEY (manquant ou incomplet)."
   "$PHP_BIN" artisan key:generate --force
 fi
+# Même logique que deploy-server.sh : footer API = version package.json du front
+if [ -f .env ] && [ -f ../react-frontend/package.json ]; then
+  PKG_VER=""
+  if command -v node >/dev/null 2>&1; then
+    PKG_VER="$(cd ../react-frontend && node -p "require('./package.json').version" 2>/dev/null || true)"
+  fi
+  if [ -z "$PKG_VER" ] && command -v jq >/dev/null 2>&1; then
+    PKG_VER="$(jq -r '.version // empty' ../react-frontend/package.json 2>/dev/null || true)"
+  fi
+  if [ -n "$PKG_VER" ] && [ "$PKG_VER" != "null" ]; then
+    if grep -q '^APP_VERSION=' .env 2>/dev/null; then
+      sed -i.bak "s/^APP_VERSION=.*/APP_VERSION=$PKG_VER/" .env && rm -f .env.bak
+    else
+      printf '\nAPP_VERSION=%s\n' "$PKG_VER" >> .env
+    fi
+    echo "→ APP_VERSION=$PKG_VER (auto, package.json)"
+  fi
+fi
 "$PHP_BIN" artisan config:clear
 "$PHP_BIN" artisan migrate --force
 "$PHP_BIN" artisan db:seed --force

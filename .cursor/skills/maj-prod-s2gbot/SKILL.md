@@ -16,6 +16,8 @@ Tu es l’agent chargé d’exécuter ou d’orchestrer la mise à jour **produc
 
 **Serveur de production (s2gBot)** : c’est la machine joignable en **SSH sur le port 167** (voir `port: 167` dans `.github/workflows/deploy.yml`). Quand l’utilisateur dit « prod » ou « serveur de production », il parle de **ce** serveur, pas d’un hôte au port 22 par défaut.
 
+**Configuration infra validée** : stack **Docker** sur le LXC (`/opt/s2gBot`, site sur **port 80**, SSH **167**, etc.). **Ne pas** modifier cette configuration via SSH ni proposer de changements ports / `.env.docker` / Nginx **sans demande explicite**. Déploiement courant = **pousser les fichiers** (`git push` `main`, workflow ou script existant) — voir aussi `.cursor/rules/s2gbot-prod-ssh.mdc`.
+
 ## Avant toute chose
 
 1. **Code prêt** : vérifier que les changements voulus sont commités ; la prod suit en général la branche `main` (voir `.github/workflows/deploy.yml`).

@@ -21,7 +21,19 @@ Exemple de commande (le terminal local gère le mot de passe ou la clé) :
 - En cas de diagnostic prod : proposer des commandes concrètes (`ssh …`, `docker compose …`, scripts sous `/opt/s2gBot`) plutôt que des leçons génériques.
 - **Ne pas** insister sur le fait de partager ou non des identifiants dans le chat ; rester bref et orienté action.
 
+## Configuration prod — ne plus modifier sans ordre explicite
+
+La stack **Docker** sur le LXC (**HTTP sur le port 80**, **SSH public sur le port 167**, proxy → LXC, `.env.docker`, etc.) est **validée et fonctionnelle**.
+
+- **Ne pas** changer la configuration serveur (ports, Nginx hôte, `docker-compose`, `.env.docker`, vhosts, pare-feu Proxmox) **sauf si l’utilisateur le demande clairement**.
+- Ne pas « améliorer » ou « harmoniser » l’infra de son propre chef.
+
+## Déploiement courant = pousser le code uniquement
+
+- Le flux normal est : **commits + `git push`** sur la branche suivie par la prod (souvent `main`), éventuellement workflow GitHub **Deploy production** ou script **`deploy-apps-dev.sh`** selon ce qui est déjà en place.
+- **Pas** de session SSH pour retoucher la conf quand l’utilisateur dit que ça marche et veut seulement livrer des fichiers.
+
 ## Chemins sur le serveur
 
 - Projet Docker / code : `/opt/s2gBot` (à ajuster si le déploiement utilise un autre chemin).
-- Après mise à jour : `./scripts/docker-prod-refresh.sh` ; en panne : `./scripts/docker-diagnose.sh`.
+- En **panne seulement** : `./scripts/docker-prod-refresh.sh` ou `./scripts/docker-diagnose.sh` — pas par défaut après un simple push.

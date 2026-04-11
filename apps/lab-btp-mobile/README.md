@@ -25,6 +25,12 @@ Pour un **backend local** (`php artisan serve`), mettre l’IP de ton Mac dans `
 
 `EXPO_PUBLIC_API_URL=http://192.168.x.x:8000`
 
+### « Impossible de joindre l’API » (HTTPS prod)
+
+1. Sur le **téléphone**, ouvre le navigateur : `https://s2g.apps-dev.fr/api/version` — si ça ne charge pas, le souci est réseau / DNS / pare-feu (Wi‑Fi invité, VPN, etc.), pas l’app.
+2. **Expo Web** (bouton `w`) : la CORS du serveur doit autoriser l’origine Expo ; le dépôt inclut `exp.direct` / `exp.host` dans `laravel-api/config/cors.php` — déployer le backend après mise à jour.
+3. **`EXPO_PUBLIC_API_URL`** : les variables `EXPO_PUBLIC_*` sont figées au démarrage de Metro ; après modification du `.env`, lancer `npx expo start -c`.
+
 ## Publication sur les stores
 
 1. Installer EAS CLI : `npm i -g eas-cli`

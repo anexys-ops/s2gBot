@@ -22,6 +22,8 @@ docker compose --env-file .env.docker up -d --build
 
 Interface : `http://localhost:8080` (ou le port `HTTP_PORT` défini dans `.env.docker`).
 
+**Proxmox / box / reverse proxy** : le **SSH** peut être exposé sur un port dédié (ex. **167**) sans rapport avec le site. Le trafic web public arrive en **80** (ou **443** terminé en amont) et est renvoyé vers le **LXC sur le port 80** : dans `.env.docker`, utiliser **`HTTP_PORT=80`** (pas le port SSH). Les URLs **`APP_URL` / `FRONTEND_URL`** doivent refléter ce que le navigateur affiche (ex. `https://votre-domaine.fr` si TLS devant).
+
 **API** : même URL et port que l’interface ; préfixes HTTP `/api/...`, `/sanctum/...`, santé `/up`.
 
 **MySQL depuis l’hôte** (administration locale au serveur, pas exposé sur Internet si vous gardez `127.0.0.1`) : `127.0.0.1:${MYSQL_PUBLISH_PORT:-33060}` (utilisateur / mot de passe = `DB_USERNAME` / `DB_PASSWORD` dans `.env.docker`). Depuis un autre poste : tunnel SSH puis client MySQL sur ce port.

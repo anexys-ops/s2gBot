@@ -53,4 +53,4 @@ if [ -f "$S2G_ROOT/docker-compose.yml" ]; then
   (cd "$S2G_ROOT" && docker compose --env-file "${ENV_DOCKER_FILE:-.env.docker}" up -d) || true
 fi
 
-echo "=== Terminé. Interface Docker typique : http://IP:\${HTTP_PORT}/ (ex. :167) ==="
+echo "=== Terminé. Interface Docker : http://IP:\${HTTP_PORT}/ (souvent HTTP_PORT=80 derrière un reverse proxy) ==="

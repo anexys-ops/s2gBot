@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Facade;
 return [
     'name' => env('APP_NAME', 'Lab BTP API'),
     /** Version affichée par GET /api/version (footer front). */
-    'version' => env('APP_VERSION', '1.0.0'),
+    'version' => env('APP_VERSION', '1.0.2'),
     'env' => env('APP_ENV', 'production'),
     'debug' => (bool) env('APP_DEBUG', false),
     'url' => env('APP_URL', 'http://localhost'),

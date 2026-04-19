@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -72,6 +74,33 @@ class AuthController extends Controller
             'token' => $token,
             'token_type' => 'Bearer',
         ], 201);
+    }
+
+    /**
+     * Liste minimale des clients pour le formulaire d'inscription (sans authentification).
+     */
+    public function registerClientList(): JsonResponse
+    {
+        $clients = Client::query()->orderBy('name')->get(['id', 'name']);
+
+        return response()->json($clients);
+    }
+
+    /**
+     * Chantiers d'un client pour l'inscription « contact chantier » (sans authentification).
+     */
+    public function registerSiteList(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'client_id' => 'required|integer|exists:clients,id',
+        ]);
+
+        $sites = Site::query()
+            ->where('client_id', $validated['client_id'])
+            ->orderBy('name')
+            ->get(['id', 'name', 'client_id']);
+
+        return response()->json($sites);
     }
 
     public function logout(Request $request): JsonResponse

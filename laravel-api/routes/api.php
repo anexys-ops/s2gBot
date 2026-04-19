@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [App\Http\Controllers\Api\AuthController::class, 'login']);
 Route::post('/register', [App\Http\Controllers\Api\AuthController::class, 'register']);
+Route::get('/register/clients', [App\Http\Controllers\Api\AuthController::class, 'registerClientList']);
+Route::get('/register/sites', [App\Http\Controllers\Api\AuthController::class, 'registerSiteList']);
 Route::get('/version', [App\Http\Controllers\Api\VersionController::class, 'show']);
 
 Route::middleware('auth:sanctum')->group(function () {

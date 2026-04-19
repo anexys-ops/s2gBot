@@ -37,7 +37,19 @@ export async function api<T>(
   }
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
-    throw new Error(data.message || `Erreur ${res.status}`)
+    let msg =
+      typeof data.message === 'string' && data.message.trim() !== ''
+        ? data.message
+        : `Erreur ${res.status}`
+    if (data.errors && typeof data.errors === 'object') {
+      const parts = Object.values(data.errors)
+        .flat(2)
+        .filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+      if (parts.length) {
+        msg = parts.join(' ')
+      }
+    }
+    throw new Error(msg)
   }
   return data as T
 }
@@ -61,6 +73,12 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  /** Clients / chantiers pour le formulaire d'inscription (sans token). */
+  registerClients: () => api<Array<{ id: number; name: string }>>('/register/clients'),
+  registerSites: (clientId: number) =>
+    api<Array<{ id: number; name: string; client_id: number }>>(
+      `/register/sites?client_id=${encodeURIComponent(String(clientId))}`,
+    ),
   logout: () => api('/logout', { method: 'POST' }),
   user: () => api<User>('/user'),
 }

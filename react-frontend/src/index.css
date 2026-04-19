@@ -1213,6 +1213,179 @@ th { background: #f9fafb; font-weight: 600; }
   }
 }
 
+/* ——— Page inscription (grille comme connexion + fond type plan / outils) ——— */
+.register-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  overflow-x: hidden;
+}
+.register-screen-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 95% 65% at 8% 18%, rgba(20, 184, 166, 0.28) 0%, transparent 52%),
+    radial-gradient(ellipse 85% 55% at 92% 78%, rgba(59, 130, 246, 0.32) 0%, transparent 48%),
+    linear-gradient(158deg, #0b1220 0%, #134e4a 38%, #0f172a 72%, #0c1929 100%);
+}
+.register-screen-blueprint {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.16;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    repeating-linear-gradient(
+      -18deg,
+      transparent,
+      transparent 11px,
+      rgba(148, 163, 184, 0.06) 11px,
+      rgba(148, 163, 184, 0.06) 12px
+    );
+  background-size: 28px 28px, 28px 28px, auto;
+  mask-image: radial-gradient(ellipse 88% 72% at 50% 48%, black 18%, transparent 78%);
+}
+.register-screen-tools {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  color: rgba(226, 232, 240, 0.38);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  mix-blend-mode: screen;
+}
+.register-tools-svg {
+  width: min(92vw, 560px);
+  height: auto;
+  max-height: 58vh;
+}
+.register-screen-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: min(1200px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(min(100%, 320px), 440px);
+  gap: clamp(2rem, 5vw, 3.5rem);
+  align-items: center;
+}
+.register-screen-topbar {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+.register-screen-topbar .public-context-nav {
+  margin-bottom: 0.25rem;
+}
+.register-hero {
+  color: #f8fafc;
+  padding: 0.5rem 0;
+  min-width: 0;
+}
+.register-hero-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #99f6e4;
+  background: rgba(20, 184, 166, 0.22);
+  border: 1px solid rgba(45, 212, 191, 0.4);
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  margin-bottom: 1rem;
+}
+.register-hero-title {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.65rem, 3.8vw, 2.25rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.28);
+}
+.register-hero-text {
+  margin: 0 0 1.25rem;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: #cbd5e1;
+  max-width: 38ch;
+}
+.register-hero-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.register-hero-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: #e2e8f0;
+}
+.register-hero-list li::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2dd4bf, #0d9488);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.22);
+}
+.register-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+  width: 100%;
+  justify-self: stretch;
+}
+
+@media (max-width: 900px) {
+  .register-screen-content {
+    grid-template-columns: 1fr;
+    max-width: 460px;
+  }
+  .register-hero {
+    text-align: center;
+    padding-bottom: 0;
+  }
+  .register-hero-text {
+    max-width: none;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .register-hero-list {
+    align-items: center;
+  }
+  .register-hero-list li {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .register-screen {
+    padding: 1rem;
+    align-items: flex-start;
+    padding-top: 2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .register-tools-svg {
+    opacity: 0.55;
+  }
+}
+
 /* ——— Modales & actions CRUD ——— */
 .modal-overlay {
   position: fixed;

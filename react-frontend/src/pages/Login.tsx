@@ -36,7 +36,9 @@ export default function Login() {
       <div className="login-screen-bg" aria-hidden />
       <div className="login-screen-grid" aria-hidden />
       <div className="login-screen-content">
-        <PublicContextNav extraLink={{ to: '/register', label: 'Inscription' }} variant="dark" />
+        <div className="login-screen-topbar">
+          <PublicContextNav extraLink={{ to: '/register', label: 'Inscription' }} variant="dark" />
+        </div>
         <div className="login-hero">
           <div className="login-hero-badge">Essais laboratoire</div>
           <h1 className="login-hero-title">Plateforme Lab BTP</h1>

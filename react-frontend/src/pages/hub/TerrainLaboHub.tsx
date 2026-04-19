@@ -26,7 +26,7 @@ export default function TerrainLaboHub() {
           {
             to: '/back-office',
             title: 'Back office',
-            desc: 'Catalogue essais, granulométrie, cadrage, calculs BTP, journal d’audit, clients, chantiers.',
+            desc: 'Catalogues (essais, commercial) et outils labo : granulométrie, audit, PDF, configuration…',
             icon: 'lab' as const,
           },
         ]

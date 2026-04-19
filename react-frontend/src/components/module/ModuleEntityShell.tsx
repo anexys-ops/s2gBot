@@ -20,6 +20,8 @@ type Props = {
   subtitle?: string
   /** Onglets style Dolibarr (Fiche, Documents…) */
   tabs?: ModuleTab[]
+  /** Entre l’en-tête et les onglets : raccourcis (ex. liens vers une autre zone du module). */
+  tabsAccessory?: ReactNode
   /** Boutons Nouveau / Liste / Modifier / Supprimer */
   actions?: ReactNode
   /** Classe(s) sur la racine `.module-shell` (ex. défilement horizontal des onglets) */
@@ -33,6 +35,7 @@ export default function ModuleEntityShell({
   title,
   subtitle,
   tabs,
+  tabsAccessory,
   actions,
   shellClassName,
   children,
@@ -63,6 +66,8 @@ export default function ModuleEntityShell({
           </div>
           {actions ? <div className="module-shell__actions">{actions}</div> : null}
         </header>
+
+        {tabsAccessory ? <div className="module-shell__tabs-accessory">{tabsAccessory}</div> : null}
 
         {tabs && tabs.length > 0 ? (
           <div className="module-shell__tabs-wrap">

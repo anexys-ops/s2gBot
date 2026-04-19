@@ -440,21 +440,31 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-home dashboard-home--v2">
-      <header className="dashboard-hero">
+      <header className="dashboard-card dashboard-card--hero dashboard-hero">
         <p className="hub-kicker">Lab BTP</p>
-      <h1>Bienvenue, {user?.name}</h1>
-      <p className="dashboard-tagline">
+        <h1>Bienvenue, {user?.name}</h1>
+        <p className="dashboard-tagline">
           Indicateurs par métier (commerce, compta, labo) : cliquez une tuile pour afficher le détail, les répartitions et
           les liens utiles.
         </p>
       </header>
 
-      {dashLoading && <p className="dashboard-loading">Chargement des statistiques…</p>}
-      {dashError && <p className="error">{(dashError as Error).message}</p>}
+      {dashLoading && (
+        <div className="dashboard-card dashboard-card--muted" aria-busy="true">
+          <p className="dashboard-loading">Chargement des statistiques…</p>
+        </div>
+      )}
+      {dashError && (
+        <div className="dashboard-card dashboard-card--error">
+          <p className="error dashboard-card__error-msg">{(dashError as Error).message}</p>
+        </div>
+      )}
 
       {dash && (
-        <section className="dashboard-section dashboard-section--metier">
-          <h2 className="dashboard-section__title">Indicateurs clés par métier</h2>
+        <section className="dashboard-card dashboard-card--metrics dashboard-section dashboard-section--metier">
+          <div className="dashboard-card__head">
+            <h2 className="dashboard-section__title">Indicateurs clés par métier</h2>
+          </div>
           <div className="dashboard-metier-tabs" role="tablist" aria-label="Métier">
             {METIER_TABS.map((t) => (
               <button
@@ -689,45 +699,51 @@ export default function Dashboard() {
         </section>
       )}
 
-      <div className="dashboard-split">
-        <Link to="/crm" className="dashboard-panel dashboard-panel--crm dashboard-panel--v2">
-          <span className="dashboard-panel-icon" aria-hidden>
-            <OutlineIcon id="handshake" />
-          </span>
-          <span className="dashboard-panel-label">CRM</span>
-          <strong>Commercial & clients</strong>
-          <span className="dashboard-panel-hint">
-            Clients, chantiers, devis, factures, mails et PDF — avec champs et indicateurs personnalisables sur les
-            fiches.
-          </span>
-        </Link>
-        <Link to="/terrain" className="dashboard-panel dashboard-panel--terrain dashboard-panel--v2">
-          <span className="dashboard-panel-icon" aria-hidden>
-            <OutlineIcon id="lab" />
-          </span>
-          <span className="dashboard-panel-label">Terrain & labo</span>
-          <strong>Prise de mesure & dossiers</strong>
-          <span className="dashboard-panel-hint">
-            Commandes, missions, forages, granulométrie et rapports — métadonnées disponibles sur commandes et missions.
-          </span>
-        </Link>
+      <div className="dashboard-card dashboard-card--hubs">
+        <p className="dashboard-card__eyebrow">Espaces métier</p>
+        <div className="dashboard-split">
+          <Link to="/crm" className="dashboard-panel dashboard-panel--crm dashboard-panel--v2">
+            <span className="dashboard-panel-icon" aria-hidden>
+              <OutlineIcon id="handshake" />
+            </span>
+            <span className="dashboard-panel-label">CRM</span>
+            <strong>Commercial & clients</strong>
+            <span className="dashboard-panel-hint">
+              Clients, chantiers, devis, factures, mails et PDF — avec champs et indicateurs personnalisables sur les
+              fiches.
+            </span>
+          </Link>
+          <Link to="/terrain" className="dashboard-panel dashboard-panel--terrain dashboard-panel--v2">
+            <span className="dashboard-panel-icon" aria-hidden>
+              <OutlineIcon id="lab" />
+            </span>
+            <span className="dashboard-panel-label">Terrain & labo</span>
+            <strong>Prise de mesure & dossiers</strong>
+            <span className="dashboard-panel-hint">
+              Commandes, missions, forages, granulométrie et rapports — métadonnées disponibles sur commandes et
+              missions.
+            </span>
+          </Link>
+        </div>
       </div>
 
-      <p className="dashboard-shortcuts-title">Accès rapides</p>
-      <div className="dashboard-shortcuts">
-        <Link to="/orders" className="btn btn-secondary">
-          Commandes
-        </Link>
-        <Link to="/back-office" className="btn btn-secondary">
-          Back office
-        </Link>
-        <Link to="/invoices" className="btn btn-secondary">
-          Factures
-        </Link>
-        <Link to="/graphiques-essais" className="btn btn-secondary">
-          Graphiques essais
-        </Link>
-      </div>
+      <section className="dashboard-card dashboard-card--shortcuts">
+        <p className="dashboard-shortcuts-title">Accès rapides</p>
+        <div className="dashboard-shortcuts">
+          <Link to="/orders" className="btn btn-secondary">
+            Commandes
+          </Link>
+          <Link to="/back-office" className="btn btn-secondary">
+            Back office
+          </Link>
+          <Link to="/invoices" className="btn btn-secondary">
+            Factures
+          </Link>
+          <Link to="/graphiques-essais" className="btn btn-secondary">
+            Graphiques essais
+          </Link>
+        </div>
+      </section>
     </div>
   )
 }

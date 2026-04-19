@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 import { canManageAppConfig } from '../../lib/settingsAccess'
@@ -69,9 +69,16 @@ function metaForPath(pathname: string): PageMeta {
     }
   return {
     title: 'Back office',
-    subtitle: 'Référentiels, outils de calcul et suivi — navigation par onglets.',
+    subtitle: 'Référentiels, outils de calcul et suivi — catalogues et configuration sont séparés.',
     crumb: 'Back office',
   }
+}
+
+function isBackOfficeCataloguePath(pathname: string): boolean {
+  return (
+    pathname.startsWith('/back-office/catalogue-essais') ||
+    pathname.startsWith('/back-office/catalogue-commercial')
+  )
 }
 
 export default function BackOfficeLayout() {
@@ -80,12 +87,16 @@ export default function BackOfficeLayout() {
   const isAdmin = user?.role === 'lab_admin'
   const canAppConfig = canManageAppConfig(user)
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
+  const onCatalogue = isBackOfficeCataloguePath(pathname)
 
   const meta = useMemo(() => metaForPath(pathname), [pathname])
 
-  const tabs = [
+  const catalogueTabs = [
     { to: '/back-office/catalogue-essais', label: 'Catalogue essais', end: true as const },
     { to: '/back-office/catalogue-commercial', label: 'Catalogue commercial', end: true as const },
+  ]
+
+  const toolsTabs = [
     { to: '/back-office/granulometrie', label: 'Granulométrie', end: true as const },
     { to: '/back-office/cadrage', label: 'Cadrage (S0)', end: true as const },
     { to: '/back-office/exemples-calculs', label: 'Calculs BTP', end: true as const },
@@ -102,6 +113,24 @@ export default function BackOfficeLayout() {
     ...(canAppConfig ? [{ to: '/back-office/configuration', label: 'Configuration', end: true as const }] : []),
   ]
 
+  const tabs = onCatalogue ? catalogueTabs : toolsTabs
+
+  const tabsAccessory = onCatalogue ? (
+    <span className="back-office-tabs-accessory">
+      <span className="back-office-tabs-accessory__label">Configuration et outils</span>
+      <Link to="/back-office/granulometrie">Granulométrie, audit, clients, PDF, mails…</Link>
+    </span>
+  ) : (
+    <span className="back-office-tabs-accessory">
+      <span className="back-office-tabs-accessory__label">Catalogues</span>
+      <Link to="/back-office/catalogue-essais">Catalogue essais</Link>
+      <span className="back-office-tabs-accessory__sep" aria-hidden>
+        ·
+      </span>
+      <Link to="/back-office/catalogue-commercial">Catalogue commercial</Link>
+    </span>
+  )
+
   return (
     <ModuleEntityShell
       shellClassName="module-shell--back-office"
@@ -110,10 +139,11 @@ export default function BackOfficeLayout() {
         { label: 'Terrain & labo', to: '/terrain' },
         { label: meta.crumb },
       ]}
-      moduleBarLabel="Laboratoire — Back office"
+      moduleBarLabel={onCatalogue ? 'Laboratoire — Catalogues' : 'Laboratoire — Configuration et outils'}
       title={meta.title}
       subtitle={meta.subtitle}
       tabs={tabs}
+      tabsAccessory={tabsAccessory}
     >
       <Outlet />
     </ModuleEntityShell>

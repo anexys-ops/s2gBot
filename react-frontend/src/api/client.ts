@@ -228,6 +228,9 @@ export interface CommercialDocumentLink {
   relation: string
 }
 
+/** Mise en page PDF (rapports / documents) — aligné sur `AppBranding::defaultLayoutConfig`. */
+export type PdfLayoutConfig = Record<string, unknown>
+
 export interface DocumentPdfTemplateRow {
   id: number
   document_type: string
@@ -235,6 +238,7 @@ export interface DocumentPdfTemplateRow {
   name: string
   blade_view: string
   is_default: boolean
+  layout_config?: PdfLayoutConfig
 }
 
 export const clientAddressesApi = {
@@ -309,8 +313,10 @@ export const documentPdfTemplatesApi = {
     api<{ data: DocumentPdfTemplateRow[] }>(
       documentType ? `/document-pdf-templates?document_type=${documentType}` : '/document-pdf-templates'
     ),
-  setDefault: (id: number, body: { is_default?: boolean; name?: string }) =>
-    api<DocumentPdfTemplateRow>(`/document-pdf-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  update: (
+    id: number,
+    body: { is_default?: boolean; name?: string; layout_config?: PdfLayoutConfig },
+  ) => api<DocumentPdfTemplateRow>(`/document-pdf-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
 }
 
 export type ExtrafieldEntityType = 'client' | 'site' | 'order' | 'invoice' | 'quote'
@@ -380,18 +386,56 @@ export const moduleSettingsApi = {
     }),
 }
 
+export const brandingApi = {
+  get: () => api<{ logo_url: string | null }>('/branding'),
+  async uploadLogo(file: File): Promise<{ logo_url: string | null; logo_public_path?: string }> {
+    const token = getToken()
+    const fd = new FormData()
+    fd.append('logo', file)
+    const res = await fetch(`${API_BASE}/branding/logo`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}`, Accept: 'application/json' } : { Accept: 'application/json' },
+      body: fd,
+    })
+    if (res.status === 401) {
+      localStorage.removeItem('token')
+      window.location.href = '/login'
+      throw new Error('Unauthorized')
+    }
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      let msg =
+        typeof data.message === 'string' && data.message.trim() !== ''
+          ? data.message.trim()
+          : `Erreur ${res.status}`
+      if (data.errors && typeof data.errors === 'object') {
+        const parts = Object.values(data.errors)
+          .flat(2)
+          .filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+        if (parts.length) msg = parts.join(' ')
+      }
+      throw new Error(msg)
+    }
+    return data as { logo_url: string | null; logo_public_path?: string }
+  },
+  deleteLogo: () => api<{ logo_url: null }>('/branding/logo', { method: 'DELETE' }),
+}
+
 export interface ReportPdfTemplateRow {
   id: number
   slug: string
   name: string
   blade_view: string
   is_default: boolean
+  layout_config?: PdfLayoutConfig
 }
 
 export const reportPdfTemplatesApi = {
   list: () => api<{ data: ReportPdfTemplateRow[] }>('/report-pdf-templates'),
-  update: (id: number, body: { is_default?: boolean; name?: string }) =>
-    api<ReportPdfTemplateRow>(`/report-pdf-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  update: (
+    id: number,
+    body: { is_default?: boolean; name?: string; layout_config?: PdfLayoutConfig },
+  ) => api<ReportPdfTemplateRow>(`/report-pdf-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
 }
 
 export interface ReportFormFieldDef {

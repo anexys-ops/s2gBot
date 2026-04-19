@@ -15,6 +15,7 @@
 </head>
 <body>
     <div class="header">
+        @include('pdf.partials.branding-header', ['layoutConfig' => $layoutConfig ?? [], 'brandingLogoDataUri' => $brandingLogoDataUri ?? null, 'formData' => $formData ?? []])
         <h1>Rapport d'essais - {{ $order->reference }}</h1>
         <p class="meta">Client : {{ $order->client->name }}</p>
         @if($order->site)
@@ -49,7 +50,30 @@
     @endforeach
     @endforeach
 
-    @php $fd = $formData ?? []; @endphp
+    @php $fd = $formData ?? []; $lc = $layoutConfig ?? []; @endphp
+    @if(!empty($lc['extra_fields'] ?? []))
+    <h2 style="margin-top: 18px;">Champs configurés du modèle</h2>
+    <table>
+        <thead><tr><th>Libellé</th><th>Valeur</th></tr></thead>
+        <tbody>
+        @foreach($lc['extra_fields'] as $f)
+            @php $fk = $f['key'] ?? ''; @endphp
+            @if($fk !== '')
+            <tr>
+                <td>{{ $f['label'] ?? $fk }}</td>
+                <td>
+                    @if(($f['type'] ?? 'text') === 'image' && !empty($fd[$fk]))
+                        <img src="{{ $fd[$fk] }}" alt="" style="max-height:100px;max-width:180px;" />
+                    @else
+                        {{ is_scalar($fd[$fk] ?? '') ? ($fd[$fk] ?? '—') : '—' }}
+                    @endif
+                </td>
+            </tr>
+            @endif
+        @endforeach
+        </tbody>
+    </table>
+    @endif
     @if(!empty($fd))
     <h2 style="margin-top: 20px;">Formulaire terrain / service</h2>
     <table>
@@ -62,7 +86,8 @@
     </table>
     @endif
 
-    @if(isset($report) && $report->signed_at)
+    @php $lc = $layoutConfig ?? []; $showSig = ($lc['header']['show_signature_block'] ?? true) !== false; @endphp
+    @if($showSig && isset($report) && $report->signed_at)
     <div style="margin-top: 40px; border-top: 1px solid #333; padding-top: 16px;">
         <p><strong>Signé électroniquement</strong> le {{ $report->signed_at->format('d/m/Y H:i') }}</p>
         @if($report->signer_name)<p>Signataire : {{ $report->signer_name }}</p>@endif

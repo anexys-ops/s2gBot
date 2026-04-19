@@ -64,6 +64,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('reports/{report}/sign', [App\Http\Controllers\Api\ReportController::class, 'sign']);
     Route::post('reports/{report}/submit-review', [App\Http\Controllers\Api\ReportController::class, 'submitReview']);
     Route::post('reports/{report}/approve-review', [App\Http\Controllers\Api\ReportController::class, 'approveReview']);
+    Route::get('branding', [App\Http\Controllers\Api\AppBrandingController::class, 'show']);
+    Route::post('branding/logo', [App\Http\Controllers\Api\AppBrandingController::class, 'uploadLogo']);
+    Route::delete('branding/logo', [App\Http\Controllers\Api\AppBrandingController::class, 'destroyLogo']);
+
     Route::get('report-pdf-templates', [App\Http\Controllers\Api\ReportPdfTemplateController::class, 'index']);
     Route::put('report-pdf-templates/{report_pdf_template}', [App\Http\Controllers\Api\ReportPdfTemplateController::class, 'update']);
     Route::get('report-form-definitions', [App\Http\Controllers\Api\ReportFormDefinitionController::class, 'index']);

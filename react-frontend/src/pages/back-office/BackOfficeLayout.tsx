@@ -49,6 +49,12 @@ function metaForPath(pathname: string): PageMeta {
       subtitle: 'Modèle par défaut utilisé lors de la génération depuis une commande.',
       crumb: 'Modèles PDF rapports',
     }
+  if (pathname.includes('/modeles-documents-pdf'))
+    return {
+      title: 'Modèles PDF — devis & factures',
+      subtitle: 'Modèle par défaut par type de document et mise en page (logo, signature, champs).',
+      crumb: 'Modèles PDF documents',
+    }
   if (pathname.includes('/pdf'))
     return {
       title: 'Création de PDF',
@@ -109,7 +115,12 @@ export default function BackOfficeLayout() {
           { to: '/back-office/mails', label: 'Mails', end: true as const },
         ]
       : []),
-    ...(isAdmin ? [{ to: '/back-office/modeles-rapports-pdf', label: 'Modèles PDF rapports', end: true as const }] : []),
+    ...(isAdmin
+      ? [
+          { to: '/back-office/modeles-rapports-pdf', label: 'Modèles PDF rapports', end: true as const },
+          { to: '/back-office/modeles-documents-pdf', label: 'Modèles PDF devis/factures', end: true as const },
+        ]
+      : []),
     ...(canAppConfig ? [{ to: '/back-office/configuration', label: 'Configuration', end: true as const }] : []),
   ]
 

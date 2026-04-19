@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Order;
 use App\Models\Report;
 use App\Models\ReportPdfTemplate;
+use App\Support\AppBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 
@@ -73,10 +74,14 @@ class ReportService
     private function writePdfToDisk(Order $order, Report $report, string $bladeView, array $formData): void
     {
         $report->loadMissing('pdfTemplate');
+        $layoutConfig = AppBranding::mergeLayoutConfig($report->pdfTemplate?->layout_config);
+
         $html = view($bladeView, [
             'order' => $order,
             'formData' => $formData,
             'report' => $report,
+            'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
+            'layoutConfig' => $layoutConfig,
         ])->render();
 
         $pdf = Pdf::loadHTML($html);

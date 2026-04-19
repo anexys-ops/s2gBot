@@ -13,12 +13,14 @@ class DocumentPdfTemplate extends Model
         'name',
         'blade_view',
         'is_default',
+        'layout_config',
     ];
 
     protected function casts(): array
     {
         return [
             'is_default' => 'boolean',
+            'layout_config' => 'array',
         ];
     }
 

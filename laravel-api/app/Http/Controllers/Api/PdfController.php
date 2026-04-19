@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Quote;
 use App\Services\ReportService;
+use App\Support\AppBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -71,7 +72,13 @@ class PdfController extends Controller
             }
             $template = $this->resolvePdfTemplate('quote', $validated['template_id'] ?? null, $quote->pdf_template_id);
             $view = $template?->blade_view ?? 'pdf.quote';
-            $html = view($view, ['quote' => $quote, 'template' => $template])->render();
+            $layoutConfig = AppBranding::mergeLayoutConfig($template?->layout_config);
+            $html = view($view, [
+                'quote' => $quote,
+                'template' => $template,
+                'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
+                'layoutConfig' => $layoutConfig,
+            ])->render();
             $filename = 'devis-'.$quote->number.'.pdf';
         } elseif ($type === 'invoice') {
             $invoice = Invoice::with(['client', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate'])->find($id);
@@ -80,7 +87,13 @@ class PdfController extends Controller
             }
             $template = $this->resolvePdfTemplate('invoice', $validated['template_id'] ?? null, $invoice->pdf_template_id);
             $view = $template?->blade_view ?? 'pdf.invoice';
-            $html = view($view, ['invoice' => $invoice, 'template' => $template])->render();
+            $layoutConfig = AppBranding::mergeLayoutConfig($template?->layout_config);
+            $html = view($view, [
+                'invoice' => $invoice,
+                'template' => $template,
+                'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
+                'layoutConfig' => $layoutConfig,
+            ])->render();
             $filename = 'facture-'.$invoice->number.'.pdf';
         } else {
             $order = Order::find($id);

@@ -17,6 +17,7 @@
 </head>
 <body>
     <div class="header">
+        @include('pdf.partials.branding-header', ['layoutConfig' => $layoutConfig ?? [], 'brandingLogoDataUri' => $brandingLogoDataUri ?? null])
         <h1>Devis n° {{ $quote->number }}</h1>
         <p class="meta">Date devis : {{ $quote->quote_date->format('d/m/Y') }}</p>
         @if($quote->order_date ?? null)

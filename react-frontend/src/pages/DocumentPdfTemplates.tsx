@@ -1,30 +1,30 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { reportPdfTemplatesApi, type ReportPdfTemplateRow } from '../api/client'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { documentPdfTemplatesApi, type DocumentPdfTemplateRow } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import PageBackNav from '../components/PageBackNav'
 import PdfLayoutConfigEditor from '../components/PdfLayoutConfigEditor'
 
-export default function ReportPdfTemplates() {
+export default function DocumentPdfTemplates() {
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const isAdmin = user?.role === 'lab_admin'
   const queryClient = useQueryClient()
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['report-pdf-templates'],
-    queryFn: () => reportPdfTemplatesApi.list(),
+    queryKey: ['document-pdf-templates'],
+    queryFn: () => documentPdfTemplatesApi.list(),
     enabled: isLab,
   })
 
   const setDefaultMut = useMutation({
-    mutationFn: (id: number) => reportPdfTemplatesApi.update(id, { is_default: true }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['report-pdf-templates'] }),
+    mutationFn: (id: number) => documentPdfTemplatesApi.update(id, { is_default: true }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['document-pdf-templates'] }),
   })
 
   const saveLayoutMut = useMutation({
     mutationFn: ({ id, layout_config }: { id: number; layout_config: Record<string, unknown> }) =>
-      reportPdfTemplatesApi.update(id, { layout_config }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['report-pdf-templates'] }),
+      documentPdfTemplatesApi.update(id, { layout_config }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['document-pdf-templates'] }),
   })
 
   if (!isLab) {
@@ -39,7 +39,7 @@ export default function ReportPdfTemplates() {
   if (isLoading) return <p>Chargement…</p>
   if (error) return <p className="error">{String(error)}</p>
 
-  const rows: ReportPdfTemplateRow[] = data?.data ?? []
+  const rows: DocumentPdfTemplateRow[] = data?.data ?? []
 
   return (
     <div>
@@ -49,15 +49,15 @@ export default function ReportPdfTemplates() {
       />
       <div className="card" style={{ marginBottom: '1rem', fontSize: '0.95rem' }}>
         <p style={{ margin: 0 }}>
-          Choix du modèle <strong>par défaut</strong> pour les rapports PDF depuis une commande. Les administrateurs peuvent
-          aussi ajuster la mise en page (logo, signature, champs et photos) via le JSON ci-dessous — fusionné côté serveur avec
-          les valeurs par défaut.
+          Modèles PDF pour les <strong>devis</strong> et <strong>factures</strong> : modèle par défaut par type de document, et mise en page
+          (logo, signature, champs supplémentaires) partagée avec la génération côté serveur.
         </p>
       </div>
       <div className="card">
         <table>
           <thead>
             <tr>
+              <th>Type</th>
               <th>Nom</th>
               <th>Slug</th>
               <th>Vue Blade</th>
@@ -68,6 +68,9 @@ export default function ReportPdfTemplates() {
           <tbody>
             {rows.map((t) => (
               <tr key={t.id}>
+                <td>
+                  <code>{t.document_type}</code>
+                </td>
                 <td>{t.name}</td>
                 <td>
                   <code>{t.slug}</code>
@@ -94,13 +97,13 @@ export default function ReportPdfTemplates() {
             ))}
           </tbody>
         </table>
-        {rows.length === 0 && <p style={{ padding: '1rem' }}>Aucun modèle (exécutez les migrations / seeders Laravel).</p>}
+        {rows.length === 0 && <p style={{ padding: '1rem' }}>Aucun modèle (migrations / seeders Laravel).</p>}
       </div>
       {isAdmin &&
         rows.map((t) => (
           <details key={`cfg-${t.id}`} className="card" style={{ marginTop: '1rem' }}>
             <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
-              Mise en page JSON — {t.name}
+              Mise en page JSON — {t.name} ({t.document_type})
             </summary>
             <PdfLayoutConfigEditor
               layoutConfig={(t.layout_config ?? {}) as Record<string, unknown>}

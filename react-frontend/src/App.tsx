@@ -32,6 +32,7 @@ import SiteFicheTab from './pages/sites/SiteFicheTab'
 import SiteMissionsTab from './pages/sites/SiteMissionsTab'
 import SiteMapTab from './pages/sites/SiteMapTab'
 import ReportPdfTemplates from './pages/ReportPdfTemplates'
+import DocumentPdfTemplates from './pages/DocumentPdfTemplates'
 import ModuleConfigurationPage from './pages/back-office/ModuleConfigurationPage'
 import ReportComptaPage from './pages/reports/ReportComptaPage'
 import ReportVentesPage from './pages/reports/ReportVentesPage'
@@ -44,6 +45,7 @@ import SettingsAccountPage from './pages/settings/SettingsAccountPage'
 import SettingsSecurityPage from './pages/settings/SettingsSecurityPage'
 import SettingsUsersPage from './pages/settings/SettingsUsersPage'
 import SettingsGroupsPage from './pages/settings/SettingsGroupsPage'
+import SettingsBrandingPage from './pages/settings/SettingsBrandingPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -92,6 +94,7 @@ function AppRoutes() {
             <Route path="exemples-calculs" element={<ExemplesCalculs />} />
             <Route path="journal-audit" element={<ActivityLogPage />} />
             <Route path="modeles-rapports-pdf" element={<ReportPdfTemplates />} />
+            <Route path="modeles-documents-pdf" element={<DocumentPdfTemplates />} />
             <Route path="configuration" element={<ModuleConfigurationPage />} />
             <Route path="pdf" element={<PdfModule />} />
             <Route path="mails" element={<Mails />} />
@@ -118,6 +121,7 @@ function AppRoutes() {
           <Route path="securite" element={<SettingsSecurityPage />} />
           <Route path="utilisateurs" element={<SettingsUsersPage />} />
           <Route path="groupes" element={<SettingsGroupsPage />} />
+          <Route path="charte" element={<SettingsBrandingPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

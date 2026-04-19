@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
+import { brandingApi } from '../api/client'
 
 type SubItem = { to: string; label: string }
 
@@ -71,6 +73,13 @@ function isGroupActive(id: MenuGroupId, pathname: string, isLab: boolean): boole
 export default function AppNavigation() {
   const { user, logout } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
+  const { data: branding } = useQuery({
+    queryKey: ['branding'],
+    queryFn: () => brandingApi.get(),
+    enabled: Boolean(user),
+    staleTime: 120_000,
+  })
+  const brandLogoSrc = branding?.logo_url && branding.logo_url.trim() !== '' ? branding.logo_url : '/logo-vertical.svg'
   const location = useLocation()
   const pathname = location.pathname
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -165,8 +174,15 @@ export default function AppNavigation() {
   return (
     <header className="app-header" ref={navRef}>
       <div className="app-header-inner">
-        <NavLink to="/" end className="app-brand" onClick={closeAll}>
-          Lab BTP
+        <NavLink to="/" end className="app-brand app-brand--logo" onClick={closeAll} aria-label="Accueil — Lab BTP">
+          <img
+            src={brandLogoSrc}
+            alt=""
+            width={220}
+            height={54}
+            decoding="async"
+            className="app-brand__logo"
+          />
         </NavLink>
 
         <button

@@ -30,7 +30,7 @@ export default function DocumentPdfTemplates() {
   if (!isLab) {
     return (
       <div>
-        <PageBackNav back={{ to: '/terrain', label: 'Terrain & labo' }} />
+        <PageBackNav back={{ to: '/labo', label: 'Laboratoire' }} />
         <p>Accès réservé au laboratoire.</p>
       </div>
     )
@@ -45,7 +45,7 @@ export default function DocumentPdfTemplates() {
     <div>
       <PageBackNav
         back={{ to: '/back-office', label: 'Back office' }}
-        extras={[{ to: '/terrain', label: 'Terrain & labo' }]}
+        extras={[{ to: '/terrain', label: 'Terrain' }, { to: '/labo', label: 'Laboratoire' }]}
       />
       <div className="card" style={{ marginBottom: '1rem', fontSize: '0.95rem' }}>
         <p style={{ margin: 0 }}>

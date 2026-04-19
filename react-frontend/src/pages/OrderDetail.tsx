@@ -335,7 +335,10 @@ export default function OrderDetail() {
     <div>
       <PageBackNav
         back={{ to: '/orders', label: 'Liste des commandes' }}
-        extras={[{ to: '/terrain', label: 'Terrain & labo' }]}
+        extras={[
+          { to: '/terrain', label: 'Terrain' },
+          { to: '/labo', label: 'Laboratoire' },
+        ]}
       />
       <h1>Commande {order.reference}</h1>
       <p>

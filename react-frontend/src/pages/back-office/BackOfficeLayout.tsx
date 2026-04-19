@@ -147,7 +147,7 @@ export default function BackOfficeLayout() {
       shellClassName="module-shell--back-office"
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'Terrain & labo', to: '/terrain' },
+        { label: 'Laboratoire', to: '/labo' },
         { label: meta.crumb },
       ]}
       moduleBarLabel={onCatalogue ? 'Laboratoire — Catalogues' : 'Laboratoire — Configuration et outils'}

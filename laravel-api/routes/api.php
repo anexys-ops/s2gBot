@@ -8,6 +8,7 @@ Route::get('/register/clients', [App\Http\Controllers\Api\AuthController::class,
 Route::get('/register/sites', [App\Http\Controllers\Api\AuthController::class, 'registerSiteList']);
 Route::get('/register/agencies', [App\Http\Controllers\Api\AuthController::class, 'registerAgencyList']);
 Route::get('/version', [App\Http\Controllers\Api\VersionController::class, 'show']);
+Route::get('/openapi.json', [App\Http\Controllers\Api\OpenApiController::class, 'show']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [App\Http\Controllers\Api\AuthController::class, 'logout']);

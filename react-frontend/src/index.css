@@ -493,6 +493,78 @@ input, select, textarea, button { font: inherit; }
   margin-top: 0.75rem;
 }
 
+/* Hub rapports : onglets + contenu */
+.reports-hub {
+  max-width: min(100%, 72rem);
+  margin: 0 auto;
+}
+.reports-hub__head {
+  margin-bottom: 1rem;
+}
+.reports-hub__title {
+  margin: 0.25rem 0 0.35rem;
+  font-size: clamp(1.35rem, 2.5vw, 1.75rem);
+}
+.reports-hub__lead {
+  margin: 0;
+  color: var(--color-muted);
+  line-height: 1.5;
+  max-width: 62ch;
+}
+.reports-hub__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+}
+.reports-hub__tab {
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--color-muted) !important;
+  text-decoration: none !important;
+  border: 1px solid transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.reports-hub__tab:hover {
+  color: var(--color-accent) !important;
+  background: var(--color-surface);
+}
+.reports-hub__tab--active {
+  background: var(--color-surface) !important;
+  color: var(--color-accent) !important;
+  border-color: rgba(234, 88, 12, 0.35);
+  box-shadow: var(--shadow-sm);
+}
+.reports-hub__panel {
+  min-width: 0;
+}
+
+.terrain-chantiers-map-wrap {
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+.terrain-chantiers-map {
+  height: min(52vh, 440px);
+  width: 100%;
+  z-index: 1;
+}
+
+.swagger-ui-host {
+  min-height: 68vh;
+  padding: 0 !important;
+  overflow: hidden;
+}
+.swagger-ui-host .swagger-ui {
+  padding: 0.35rem 0.15rem 1rem;
+}
+
 .card {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
@@ -1027,6 +1099,28 @@ th { background: #f9fafb; font-weight: 600; }
   background: var(--color-accent-soft) !important;
   color: #9a3412 !important;
   font-weight: 600;
+}
+
+.nav-aide-link {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #e2e8f0 !important;
+  text-decoration: none !important;
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.nav-aide-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff !important;
+  border-color: rgba(251, 146, 60, 0.45);
+}
+.nav-aide-link--active {
+  background: rgba(234, 88, 12, 0.25);
+  border-color: rgba(251, 146, 60, 0.55);
+  color: #fff !important;
 }
 
 .nav-settings-gear {
@@ -1906,6 +2000,10 @@ th { background: #f9fafb; font-weight: 600; }
 .dashboard-panel--terrain {
   background: linear-gradient(145deg, #ecfdf5 0%, #fff 100%);
   border-color: #a7f3d0;
+}
+.dashboard-panel--labo {
+  background: linear-gradient(145deg, #fff7ed 0%, #fff 100%);
+  border-color: #fed7aa;
 }
 .dashboard-panel-label {
   font-size: 0.75rem;

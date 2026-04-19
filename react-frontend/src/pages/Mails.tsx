@@ -136,7 +136,7 @@ export default function Mails() {
 
   return (
     <div className="mails-page">
-      <PageBackNav back={{ to: '/crm', label: 'CRM' }} extras={[{ to: '/terrain', label: 'Terrain & labo' }]} />
+      <PageBackNav back={{ to: '/crm', label: 'CRM' }} extras={[{ to: '/terrain', label: 'Terrain' }, { to: '/labo', label: 'Laboratoire' }]} />
       <div className="mails-page-grid">
         <div className="card">
           <h3>Envoyer un e-mail</h3>

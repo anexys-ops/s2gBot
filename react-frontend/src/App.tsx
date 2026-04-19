@@ -22,7 +22,13 @@ import BackOfficeLayout from './pages/back-office/BackOfficeLayout'
 import GraphiquesEssais from './pages/GraphiquesEssais'
 import CrmHub from './pages/hub/CrmHub'
 import CrmDocuments from './pages/CrmDocuments'
-import TerrainLaboHub from './pages/hub/TerrainLaboHub'
+import TerrainHub from './pages/hub/TerrainHub'
+import LaboHub from './pages/hub/LaboHub'
+import TerrainMesuresPage from './pages/TerrainMesuresPage'
+import TerrainChantiersCartePage from './pages/TerrainChantiersCartePage'
+import LaboEssaisPage from './pages/LaboEssaisPage'
+import ReportsLayout from './pages/reports/ReportsLayout'
+import HelpOpenApiPage from './pages/HelpOpenApiPage'
 import ClientLayout, { LegacyClientCommercialRedirect } from './pages/clients/ClientLayout'
 import ClientFicheTab from './pages/clients/ClientFicheTab'
 import ClientCommerceTab from './pages/clients/ClientCommerceTab'
@@ -68,13 +74,21 @@ function AppRoutes() {
         }
       >
         <Route index element={<Dashboard />} />
-        <Route path="rapports/compta" element={<ReportComptaPage />} />
-        <Route path="rapports/ventes" element={<ReportVentesPage />} />
-        <Route path="rapports/delai-traitement" element={<ReportDelaiTraitementPage />} />
-        <Route path="rapports/delai-chantier" element={<ReportDelaiChantierPage />} />
+        <Route path="rapports" element={<ReportsLayout />}>
+          <Route index element={<Navigate to="compta" replace />} />
+          <Route path="compta" element={<ReportComptaPage />} />
+          <Route path="ventes" element={<ReportVentesPage />} />
+          <Route path="delai-traitement" element={<ReportDelaiTraitementPage />} />
+          <Route path="delai-chantier" element={<ReportDelaiChantierPage />} />
+        </Route>
         <Route path="crm" element={<CrmHub />} />
         <Route path="crm/documents" element={<CrmDocuments />} />
-        <Route path="terrain" element={<TerrainLaboHub />} />
+        <Route path="terrain" element={<TerrainHub />} />
+        <Route path="terrain/mesures" element={<TerrainMesuresPage />} />
+        <Route path="terrain/chantiers" element={<TerrainChantiersCartePage />} />
+        <Route path="labo" element={<LaboHub />} />
+        <Route path="labo/essais" element={<LaboEssaisPage />} />
+        <Route path="aide" element={<HelpOpenApiPage />} />
         <Route path="orders" element={<Orders />} />
         <Route path="orders/new" element={<OrderNew />} />
         <Route path="orders/:id" element={<OrderDetail />} />

@@ -67,7 +67,11 @@ export default function CrmHub() {
       </div>
       <p className="hub-footnote hub-footnote--switch">
         <Link to="/terrain" className="hub-footnote__link">
-          Passer à Terrain & laboratoire →
+          Terrain →
+        </Link>
+        {' · '}
+        <Link to="/labo" className="hub-footnote__link">
+          Laboratoire →
         </Link>
       </p>
     </div>

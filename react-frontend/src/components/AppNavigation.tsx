@@ -6,7 +6,7 @@ import { brandingApi } from '../api/client'
 
 type SubItem = { to: string; label: string }
 
-type MenuGroupId = 'crm' | 'terrain' | 'activity' | 'reports'
+type MenuGroupId = 'crm' | 'terrain' | 'labo' | 'activity' | 'reports'
 
 type MenuGroup = {
   id: MenuGroupId
@@ -31,24 +31,24 @@ function isCrmModuleActive(pathname: string, isLab: boolean): boolean {
   return false
 }
 
-function isTerrainModuleActive(pathname: string, isLab: boolean): boolean {
+function isTerrainModuleActive(pathname: string): boolean {
   if (pathname.startsWith('/graphiques-essais')) return false
-  if (pathname.startsWith('/terrain')) return true
+  return pathname.startsWith('/terrain')
+}
+
+function isLaboModuleActive(pathname: string, isLab: boolean): boolean {
+  if (pathname.startsWith('/graphiques-essais')) return false
+  if (pathname.startsWith('/labo')) return true
   if (pathname.startsWith('/orders')) return true
-  if (!isLab) {
-    if (pathname.startsWith('/back-office/catalogue-essais')) return true
-    if (pathname.startsWith('/back-office/granulometrie')) return true
-    return false
-  }
   if (!pathname.startsWith('/back-office')) return false
   if (pathname.startsWith('/back-office/catalogue-commercial')) return false
   if (pathname.startsWith('/back-office/pdf')) return false
   if (pathname.startsWith('/back-office/mails')) return false
-  return true
+  return isLab || pathname.startsWith('/back-office/catalogue-essais') || pathname.startsWith('/back-office/granulometrie')
 }
 
 function isActivityModuleActive(pathname: string): boolean {
-  return pathname === '/' || pathname.startsWith('/graphiques-essais')
+  return pathname.startsWith('/graphiques-essais')
 }
 
 function isReportsModuleActive(pathname: string): boolean {
@@ -60,7 +60,9 @@ function isGroupActive(id: MenuGroupId, pathname: string, isLab: boolean): boole
     case 'crm':
       return isCrmModuleActive(pathname, isLab)
     case 'terrain':
-      return isTerrainModuleActive(pathname, isLab)
+      return isTerrainModuleActive(pathname)
+    case 'labo':
+      return isLaboModuleActive(pathname, isLab)
     case 'activity':
       return isActivityModuleActive(pathname)
     case 'reports':
@@ -104,34 +106,34 @@ export default function AppNavigation() {
     }
 
     const terrainItems: SubItem[] = [
-      { to: '/terrain', label: 'Vue d’ensemble terrain & labo' },
-      { to: '/orders', label: 'Commandes & dossiers' },
+      { to: '/terrain', label: 'Vue d’ensemble terrain' },
+      { to: '/terrain/mesures', label: 'Mesures terrain' },
+      { to: '/terrain/chantiers', label: 'Chantiers & carte GPS' },
+    ]
+
+    const laboItems: SubItem[] = [
+      { to: '/labo', label: 'Vue d’ensemble laboratoire' },
+      { to: '/labo/essais', label: 'Essais & graphiques' },
+      { to: '/orders', label: 'Dossiers & commandes' },
       { to: '/orders/new', label: 'Nouvelle commande' },
     ]
     if (isLab) {
-      terrainItems.push({ to: '/back-office', label: 'Back office labo' })
+      laboItems.push({ to: '/back-office', label: 'Back office laboratoire' })
     } else {
-      terrainItems.push(
+      laboItems.push(
         { to: '/back-office/catalogue-essais', label: 'Catalogue des essais' },
         { to: '/back-office/granulometrie', label: 'Granulométrie' },
       )
     }
 
-    const activityItems: SubItem[] = [
-      { to: '/', label: 'Accueil' },
-      { to: '/graphiques-essais', label: 'Graphiques essais' },
-    ]
+    const activityItems: SubItem[] = [{ to: '/graphiques-essais', label: 'Graphiques essais' }]
 
-    const rapportsItems: SubItem[] = [
-      { to: '/rapports/compta', label: 'Rapport compta' },
-      { to: '/rapports/ventes', label: 'Stats ventes & rapports' },
-      { to: '/rapports/delai-traitement', label: 'Délais de traitement' },
-      { to: '/rapports/delai-chantier', label: 'Délais chantier' },
-    ]
+    const rapportsItems: SubItem[] = [{ to: '/rapports/compta', label: 'Tous les rapports' }]
 
     return [
       { id: 'crm', label: 'CRM', items: crmItems },
-      { id: 'terrain', label: 'Terrain & labo', items: terrainItems },
+      { id: 'terrain', label: 'Terrain', items: terrainItems },
+      { id: 'labo', label: 'Laboratoire', items: laboItems },
       { id: 'activity', label: 'Activité', items: activityItems },
       { id: 'reports', label: 'Rapports', items: rapportsItems },
     ]
@@ -231,7 +233,6 @@ export default function AppNavigation() {
                       <li key={item.to} role="none">
                         <NavLink
                           to={item.to}
-                          end={item.to === '/'}
                           className={({ isActive }) =>
                             `nav-dropdown-link${isActive ? ' nav-dropdown-link--active' : ''}`
                           }
@@ -249,6 +250,14 @@ export default function AppNavigation() {
           </nav>
 
           <div className="nav-user">
+            <NavLink
+              to="/aide"
+              className={({ isActive }) => `nav-aide-link${isActive ? ' nav-aide-link--active' : ''}`}
+              title="Aide API (OpenAPI)"
+              onClick={closeAll}
+            >
+              Aide
+            </NavLink>
             <NavLink
               to="/settings"
               className={({ isActive }) => `nav-settings-gear${isActive ? ' nav-settings-gear--active' : ''}`}

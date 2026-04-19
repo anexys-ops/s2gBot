@@ -81,7 +81,7 @@ export default function PdfModule() {
 
   return (
     <div>
-      <PageBackNav back={{ to: '/crm', label: 'CRM' }} extras={[{ to: '/terrain', label: 'Terrain & labo' }]} />
+      <PageBackNav back={{ to: '/crm', label: 'CRM' }} extras={[{ to: '/terrain', label: 'Terrain' }, { to: '/labo', label: 'Laboratoire' }]} />
       <div className="card" style={{ maxWidth: 560 }}>
         <h3 style={{ marginTop: 0 }}>Choisir le type et le document</h3>
         <div className="form-group">

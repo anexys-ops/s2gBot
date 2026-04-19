@@ -147,7 +147,7 @@ export default function Catalog() {
 
   return (
     <div>
-      <PageBackNav back={{ to: '/back-office', label: 'Back office' }} extras={[{ to: '/terrain', label: 'Terrain & labo' }]} />
+      <PageBackNav back={{ to: '/back-office', label: 'Back office' }} extras={[{ to: '/terrain', label: 'Terrain' }, { to: '/labo', label: 'Laboratoire' }]} />
       <p className="page-lead" style={{ color: '#64748b', marginBottom: '1rem', maxWidth: '42rem' }}>
         Types d&apos;essais, normes, tarifs unitaires et paramètres mesurés (saisie sur les dossiers). Réservé au
         personnel laboratoire pour la mise à jour.

@@ -759,13 +759,22 @@ export default function Dashboard() {
           </Link>
           <Link to="/terrain" className="dashboard-panel dashboard-panel--terrain dashboard-panel--v2">
             <span className="dashboard-panel-icon" aria-hidden>
+              <OutlineIcon id="map" />
+            </span>
+            <span className="dashboard-panel-label">Terrain</span>
+            <strong>Mesures & chantiers</strong>
+            <span className="dashboard-panel-hint">
+              Mesures sur le terrain, chantiers et carte GPS — distinct du laboratoire.
+            </span>
+          </Link>
+          <Link to="/labo" className="dashboard-panel dashboard-panel--labo dashboard-panel--v2">
+            <span className="dashboard-panel-icon" aria-hidden>
               <OutlineIcon id="lab" />
             </span>
-            <span className="dashboard-panel-label">Terrain & labo</span>
-            <strong>Prise de mesure & dossiers</strong>
+            <span className="dashboard-panel-label">Laboratoire</span>
+            <strong>Essais & dossiers</strong>
             <span className="dashboard-panel-hint">
-              Commandes, missions, forages, granulométrie et rapports — métadonnées disponibles sur commandes et
-              missions.
+              Graphiques d’essais, commandes, catalogues et outils de calcul normés.
             </span>
           </Link>
         </div>

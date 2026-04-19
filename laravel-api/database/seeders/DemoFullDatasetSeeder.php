@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Agency;
 use App\Models\Borehole;
 use App\Models\Client;
 use App\Models\ClientAddress;
@@ -106,8 +107,13 @@ class DemoFullDatasetSeeder extends Seeder
         $pdfQuote = DocumentPdfTemplate::where('document_type', 'quote')->where('is_default', true)->first();
         $pdfInvoice = DocumentPdfTemplate::where('document_type', 'invoice')->where('is_default', true)->first();
 
+        $hqDemo = (int) Agency::query()->where('client_id', $demoClient->id)->where('is_headquarters', true)->value('id');
+        $hqBt = (int) Agency::query()->where('client_id', $clientBt->id)->where('is_headquarters', true)->value('id');
+        $hqErp = (int) Agency::query()->where('client_id', $clientErp->id)->where('is_headquarters', true)->value('id');
+
         $siteZac = Site::create([
             'client_id' => $demoClient->id,
+            'agency_id' => $hqDemo,
             'name' => 'ZAC Les Iris — bureaux et commerces',
             'address' => 'ZAC Les Iris, 69100 Villeurbanne',
             'reference' => self::SITE_MARKER_REF,
@@ -122,6 +128,7 @@ class DemoFullDatasetSeeder extends Seeder
             ['reference' => 'SEED-HSL-LOT3'],
             [
                 'client_id' => $clientBt->id,
+                'agency_id' => $hqBt,
                 'name' => 'Ligne nouvelle — Lot géotechnique 3',
                 'address' => 'Secteur Valence — Romans, Drôme',
                 'latitude' => 44.9333,
@@ -136,6 +143,7 @@ class DemoFullDatasetSeeder extends Seeder
             ['reference' => 'SEED-CASERNE-09'],
             [
                 'client_id' => $clientErp->id,
+                'agency_id' => $hqErp,
                 'name' => 'Réhabilitation caserne historique',
                 'address' => 'Place d’Armes, 09000 Foix',
                 'latitude' => 42.9687,
@@ -145,6 +153,15 @@ class DemoFullDatasetSeeder extends Seeder
                 'travel_fee_label' => 'Déplacement Ariège',
             ],
         );
+
+        foreach ([$siteHsl, $siteCas] as $s) {
+            if ($s->agency_id === null) {
+                $hid = (int) Agency::query()->where('client_id', $s->client_id)->where('is_headquarters', true)->value('id');
+                if ($hid) {
+                    $s->update(['agency_id' => $hid]);
+                }
+            }
+        }
 
         User::firstOrCreate(
             ['email' => 'chantier@demo.local'],
@@ -218,6 +235,7 @@ class DemoFullDatasetSeeder extends Seeder
         $orderTerrain = Order::create([
             'reference' => 'SEED-CHANT-ZAC-01',
             'client_id' => $demoClient->id,
+            'agency_id' => $hqDemo,
             'site_id' => $siteZac->id,
             'user_id' => $actorId,
             'status' => Order::STATUS_IN_PROGRESS,
@@ -281,6 +299,7 @@ class DemoFullDatasetSeeder extends Seeder
         $orderRapport = Order::create([
             'reference' => 'SEED-RAPPORT-REVIEW',
             'client_id' => $demoClient->id,
+            'agency_id' => $hqDemo,
             'site_id' => $siteZac->id,
             'user_id' => $actorId,
             'status' => Order::STATUS_COMPLETED,
@@ -308,6 +327,7 @@ class DemoFullDatasetSeeder extends Seeder
         $orderFacture = Order::create([
             'reference' => 'SEED-FACTURE-LIE',
             'client_id' => $clientBt->id,
+            'agency_id' => $hqBt,
             'site_id' => $siteHsl->id,
             'user_id' => $actorId,
             'status' => Order::STATUS_COMPLETED,
@@ -333,6 +353,7 @@ class DemoFullDatasetSeeder extends Seeder
         $quote = Quote::create([
             'number' => 'DEV-SEED-2026-001',
             'client_id' => $clientBt->id,
+            'agency_id' => $hqBt,
             'site_id' => $siteHsl->id,
             'quote_date' => now()->subWeeks(2),
             'valid_until' => now()->addMonth(),
@@ -377,6 +398,7 @@ class DemoFullDatasetSeeder extends Seeder
             ['number' => 'DEV-SEED-2026-002'],
             [
                 'client_id' => $clientErp->id,
+                'agency_id' => $hqErp,
                 'site_id' => $siteCas->id,
                 'quote_date' => now()->subDays(5),
                 'valid_until' => now()->addWeeks(3),
@@ -394,6 +416,7 @@ class DemoFullDatasetSeeder extends Seeder
         $invoice = Invoice::create([
             'number' => 'FAC-SEED-2026-001',
             'client_id' => $clientBt->id,
+            'agency_id' => $hqBt,
             'invoice_date' => now()->subWeeks(2),
             'due_date' => now()->addWeeks(2),
             'order_date' => $orderFacture->order_date,

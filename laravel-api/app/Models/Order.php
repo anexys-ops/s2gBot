@@ -20,6 +20,7 @@ class Order extends Model
     protected $fillable = [
         'reference',
         'client_id',
+        'agency_id',
         'site_id',
         'user_id',
         'status',
@@ -43,6 +44,11 @@ class Order extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function agency(): BelongsTo
+    {
+        return $this->belongsTo(Agency::class);
     }
 
     public function site(): BelongsTo

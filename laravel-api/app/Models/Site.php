@@ -14,6 +14,7 @@ class Site extends Model
 
     protected $fillable = [
         'client_id',
+        'agency_id',
         'name',
         'address',
         'latitude',
@@ -39,6 +40,11 @@ class Site extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function agency(): BelongsTo
+    {
+        return $this->belongsTo(Agency::class);
     }
 
     public function users(): HasMany

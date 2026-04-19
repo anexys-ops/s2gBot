@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Agency;
 use App\Models\Invoice;
 use App\Models\InvoiceLine;
+use App\Support\AgencyAccess;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\InvoiceService;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +24,7 @@ class InvoiceController extends Controller
         $user = $request->user();
         $query = Invoice::query()->with([
             'client',
+            'agency',
             'orders',
             'invoiceLines',
             'billingAddress',
@@ -29,10 +32,8 @@ class InvoiceController extends Controller
             'pdfTemplate',
         ]);
 
-        if ($user->isClient()) {
-            $query->where('client_id', $user->client_id);
-        } elseif ($user->isSiteContact()) {
-            $query->where('client_id', $user->client_id);
+        if (! $user->isLab()) {
+            AgencyAccess::applyInvoiceScope($query, $user);
         }
 
         if ($search = trim((string) $request->query('search', ''))) {
@@ -117,9 +118,15 @@ class InvoiceController extends Controller
 
         $tvaRate = $validated['tva_rate'] ?? 20;
 
+        $agencyId = Agency::query()
+            ->where('client_id', $validated['client_id'])
+            ->where('is_headquarters', true)
+            ->value('id');
+
         $invoice = Invoice::create([
             'number' => $validated['number'],
             'client_id' => $validated['client_id'],
+            'agency_id' => $agencyId,
             'invoice_date' => $validated['invoice_date'],
             'order_date' => $validated['order_date'] ?? null,
             'site_delivery_date' => $validated['site_delivery_date'] ?? null,
@@ -176,15 +183,12 @@ class InvoiceController extends Controller
     public function show(Request $request, Invoice $invoice): JsonResponse
     {
         $user = $request->user();
-        if ($user->isClient() && $invoice->client_id !== $user->client_id) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
-        if ($user->isSiteContact() && $invoice->client_id !== $user->client_id) {
+        if (! AgencyAccess::userMayAccessInvoice($user, $invoice)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
         return response()->json($invoice->load([
-            'client', 'orders', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate', 'attachments',
+            'client', 'agency', 'orders', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate', 'attachments',
         ]));
     }
 

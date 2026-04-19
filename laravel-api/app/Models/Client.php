@@ -11,6 +11,21 @@ class Client extends Model
 {
     use HasFactory;
 
+    protected static function booted(): void
+    {
+        static::created(function (Client $client) {
+            if (Agency::query()->where('client_id', $client->id)->where('is_headquarters', true)->exists()) {
+                return;
+            }
+            Agency::query()->create([
+                'client_id' => $client->id,
+                'name' => $client->name.' — Siège',
+                'code' => 'HQ',
+                'is_headquarters' => true,
+            ]);
+        });
+    }
+
     protected $fillable = [
         'name',
         'address',
@@ -46,6 +61,16 @@ class Client extends Model
     public function attachments(): MorphMany
     {
         return $this->morphMany(Attachment::class, 'attachable');
+    }
+
+    public function agencies(): HasMany
+    {
+        return $this->hasMany(Agency::class);
+    }
+
+    public function headquartersAgency(): ?Agency
+    {
+        return $this->agencies()->where('is_headquarters', true)->first();
     }
 
     public function sites(): HasMany

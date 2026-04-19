@@ -79,6 +79,8 @@ export const authApi = {
     api<Array<{ id: number; name: string; client_id: number }>>(
       `/register/sites?client_id=${encodeURIComponent(String(clientId))}`,
     ),
+  registerAgencies: (clientId: number) =>
+    api<AgencyRow[]>(`/register/agencies?client_id=${encodeURIComponent(String(clientId))}`),
   logout: () => api('/logout', { method: 'POST' }),
   user: () => api<User>('/user'),
 }
@@ -136,6 +138,7 @@ export const adminUsersApi = {
     client_id?: number | null
     site_id?: number | null
     access_group_ids?: number[]
+    agency_ids?: number[]
   }) => api<User>('/admin/users', { method: 'POST', body: JSON.stringify(body) }),
   update: (
     id: number,
@@ -148,6 +151,7 @@ export const adminUsersApi = {
       client_id: number | null
       site_id: number | null
       access_group_ids: number[]
+      agency_ids: number[]
     }>,
   ) => api<User>(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/admin/users/${id}`, { method: 'DELETE' }),
@@ -165,6 +169,18 @@ export const accessGroupsApi = {
     body: Partial<{ name: string; slug: string; description: string | null; permissions: string[] }>,
   ) => api<AccessGroupRow>(`/admin/access-groups/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/admin/access-groups/${id}`, { method: 'DELETE' }),
+}
+
+export interface AgencyRow {
+  id: number
+  client_id: number
+  name: string
+  code?: string | null
+  is_headquarters?: boolean
+}
+
+export const agenciesApi = {
+  listForClient: (clientId: number) => api<AgencyRow[]>(`/clients/${clientId}/agencies`),
 }
 
 export const clientsApi = {
@@ -907,6 +923,7 @@ export interface User {
   client?: Client
   site?: Site
   access_groups?: AccessGroupRow[]
+  agencies?: AgencyRow[]
   effective_permissions?: string[]
 }
 

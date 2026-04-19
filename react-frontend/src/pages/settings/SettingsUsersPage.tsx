@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   accessGroupsApi,
   adminUsersApi,
+  agenciesApi,
   clientsApi,
   sitesApi,
   type User,
@@ -30,6 +31,7 @@ function emptyForm() {
     client_id: '' as number | '',
     site_id: '' as number | '',
     access_group_ids: [] as number[],
+    agency_ids: [] as number[],
   }
 }
 
@@ -42,6 +44,9 @@ export default function SettingsUsersPage() {
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [editing, setEditing] = useState<User | null>(null)
   const [form, setForm] = useState(emptyForm)
+
+  const needsClient = form.role === 'client' || form.role === 'site_contact'
+  const needsSite = form.role === 'site_contact'
 
   const allowed = canManageUsers(me)
   const { data, isLoading, error } = useQuery({
@@ -64,6 +69,12 @@ export default function SettingsUsersPage() {
     queryFn: () => sitesApi.list(),
     enabled: allowed && (modal === 'create' || modal === 'edit'),
   })
+  const agencyClientId = form.client_id === '' ? null : form.client_id
+  const { data: agenciesForClient = [] } = useQuery({
+    queryKey: ['agencies', 'settings-users', agencyClientId],
+    queryFn: () => agenciesApi.listForClient(agencyClientId as number),
+    enabled: allowed && (modal === 'create' || modal === 'edit') && needsClient && agencyClientId !== null,
+  })
 
   const groups = groupsRes?.data ?? []
 
@@ -78,6 +89,7 @@ export default function SettingsUsersPage() {
         client_id: form.client_id === '' ? undefined : form.client_id,
         site_id: form.site_id === '' ? undefined : form.site_id,
         access_group_ids: form.access_group_ids,
+        ...(needsClient ? { agency_ids: form.agency_ids } : {}),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] })
@@ -97,6 +109,7 @@ export default function SettingsUsersPage() {
         client_id: form.client_id === '' ? null : form.client_id,
         site_id: form.site_id === '' ? null : form.site_id,
         access_group_ids: form.access_group_ids,
+        ...(needsClient ? { agency_ids: form.agency_ids } : {}),
       }
       if (form.password.trim()) body.password = form.password
       return adminUsersApi.update(editing.id, body)
@@ -131,12 +144,10 @@ export default function SettingsUsersPage() {
       client_id: u.client_id ?? '',
       site_id: u.site_id ?? '',
       access_group_ids: (u.access_groups ?? []).map((g) => g.id),
+      agency_ids: (u.agencies ?? []).map((a) => a.id),
     })
     setModal('edit')
   }
-
-  const needsClient = form.role === 'client' || form.role === 'site_contact'
-  const needsSite = form.role === 'site_contact'
 
   const sitesFiltered = useMemo(() => {
     if (form.client_id === '') return sites
@@ -175,6 +186,7 @@ export default function SettingsUsersPage() {
               <th>Email</th>
               <th>Rôle</th>
               <th>Groupes</th>
+              <th>Agences</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -185,6 +197,7 @@ export default function SettingsUsersPage() {
                 <td>{u.email}</td>
                 <td>{u.role}</td>
                 <td>{(u.access_groups ?? []).map((g) => g.name).join(', ') || '—'}</td>
+                <td>{(u.agencies ?? []).map((a) => a.name).join(', ') || '—'}</td>
                 <td>
                   <div className="crud-actions">
                     <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEdit(u)}>
@@ -255,6 +268,7 @@ export default function SettingsUsersPage() {
                     role: e.target.value,
                     client_id: '',
                     site_id: '',
+                    agency_ids: [],
                   }))
                 }
               >
@@ -275,6 +289,7 @@ export default function SettingsUsersPage() {
                       ...f,
                       client_id: e.target.value === '' ? '' : Number(e.target.value),
                       site_id: '',
+                      agency_ids: [],
                     }))
                   }
                   required
@@ -305,6 +320,34 @@ export default function SettingsUsersPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+            )}
+            {needsClient && form.client_id !== '' && (
+              <div className="form-group">
+                <label>Agences (périmètre)</label>
+                <p className="text-muted" style={{ fontSize: '0.85rem', margin: '0 0 0.5rem' }}>
+                  Laissez vide pour accéder à toutes les agences du client. Cochez pour restreindre.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: 160, overflow: 'auto' }}>
+                  {agenciesForClient.map((a) => (
+                    <label key={a.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={form.agency_ids.includes(a.id)}
+                        onChange={() => {
+                          setForm((f) => ({
+                            ...f,
+                            agency_ids: f.agency_ids.includes(a.id)
+                              ? f.agency_ids.filter((x) => x !== a.id)
+                              : [...f.agency_ids, a.id],
+                          }))
+                        }}
+                      />
+                      {a.name}
+                      {a.is_headquarters ? ' (siège)' : ''}
+                    </label>
+                  ))}
+                </div>
               </div>
             )}
             <div className="form-group">

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Agency;
 use App\Models\Invoice;
 use App\Models\InvoiceLine;
 use App\Models\Order;
@@ -29,11 +30,20 @@ class InvoiceService
             }
         }
 
+        $agencyIds = $orders->pluck('agency_id')->filter()->unique()->values();
+        if ($agencyIds->count() > 1) {
+            throw new \InvalidArgumentException('Toutes les commandes doivent appartenir à la même agence.');
+        }
+
         $number = 'FAC-'.Carbon::now()->format('Ymd').'-'.str_pad((string) (Invoice::count() + 1), 4, '0', STR_PAD_LEFT);
+
+        $hqId = Agency::query()->where('client_id', $clientId)->where('is_headquarters', true)->value('id');
+        $agencyId = $agencyIds->first() ?? $hqId;
 
         $invoice = Invoice::create([
             'number' => $number,
             'client_id' => $clientId,
+            'agency_id' => $agencyId,
             'invoice_date' => Carbon::now()->toDateString(),
             'due_date' => Carbon::now()->addDays(30)->toDateString(),
             'amount_ht' => 0,

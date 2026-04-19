@@ -6,6 +6,7 @@ Route::post('/login', [App\Http\Controllers\Api\AuthController::class, 'login'])
 Route::post('/register', [App\Http\Controllers\Api\AuthController::class, 'register']);
 Route::get('/register/clients', [App\Http\Controllers\Api\AuthController::class, 'registerClientList']);
 Route::get('/register/sites', [App\Http\Controllers\Api\AuthController::class, 'registerSiteList']);
+Route::get('/register/agencies', [App\Http\Controllers\Api\AuthController::class, 'registerAgencyList']);
 Route::get('/version', [App\Http\Controllers\Api\VersionController::class, 'show']);
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -25,6 +26,11 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::apiResource('clients', App\Http\Controllers\Api\ClientController::class);
+    Route::get('clients/{client}/agencies', [App\Http\Controllers\Api\AgencyController::class, 'index']);
+    Route::post('clients/{client}/agencies', [App\Http\Controllers\Api\AgencyController::class, 'store']);
+    Route::get('agencies/{agency}', [App\Http\Controllers\Api\AgencyController::class, 'show']);
+    Route::put('agencies/{agency}', [App\Http\Controllers\Api\AgencyController::class, 'update']);
+    Route::delete('agencies/{agency}', [App\Http\Controllers\Api\AgencyController::class, 'destroy']);
     Route::get('clients/{client}/commercial-overview', [App\Http\Controllers\Api\ClientCommercialController::class, 'overview']);
     Route::get('clients/{client}/addresses', [App\Http\Controllers\Api\ClientAddressController::class, 'index']);
     Route::post('clients/{client}/addresses', [App\Http\Controllers\Api\ClientAddressController::class, 'store']);

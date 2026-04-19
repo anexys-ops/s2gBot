@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Agency;
 use App\Models\Client;
 use App\Models\Site;
 use App\Models\User;
@@ -32,7 +33,7 @@ class AuthController extends Controller
         $user->tokens()->where('name', $tokenName)->delete();
         $token = $user->createToken($tokenName)->plainTextToken;
 
-        $user->load(['client', 'site', 'accessGroups']);
+        $user->load(['client', 'site', 'accessGroups', 'agencies']);
         $payload = $user->toArray();
         $payload['effective_permissions'] = $user->effectivePermissionKeys();
 
@@ -63,9 +64,16 @@ class AuthController extends Controller
             'site_id' => $request->site_id,
         ]);
 
+        if ($user->site_id) {
+            $site = Site::query()->find($user->site_id);
+            if ($site && $site->agency_id) {
+                $user->agencies()->sync([$site->agency_id]);
+            }
+        }
+
         $token = $user->createToken('spa')->plainTextToken;
 
-        $user->load(['client', 'site', 'accessGroups']);
+        $user->load(['client', 'site', 'accessGroups', 'agencies']);
         $payload = $user->toArray();
         $payload['effective_permissions'] = $user->effectivePermissionKeys();
 
@@ -103,6 +111,24 @@ class AuthController extends Controller
         return response()->json($sites);
     }
 
+    /**
+     * Agences d'un client (inscription / choix tenant).
+     */
+    public function registerAgencyList(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'client_id' => 'required|integer|exists:clients,id',
+        ]);
+
+        $agencies = Agency::query()
+            ->where('client_id', $validated['client_id'])
+            ->orderByDesc('is_headquarters')
+            ->orderBy('name')
+            ->get(['id', 'name', 'client_id', 'is_headquarters', 'code']);
+
+        return response()->json($agencies);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
@@ -112,7 +138,7 @@ class AuthController extends Controller
 
     public function user(Request $request): JsonResponse
     {
-        $u = $request->user()->load(['client', 'site', 'accessGroups']);
+        $u = $request->user()->load(['client', 'site', 'accessGroups', 'agencies']);
         $data = $u->toArray();
         $data['effective_permissions'] = $u->effectivePermissionKeys();
 

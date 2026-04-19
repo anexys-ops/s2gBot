@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Mobile;
 
 use App\Http\Controllers\Controller;
+use App\Support\AgencyAccess;
 use App\Models\MobileDossierPhoto;
 use App\Models\MobileMeasureSubmission;
 use App\Models\ModuleSetting;
@@ -10,6 +11,7 @@ use App\Models\Order;
 use App\Models\Site;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+
 class MobileDossierController extends Controller
 {
     private const KINDS = ['order', 'site'];
@@ -182,10 +184,7 @@ class MobileDossierController extends Controller
     private function assertCanAccessOrder(Request $request, Order $order): void
     {
         $user = $request->user();
-        if ($user->isClient() && $order->client_id !== $user->client_id) {
-            abort(403, 'Non autorisé');
-        }
-        if ($user->isSiteContact() && $order->client_id !== $user->client_id) {
+        if (! AgencyAccess::userMayAccessOrder($user, $order)) {
             abort(403, 'Non autorisé');
         }
     }
@@ -193,10 +192,7 @@ class MobileDossierController extends Controller
     private function assertCanAccessSite(Request $request, Site $site): void
     {
         $user = $request->user();
-        if ($user->isClient() && $site->client_id !== $user->client_id) {
-            abort(403, 'Non autorisé');
-        }
-        if ($user->isSiteContact() && $site->client_id !== $user->client_id) {
+        if (! AgencyAccess::userMayAccessSite($user, $site)) {
             abort(403, 'Non autorisé');
         }
     }

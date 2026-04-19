@@ -10,6 +10,7 @@ use App\Models\Quote;
 use App\Models\Report;
 use App\Models\Sample;
 use App\Models\Site;
+use App\Support\AgencyAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,8 +25,8 @@ class StatsController extends Controller
         $user = $request->user();
         $query = Order::query()->with(['orderItems.testType.params', 'orderItems.samples.testResults.testTypeParam']);
 
-        if ($user->isClient() || $user->isSiteContact()) {
-            $query->where('client_id', $user->client_id);
+        if (! $user->isLab()) {
+            AgencyAccess::applyOrderScope($query, $user);
         }
 
         $orders = $query->orderByDesc('order_date')->limit(200)->get();
@@ -129,10 +130,7 @@ class StatsController extends Controller
     {
         $user = $request->user();
 
-        $clientIds = null;
-        if ($user->isClient() || $user->isSiteContact()) {
-            $clientIds = [$user->client_id];
-        }
+        $scoped = $user->isClient() || $user->isSiteContact();
 
         $clientsQ = Client::query();
         $sitesQ = Site::query();
@@ -140,12 +138,12 @@ class StatsController extends Controller
         $quotesQ = Quote::query();
         $invoicesQ = Invoice::query();
 
-        if ($clientIds !== null) {
-            $clientsQ->whereIn('id', $clientIds);
-            $sitesQ->whereIn('client_id', $clientIds);
-            $ordersQ->whereIn('client_id', $clientIds);
-            $quotesQ->whereIn('client_id', $clientIds);
-            $invoicesQ->whereIn('client_id', $clientIds);
+        if ($scoped) {
+            $clientsQ->where('id', $user->client_id);
+            AgencyAccess::applySiteScope($sitesQ, $user);
+            AgencyAccess::applyOrderScope($ordersQ, $user);
+            AgencyAccess::applyQuoteScope($quotesQ, $user);
+            AgencyAccess::applyInvoiceScope($invoicesQ, $user);
         }
 
         $ordersByStatus = (clone $ordersQ)->selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status')->all();
@@ -160,9 +158,9 @@ class StatsController extends Controller
             ->whereNotIn('status', [Quote::STATUS_INVOICED, Quote::STATUS_LOST, Quote::STATUS_REJECTED])
             ->sum('amount_ttc');
 
-        $reportsQ = Report::query()->whereHas('order', function ($q) use ($clientIds) {
-            if ($clientIds !== null) {
-                $q->whereIn('client_id', $clientIds);
+        $reportsQ = Report::query()->whereHas('order', function ($q) use ($user, $scoped) {
+            if ($scoped) {
+                AgencyAccess::applyOrderScope($q, $user);
             }
         });
 
@@ -170,9 +168,9 @@ class StatsController extends Controller
         $reportsPendingReview = (clone $reportsQ)->where('review_status', Report::REVIEW_PENDING)->count();
         $reportsApproved = (clone $reportsQ)->where('review_status', Report::REVIEW_APPROVED)->count();
 
-        $samplesQ = Sample::query()->whereHas('orderItem.order', function ($q) use ($clientIds) {
-            if ($clientIds !== null) {
-                $q->whereIn('client_id', $clientIds);
+        $samplesQ = Sample::query()->whereHas('orderItem.order', function ($q) use ($user, $scoped) {
+            if ($scoped) {
+                AgencyAccess::applyOrderScope($q, $user);
             }
         });
         $samplesTotal = (clone $samplesQ)->count();
@@ -182,7 +180,9 @@ class StatsController extends Controller
         $ordersForDelay = Order::query()
             ->with(['reports' => fn ($q) => $q->orderBy('generated_at')])
             ->whereHas('reports')
-            ->when($clientIds !== null, fn ($q) => $q->whereIn('client_id', $clientIds))
+            ->when($scoped, function ($q) use ($user) {
+                AgencyAccess::applyOrderScope($q, $user);
+            })
             ->get();
         foreach ($ordersForDelay as $order) {
             $first = $order->reports->first();
@@ -194,7 +194,9 @@ class StatsController extends Controller
         $chantierCycleDays = [];
         $ordersChantier = Order::query()
             ->whereNotNull('delivery_date')
-            ->when($clientIds !== null, fn ($q) => $q->whereIn('client_id', $clientIds))
+            ->when($scoped, function ($q) use ($user) {
+                AgencyAccess::applyOrderScope($q, $user);
+            })
             ->get(['order_date', 'delivery_date']);
         foreach ($ordersChantier as $o) {
             if ($o->order_date && $o->delivery_date) {
@@ -206,7 +208,9 @@ class StatsController extends Controller
         $quotesPlanning = Quote::query()
             ->whereNotNull('site_delivery_date')
             ->whereNotNull('quote_date')
-            ->when($clientIds !== null, fn ($q) => $q->whereIn('client_id', $clientIds))
+            ->when($scoped, function ($q) use ($user) {
+                AgencyAccess::applyQuoteScope($q, $user);
+            })
             ->get(['quote_date', 'site_delivery_date']);
         foreach ($quotesPlanning as $q) {
             if ($q->quote_date && $q->site_delivery_date) {
@@ -218,8 +222,10 @@ class StatsController extends Controller
         $samplesRecv = Sample::query()
             ->whereNotNull('received_at')
             ->with('orderItem.order')
-            ->when($clientIds !== null, function ($q) use ($clientIds) {
-                $q->whereHas('orderItem.order', fn ($oq) => $oq->whereIn('client_id', $clientIds));
+            ->when($scoped, function ($q) use ($user) {
+                $q->whereHas('orderItem.order', function ($oq) use ($user) {
+                    AgencyAccess::applyOrderScope($oq, $user);
+                });
             })
             ->get();
         foreach ($samplesRecv as $s) {

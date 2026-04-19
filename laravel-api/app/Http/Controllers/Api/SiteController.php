@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Agency;
 use App\Models\Site;
+use App\Support\AgencyAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -12,12 +14,10 @@ class SiteController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $query = Site::query()->with('client');
+        $query = Site::query()->with(['client', 'agency']);
 
-        if ($user->isClient()) {
-            $query->where('client_id', $user->client_id);
-        } elseif ($user->isSiteContact()) {
-            $query->where('client_id', $user->client_id);
+        if (! $user->isLab()) {
+            AgencyAccess::applySiteScope($query, $user);
         }
 
         if ($search = trim((string) $request->query('search', ''))) {
@@ -41,6 +41,7 @@ class SiteController extends Controller
 
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,id',
+            'agency_id' => 'nullable|exists:agencies,id',
             'name' => 'required|string|max:255',
             'address' => 'nullable|string',
             'reference' => 'nullable|string|max:100',
@@ -52,22 +53,30 @@ class SiteController extends Controller
             'meta' => 'nullable|array',
         ]);
 
-        $site = Site::create($validated);
+        $clientId = (int) $validated['client_id'];
+        $agencyId = isset($validated['agency_id']) ? (int) $validated['agency_id'] : null;
+        if ($agencyId) {
+            $ok = Agency::query()->whereKey($agencyId)->where('client_id', $clientId)->exists();
+            if (! $ok) {
+                return response()->json(['message' => 'Agence invalide pour ce client.'], 422);
+            }
+        } else {
+            $agencyId = (int) Agency::query()->where('client_id', $clientId)->where('is_headquarters', true)->value('id');
+        }
 
-        return response()->json($site->load('client'), 201);
+        $site = Site::create(array_merge($validated, ['agency_id' => $agencyId]));
+
+        return response()->json($site->load(['client', 'agency']), 201);
     }
 
     public function show(Request $request, Site $site): JsonResponse
     {
         $user = $request->user();
-        if ($user->isClient() && $site->client_id !== $user->client_id) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
-        if ($user->isSiteContact() && $site->client_id !== $user->client_id) {
+        if (! AgencyAccess::userMayAccessSite($user, $site)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        return response()->json($site->load('client'));
+        return response()->json($site->load(['client', 'agency']));
     }
 
     public function update(Request $request, Site $site): JsonResponse
@@ -78,6 +87,7 @@ class SiteController extends Controller
 
         $validated = $request->validate([
             'client_id' => 'sometimes|exists:clients,id',
+            'agency_id' => 'nullable|exists:agencies,id',
             'name' => 'sometimes|string|max:255',
             'address' => 'nullable|string',
             'reference' => 'nullable|string|max:100',
@@ -89,9 +99,17 @@ class SiteController extends Controller
             'meta' => 'nullable|array',
         ]);
 
+        if (isset($validated['agency_id']) && $validated['agency_id'] !== null) {
+            $cid = (int) ($validated['client_id'] ?? $site->client_id);
+            $ok = Agency::query()->whereKey((int) $validated['agency_id'])->where('client_id', $cid)->exists();
+            if (! $ok) {
+                return response()->json(['message' => 'Agence invalide pour ce client.'], 422);
+            }
+        }
+
         $site->update($validated);
 
-        return response()->json($site->load('client'));
+        return response()->json($site->load(['client', 'agency']));
     }
 
     public function destroy(Request $request, Site $site): JsonResponse

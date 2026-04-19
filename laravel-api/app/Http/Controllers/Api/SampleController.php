@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Sample;
+use App\Support\AgencyAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -13,10 +14,7 @@ class SampleController extends Controller
     public function index(Request $request, Order $order): JsonResponse
     {
         $user = $request->user();
-        if ($user->isClient() && $order->client_id !== $user->client_id) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
-        if ($user->isSiteContact() && $order->client_id !== $user->client_id) {
+        if (! AgencyAccess::userMayAccessOrder($user, $order)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -60,10 +58,7 @@ class SampleController extends Controller
     {
         $order = $sample->orderItem->order;
         $user = $request->user();
-        if ($user->isClient() && $order->client_id !== $user->client_id) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
-        if ($user->isSiteContact() && $order->client_id !== $user->client_id) {
+        if (! AgencyAccess::userMayAccessOrder($user, $order)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 

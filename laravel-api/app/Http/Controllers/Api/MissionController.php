@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Mission;
 use App\Models\Site;
+use App\Support\AgencyAccess;
 use App\Services\ActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -124,7 +125,7 @@ class MissionController extends Controller
         if ($user->isLab()) {
             return null;
         }
-        if (($user->isClient() || $user->isSiteContact()) && $user->client_id === $site->client_id) {
+        if (($user->isClient() || $user->isSiteContact()) && AgencyAccess::userMayAccessSite($user, $site)) {
             return null;
         }
 

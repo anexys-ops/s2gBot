@@ -78,7 +78,7 @@ class ClientController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        return response()->json($client->load('sites'));
+        return response()->json($client->load(['sites.agency', 'agencies']));
     }
 
     public function update(Request $request, Client $client): JsonResponse

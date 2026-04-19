@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Sample;
 use App\Models\TestResult;
+use App\Support\AgencyAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -50,10 +51,7 @@ class TestResultController extends Controller
     public function byOrder(Request $request, Order $order): JsonResponse
     {
         $user = $request->user();
-        if ($user->isClient() && $order->client_id !== $user->client_id) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
-        if ($user->isSiteContact() && $order->client_id !== $user->client_id) {
+        if (! AgencyAccess::userMayAccessOrder($user, $order)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 

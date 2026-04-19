@@ -56,6 +56,11 @@ class User extends Authenticatable
         return $this->belongsToMany(AccessGroup::class, 'access_group_user')->withTimestamps();
     }
 
+    public function agencies(): BelongsToMany
+    {
+        return $this->belongsToMany(Agency::class, 'agency_user')->withTimestamps();
+    }
+
     /**
      * Capacité métier (groupes). Les administrateurs laboratoire ont tout.
      */

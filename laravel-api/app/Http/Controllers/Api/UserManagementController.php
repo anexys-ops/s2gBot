@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Agency;
 use App\Models\User;
 use App\Support\PermissionCatalog;
 use Illuminate\Http\JsonResponse;
@@ -17,7 +18,7 @@ class UserManagementController extends Controller
     {
         $this->authorizeUsers($request);
 
-        $q = User::query()->with(['client', 'site', 'accessGroups'])->orderBy('name');
+        $q = User::query()->with(['client', 'site', 'accessGroups', 'agencies'])->orderBy('name');
 
         if ($search = trim((string) $request->query('search', ''))) {
             $q->where(function ($qq) use ($search) {
@@ -48,6 +49,8 @@ class UserManagementController extends Controller
             'site_id' => 'nullable|exists:sites,id',
             'access_group_ids' => 'nullable|array',
             'access_group_ids.*' => 'integer|exists:access_groups,id',
+            'agency_ids' => 'nullable|array',
+            'agency_ids.*' => 'integer|exists:agencies,id',
         ]);
 
         $user = User::create([
@@ -64,14 +67,18 @@ class UserManagementController extends Controller
             $user->accessGroups()->sync($validated['access_group_ids']);
         }
 
-        return response()->json($user->fresh()->load(['client', 'site', 'accessGroups']), 201);
+        if (array_key_exists('agency_ids', $validated)) {
+            self::syncAgenciesForUser($user, $validated['agency_ids'] ?? []);
+        }
+
+        return response()->json($user->fresh()->load(['client', 'site', 'accessGroups', 'agencies']), 201);
     }
 
     public function show(Request $request, User $user): JsonResponse
     {
         $this->authorizeUsers($request);
 
-        return response()->json($user->load(['client', 'site', 'accessGroups']));
+        return response()->json($user->load(['client', 'site', 'accessGroups', 'agencies']));
     }
 
     public function update(Request $request, User $user): JsonResponse
@@ -93,6 +100,8 @@ class UserManagementController extends Controller
             'site_id' => 'nullable|exists:sites,id',
             'access_group_ids' => 'nullable|array',
             'access_group_ids.*' => 'integer|exists:access_groups,id',
+            'agency_ids' => 'nullable|array',
+            'agency_ids.*' => 'integer|exists:agencies,id',
         ]);
 
         if (isset($validated['password']) && $validated['password'] !== null && $validated['password'] !== '') {
@@ -106,10 +115,15 @@ class UserManagementController extends Controller
             unset($validated['access_group_ids']);
         }
 
+        if (array_key_exists('agency_ids', $validated)) {
+            self::syncAgenciesForUser($user, $validated['agency_ids'] ?? []);
+            unset($validated['agency_ids']);
+        }
+
         $user->fill($validated);
         $user->save();
 
-        return response()->json($user->fresh()->load(['client', 'site', 'accessGroups']));
+        return response()->json($user->fresh()->load(['client', 'site', 'accessGroups', 'agencies']));
     }
 
     public function destroy(Request $request, User $user): JsonResponse
@@ -133,5 +147,29 @@ class UserManagementController extends Controller
             403,
             'Non autorisé'
         );
+    }
+
+    /**
+     * @param  array<int, int|string>  $agencyIds
+     */
+    private static function syncAgenciesForUser(User $user, array $agencyIds): void
+    {
+        if ($agencyIds === []) {
+            $user->agencies()->sync([]);
+
+            return;
+        }
+        $cid = $user->client_id;
+        if (! $cid) {
+            $user->agencies()->sync([]);
+
+            return;
+        }
+        $allowed = Agency::query()
+            ->where('client_id', $cid)
+            ->whereIn('id', array_map('intval', $agencyIds))
+            ->pluck('id')
+            ->all();
+        $user->agencies()->sync($allowed);
     }
 }

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Agency;
 use App\Models\Site;
 use App\Models\Quote;
+use App\Support\AgencyAccess;
 use App\Models\QuoteLine;
 use App\Services\CommercialDocumentTotalsService;
 use Carbon\Carbon;
@@ -29,6 +31,7 @@ class QuoteController extends Controller
         $user = $request->user();
         $query = Quote::query()->with([
             'client',
+            'agency',
             'site',
             'quoteLines.commercialOffering',
             'billingAddress',
@@ -36,8 +39,8 @@ class QuoteController extends Controller
             'pdfTemplate',
         ]);
 
-        if ($user->isClient() || $user->isSiteContact()) {
-            $query->where('client_id', $user->client_id);
+        if (! $user->isLab()) {
+            AgencyAccess::applyQuoteScope($query, $user);
         }
 
         if ($search = trim((string) $request->query('search', ''))) {
@@ -98,9 +101,22 @@ class QuoteController extends Controller
             }
         }
 
+        $cid = (int) $validated['client_id'];
+        $agencyId = null;
+        if (! empty($validated['site_id'])) {
+            $site = Site::query()->find((int) $validated['site_id']);
+            if ($site && (int) $site->client_id === $cid) {
+                $agencyId = $site->agency_id;
+            }
+        }
+        if (! $agencyId) {
+            $agencyId = Agency::query()->where('client_id', $cid)->where('is_headquarters', true)->value('id');
+        }
+
         $quote = Quote::create([
             'number' => $number,
             'client_id' => $validated['client_id'],
+            'agency_id' => $agencyId,
             'site_id' => $validated['site_id'] ?? null,
             'quote_date' => $validated['quote_date'],
             'order_date' => $validated['order_date'] ?? null,
@@ -127,22 +143,19 @@ class QuoteController extends Controller
         $this->recalculateQuoteTotals($quote);
 
         return response()->json($quote->fresh()->load([
-            'client', 'site', 'quoteLines.commercialOffering', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
+            'client', 'agency', 'site', 'quoteLines.commercialOffering', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
         ]), 201);
     }
 
     public function show(Request $request, Quote $quote): JsonResponse
     {
         $user = $request->user();
-        if ($user->isClient() && $quote->client_id !== $user->client_id) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
-        if ($user->isSiteContact() && $quote->client_id !== $user->client_id) {
+        if (! AgencyAccess::userMayAccessQuote($user, $quote)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
         return response()->json($quote->load([
-            'client', 'site', 'quoteLines.commercialOffering', 'billingAddress', 'deliveryAddress', 'pdfTemplate', 'attachments',
+            'client', 'agency', 'site', 'quoteLines.commercialOffering', 'billingAddress', 'deliveryAddress', 'pdfTemplate', 'attachments',
         ]));
     }
 
@@ -209,6 +222,19 @@ class QuoteController extends Controller
             }
         }
         $quote->fill($fill);
+        if (array_key_exists('site_id', $fill) || array_key_exists('client_id', $fill)) {
+            $cid = (int) $quote->client_id;
+            $agencyId = null;
+            if ($quote->site_id) {
+                $agencyId = Site::query()->whereKey($quote->site_id)->value('agency_id');
+            }
+            if (! $agencyId) {
+                $agencyId = Agency::query()->where('client_id', $cid)->where('is_headquarters', true)->value('id');
+            }
+            if ($agencyId) {
+                $quote->agency_id = $agencyId;
+            }
+        }
 
         if (isset($validated['lines'])) {
             $defaultTva = $validated['tva_rate'] ?? $quote->tva_rate;
@@ -220,7 +246,7 @@ class QuoteController extends Controller
         $this->recalculateQuoteTotals($quote);
 
         return response()->json($quote->fresh()->load([
-            'client', 'site', 'quoteLines.commercialOffering', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
+            'client', 'agency', 'site', 'quoteLines.commercialOffering', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
         ]));
     }
 

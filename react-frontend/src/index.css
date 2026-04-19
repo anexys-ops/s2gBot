@@ -390,6 +390,109 @@ input, select, textarea, button { font: inherit; }
   color: var(--color-accent-hover);
 }
 
+/* Éditeur graphique mise en page PDF (modèles rapports / documents). */
+.pdf-layout-editor {
+  margin-top: 0.75rem;
+  max-width: 56rem;
+}
+.pdf-layout-editor__intro {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin: 0 0 1rem;
+}
+.pdf-layout-editor__section {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.pdf-layout-editor__section:last-of-type {
+  border-bottom: none;
+}
+.pdf-layout-editor__section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+.pdf-layout-editor__h {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 0.65rem;
+  color: var(--color-text);
+}
+.pdf-layout-editor__check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.45rem;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.pdf-layout-editor__check input {
+  flex-shrink: 0;
+}
+.pdf-layout-editor__field {
+  margin-top: 0.65rem;
+  max-width: 32rem;
+}
+.pdf-layout-editor__field label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  color: var(--color-muted);
+}
+.pdf-layout-editor__hint {
+  font-size: 0.82rem;
+  color: var(--color-muted);
+  margin: 0 0 0.65rem;
+  line-height: 1.45;
+}
+.pdf-layout-editor__empty {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  margin: 0;
+}
+.pdf-layout-editor__table-wrap {
+  overflow-x: auto;
+}
+.pdf-layout-editor__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.pdf-layout-editor__table th,
+.pdf-layout-editor__table td {
+  padding: 0.4rem 0.5rem 0.4rem 0;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--color-border);
+}
+.pdf-layout-editor__table th {
+  font-weight: 600;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}
+.pdf-layout-editor__table .input--table {
+  width: 100%;
+  max-width: 14rem;
+  margin: 0;
+  font-size: 0.86rem;
+  padding: 0.35rem 0.5rem;
+}
+.pdf-layout-editor__err {
+  margin: 0.5rem 0 0;
+}
+.pdf-layout-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
 .card {
   background: var(--color-surface);
   border-radius: var(--radius-lg);

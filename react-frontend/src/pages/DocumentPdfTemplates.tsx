@@ -103,7 +103,7 @@ export default function DocumentPdfTemplates() {
         rows.map((t) => (
           <details key={`cfg-${t.id}`} className="card" style={{ marginTop: '1rem' }}>
             <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
-              Mise en page JSON — {t.name} ({t.document_type})
+              Mise en page — {t.name} ({t.document_type})
             </summary>
             <PdfLayoutConfigEditor
               layoutConfig={(t.layout_config ?? {}) as Record<string, unknown>}

@@ -50,8 +50,8 @@ export default function ReportPdfTemplates() {
       <div className="card" style={{ marginBottom: '1rem', fontSize: '0.95rem' }}>
         <p style={{ margin: 0 }}>
           Choix du modèle <strong>par défaut</strong> pour les rapports PDF depuis une commande. Les administrateurs peuvent
-          aussi ajuster la mise en page (logo, signature, champs et photos) via le JSON ci-dessous — fusionné côté serveur avec
-          les valeurs par défaut.
+          configurer la mise en page (exports, en-tête, champs et photos) dans le panneau graphique ci-dessous — enregistré
+          côté serveur avec fusion des valeurs par défaut.
         </p>
       </div>
       <div className="card">
@@ -100,7 +100,7 @@ export default function ReportPdfTemplates() {
         rows.map((t) => (
           <details key={`cfg-${t.id}`} className="card" style={{ marginTop: '1rem' }}>
             <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
-              Mise en page JSON — {t.name}
+              Mise en page — {t.name}
             </summary>
             <PdfLayoutConfigEditor
               layoutConfig={(t.layout_config ?? {}) as Record<string, unknown>}

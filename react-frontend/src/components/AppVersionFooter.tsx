@@ -1,12 +1,5 @@
 import { useEffect, useState } from 'react'
-import {
-  SUPPORT_EMAIL,
-  SUPPORT_EMAIL_HREF,
-  SUPPORT_SITE_HREF,
-  SUPPORT_SITE_LABEL,
-  SUPPORT_WHATSAPP_E164,
-  SUPPORT_WHATSAPP_HREF,
-} from '../config/support'
+import SupportFab from './SupportFab'
 
 type Variant = 'app' | 'auth'
 
@@ -35,12 +28,12 @@ function formatBuildDate(iso: string): string {
 
 type Props = {
   variant?: Variant
-  /** Barre toujours visible en bas de l’écran (app connectée) — évite de devoir scroller pour voir le statut déploiement. */
+  /** Barre fixe en bas (app connectée). */
   dock?: boolean
 }
 
 /**
- * Versions : bundle front (package.json, git, build) + API Laravel / PHP (GET /api/version).
+ * Versions : bundle front + API (GET /api/version). Une ligne en mode dock ; détails au survol.
  */
 export default function AppVersionFooter({ variant = 'app', dock = false }: Props) {
   const [apiInfo, setApiInfo] = useState<ApiVersionPayload | null>(null)
@@ -72,13 +65,6 @@ export default function AppVersionFooter({ variant = 'app', dock = false }: Prop
       ? 'API : indisponible — le déploiement n’est pas complet (reverse proxy / PHP-FPM / route /api).'
       : 'API : vérification en cours…'
 
-  const statusClass =
-    apiInfo != null
-      ? 'app-version-footer__status app-version-footer__status--ok'
-      : apiError
-        ? 'app-version-footer__status app-version-footer__status--error'
-        : 'app-version-footer__status app-version-footer__status--pending'
-
   const statusText =
     apiInfo != null
       ? 'Déploiement OK — front servi et API /api/version joignable.'
@@ -86,32 +72,53 @@ export default function AppVersionFooter({ variant = 'app', dock = false }: Prop
         ? 'Déploiement à corriger — le front est chargé mais l’API ne répond pas.'
         : 'Validation du déploiement…'
 
+  const dotClass =
+    apiInfo != null
+      ? 'app-version-footer__dot app-version-footer__dot--ok'
+      : apiError
+        ? 'app-version-footer__dot app-version-footer__dot--error'
+        : 'app-version-footer__dot app-version-footer__dot--pending'
+
+  const apiShort = apiInfo
+    ? `API v${apiInfo.api}${apiInfo.app_env ? ` (${apiInfo.app_env})` : ''}`
+    : apiError
+      ? 'API indisponible'
+      : 'API…'
+
+  const dockLine = `Lab BTP v${__APP_VERSION__} · ${apiShort}`
+  const fullTitle = `${statusText}\n${frontLabel}\n${apiLabel}`
+
   const dockClass = dock && variant !== 'auth' ? ' app-version-footer--dock' : ''
 
+  if (dock && variant !== 'auth') {
+    return (
+      <>
+        <footer
+          className={`app-version-footer app-version-footer--compact${dockClass}`}
+          title={fullTitle}
+        >
+          <div className="app-version-footer__inner app-version-footer__inner--dock">
+            <span className={dotClass} title={statusText} aria-hidden />
+            <span className="app-version-footer__dock-text">{dockLine}</span>
+          </div>
+        </footer>
+        <SupportFab anchor="dock" />
+      </>
+    )
+  }
+
   return (
-    <footer
-      className={`app-version-footer${variant === 'auth' ? ' app-version-footer--auth' : ''}${dockClass}`}
-      title={`Build ISO : ${__APP_BUILD_ISO__}`}
-    >
-      <div className="app-version-footer__inner">
-        <div className={statusClass} role="status" aria-live="polite">
-          {statusText}
+    <>
+      <footer
+        className={`app-version-footer app-version-footer--compact${variant === 'auth' ? ' app-version-footer--auth' : ''}`}
+        title={fullTitle}
+      >
+        <div className="app-version-footer__inner app-version-footer__inner--single">
+          <span className={dotClass} title={statusText} aria-hidden />
+          <span className="app-version-footer__dock-text">{dockLine}</span>
         </div>
-        <div className="app-version-footer__line app-version-footer__line--support">
-          Support :{' '}
-          <a href={SUPPORT_SITE_HREF} target="_blank" rel="noopener noreferrer">
-            {SUPPORT_SITE_LABEL}
-          </a>
-          {' · '}
-          <a href={SUPPORT_WHATSAPP_HREF} target="_blank" rel="noopener noreferrer">
-            WhatsApp {SUPPORT_WHATSAPP_E164}
-          </a>
-          {' · '}
-          <a href={SUPPORT_EMAIL_HREF}>{SUPPORT_EMAIL}</a>
-        </div>
-        <div className="app-version-footer__line app-version-footer__line--detail">{frontLabel}</div>
-        <div className="app-version-footer__line app-version-footer__line--api">{apiLabel}</div>
-      </div>
-    </footer>
+      </footer>
+      {variant === 'auth' ? <SupportFab anchor="auth" /> : null}
+    </>
   )
 }

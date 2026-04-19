@@ -27,8 +27,10 @@
   --layout-padding-x: clamp(0.75rem, 2.8vw, 1.5rem);
   /* Hauteur approx. du header sticky (aligne la barre contextuelle en dessous) */
   --app-header-sticky-offset: 52px;
-  /* Réserve sous le contenu quand le footer déploiement est fixe en bas. */
-  --layout-footer-dock-reserve: max(5.75rem, calc(4.5rem + env(safe-area-inset-bottom, 0px)));
+  /* Réserve sous le contenu : pied fixe une ligne + encoche. */
+  --layout-footer-dock-reserve: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  /* Bouton support au-dessus du pied (aligné avec la réserve). */
+  --support-fab-bottom: calc(2.85rem + env(safe-area-inset-bottom, 0px));
 }
 
 * { box-sizing: border-box; }
@@ -209,67 +211,67 @@ input, select, textarea, button { font: inherit; }
 .app-version-footer {
   flex-shrink: 0;
   margin-top: auto;
-  padding: 0.65rem 1rem 1rem;
+  padding: 0.45rem var(--layout-padding-x) 0.55rem;
   text-align: center;
-  font-size: 0.7rem;
-  line-height: 1.45;
+  font-size: 0.72rem;
+  line-height: 1.35;
   color: var(--color-muted, #64748b);
   border-top: 1px solid var(--color-border, #e2e8f0);
   background: linear-gradient(180deg, transparent 0%, var(--color-surface-2, #f8fafc) 35%);
 }
 
+.app-version-footer--compact {
+  padding-top: 0.4rem;
+  padding-bottom: 0.45rem;
+}
+
 .app-version-footer__inner {
   display: inline-flex;
-  flex-direction: column;
-  gap: 0.35rem;
   max-width: min(100%, 52rem);
-  word-break: break-word;
 }
 
-.app-version-footer__status {
-  display: block;
-  font-size: 0.72rem;
+.app-version-footer__inner--dock,
+.app-version-footer__inner--single {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.app-version-footer__dot {
+  flex: 0 0 auto;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12);
+}
+
+.app-version-footer__dot--ok {
+  background: #22c55e;
+}
+
+.app-version-footer__dot--error {
+  background: #ef4444;
+}
+
+.app-version-footer__dot--pending {
+  background: #94a3b8;
+}
+
+.app-version-footer__dock-text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: 600;
   letter-spacing: 0.01em;
-}
-
-.app-version-footer__status--ok {
-  color: #15803d;
-}
-
-.app-version-footer__status--error {
-  color: #b91c1c;
-}
-
-.app-version-footer__status--pending {
-  color: var(--color-muted, #64748b);
-}
-
-.app-version-footer__line {
-  display: block;
-}
-
-.app-version-footer__line--detail {
-  font-size: 0.68rem;
-  opacity: 0.95;
-}
-
-.app-version-footer__line--api {
-  opacity: 0.92;
-}
-
-.app-version-footer__line--support {
-  font-size: 0.72rem;
-  font-weight: 600;
-}
-.app-version-footer__line--support a {
-  color: var(--color-accent);
-  text-decoration: none;
-  font-weight: 600;
-}
-.app-version-footer__line--support a:hover {
-  text-decoration: underline;
-  color: var(--color-accent-hover);
+  color: var(--color-text);
+  opacity: 0.88;
 }
 
 .app-version-footer--auth {
@@ -279,26 +281,23 @@ input, select, textarea, button { font: inherit; }
   color: rgba(226, 232, 240, 0.75);
 }
 
-.app-version-footer--auth .app-version-footer__status--ok {
-  color: #86efac;
+.app-version-footer--auth .app-version-footer__dock-text {
+  color: rgba(241, 245, 249, 0.92);
 }
 
-.app-version-footer--auth .app-version-footer__status--error {
-  color: #fca5a5;
+.app-version-footer--auth .app-version-footer__dot--ok {
+  background: #4ade80;
 }
 
-.app-version-footer--auth .app-version-footer__status--pending {
-  color: rgba(226, 232, 240, 0.65);
+.app-version-footer--auth .app-version-footer__dot--error {
+  background: #f87171;
 }
 
-.app-version-footer--auth .app-version-footer__line--support a {
-  color: #93c5fd;
-}
-.app-version-footer--auth .app-version-footer__line--support a:hover {
-  color: #bfdbfe;
+.app-version-footer--auth .app-version-footer__dot--pending {
+  background: rgba(148, 163, 184, 0.85);
 }
 
-/* Toujours visible : bandeau bas d’écran (validation déploiement sans scroll). */
+/* Pied fixe une ligne (app connectée). */
 .app-version-footer--dock {
   position: fixed;
   left: 0;
@@ -306,21 +305,89 @@ input, select, textarea, button { font: inherit; }
   bottom: 0;
   z-index: 1025;
   margin-top: 0;
-  padding: 0.55rem var(--layout-padding-x) calc(0.7rem + env(safe-area-inset-bottom, 0px));
-  background: #e8eef5;
+  padding: 0.38rem var(--layout-padding-x) calc(0.42rem + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(180deg, #eef2f7 0%, #e2e8f0 100%);
   border-top: 1px solid #cbd5e1;
-  box-shadow: 0 -6px 28px rgba(15, 23, 42, 0.14);
-  font-size: 0.72rem;
+  box-shadow: 0 -4px 18px rgba(15, 23, 42, 0.1);
 }
 
-.app-version-footer--dock .app-version-footer__status {
-  font-size: 0.74rem;
+/* Bouton support + panneau (voir SupportFab.tsx). */
+.support-fab {
+  position: fixed;
+  right: max(0.65rem, env(safe-area-inset-right, 0px));
+  z-index: 1040;
 }
 
-.app-version-footer--dock .app-version-footer__line--detail,
-.app-version-footer--dock .app-version-footer__line--api {
-  font-size: 0.68rem;
+.support-fab--dock {
+  bottom: var(--support-fab-bottom);
+}
+
+.support-fab--auth {
+  bottom: calc(2.65rem + env(safe-area-inset-bottom, 0px));
+}
+
+.support-fab__trigger {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: var(--color-surface);
+  color: var(--color-accent);
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.support-fab__trigger:hover {
+  transform: scale(1.04);
+  box-shadow: 0 16px 36px -12px rgba(234, 88, 12, 0.35);
+}
+
+.support-fab__panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.45rem);
+  width: min(16.5rem, calc(100vw - 1.5rem));
+  padding: 0.65rem 0.75rem 0.7rem;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  text-align: left;
+}
+
+.support-fab__panel-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 0.45rem;
+}
+
+.support-fab__links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.support-fab__links a {
+  color: var(--color-accent);
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.support-fab__links a:hover {
+  text-decoration: underline;
+  color: var(--color-accent-hover);
 }
 
 .card {

@@ -6,6 +6,13 @@ import { useAuth } from '../contexts/AuthContext'
 import { statsApi, type DashboardStatsPayload } from '../api/client'
 import { INVOICE_STATUS_LABELS, QUOTE_STATUS_LABELS } from '../lib/commercialStatusLabels'
 import { formatMoney } from '../lib/appLocale'
+import { KPI_PRESENTATION, type KpiId } from '../lib/dashboardKpiPresentation'
+import {
+  presentationInvoiceStatus,
+  presentationOrderStatus,
+  presentationQuoteStatus,
+  presentationSampleStatus,
+} from '../lib/statusPresentation'
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
@@ -23,22 +30,6 @@ const SAMPLE_STATUS_LABELS: Record<string, string> = {
 }
 
 type MetierTab = 'commerce' | 'compta' | 'labo'
-
-type KpiId =
-  | 'clients'
-  | 'sites'
-  | 'orders'
-  | 'quotes'
-  | 'invoices_count'
-  | 'pipeline_quotes_ttc'
-  | 'ca_ttc'
-  | 'encaisse'
-  | 'impayes'
-  | 'reports_total'
-  | 'reports_pending'
-  | 'samples'
-  | 'delay_first_report'
-  | 'delay_cycle'
 
 function statusRows(record: Record<string, number>, labels: Record<string, string>) {
   return Object.entries(record)
@@ -62,17 +53,50 @@ function KpiTile({
   selected: boolean
   onToggle: (id: KpiId) => void
 }) {
+  const { emoji, tone } = KPI_PRESENTATION[id]
   return (
     <button
       type="button"
-      className={`dashboard-kpi dashboard-kpi--tile${accent ? ' dashboard-kpi--accent' : ''}${selected ? ' dashboard-kpi--tile-open' : ''}`}
+      className={`dashboard-kpi dashboard-kpi--tile dashboard-kpi--tone-${tone}${accent ? ' dashboard-kpi--accent' : ''}${selected ? ' dashboard-kpi--tile-open' : ''}`}
       aria-expanded={selected}
       onClick={() => onToggle(id)}
     >
-      <span className="dashboard-kpi__label">{label}</span>
-      <strong>{value}</strong>
+      <span className="dashboard-kpi__head">
+        <span className={`dashboard-kpi__bubble dashboard-kpi__bubble--${tone}`} aria-hidden>
+          {emoji}
+        </span>
+        <span className="dashboard-kpi__label">{label}</span>
+      </span>
+      <strong className="dashboard-kpi__value">{value}</strong>
       <span className="dashboard-kpi__hint">{selected ? 'Masquer le détail' : 'Voir le détail'}</span>
     </button>
+  )
+}
+
+function StatusPillCell({
+  domain,
+  statusKey,
+  label,
+}: {
+  domain: 'order' | 'quote' | 'invoice' | 'sample'
+  statusKey: string
+  label: string
+}) {
+  const p =
+    domain === 'order'
+      ? presentationOrderStatus(statusKey)
+      : domain === 'quote'
+        ? presentationQuoteStatus(statusKey)
+        : domain === 'invoice'
+          ? presentationInvoiceStatus(statusKey)
+          : presentationSampleStatus(statusKey)
+  return (
+    <span className={`status-pill status-pill--${p.tone}`}>
+      <span className="status-pill__emoji" aria-hidden>
+        {p.emoji}
+      </span>
+      {label}
+    </span>
   )
 }
 
@@ -118,7 +142,9 @@ function renderKpiDetail(id: KpiId, dash: DashboardStatsPayload) {
               <tbody>
                 {statusRows(dash.counts.orders_by_status, ORDER_STATUS_LABELS).map((row) => (
                   <tr key={row.key}>
-                    <td>{row.label}</td>
+                    <td>
+                      <StatusPillCell domain="order" statusKey={row.key} label={row.label} />
+                    </td>
                     <td className="dashboard-kpi-detail__num">{row.count}</td>
                   </tr>
                 ))}
@@ -141,7 +167,9 @@ function renderKpiDetail(id: KpiId, dash: DashboardStatsPayload) {
               <tbody>
                 {statusRows(dash.counts.quotes_by_status, QUOTE_STATUS_LABELS).map((row) => (
                   <tr key={row.key}>
-                    <td>{row.label}</td>
+                    <td>
+                      <StatusPillCell domain="quote" statusKey={row.key} label={row.label} />
+                    </td>
                     <td className="dashboard-kpi-detail__num">{row.count}</td>
                   </tr>
                 ))}
@@ -168,7 +196,9 @@ function renderKpiDetail(id: KpiId, dash: DashboardStatsPayload) {
               <tbody>
                 {statusRows(dash.counts.invoices_by_status, INVOICE_STATUS_LABELS).map((row) => (
                   <tr key={row.key}>
-                    <td>{row.label}</td>
+                    <td>
+                      <StatusPillCell domain="invoice" statusKey={row.key} label={row.label} />
+                    </td>
                     <td className="dashboard-kpi-detail__num">{row.count}</td>
                   </tr>
                 ))}
@@ -319,7 +349,9 @@ function renderKpiDetail(id: KpiId, dash: DashboardStatsPayload) {
               <tbody>
                 {statusRows(dash.counts.samples_by_status, SAMPLE_STATUS_LABELS).map((row) => (
                   <tr key={row.key}>
-                    <td>{row.label}</td>
+                    <td>
+                      <StatusPillCell domain="sample" statusKey={row.key} label={row.label} />
+                    </td>
                     <td className="dashboard-kpi-detail__num">{row.count}</td>
                   </tr>
                 ))}
@@ -408,9 +440,21 @@ function renderKpiDetail(id: KpiId, dash: DashboardStatsPayload) {
 }
 
 const METIER_TABS: { id: MetierTab; label: string; hint: string }[] = [
-  { id: 'commerce', label: 'Commerce', hint: 'Clients, chantiers, commandes, devis, volume factures' },
-  { id: 'compta', label: 'Compta', hint: 'CA, encaissements, impayés, CA mensuel' },
-  { id: 'labo', label: 'Labo', hint: 'Rapports, échantillons, délais, volume essais' },
+  {
+    id: 'commerce',
+    label: '🛒 Commerce',
+    hint: 'Clients, chantiers, commandes, devis, volume factures',
+  },
+  {
+    id: 'compta',
+    label: '💼 Compta',
+    hint: 'CA, encaissements, impayés, CA mensuel',
+  },
+  {
+    id: 'labo',
+    label: '🔬 Labo',
+    hint: 'Rapports, échantillons, délais, volume essais',
+  },
 ]
 
 export default function Dashboard() {

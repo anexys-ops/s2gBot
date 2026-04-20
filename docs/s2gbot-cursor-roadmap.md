@@ -73,7 +73,7 @@
 
 ### Tâches 4 à 8 — Implémentées dans le dépôt (avril 2026)
 
-- **4** — Relances : `invoices:relaunch-overdue`, champs `last_reminder_sent_at` / `reminder_count`, `invoice_reminders` + template `invoice_reminder`, schedule 08:00. Voir `livraison.md`.
+- **4** — Relances : `invoices:relaunch-overdue`, champs `last_reminder_sent_at` / `reminder_count`, `invoice_reminders` + template `invoice_reminder`, schedule 08:00. Voir `LIVRAISON.md`.
 - **5** — `GET /api/accounting/exports` (Sage / Cegid), `accounting_export` dans `module_settings`.
 - **6** — `report_versions`, `ReportObserver`, `GET /api/reports/{id}/versions` (lab), blocage `form_data` si rapport signé.
 - **7** — `.github/workflows/tests.yml` (Laravel + build React) ; couverture / Vitest : **non** (à faire).

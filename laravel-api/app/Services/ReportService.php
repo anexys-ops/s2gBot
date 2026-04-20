@@ -13,7 +13,7 @@ class ReportService
 {
     public function generate(Order $order, ?int $templateId = null, ?array $formData = null): Report
     {
-        $order->load(['client', 'site', 'orderItems.testType.params', 'orderItems.samples.testResults.testTypeParam']);
+        $order->load(['client', 'site', 'orderItems.testType.params', 'orderItems.samples.testResults.testTypeParam', 'orderItems.samples.testResults.equipment.calibrations']);
 
         $template = $this->resolveTemplate($templateId);
         $formData = $formData ?? [];
@@ -49,7 +49,7 @@ class ReportService
 
         $report->refresh();
         $order = Order::query()
-            ->with(['client', 'site', 'orderItems.testType.params', 'orderItems.samples.testResults.testTypeParam'])
+            ->with(['client', 'site', 'orderItems.testType.params', 'orderItems.samples.testResults.testTypeParam', 'orderItems.samples.testResults.equipment.calibrations'])
             ->findOrFail($report->order_id);
         $report->load('pdfTemplate');
         $blade = $report->pdfTemplate?->blade_view ?? 'reports.order';

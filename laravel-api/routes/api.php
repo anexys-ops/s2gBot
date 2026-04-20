@@ -55,6 +55,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('lithology-layers/{lithology_layer}', [App\Http\Controllers\Api\LithologyLayerController::class, 'update']);
     Route::delete('lithology-layers/{lithology_layer}', [App\Http\Controllers\Api\LithologyLayerController::class, 'destroy']);
     Route::apiResource('test-types', App\Http\Controllers\Api\TestTypeController::class);
+    Route::apiResource('equipments', App\Http\Controllers\Api\EquipmentController::class);
+    Route::get('equipments/{equipment}/calibrations', [App\Http\Controllers\Api\CalibrationController::class, 'index']);
+    Route::post('equipments/{equipment}/calibrations', [App\Http\Controllers\Api\CalibrationController::class, 'store']);
+    Route::get('equipments/{equipment}/calibrations/{calibration}', [App\Http\Controllers\Api\CalibrationController::class, 'show']);
+    Route::put('equipments/{equipment}/calibrations/{calibration}', [App\Http\Controllers\Api\CalibrationController::class, 'update']);
+    Route::patch('equipments/{equipment}/calibrations/{calibration}', [App\Http\Controllers\Api\CalibrationController::class, 'update']);
+    Route::delete('equipments/{equipment}/calibrations/{calibration}', [App\Http\Controllers\Api\CalibrationController::class, 'destroy']);
     Route::apiResource('orders', App\Http\Controllers\Api\OrderController::class);
     Route::get('orders/{order}/samples', [App\Http\Controllers\Api\SampleController::class, 'index']);
     Route::apiResource('samples', App\Http\Controllers\Api\SampleController::class)->except(['index']);

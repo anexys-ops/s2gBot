@@ -34,6 +34,12 @@ class MailTemplateSeeder extends Seeder
                 'body' => "Bonjour,\n\nLa facture n° {{invoice_number}} (échéance {{due_date}}, montant TTC {{amount_ttc}}) est en retard de règlement.\n\nMerci de procéder au paiement ou de nous contacter.\n\nCordialement,\nL'équipe Lab BTP",
                 'description' => 'Relance automatique facture impayée',
             ],
+            [
+                'name' => 'equipment_calibration_due',
+                'subject' => 'Étalonnages à planifier (fenêtre {{within_days}} j.)',
+                'body' => "Bonjour,\n\nLes équipements suivants ont une échéance d'étalonnage à prévoir ou dépassée (fenêtre {{within_days}} jours) :\n\n{{equipment_lines}}\n\nCordialement,\nL'équipe Lab BTP",
+                'description' => 'Rappel hebdomadaire échéances étalonnage (dernier étalonnage enregistré)',
+            ],
         ];
 
         foreach ($templates as $t) {

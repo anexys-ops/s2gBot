@@ -43,6 +43,12 @@ function metaForPath(pathname: string): PageMeta {
       subtitle: 'Piste d’audit simplifiée : missions, rapports (extensible).',
       crumb: 'Journal d’audit',
     }
+  if (pathname.includes('/equipements'))
+    return {
+      title: 'Équipements & étalonnages',
+      subtitle: 'Parc matériel, rattachement aux essais et suivi des échéances (SNIMA / ISO 17025).',
+      crumb: 'Équipements',
+    }
   if (pathname.includes('/modeles-rapports-pdf'))
     return {
       title: 'Modèles PDF — rapports d’essais',
@@ -107,6 +113,7 @@ export default function BackOfficeLayout() {
     { to: '/back-office/cadrage', label: 'Cadrage (S0)', end: true as const },
     { to: '/back-office/exemples-calculs', label: 'Calculs BTP', end: true as const },
     { to: '/back-office/journal-audit', label: 'Journal d’audit', end: true as const },
+    { to: '/back-office/equipements', label: 'Équipements', end: true as const },
     { to: '/clients', label: 'Clients' },
     { to: '/sites', label: 'Chantiers' },
     ...(isLab

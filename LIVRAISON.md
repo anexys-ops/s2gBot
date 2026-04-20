@@ -1,8 +1,9 @@
 # LIVRAISON — s2gBot Roadmap (orchestration Cursor ↔ Claude)
 
-**Date** : 2026-04-20  
+**Date** : 2026-04-21  
 **Projet Linear** : [s2gBot — Roadmap améliorations](https://linear.app/anexys/project/s2gbot-roadmap-ameliorations-a6b525d0bfcd) (team Anexys / BDC)  
-**Branche courante** : `feat/s2gbot-lot1-indexes-invoices-pdf` → extension tâches 4–8.
+**Branche courante** : `feat/s2gbot-09-equipments-calibrations` (tâche 09). Lots 1–8 : `main` / historique `feat/s2gbot-lot1-indexes-invoices-pdf`.  
+**Doc / suivi** : alignement nom fichier + synthèse livrable — [BDC-57](https://linear.app/anexys/issue/BDC-57).
 
 ---
 
@@ -18,7 +19,7 @@
 | 06 | Versioning rapports signés                      | 🟢 Done      | [BDC-40](https://linear.app/anexys/issue/BDC-40) | ✅ Validé |
 | 07 | Tests automatisés (coverage ≥ 60 %)             | 🟢 Done      | [BDC-41](https://linear.app/anexys/issue/BDC-41) | ✅ Itération 2 |
 | 08 | Archivage `activity_logs`                       | 🟢 Done      | [BDC-42](https://linear.app/anexys/issue/BDC-42) | ✅ Itération 2 |
-| 09 | Module équipements & étalonnages                | ⚪ Todo      | [BDC-43](https://linear.app/anexys/issue/BDC-43) | — |
+| 09 | Module équipements & étalonnages                | 🟡 PR / revue | [BDC-43](https://linear.app/anexys/issue/BDC-43) | — (attente revue) |
 | 10 | Non-conformités & CAPA (8D)                     | ⚪ Todo      | [BDC-44](https://linear.app/anexys/issue/BDC-44) | — |
 | 11 | Planning techniciens                            | ⚪ Todo      | [BDC-45](https://linear.app/anexys/issue/BDC-45) | — |
 | 12 | Bilingue FR / AR                                | ⚪ Todo      | [BDC-46](https://linear.app/anexys/issue/BDC-46) | — |
@@ -33,7 +34,7 @@
 | 21 | Multi-tenant strict                             | ⚪ Todo      | [BDC-55](https://linear.app/anexys/issue/BDC-55) | — |
 | 22 | API publique OpenAPI + webhooks                 | ⚪ Todo      | [BDC-56](https://linear.app/anexys/issue/BDC-56) | — |
 
-**Progression** : 8 validées / 0 à corriger sur le périmètre 1–8 / 14 restantes — **36 % lot 1 complet** (tâches 1–8 bouclées).
+**Progression** : lots **1–8** revus Claude (**8/8**). **Tâche 09** : code livré sur branche dédiée, **PR / merge + revue** à finaliser — **13** tâches roadmap encore ouvertes (10–22). Vue globale **9/22** avec implémentation poussée (~**41 %** du tableau).
 
 ---
 
@@ -46,6 +47,7 @@
 | Tâche 6 — Versioning rapports | Livré | Table `report_versions`, observer, API versions lab, blocage `form_data` si signé |
 | Tâche 7 — CI tests | Livré | Vitest + tests pages CRM, job `frontend-tests`, couverture Laravel avec PCOV, `docs/CI.md` ; override `recharts-scale@0.4.4` pour build fiable |
 | Tâche 8 — Archivage logs | Livré | Purge planifiée (`logs:purge-archive --older-than-years=2`), `GET /api/admin/activity-logs` avec `include=archive` + pagination curseur, tests feature |
+| Tâche 9 — Équipements & étalonnages | Livré code | Migration + API + PDF + commande alertes + UI back-office ; tests ciblés — voir §5 |
 
 ---
 
@@ -110,38 +112,37 @@ Réalisé : planification mensuelle purge, `ActivityLogController@indexAll` av
 
 ---
 
-## 5. Prochaine tâche — Tâche 9 · Module équipements & étalonnages
+## 5. Tâche 9 · Module équipements & étalonnages — **livré code (2026-04-21)**
 
-**Brief à coller dans Cursor (uniquement quand tâches 7 et 8 validées)** :
+Branche : `feat/s2gbot-09-equipments-calibrations` · Linear [BDC-43](https://linear.app/anexys/issue/BDC-43).
 
-> **Contexte.** Accréditation SNIMA / ISO 17025 impossible sans gestion équipements + étalonnages. Rattachement équipement ↔ résultat requis pour traçabilité.
->
-> **Livrables.**
->
-> Migration `2026_04_22_100000_create_equipments_and_calibrations.php` :
-> - `equipments` : id, name, code (unique), type, brand, model, serial_number, location, `agency_id` (nullable FK), purchase_date, status enum (`active`, `maintenance`, `retired`), meta JSON, timestamps.
-> - `calibrations` : id, `equipment_id` FK, calibration_date, next_due_date, certificate_path (nullable), provider, result enum (`ok`, `ok_with_reserve`, `failed`), notes, timestamps.
-> - Pivot `equipment_test_type` : `equipment_id`, `test_type_id` (quels essais utilisent quel équipement).
-> - Ajout colonne `equipment_id` nullable FK sur `test_results`.
->
-> Modèles : `app/Models/Equipment.php`, `app/Models/Calibration.php` + relations.
->
-> Controllers API (rôle `lab_admin` ou `lab_technician` lecture, `lab_admin` écriture) :
-> - `EquipmentController` : CRUD + endpoint `GET /api/equipments?status=active&due_within=30` (étalonnages à renouveler sous 30j).
-> - `CalibrationController` : CRUD imbriqué `/api/equipments/{equipment}/calibrations`.
-> - Attachement certificat via `attachments` polymorphe existant (`attachable_type=equipment`).
->
-> Commande `equipments:calibration-alerts` : scan des `next_due_date` ≤ 30 jours → mail template `equipment_calibration_due` → user `lab_admin`. Schedule hebdo lundi 07:00.
->
-> Frontend (React) : `pages/admin/EquipmentsPage.tsx` (liste + filtres statut/agence/expiration), `EquipmentDetailPage.tsx` (onglets Infos / Étalonnages / Essais / PJ).
->
-> Rapport PDF : inclure référence équipement + date étalonnage si `test_result.equipment_id` renseigné.
->
-> **Critères.**
-> - Migration réversible.
-> - Tests features : création équipement + étalonnage + alerte mail + endpoint filtres.
-> - `php artisan test` vert, coverage backend > 60 %.
-> - Branche `feat/s2gbot-09-equipments-calibrations`. PR vers `main`.
+### Réalisé (backend)
+
+- **Migrations** : `2026_04_22_100000_create_equipments_and_calibrations.php` (`equipments`, pivot `equipment_test_type`, `calibrations`, `test_results.equipment_id` nullable) ; `2026_04_22_120000_seed_equipment_calibration_alerts_module_settings.php` (`module_settings.equipment_calibration_alerts` : `enabled`, `within_days`).
+- **Modèles** : `Equipment` (`$table = 'equipments'`), `Calibration`, relations `TestResult` / `TestType::equipments()`.
+- **API** : `EquipmentController` (CRUD, filtres `status`, `due_within`) ; `CalibrationController` sous `/api/equipments/{equipment}/calibrations` ; pièces jointes types `equipment` / `calibration` dans `AttachmentController`.
+- **Résultats d’essais** : `POST /api/samples/{sample}/results` accepte `equipment_id` optionnel ; contrôle agence commande ↔ équipement (si `order.agency_id` défini) + rattachement pivot type d’essai ; réponse et `GET /api/orders/{order}/results` incluent `equipment`.
+- **Alertes** : commande `equipments:calibration-alerts` (`--dry-run`, `--within=`) ; e-mail digest aux `lab_admin`, template `equipment_calibration_due`, `MailLog` ; planification **lundi 07:00** dans `routes/console.php` ; entrée seeder `MailTemplateSeeder`.
+- **PDF rapport** : `ReportService` eager-load `equipment.calibrations` ; vue `resources/views/reports/order.blade.php` colonne équipement + dernier étalonnage.
+
+### Réalisé (frontend)
+
+- Pages `react-frontend/src/pages/back-office/EquipmentsPage.tsx`, `EquipmentDetailPage.tsx` ; `equipmentsApi` dans `src/api/client.ts` ; routes `/back-office/equipements` ; navigation `BackOfficeLayout`, carte hub `LaboHub`.
+
+### Tests
+
+- `tests/Feature/TestResultEquipmentTest.php`, `tests/Feature/EquipmentCalibrationAlertCommandTest.php`.
+
+### Écarts / suite
+
+- Revue externe (Claude) et merge **PR → `main`** à tracer ; objectif couverture **> 60 %** backend global inchangé comme cible continue.
+- Mention brief : chemins UI sous `back-office/` (et non `pages/admin/`).
+
+---
+
+## 5 bis. Prochaine tâche — Tâche 10 · Non-conformités & CAPA (8D)
+
+Linear [BDC-44](https://linear.app/anexys/issue/BDC-44) — brief à prendre depuis l’issue / roadmap projet ; branche dédiée au lancement.
 
 ---
 
@@ -150,6 +151,7 @@ Réalisé : planification mensuelle purge, `ActivityLogController@indexAll` av
 ```bash
 cd laravel-api && php artisan test
 cd laravel-api && php artisan invoices:relaunch-overdue --dry-run
+cd laravel-api && php artisan equipments:calibration-alerts --dry-run
 cd laravel-api && php artisan logs:archive --older-than=90
 cd laravel-api && php artisan logs:purge-archive --older-than-years=2
 cd react-frontend && npm run build
@@ -165,6 +167,7 @@ cd react-frontend && npm run test:coverage
 | 2026-04-20 | Agent Cursor (auto)      | Partiel                | CI sans Vitest ; archive sans UNION ; purge non planifiée |
 | 2026-04-20 | Claude (revue externe)   | **6/8 validés, 2 à corriger** | Cf. §3. Briefs itération 2 rédigés ci-dessus (tâches 7 et 8) |
 | 2026-04-20 | Cursor itération 2       | OK (lot 7–8)           | Vitest + workflow + `docs/CI.md` ; archive unifiée + purge planifiée ; fix npm `recharts-scale` |
+| 2026-04-21 | Cursor                     | Livré code tâche 09    | Équipements / étalonnages + doc `LIVRAISON.md` ; suivi [BDC-57](https://linear.app/anexys/issue/BDC-57) |
 
 ---
 
@@ -195,4 +198,4 @@ cd react-frontend && npm run test:coverage
 
 ---
 
-*Document unique de suivi. Mise à jour à chaque validation Claude. Linear = vue Kanban, ce fichier = source de vérité détaillée.*
+*Document unique de suivi (`LIVRAISON.md` à la racine ; ancien nom `livraison.md`). Mise à jour à chaque validation Claude. Linear = vue Kanban, ce fichier = source de vérité détaillée.*

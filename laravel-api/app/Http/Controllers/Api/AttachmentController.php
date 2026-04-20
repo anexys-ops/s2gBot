@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attachment;
+use App\Models\Calibration;
 use App\Models\Client;
+use App\Models\Equipment;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Quote;
@@ -20,7 +22,7 @@ class AttachmentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order', 'site'])],
+            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order', 'site', 'equipment', 'calibration'])],
             'attachable_id' => 'required|integer',
         ]);
 
@@ -37,7 +39,7 @@ class AttachmentController extends Controller
     {
         $validated = $request->validate([
             'file' => 'required|file|max:15360',
-            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order', 'site'])],
+            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order', 'site', 'equipment', 'calibration'])],
             'attachable_id' => 'required|integer',
         ]);
 
@@ -105,6 +107,8 @@ class AttachmentController extends Controller
             'invoice' => Invoice::class,
             'order' => Order::class,
             'site' => Site::class,
+            'equipment' => Equipment::class,
+            'calibration' => Calibration::class,
             default => Client::class,
         };
     }

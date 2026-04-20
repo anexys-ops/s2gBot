@@ -9,5 +9,6 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('invoices:relaunch-overdue')->dailyAt('08:00');
+Schedule::command('equipments:calibration-alerts')->weeklyOn(1, '7:00');
 Schedule::command('logs:archive --older-than=90')->weeklyOn(0, '3:00');
 Schedule::command('logs:purge-archive --older-than-years=2')->monthlyOn(1, '3:30');

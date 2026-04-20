@@ -18,6 +18,8 @@ import Cadrage from './pages/back-office/Cadrage'
 import ExemplesCalculs from './pages/back-office/ExemplesCalculs'
 import GranulometryLab from './pages/back-office/GranulometryLab'
 import ActivityLogPage from './pages/back-office/ActivityLogPage'
+import EquipmentsPage from './pages/back-office/EquipmentsPage'
+import EquipmentDetailPage from './pages/back-office/EquipmentDetailPage'
 import BackOfficeLayout from './pages/back-office/BackOfficeLayout'
 import GraphiquesEssais from './pages/GraphiquesEssais'
 import CrmHub from './pages/hub/CrmHub'
@@ -107,6 +109,8 @@ function AppRoutes() {
             <Route path="cadrage" element={<Cadrage />} />
             <Route path="exemples-calculs" element={<ExemplesCalculs />} />
             <Route path="journal-audit" element={<ActivityLogPage />} />
+            <Route path="equipements" element={<EquipmentsPage />} />
+            <Route path="equipements/:id" element={<EquipmentDetailPage />} />
             <Route path="modeles-rapports-pdf" element={<ReportPdfTemplates />} />
             <Route path="modeles-documents-pdf" element={<DocumentPdfTemplates />} />
             <Route path="configuration" element={<ModuleConfigurationPage />} />

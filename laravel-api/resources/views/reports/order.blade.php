@@ -35,6 +35,7 @@
                 <th>Paramètre</th>
                 <th>Valeur</th>
                 <th>Unité</th>
+                <th>Équipement</th>
             </tr>
         </thead>
         <tbody>
@@ -43,6 +44,17 @@
                 <td>{{ $res->testTypeParam->name }}</td>
                 <td>{{ $res->value }}</td>
                 <td>{{ $res->testTypeParam->unit ?? '-' }}</td>
+                <td>
+                    @if($res->equipment)
+                        {{ $res->equipment->code }} — {{ $res->equipment->name }}
+                        @php $lastCal = $res->equipment->calibrations->first(); @endphp
+                        @if($lastCal)
+                            <br><span style="font-size:9px;color:#444;">Dernier étalonnage : {{ $lastCal->calibration_date?->format('d/m/Y') }}@if($lastCal->next_due_date) — prochain : {{ $lastCal->next_due_date->format('d/m/Y') }}@endif</span>
+                        @endif
+                    @else
+                        —
+                    @endif
+                </td>
             </tr>
             @endforeach
         </tbody>

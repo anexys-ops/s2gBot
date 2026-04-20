@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Equipment;
 use App\Models\Order;
 use App\Models\Sample;
 use App\Models\TestResult;
@@ -22,7 +23,28 @@ class TestResultController extends Controller
             'results' => 'required|array|min:1',
             'results.*.test_type_param_id' => 'required|exists:test_type_params,id',
             'results.*.value' => 'required|string|max:255',
+            'results.*.equipment_id' => 'nullable|exists:equipments,id',
         ]);
+
+        $sample->loadMissing('orderItem.order');
+        $order = $sample->orderItem->order;
+        $testTypeId = (int) $sample->orderItem->test_type_id;
+
+        foreach ($validated['results'] as $r) {
+            if (empty($r['equipment_id'])) {
+                continue;
+            }
+            $equipment = Equipment::query()->find((int) $r['equipment_id']);
+            if (! $equipment instanceof Equipment) {
+                continue;
+            }
+            if ($order->agency_id !== null && (int) $equipment->agency_id !== (int) $order->agency_id) {
+                return response()->json(['message' => 'L’équipement ne correspond pas à l’agence de la commande.'], 422);
+            }
+            if (! $equipment->testTypes()->where('test_types.id', $testTypeId)->exists()) {
+                return response()->json(['message' => 'L’équipement n’est pas rattaché au type d’essai de cette ligne.'], 422);
+            }
+        }
 
         $created = [];
         foreach ($validated['results'] as $r) {
@@ -39,13 +61,14 @@ class TestResultController extends Controller
                 [
                     'value' => $r['value'],
                     'created_by' => $request->user()->id,
+                    'equipment_id' => $r['equipment_id'] ?? null,
                 ]
             );
         }
 
         $sample->update(['status' => Sample::STATUS_TESTED]);
 
-        return response()->json($sample->load(['testResults.testTypeParam']), 201);
+        return response()->json($sample->load(['testResults.testTypeParam', 'testResults.equipment']), 201);
     }
 
     public function byOrder(Request $request, Order $order): JsonResponse
@@ -57,7 +80,7 @@ class TestResultController extends Controller
 
         $samples = Sample::query()
             ->whereHas('orderItem', fn ($q) => $q->where('order_id', $order->id))
-            ->with(['orderItem.testType', 'testResults.testTypeParam', 'testResults.createdBy'])
+            ->with(['orderItem.testType', 'testResults.testTypeParam', 'testResults.createdBy', 'testResults.equipment'])
             ->get();
 
         return response()->json($samples);

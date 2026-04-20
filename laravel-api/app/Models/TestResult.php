@@ -10,6 +10,7 @@ class TestResult extends Model
     protected $fillable = [
         'sample_id',
         'test_type_param_id',
+        'equipment_id',
         'value',
         'created_by',
     ];
@@ -27,5 +28,10 @@ class TestResult extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function equipment(): BelongsTo
+    {
+        return $this->belongsTo(Equipment::class);
     }
 }

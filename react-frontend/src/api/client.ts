@@ -475,6 +475,113 @@ export const sitesApi = {
 
 export type TestTypeParamInput = { id?: number; name: string; unit?: string; expected_type?: string }
 
+export interface CalibrationRow {
+  id: number
+  equipment_id: number
+  calibration_date: string
+  next_due_date?: string | null
+  certificate_path?: string | null
+  provider?: string | null
+  result: 'ok' | 'ok_with_reserve' | 'failed'
+  notes?: string | null
+}
+
+export interface EquipmentRow {
+  id: number
+  name: string
+  code: string
+  type?: string | null
+  brand?: string | null
+  model?: string | null
+  serial_number?: string | null
+  location?: string | null
+  agency_id?: number | null
+  purchase_date?: string | null
+  status: string
+  meta?: Record<string, unknown> | null
+  agency?: { id: number; name: string } | null
+  test_types?: Array<{ id: number; name: string }>
+  calibrations?: CalibrationRow[]
+}
+
+export const equipmentsApi = {
+  list: (params?: { status?: string; due_within?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.due_within != null) q.set('due_within', String(params.due_within))
+    const s = q.toString()
+    return api<EquipmentRow[]>(`/equipments${s ? `?${s}` : ''}`)
+  },
+  get: (id: number) => api<EquipmentRow>(`/equipments/${id}`),
+  create: (body: {
+    name: string
+    code: string
+    type?: string | null
+    brand?: string | null
+    model?: string | null
+    serial_number?: string | null
+    location?: string | null
+    agency_id?: number | null
+    purchase_date?: string | null
+    status?: string
+    meta?: Record<string, unknown> | null
+    test_type_ids?: number[]
+  }) => api<EquipmentRow>('/equipments', { method: 'POST', body: JSON.stringify(body) }),
+  update: (
+    id: number,
+    body: Partial<{
+      name: string
+      code: string
+      type: string | null
+      brand: string | null
+      model: string | null
+      serial_number: string | null
+      location: string | null
+      agency_id: number | null
+      purchase_date: string | null
+      status: string
+      meta: Record<string, unknown> | null
+      test_type_ids: number[]
+    }>,
+  ) => api<EquipmentRow>(`/equipments/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/equipments/${id}`, { method: 'DELETE' }),
+  listCalibrations: (equipmentId: number) =>
+    api<CalibrationRow[]>(`/equipments/${equipmentId}/calibrations`),
+  createCalibration: (
+    equipmentId: number,
+    body: {
+      calibration_date: string
+      next_due_date?: string | null
+      certificate_path?: string | null
+      provider?: string | null
+      result: string
+      notes?: string | null
+    },
+  ) =>
+    api<CalibrationRow>(`/equipments/${equipmentId}/calibrations`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateCalibration: (
+    equipmentId: number,
+    calibrationId: number,
+    body: Partial<{
+      calibration_date: string
+      next_due_date: string | null
+      certificate_path: string | null
+      provider: string | null
+      result: string
+      notes: string | null
+    }>,
+  ) =>
+    api<CalibrationRow>(`/equipments/${equipmentId}/calibrations/${calibrationId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  deleteCalibration: (equipmentId: number, calibrationId: number) =>
+    api(`/equipments/${equipmentId}/calibrations/${calibrationId}`, { method: 'DELETE' }),
+}
+
 export const testTypesApi = {
   list: () => api<TestType[]>('/test-types'),
   get: (id: number) => api<TestType>(`/test-types/${id}`),
@@ -536,8 +643,10 @@ export const samplesApi = {
   update: (id: number, body: Partial<SampleWriteBody> & Partial<Pick<Sample, 'status'>>) =>
     api<Sample>(`/samples/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/samples/${id}`, { method: 'DELETE' }),
-  results: (sampleId: number, results: Array<{ test_type_param_id: number; value: string }>) =>
-    api<Sample>(`/samples/${sampleId}/results`, { method: 'POST', body: JSON.stringify({ results }) }),
+  results: (
+    sampleId: number,
+    results: Array<{ test_type_param_id: number; value: string; equipment_id?: number | null }>,
+  ) => api<Sample>(`/samples/${sampleId}/results`, { method: 'POST', body: JSON.stringify({ results }) }),
 }
 
 export const reportsApi = {
@@ -1181,8 +1290,10 @@ export interface TestResult {
   id: number
   sample_id: number
   test_type_param_id: number
+  equipment_id?: number | null
   value: string
   test_type_param?: TestTypeParam
+  equipment?: Pick<EquipmentRow, 'id' | 'name' | 'code' | 'status'>
 }
 
 export interface Report {

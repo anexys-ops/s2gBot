@@ -30,6 +30,12 @@ export default function LaboHub() {
     ...(isLab
       ? [
           {
+            to: '/back-office/equipements',
+            title: 'Équipements & étalonnages',
+            desc: 'Parc matériel, certificats et échéances.',
+            icon: 'calculator' as const,
+          },
+          {
             to: '/back-office',
             title: 'Back office laboratoire',
             desc: 'Catalogues, modèles PDF, configuration, mails…',

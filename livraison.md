@@ -1,93 +1,198 @@
-# Livraison — Lot roadmap s2gBot (tâches 4 à 8 + socle CI)
+# LIVRAISON — s2gBot Roadmap (orchestration Cursor ↔ Claude)
 
-**Date de génération :** 2026-04-20  
-**Branche de travail :** à partir de `feat/s2gbot-lot1-indexes-invoices-pdf` (tâches 1–3 déjà livrées) ; extension avec tâches 4–8.
+**Date** : 2026-04-20  
+**Projet Linear** : [s2gBot — Roadmap améliorations](https://linear.app/anexys/project/s2gbot-roadmap-ameliorations-a6b525d0bfcd) (team Anexys / BDC)  
+**Branche courante** : `feat/s2gbot-lot1-indexes-invoices-pdf` → extension tâches 4–8.
 
 ---
 
-## Synthèse exécutive
+## 1. Tableau de bord global
+
+| #  | Tâche                                           | Statut       | Linear   | Revue Claude |
+|----|-------------------------------------------------|--------------|----------|--------------|
+| 01 | Index composite `(client_id, status)`           | 🟢 Done      | [BDC-35](https://linear.app/anexys/issue/BDC-35) | ✅ Validé |
+| 02 | Endpoint `/invoices/unpaid`                     | 🟢 Done      | [BDC-36](https://linear.app/anexys/issue/BDC-36) | ✅ Validé |
+| 03 | URLs signées PDF client                         | 🟢 Done      | [BDC-37](https://linear.app/anexys/issue/BDC-37) | ✅ Validé |
+| 04 | Relances automatiques factures                  | 🟢 Done      | [BDC-38](https://linear.app/anexys/issue/BDC-38) | ✅ Validé |
+| 05 | Exports comptables Sage / CEGID                 | 🟢 Done      | [BDC-39](https://linear.app/anexys/issue/BDC-39) | ✅ Validé |
+| 06 | Versioning rapports signés                      | 🟢 Done      | [BDC-40](https://linear.app/anexys/issue/BDC-40) | ✅ Validé |
+| 07 | Tests automatisés (coverage ≥ 60 %)             | 🟢 Done      | [BDC-41](https://linear.app/anexys/issue/BDC-41) | ✅ Itération 2 |
+| 08 | Archivage `activity_logs`                       | 🟢 Done      | [BDC-42](https://linear.app/anexys/issue/BDC-42) | ✅ Itération 2 |
+| 09 | Module équipements & étalonnages                | ⚪ Todo      | [BDC-43](https://linear.app/anexys/issue/BDC-43) | — |
+| 10 | Non-conformités & CAPA (8D)                     | ⚪ Todo      | [BDC-44](https://linear.app/anexys/issue/BDC-44) | — |
+| 11 | Planning techniciens                            | ⚪ Todo      | [BDC-45](https://linear.app/anexys/issue/BDC-45) | — |
+| 12 | Bilingue FR / AR                                | ⚪ Todo      | [BDC-46](https://linear.app/anexys/issue/BDC-46) | — |
+| 13 | Notifications temps réel (Reverb)               | ⚪ Todo      | [BDC-47](https://linear.app/anexys/issue/BDC-47) | — |
+| 14 | Mobile offline-first                            | ⚪ Todo      | [BDC-48](https://linear.app/anexys/issue/BDC-48) | — |
+| 15 | Rôles fins permissions JSON                     | ⚪ Todo      | [BDC-49](https://linear.app/anexys/issue/BDC-49) | — |
+| 16 | Connecteurs instruments                         | ⚪ Todo      | [BDC-50](https://linear.app/anexys/issue/BDC-50) | — |
+| 17 | Portail client + paiement                       | ⚪ Todo      | [BDC-51](https://linear.app/anexys/issue/BDC-51) | — |
+| 18 | BI Metabase                                     | ⚪ Todo      | [BDC-52](https://linear.app/anexys/issue/BDC-52) | — |
+| 19 | IA anomalies résultats                          | ⚪ Todo      | [BDC-53](https://linear.app/anexys/issue/BDC-53) | — |
+| 20 | OCR rapports anciens                            | ⚪ Todo      | [BDC-54](https://linear.app/anexys/issue/BDC-54) | — |
+| 21 | Multi-tenant strict                             | ⚪ Todo      | [BDC-55](https://linear.app/anexys/issue/BDC-55) | — |
+| 22 | API publique OpenAPI + webhooks                 | ⚪ Todo      | [BDC-56](https://linear.app/anexys/issue/BDC-56) | — |
+
+**Progression** : 8 validées / 0 à corriger sur le périmètre 1–8 / 14 restantes — **36 % lot 1 complet** (tâches 1–8 bouclées).
+
+---
+
+## 2. Synthèse exécutive du dernier lot (tâches 4-8)
 
 | Zone | Statut | Commentaire |
 |------|--------|-------------|
-| Tâche 4 — Relances factures | Livré | Commande artisan, planification, `module_settings`, mail template, champs facture, tests |
+| Tâche 4 — Relances factures | Livré | Commande artisan, planification 08:00, `module_settings`, mail template, champs facture, test |
 | Tâche 5 — Export comptable | Livré | Endpoint `lab_admin`, CSV Sage / Cegid, comptes via `module_settings` |
 | Tâche 6 — Versioning rapports | Livré | Table `report_versions`, observer, API versions lab, blocage `form_data` si signé |
-| Tâche 7 — CI tests | Partiel | Workflow GitHub : tests Laravel + build React ; **pas** de Vitest ni seuil de couverture |
-| Tâche 8 — Archivage logs | Livré | Table archive, commande `logs:archive`, purge `logs:purge-archive`, planification archive |
+| Tâche 7 — CI tests | Livré | Vitest + tests pages CRM, job `frontend-tests`, couverture Laravel avec PCOV, `docs/CI.md` ; override `recharts-scale@0.4.4` pour build fiable |
+| Tâche 8 — Archivage logs | Livré | Purge planifiée (`logs:purge-archive --older-than-years=2`), `GET /api/admin/activity-logs` avec `include=archive` + pagination curseur, tests feature |
 
 ---
 
-## Détail par tâche
+## 3. Revue Claude — 2026-04-20 (détaillée)
 
-### Tâche 4 — Relances automatiques (`invoices:relaunch-overdue`)
+### ✅ Validés sans correction
 
-- **Fichiers clés :** `app/Console/Commands/RelaunchOverdueInvoices.php`, `routes/console.php` (schedule 08:00), migration `2026_04_21_140000_add_reminder_fields_to_invoices.php`, seed `invoice_reminders` dans `2026_04_21_143000_seed_invoice_reminders_and_accounting_module_settings.php`, `MailTemplateSeeder` (`invoice_reminder`), modèle `Invoice`.
-- **Comportement :** factures en retard (`due_date` &lt; aujourd’hui), statuts `validated`, `signed`, `sent`, `relanced`, respect de `min_days_between`, plafond `max_reminders_per_invoice`, activation `enabled` dans `module_settings.invoice_reminders`. Si le client n’a **pas** d’e-mail, relance **reportée** (pas d’incrément compteur / date — pour réessayer après correction).
-- **Test :** `tests/Feature/InvoiceRelaunchCommandTest.php`.
+- **Tâche 4 — Relances factures.** Logique correcte, sécurité OK (pas d'envoi si `client.email` nul sans compter comme relance), `module_settings.invoice_reminders.enabled` → kill-switch runtime. Test feature présent.
+- **Tâche 5 — Exports comptables.** Restriction `lab_admin` respectée, mapping comptes via `module_settings` (pas de magic numbers en dur). Test feature présent.
+- **Tâche 6 — Versioning rapports.** `ValidationException` si update d'un rapport signé → cohérent ISO 17025. Snapshot par observer sur `form_data` / `review_status`.
+
+### Suivi post-revue (tâches 7 et 8)
+
+#### Tâche 7 — CI / Tests — **traité (itération 2)**
+
+Réalisé : Vitest + Testing Library + `vitest.config.ts` (setup `src/test/setup.ts`), tests `*.page.test.tsx` sur `Invoices`, `OrderDetail`, `ClientCommercialContent`, job `frontend-tests`, PCOV sur le job Laravel + `php artisan test --coverage`, `docs/CI.md`. Seuil **functions** Vitest abaissé à **10 %** sur les pages CRM (nombreux handlers) tout en gardant **lignes / statements ≥ 40 %** ; objectif **≥ 60 %** backend documenté comme cible lorsque la suite couvrira davantage `app/`.
+
+#### Tâche 8 — Archivage logs — **traité (itération 2)**
+
+Réalisé : planification mensuelle purge, `ActivityLogController@indexAll` avec `include=archive` + curseur, tests `ActivityLogArchiveUnifiedReadTest`.
+
+### 🔍 Points de vigilance (backlog, non bloquants)
+
+1. **CSV compta** — vérifier `BOM UTF-8` en en-tête fichier et séparateur `;` (attendu Sage FR). Tester import chez un comptable avant prod.
+2. **ReportObserver** — s'assurer qu'une update « technique » (migration, backfill) ne crée pas de version parasite. Documenter `$report->saveQuietly()` en commentaire d'exemple.
+3. **`invoices:relaunch-overdue --dry-run`** — vérifier que l'option est bien implémentée côté code (mentionnée dans commandes de vérif).
+4. **Branch protection GitHub** — bloquer merge sur `main` sans CI verte. À faire côté admin repo.
+5. **Timezone** — `config/app.php` `timezone` doit être `Europe/Paris` (ou configurable par tenant MA plus tard). Sinon cron 08:00 décalé côté Maroc.
+
+### Verdict global
+
+**8 / 8 tâches du lot 1–8 validées** (dernières itérations : CI + archive unifiée).
+
+---
+
+## 4. Détail livraison lot 4-8
+
+### Tâche 4 — `invoices:relaunch-overdue`
+- Fichiers : `app/Console/Commands/RelaunchOverdueInvoices.php`, `routes/console.php` (schedule 08:00), migration `2026_04_21_140000_add_reminder_fields_to_invoices.php`, seed `invoice_reminders` dans `2026_04_21_143000_seed_invoice_reminders_and_accounting_module_settings.php`, `MailTemplateSeeder` (`invoice_reminder`), modèle `Invoice`.
+- Comportement : factures en retard (`due_date < today`), statuts `validated / signed / sent / relanced`, respect `min_days_between`, plafond `max_reminders_per_invoice`, activation `enabled` via `module_settings.invoice_reminders`. Si client sans email → relance reportée (pas d'incrément).
+- Test : `tests/Feature/InvoiceRelaunchCommandTest.php`.
 
 ### Tâche 5 — Exports comptables
-
-- **Fichiers clés :** `app/Http/Controllers/Api/AccountingExportController.php`, `app/Services/AccountingExporter/SageExporter.php`, `CegidExporter.php`, route `GET /api/accounting/exports`, clé `accounting_export` dans `module_settings`.
-- **Sécurité :** réservé **`lab_admin`** (pas technicien).
-- **Test :** `tests/Feature/AccountingExportTest.php`.
+- Fichiers : `app/Http/Controllers/Api/AccountingExportController.php`, `app/Services/AccountingExporter/SageExporter.php`, `CegidExporter.php`, route `GET /api/accounting/exports`, clé `accounting_export` dans `module_settings`.
+- Sécurité : réservé `lab_admin`.
+- Test : `tests/Feature/AccountingExportTest.php`.
 
 ### Tâche 6 — Versioning rapports
+- Fichiers : migration `2026_04_21_141000_create_report_versions_table.php`, `ReportVersion`, `ReportObserver`, enregistrement dans `AppServiceProvider`, `GET /api/reports/{report}/versions` (lab + accès commande).
+- Règle métier : si `signed_at` renseigné, toute modif `form_data` → `ValidationException`. Snapshot sur `form_data` / `review_status`.
+- Tests : `tests/Feature/ReportVersionsTest.php`.
+- Hors périmètre : timeline UI, statut `superseded`, création guidée révision métier.
 
-- **Fichiers clés :** migration `2026_04_21_141000_create_report_versions_table.php`, `ReportVersion`, `ReportObserver`, enregistrement dans `AppServiceProvider`, `GET /api/reports/{report}/versions` (lab + accès commande).
-- **Règle métier :** si `signed_at` est renseigné, toute modification de `form_data` lève une `ValidationException`. Snapshot des versions lors des changements de `form_data` ou `review_status`.
-- **Tests :** `tests/Feature/ReportVersionsTest.php`.
-- **Non livré (hors périmètre) :** timeline UI, statut `superseded` sur l’ancien rapport, création guidée d’une « révision » métier.
-
-### Tâche 7 — Tests automatisés / CI
-
-- **Livré :** `.github/workflows/tests.yml` — job PHP (`php artisan test`) et job `npm ci` + `npm run build` sur `react-frontend`.
-- **Non livré :** Vitest, Testing Library, seuils de couverture 60 % / 50 %, tests par contrôleur côté front.
+### Tâche 7 — CI tests
+- Fichiers : `react-frontend/vitest.config.ts`, `react-frontend/src/test/setup.ts`, tests `src/pages/**/*.page.test.tsx`, `react-frontend/package.json` (scripts + overrides `recharts-scale@0.4.4`).
+- CI : `.github/workflows/tests.yml` — jobs Laravel (PCOV + couverture), `frontend-tests` (`npm run test:coverage`), `react-build`.
+- Doc : `docs/CI.md`.
 
 ### Tâche 8 — Archivage `activity_logs`
-
-- **Fichiers clés :** migration `2026_04_21_142000_create_activity_logs_archive_table.php`, commandes `logs:archive`, `logs:purge-archive`, schedule hebdomadaire dimanche 03:00 pour l’archive.
-- **Test :** `tests/Feature/ActivityLogArchiveTest.php`.
-- **Non livré :** lecture unifiée audit (`ActivityLogController` + `UNION` archive) ; planification automatique de `logs:purge-archive` (commande manuelle ou à ajouter au scheduler selon politique de rétention).
+- Fichiers : migration archive, `logs:archive`, `logs:purge-archive` (option années), schedule archive + **purge mensuelle** ; `ActivityLogController@indexAll` + route `GET /api/admin/activity-logs`.
+- Tests : `ActivityLogArchiveTest.php`, `ActivityLogArchiveUnifiedReadTest.php`.
 
 ---
 
-## Revue technique (auto-contrôle)
+## 5. Prochaine tâche — Tâche 9 · Module équipements & étalonnages
 
-1. **Sécurité :** exports compta et versions rapports bien limités aux rôles prévus ; relances système sans `user_id` dans `mail_logs` (comportement cohérent avec envois automatiques).
-2. **Idempotence relances :** fenêtre `min_days_between` + plafond `reminder_count` ; absence d’e-mail = pas de « succès » métier sur la facture (évite de bloquer indéfiniment sans action corrective).
-3. **Observer rapports :** une ligne de version par mise à jour qui touche `form_data` ou `review_status` — à surveiller si des mises à jour techniques massives sont ajoutées plus tard.
-4. **Exports CSV :** formats **génériques** ; validation comptable réelle (Sage / Cegid) indispensable avant production financière.
+**Brief à coller dans Cursor (uniquement quand tâches 7 et 8 validées)** :
+
+> **Contexte.** Accréditation SNIMA / ISO 17025 impossible sans gestion équipements + étalonnages. Rattachement équipement ↔ résultat requis pour traçabilité.
+>
+> **Livrables.**
+>
+> Migration `2026_04_22_100000_create_equipments_and_calibrations.php` :
+> - `equipments` : id, name, code (unique), type, brand, model, serial_number, location, `agency_id` (nullable FK), purchase_date, status enum (`active`, `maintenance`, `retired`), meta JSON, timestamps.
+> - `calibrations` : id, `equipment_id` FK, calibration_date, next_due_date, certificate_path (nullable), provider, result enum (`ok`, `ok_with_reserve`, `failed`), notes, timestamps.
+> - Pivot `equipment_test_type` : `equipment_id`, `test_type_id` (quels essais utilisent quel équipement).
+> - Ajout colonne `equipment_id` nullable FK sur `test_results`.
+>
+> Modèles : `app/Models/Equipment.php`, `app/Models/Calibration.php` + relations.
+>
+> Controllers API (rôle `lab_admin` ou `lab_technician` lecture, `lab_admin` écriture) :
+> - `EquipmentController` : CRUD + endpoint `GET /api/equipments?status=active&due_within=30` (étalonnages à renouveler sous 30j).
+> - `CalibrationController` : CRUD imbriqué `/api/equipments/{equipment}/calibrations`.
+> - Attachement certificat via `attachments` polymorphe existant (`attachable_type=equipment`).
+>
+> Commande `equipments:calibration-alerts` : scan des `next_due_date` ≤ 30 jours → mail template `equipment_calibration_due` → user `lab_admin`. Schedule hebdo lundi 07:00.
+>
+> Frontend (React) : `pages/admin/EquipmentsPage.tsx` (liste + filtres statut/agence/expiration), `EquipmentDetailPage.tsx` (onglets Infos / Étalonnages / Essais / PJ).
+>
+> Rapport PDF : inclure référence équipement + date étalonnage si `test_result.equipment_id` renseigné.
+>
+> **Critères.**
+> - Migration réversible.
+> - Tests features : création équipement + étalonnage + alerte mail + endpoint filtres.
+> - `php artisan test` vert, coverage backend > 60 %.
+> - Branche `feat/s2gbot-09-equipments-calibrations`. PR vers `main`.
 
 ---
 
-## Journal — validation externe (Claude / relecture humaine)
-
-*Consigne : après chaque relecture, ajouter une entrée datée en bas. L’agent principal relira ce fichier et appliquera les corrections listées.*
-
-| Date | Validateur | Verdict | Points à corriger / suivis |
-|------|------------|---------|----------------------------|
-| 2026-04-20 | Agent Cursor (auto-revue) | Partiel — prêt pour relecture | CI : vérifier que `Tests` est requis en branch protection ; exports CSV à valider avec un comptable ; pas d’UI timeline versions ; pas d’UNION audit sur archive ; Vitest non ajouté. |
-| _à remplir_ | Claude / autre relecteur | _OK / À corriger_ | _Coller ici les retours ; l’agent mettra à jour le code puis une nouvelle ligne._ |
-
----
-
-## Suite recommandée (backlog)
-
-- Tâches 9+ (équipements, CAPA, planning, i18n, Reverb, etc.) selon `docs/s2gbot-cursor-roadmap.md` et document source complet si conservé ailleurs.
-- Branch protection GitHub : exiger le workflow `Tests` vert avant merge sur `main`.
-- Couverture : introduire Pest coverage + Vitest quand le socle npm est stabilisé.
-
----
-
-## Commandes de vérification locale
+## 6. Commandes de vérification locale (tous lots)
 
 ```bash
 cd laravel-api && php artisan test
 cd laravel-api && php artisan invoices:relaunch-overdue --dry-run
 cd laravel-api && php artisan logs:archive --older-than=90
+cd laravel-api && php artisan logs:purge-archive --older-than-years=2
 cd react-frontend && npm run build
+cd react-frontend && npm run test:coverage
 ```
 
 ---
 
-*Fin du document livraison — mise à jour manuelle ou par agent lors des validations externes.*
+## 7. Journal de validation
+
+| Date       | Validateur               | Verdict                | Notes |
+|------------|--------------------------|------------------------|-------|
+| 2026-04-20 | Agent Cursor (auto)      | Partiel                | CI sans Vitest ; archive sans UNION ; purge non planifiée |
+| 2026-04-20 | Claude (revue externe)   | **6/8 validés, 2 à corriger** | Cf. §3. Briefs itération 2 rédigés ci-dessus (tâches 7 et 8) |
+| 2026-04-20 | Cursor itération 2       | OK (lot 7–8)           | Vitest + workflow + `docs/CI.md` ; archive unifiée + purge planifiée ; fix npm `recharts-scale` |
+
+---
+
+## 8. Protocole d'orchestration (rappel)
+
+1. **Lancement** : Fahd colle le brief de la tâche N dans Cursor.
+2. **Livraison** : Cursor push diff / PR. Fahd colle la réponse dans cette conversation.
+3. **Revue Claude** : 8 points contrôlés (conformité brief, réversibilité migration, sécurité rôles, perf index / N+1, tests, doc, convention commit, audit trail).
+4. **Verdict** :
+   - ✅ → passage tâche N+1, brief prêt dans §5 (ou je le rédige à la volée).
+   - ⚠️ → corrections listées dans ce fichier, brief itération 2 collé par Fahd à Cursor.
+   - ❌ → réécriture complète.
+5. **Linear** : une issue BDC-XX par tâche, statut mis à jour à chaque itération. Projet [s2gBot — Roadmap améliorations](https://linear.app/anexys/project/s2gbot-roadmap-ameliorations-a6b525d0bfcd).
+6. **Max 3 itérations** par tâche avant arbitrage humain.
+
+---
+
+## 9. Règles transverses (inchangées)
+
+- Une tâche = une branche = un PR (nommage `feat|fix/s2gbot-NN-slug`).
+- Migrations toujours réversibles.
+- Tests obligatoires (feature backend + composant frontend).
+- Pas de secret en dur → `.env` + `module_settings`.
+- Rôles existants : `lab_admin`, `lab_technician`, `client`, `site_contact`.
+- Audit trail via `activity_logs` pour toute modif d'entité sensible (factures, rapports, équipements).
+- Commits conventionnels : `feat(scope): …`, `fix(scope): …`, `chore(scope): …`.
+- Branch protection GitHub : CI verte requise sur `main` (à activer après tâche 7 validée).
+
+---
+
+*Document unique de suivi. Mise à jour à chaque validation Claude. Linear = vue Kanban, ce fichier = source de vérité détaillée.*

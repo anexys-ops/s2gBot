@@ -5,7 +5,9 @@
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
-    "ios": "expo start --ios",
+    "ios": "expo start --ios --localhost -p 19009",
+    "ios:lan": "expo start --ios --lan -p 19009",
+    "ios:offline": "EXPO_OFFLINE=1 expo start --ios -p 19009",
     "web": "expo start --web"
   },
   "dependencies": {

@@ -36,7 +36,7 @@ final class CegidExporter
             $lines[] = implode(';', ['VT', $date, $accVat, $lib.' TVA', 'C', $this->num($tva), $ref]);
         }
 
-        return implode("\n", $lines)."\n";
+        return "\xEF\xBB\xBF".implode("\n", $lines)."\n";
     }
 
     private function num(float $n): string

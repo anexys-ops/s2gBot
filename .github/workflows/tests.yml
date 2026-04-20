@@ -18,12 +18,30 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: mbstring, sqlite3, pdo_sqlite
-          coverage: none
+          extensions: mbstring, sqlite3, pdo_sqlite, pcov
+          coverage: pcov
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
-      - name: Run tests
-        run: php artisan test
+      - name: Run tests with coverage
+        run: php artisan test --coverage
+
+  frontend-tests:
+    name: React Vitest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: react-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: react-frontend/package-lock.json
+      - name: Install npm dependencies
+        run: npm ci
+      - name: Unit tests and coverage
+        run: npm run test:coverage
 
   react-build:
     name: React build

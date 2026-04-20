@@ -22,6 +22,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('permissions/catalog', [App\Http\Controllers\Api\AccountController::class, 'permissionCatalog']);
 
     Route::prefix('admin')->group(function () {
+        Route::get('activity-logs', [App\Http\Controllers\Api\ActivityLogController::class, 'indexAll']);
         Route::apiResource('users', App\Http\Controllers\Api\UserManagementController::class);
         Route::apiResource('access-groups', App\Http\Controllers\Api\AccessGroupController::class);
     });

@@ -286,11 +286,11 @@ input, select, textarea, button { font: inherit; }
 }
 
 .app-version-footer--auth .app-version-footer__dot--ok {
-  background: #4ade80;
+  background: #38bdf8;
 }
 
 .app-version-footer--auth .app-version-footer__dot--error {
-  background: #f87171;
+  background: #fb7185;
 }
 
 .app-version-footer--auth .app-version-footer__dot--pending {
@@ -1345,7 +1345,7 @@ th { background: #f9fafb; font-weight: 600; }
   }
 }
 
-/* ——— Page connexion (métier BTP / labo) ——— */
+/* ——— Page connexion (palette pro ardoise / bleu acier) ——— */
 .login-screen {
   min-height: 100vh;
   min-height: 100dvh;
@@ -1361,18 +1361,18 @@ th { background: #f9fafb; font-weight: 600; }
   inset: 0;
   z-index: 0;
   background:
-    radial-gradient(ellipse 120% 80% at 0% 0%, rgba(234, 88, 12, 0.35) 0%, transparent 55%),
-    radial-gradient(ellipse 100% 70% at 100% 100%, rgba(30, 58, 138, 0.45) 0%, transparent 50%),
-    linear-gradient(145deg, #0f172a 0%, #1e3a5f 35%, #0c4a6e 65%, #0f172a 100%);
+    radial-gradient(ellipse 110% 75% at 15% 0%, rgba(56, 189, 248, 0.14) 0%, transparent 52%),
+    radial-gradient(ellipse 90% 65% at 100% 100%, rgba(99, 102, 241, 0.12) 0%, transparent 48%),
+    linear-gradient(158deg, #0b1220 0%, #111a2e 38%, #0f172a 72%, #0a0f18 100%);
 }
 .login-screen-grid {
   position: fixed;
   inset: 0;
   z-index: 0;
-  opacity: 0.12;
+  opacity: 0.1;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    linear-gradient(rgba(248, 250, 252, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(248, 250, 252, 0.06) 1px, transparent 1px);
   background-size: 48px 48px;
   mask-image: radial-gradient(ellipse 90% 80% at 50% 50%, black 20%, transparent 100%);
 }
@@ -1407,9 +1407,9 @@ th { background: #f9fafb; font-weight: 600; }
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #fed7aa;
-  background: rgba(234, 88, 12, 0.25);
-  border: 1px solid rgba(251, 146, 60, 0.35);
+  color: #cbd5e1;
+  background: rgba(30, 41, 59, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.35);
   padding: 0.35rem 0.75rem;
   border-radius: 999px;
   margin-bottom: 1rem;
@@ -1449,9 +1449,9 @@ th { background: #f9fafb; font-weight: 600; }
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #fb923c, #ea580c);
+  background: #38bdf8;
   flex-shrink: 0;
-  box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.25);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.22);
 }
 
 .login-panel {
@@ -1526,9 +1526,9 @@ th { background: #f9fafb; font-weight: 600; }
 }
 .login-input:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: #2563eb;
   background: #fff;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 .login-input:disabled {
   opacity: 0.65;
@@ -1540,7 +1540,7 @@ th { background: #f9fafb; font-weight: 600; }
   border-radius: 12px;
   font-size: 0.85rem;
   line-height: 1.45;
-  color: #991b1b;
+  color: #7f1d1d;
   background: #fef2f2;
   border: 1px solid #fecaca;
 }
@@ -1556,16 +1556,16 @@ th { background: #f9fafb; font-weight: 600; }
   font-size: 1rem;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, #34d399 0%, #059669 38%, #ea580c 100%);
+  background: linear-gradient(165deg, #3b82f6 0%, #2563eb 45%, #1d4ed8 100%);
   border: none;
   border-radius: 12px;
   cursor: pointer;
-  box-shadow: 0 4px 18px rgba(234, 88, 12, 0.35);
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35);
   transition: transform 0.15s, box-shadow 0.2s, filter 0.2s;
 }
 .login-submit:hover:not(:disabled) {
-  filter: brightness(1.05);
-  box-shadow: 0 8px 26px rgba(5, 150, 105, 0.35);
+  filter: brightness(1.04);
+  box-shadow: 0 8px 24px rgba(29, 78, 216, 0.38);
   transform: translateY(-1px);
 }
 .login-submit:active:not(:disabled) {
@@ -1599,12 +1599,12 @@ th { background: #f9fafb; font-weight: 600; }
 .login-link-register {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #fdba74 !important;
+  color: #2563eb !important;
   text-decoration: none !important;
 }
 .login-link-register:hover {
   text-decoration: underline !important;
-  color: #fff !important;
+  color: #1e40af !important;
 }
 
 .login-hint {

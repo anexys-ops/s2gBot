@@ -34,7 +34,7 @@ final class SageExporter
             $lines[] = implode(';', [$journal, $date, $accVat, $label.' TVA', '', $this->num($tva), $piece]);
         }
 
-        return implode("\n", $lines)."\n";
+        return "\xEF\xBB\xBF".implode("\n", $lines)."\n";
     }
 
     private function num(float $n): string

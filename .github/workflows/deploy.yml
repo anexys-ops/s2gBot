@@ -1,16 +1,20 @@
-# Déploiement automatique au push sur main : SSH vers le serveur, git pull,
-# alignement APP_VERSION (.env.docker) puis rebuild Docker (app + web).
+# Déploiement automatique à chaque push sur la branche `main` : connexion SSH
+# vers le serveur, `git fetch` + `reset --hard`, alignement APP_VERSION (.env.docker),
+# puis `./scripts/docker-prod-refresh.sh`.
 #
-# Secrets GitHub (Settings → Secrets and variables → Actions) :
-#   DEPLOY_HOST      — hôte SSH
+# Ne jamais commiter de PAT (`ghp_…`, `github_pat_…`) ni mot de passe : uniquement
+# des secrets GitHub (chiffrement côté GitHub).
+#
+# Secrets (Settings → Secrets and variables → Actions) :
+#   DEPLOY_HOST      — hôte SSH (ex. celui de votre infra)
 #   DEPLOY_USER      — utilisateur SSH (ex. root)
-#   DEPLOY_SSH_KEY   — clé privée PEM (déploiement)
+#   DEPLOY_SSH_KEY   — clé privée PEM dédiée au déploiement (sans passphrase si CI)
 #   DEPLOY_PATH      — racine du clone git sur le serveur (ex. /opt/s2gBot)
 #
-# Port SSH : 167 ci-dessous. Pour 22, adapter la clé `port`.
+# Port SSH : 167. Pour le port 22, changer `port` ci-dessous.
 #
-# Prérequis sur le serveur : DEPLOY_PATH = clone git avec remote en lecture,
-#   fichier .env.docker (non versionné), stack Docker déjà démarrée au moins une fois.
+# Sur le serveur : clone git avec accès au remote (déploy key ou HTTPS + credentials
+# locaux sur la machine), `.env.docker` présent, Docker déjà opérationnel.
 
 name: Deploy production
 
@@ -23,6 +27,9 @@ on:
 concurrency:
   group: deploy-production
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   deploy:

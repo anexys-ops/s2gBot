@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * Rapport d’essais. Pour des mises à jour techniques (migration, backfill) sans
+ * déclencher {@see \App\Observers\ReportObserver}, utiliser {@see Model::saveQuietly()}.
+ */
 class Report extends Model
 {
     public const REVIEW_DRAFT = 'draft';

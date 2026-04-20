@@ -3249,7 +3249,10 @@ th { background: #f9fafb; font-weight: 600; }
 .client-synthese-table-wrap {
   border-radius: var(--radius-md, 8px);
   border: 1px solid var(--color-border, #e2e8f0);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
   background: #fff;
 }
 .client-synthese-status {
@@ -3579,6 +3582,7 @@ th { background: #f9fafb; font-weight: 600; }
   }
   .card {
     padding: 1rem 1rem;
+    overflow-x: auto;
   }
   .modal-body {
     padding: 1rem;
@@ -3598,6 +3602,13 @@ th { background: #f9fafb; font-weight: 600; }
   .btn-sm {
     min-height: 40px;
     padding: 0.4rem 0.6rem;
+  }
+  .main-content table th,
+  .main-content table td,
+  .module-shell__content table th,
+  .module-shell__content table td {
+    padding: 0.4rem 0.45rem;
+    font-size: 0.88rem;
   }
   .crud-actions:not(.pagination-bar) {
     flex-direction: column;
@@ -3750,4 +3761,83 @@ th { background: #f9fafb; font-weight: 600; }
 }
 .text-muted {
   color: var(--color-muted, #64748b);
+}
+
+/* ========== Responsive — renforcement transversal des pages ========== */
+
+/* Onglets fiches (ModuleEntityShell) : défilement horizontal sur téléphone / petite tablette */
+@media (max-width: 767px) {
+  .module-shell__tabs-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .module-shell__tabs {
+    flex-wrap: nowrap;
+    width: max-content;
+    min-width: 100%;
+  }
+  .module-shell__tab {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .reports-hub__tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    gap: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+  .reports-hub__tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .module-shell__breadcrumb {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    max-width: 100%;
+    padding-bottom: 0.35rem;
+    white-space: nowrap;
+  }
+}
+
+/* Paramètres : nombreux onglets — même logique */
+@media (max-width: 640px) {
+  .settings-layout__tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 0.4rem;
+    padding-bottom: 0.3rem;
+    margin-bottom: 1rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .settings-layout__tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+
+/* Catalogue commercial : grille 2 colonnes → 1 sur mobile */
+.commercial-catalog-page__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  width: 100%;
+}
+.commercial-catalog-page__toolbar input[type='search'] {
+  flex: 1 1 12rem;
+  width: 100%;
+  max-width: 28rem;
+  min-width: 0;
+}
+@media (max-width: 560px) {
+  .commercial-catalog-form {
+    grid-template-columns: 1fr;
+  }
 }

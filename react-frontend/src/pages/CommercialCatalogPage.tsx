@@ -92,7 +92,7 @@ export default function CommercialCatalogPage() {
           Référentiel pour les lignes de devis : prix d&apos;achat (référence interne), prix de vente HT, TVA par défaut,
           stock pour les produits. Les prestations peuvent avoir le suivi de stock désactivé.
         </p>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+        <div className="commercial-catalog-page__toolbar">
           <input
             type="search"
             placeholder="Rechercher code, libellé…"
@@ -101,7 +101,6 @@ export default function CommercialCatalogPage() {
               setSearch(e.target.value)
               setPage(1)
             }}
-            style={{ minWidth: 220 }}
           />
           <button type="button" className="btn btn-primary" onClick={openCreate}>
             Nouvelle référence

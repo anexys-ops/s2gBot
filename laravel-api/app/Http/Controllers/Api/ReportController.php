@@ -122,6 +122,21 @@ class ReportController extends Controller
         return $this->reportFileResponse($report);
     }
 
+    public function versions(Request $request, Report $report): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        $order = $report->order;
+        if (! AgencyAccess::userMayAccessOrder($request->user(), $order)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $data = $report->versions()->with('changedByUser:id,name')->get();
+
+        return response()->json(['data' => $data]);
+    }
+
     private function reportFileResponse(Report $report): StreamedResponse|JsonResponse
     {
         if (! Storage::disk('local')->exists($report->file_path)) {

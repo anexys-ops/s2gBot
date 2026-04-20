@@ -28,6 +28,12 @@ class MailTemplateSeeder extends Seeder
                 'body' => "Bonjour,\n\nLe rapport d'essais pour la commande {{order_reference}} est disponible.\n\nCordialement,\nL'équipe Lab BTP",
                 'description' => 'Notification rapport disponible',
             ],
+            [
+                'name' => 'invoice_reminder',
+                'subject' => 'Rappel — facture {{invoice_number}} en retard',
+                'body' => "Bonjour,\n\nLa facture n° {{invoice_number}} (échéance {{due_date}}, montant TTC {{amount_ttc}}) est en retard de règlement.\n\nMerci de procéder au paiement ou de nous contacter.\n\nCordialement,\nL'équipe Lab BTP",
+                'description' => 'Relance automatique facture impayée',
+            ],
         ];
 
         foreach ($templates as $t) {

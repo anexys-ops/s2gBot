@@ -71,9 +71,17 @@
 
 ---
 
-### Tâche 4 à 22 — (inchangées par rapport au document source)
+### Tâches 4 à 8 — Implémentées dans le dépôt (avril 2026)
 
-Suite du backlog : relances factures (`invoices:relaunch-overdue`), exports comptables, versioning rapports, CI/tests, archivage `activity_logs`, équipements, CAPA, planning, i18n, Reverb, offline mobile, RBAC, etc.
+- **4** — Relances : `invoices:relaunch-overdue`, champs `last_reminder_sent_at` / `reminder_count`, `invoice_reminders` + template `invoice_reminder`, schedule 08:00. Voir `livraison.md`.
+- **5** — `GET /api/accounting/exports` (Sage / Cegid), `accounting_export` dans `module_settings`.
+- **6** — `report_versions`, `ReportObserver`, `GET /api/reports/{id}/versions` (lab), blocage `form_data` si rapport signé.
+- **7** — `.github/workflows/tests.yml` (Laravel + build React) ; couverture / Vitest : **non** (à faire).
+- **8** — `activity_logs_archive`, `logs:archive`, `logs:purge-archive`, schedule hebdo archive.
+
+### Tâches 9 à 22 — Backlog (non réalisées ici)
+
+Équipements, CAPA, planning, i18n, Reverb, offline mobile, RBAC, instruments, portail paiement, Metabase, IA, OCR, multi-tenant, OpenAPI/webhooks, etc.
 
 ---
 

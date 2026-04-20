@@ -55,6 +55,8 @@ class Invoice extends Model
         'delivery_address_id',
         'pdf_template_id',
         'status',
+        'last_reminder_sent_at',
+        'reminder_count',
         'meta',
     ];
 
@@ -65,6 +67,8 @@ class Invoice extends Model
             'order_date' => 'date',
             'site_delivery_date' => 'date',
             'due_date' => 'date',
+            'last_reminder_sent_at' => 'datetime',
+            'reminder_count' => 'integer',
             'amount_ht' => 'decimal:2',
             'amount_ttc' => 'decimal:2',
             'tva_rate' => 'decimal:2',

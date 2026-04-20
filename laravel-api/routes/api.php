@@ -62,6 +62,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('orders/{order}/reports', [App\Http\Controllers\Api\ReportController::class, 'generate']);
     Route::get('orders/{order}/reports', [App\Http\Controllers\Api\ReportController::class, 'index']);
     Route::get('reports/{report}/download', [App\Http\Controllers\Api\ReportController::class, 'download']);
+    Route::get('reports/{report}/versions', [App\Http\Controllers\Api\ReportController::class, 'versions']);
     Route::get('reports/{report}/pdf-link', [App\Http\Controllers\Api\ReportController::class, 'pdfLink']);
     Route::post('reports/{report}/sign', [App\Http\Controllers\Api\ReportController::class, 'sign']);
     Route::post('reports/{report}/submit-review', [App\Http\Controllers\Api\ReportController::class, 'submitReview']);
@@ -96,6 +97,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('activity-logs', [App\Http\Controllers\Api\ActivityLogController::class, 'index']);
     Route::get('stats/essais', [App\Http\Controllers\Api\StatsController::class, 'essais']);
     Route::get('stats/dashboard', [App\Http\Controllers\Api\StatsController::class, 'dashboard']);
+    Route::get('accounting/exports', [App\Http\Controllers\Api\AccountingExportController::class, 'export']);
 
     Route::get('attachments', [App\Http\Controllers\Api\AttachmentController::class, 'index']);
     Route::post('attachments', [App\Http\Controllers\Api\AttachmentController::class, 'store']);

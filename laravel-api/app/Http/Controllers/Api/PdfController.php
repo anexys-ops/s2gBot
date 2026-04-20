@@ -85,16 +85,8 @@ class PdfController extends Controller
             if (! $invoice) {
                 return response()->json(['message' => 'Facture introuvable'], 404);
             }
-            $template = $this->resolvePdfTemplate('invoice', $validated['template_id'] ?? null, $invoice->pdf_template_id);
-            $view = $template?->blade_view ?? 'pdf.invoice';
-            $layoutConfig = AppBranding::mergeLayoutConfig($template?->layout_config);
-            $html = view($view, [
-                'invoice' => $invoice,
-                'template' => $template,
-                'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
-                'layoutConfig' => $layoutConfig,
-            ])->render();
-            $filename = 'facture-'.$invoice->number.'.pdf';
+
+            return $this->streamInvoicePdf($invoice, $validated['template_id'] ?? null);
         } else {
             $order = Order::find($id);
             if (! $order) {
@@ -107,6 +99,33 @@ class PdfController extends Controller
                 ['Content-Type' => 'application/pdf']
             );
         }
+
+        $pdf = Pdf::loadHTML($html);
+        $pdf->getDomPDF()->setPaper('A4', 'portrait');
+
+        return response()->streamDownload(
+            fn () => print($pdf->output()),
+            $filename,
+            ['Content-Type' => 'application/pdf']
+        );
+    }
+
+    /**
+     * Génère le PDF facture (utilisé par POST /pdf/generate et par l’URL signée portail client).
+     */
+    public function streamInvoicePdf(Invoice $invoice, ?int $requestTemplateId = null): StreamedResponse
+    {
+        $invoice->loadMissing(['client', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate']);
+        $template = $this->resolvePdfTemplate('invoice', $requestTemplateId, $invoice->pdf_template_id);
+        $view = $template?->blade_view ?? 'pdf.invoice';
+        $layoutConfig = AppBranding::mergeLayoutConfig($template?->layout_config);
+        $html = view($view, [
+            'invoice' => $invoice,
+            'template' => $template,
+            'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
+            'layoutConfig' => $layoutConfig,
+        ])->render();
+        $filename = 'facture-'.$invoice->number.'.pdf';
 
         $pdf = Pdf::loadHTML($html);
         $pdf->getDomPDF()->setPaper('A4', 'portrait');

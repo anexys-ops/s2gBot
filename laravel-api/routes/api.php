@@ -62,6 +62,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('orders/{order}/reports', [App\Http\Controllers\Api\ReportController::class, 'generate']);
     Route::get('orders/{order}/reports', [App\Http\Controllers\Api\ReportController::class, 'index']);
     Route::get('reports/{report}/download', [App\Http\Controllers\Api\ReportController::class, 'download']);
+    Route::get('reports/{report}/pdf-link', [App\Http\Controllers\Api\ReportController::class, 'pdfLink']);
     Route::post('reports/{report}/sign', [App\Http\Controllers\Api\ReportController::class, 'sign']);
     Route::post('reports/{report}/submit-review', [App\Http\Controllers\Api\ReportController::class, 'submitReview']);
     Route::post('reports/{report}/approve-review', [App\Http\Controllers\Api\ReportController::class, 'approveReview']);
@@ -73,6 +74,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('report-pdf-templates/{report_pdf_template}', [App\Http\Controllers\Api\ReportPdfTemplateController::class, 'update']);
     Route::get('report-form-definitions', [App\Http\Controllers\Api\ReportFormDefinitionController::class, 'index']);
     Route::post('invoices/from-orders', [App\Http\Controllers\Api\InvoiceController::class, 'fromOrders']);
+    Route::get('invoices/unpaid', [App\Http\Controllers\Api\InvoiceController::class, 'unpaid']);
+    Route::get('invoices/{invoice}/pdf-link', [App\Http\Controllers\Api\InvoiceController::class, 'pdfLink']);
     Route::apiResource('invoices', App\Http\Controllers\Api\InvoiceController::class);
     Route::apiResource('quotes', App\Http\Controllers\Api\QuoteController::class);
     Route::apiResource('commercial-offerings', App\Http\Controllers\Api\CommercialOfferingController::class);
@@ -131,4 +134,11 @@ Route::middleware('auth:sanctum')->group(function () {
             ->where('kind', 'order|site')
             ->whereNumber('id');
     });
+});
+
+Route::middleware('signed')->group(function () {
+    Route::get('invoices/{invoice}/pdf', [App\Http\Controllers\Api\InvoiceController::class, 'signedPdf'])
+        ->name('invoice.pdf.signed');
+    Route::get('reports/{report}/pdf', [App\Http\Controllers\Api\ReportController::class, 'signedPdf'])
+        ->name('report.pdf.signed');
 });

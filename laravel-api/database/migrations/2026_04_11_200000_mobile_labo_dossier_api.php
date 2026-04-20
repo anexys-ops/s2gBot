@@ -38,59 +38,14 @@ return new class extends Migration
             $table->index(['dossier_kind', 'dossier_id']);
         });
 
-        if (! DB::table('module_settings')->where('module_key', 'mobile_labo_terrain')->exists()) {
-            DB::table('module_settings')->insert([
-                'module_key' => 'mobile_labo_terrain',
-                'settings' => json_encode([
-                    'measure_form_templates' => self::defaultMeasureFormTemplates(),
-                ]),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
     }
 
     public function down(): void
     {
         Schema::dropIfExists('mobile_dossier_photos');
         Schema::dropIfExists('mobile_measure_submissions');
-        DB::table('module_settings')->where('module_key', 'mobile_labo_terrain')->delete();
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private static function defaultMeasureFormTemplates(): array
-    {
-        return [
-            [
-                'id' => 12,
-                'name' => 'Essai Proctor (démo)',
-                'fields' => [
-                    [
-                        'id' => 'f1',
-                        'key' => 'water_content',
-                        'label' => 'Teneur en eau',
-                        'type' => 'number',
-                        'required' => true,
-                        'unit' => '%',
-                        'order' => 10,
-                        'options' => null,
-                        'validation' => ['min' => 0, 'max' => 100],
-                    ],
-                    [
-                        'id' => 'f2',
-                        'key' => 'observation',
-                        'label' => 'Observation',
-                        'type' => 'textarea',
-                        'required' => false,
-                        'unit' => null,
-                        'order' => 20,
-                        'options' => null,
-                        'validation' => null,
-                    ],
-                ],
-            ],
-        ];
+        if (Schema::hasTable('module_settings')) {
+            DB::table('module_settings')->where('module_key', 'mobile_labo_terrain')->delete();
+        }
     }
 };

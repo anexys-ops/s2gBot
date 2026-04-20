@@ -303,7 +303,7 @@ export default function Invoices() {
           { id: 'ttc', label: 'Montant TTC' },
           { id: 'travel', label: 'Dépl. HT' },
           { id: 'status', label: 'Statut' },
-          ...(isLab ? [{ id: 'pdf', label: 'PDF' }] : []),
+          { id: 'pdf', label: 'PDF' },
           ...(isAdmin ? [{ id: 'actions', label: 'Actions' }] : []),
         ]}
         visibleColumns={visible}
@@ -319,7 +319,7 @@ export default function Invoices() {
               {visible.ttc !== false && <th>Montant TTC ({MONEY_UNIT_LABEL})</th>}
               {visible.travel !== false && <th>Dépl. HT ({MONEY_UNIT_LABEL})</th>}
               {visible.status !== false && <th>Statut</th>}
-              {isLab && visible.pdf !== false && <th>PDF</th>}
+              {visible.pdf !== false && <th>PDF</th>}
               {isAdmin && visible.actions !== false && <th>Actions</th>}
             </tr>
           </thead>
@@ -332,15 +332,25 @@ export default function Invoices() {
                 {visible.ttc !== false && <td>{formatMoney(Number(inv.amount_ttc))}</td>}
                 {visible.travel !== false && <td>{formatMoney(Number(inv.travel_fee_ht ?? 0))}</td>}
                 {visible.status !== false && <td>{STATUS_LABELS[inv.status] ?? inv.status}</td>}
-                {isLab && visible.pdf !== false && (
+                {visible.pdf !== false && (
                   <td>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => pdfApi.generate('invoice', inv.id, inv.pdf_template_id)}
-                    >
-                      PDF
-                    </button>
+                    {isLab ? (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => pdfApi.generate('invoice', inv.id, inv.pdf_template_id)}
+                      >
+                        PDF
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => invoicesApi.openInvoicePdf(inv.id)}
+                      >
+                        Télécharger PDF
+                      </button>
+                    )}
                   </td>
                 )}
                 {isAdmin && visible.actions !== false && (

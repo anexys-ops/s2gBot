@@ -547,31 +547,50 @@ export const reportsApi = {
     api<Report>(`/reports/${reportId}/submit-review`, { method: 'POST', body: '{}' }),
   approveReview: (reportId: number) =>
     api<Report>(`/reports/${reportId}/approve-review`, { method: 'POST', body: '{}' }),
+  /** Lien signé (15 min) — ouvre le PDF dans un nouvel onglet (lab + client). */
   download: async (reportId: number) => {
-    const token = getToken()
-    const res = await fetch(`${API_BASE}/reports/${reportId}/download`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (!res.ok) throw new Error('Téléchargement impossible')
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `rapport-${reportId}.pdf`
-    a.click()
-    URL.revokeObjectURL(url)
+    const { url } = await api<{ url: string }>(`/reports/${reportId}/pdf-link`)
+    window.open(url, '_blank', 'noopener,noreferrer')
   },
 }
 
 export const invoicesApi = {
-  list: (params?: { search?: string; status?: string; page?: number; client_id?: number }) => {
+  list: (params?: { search?: string; status?: string | string[]; page?: number; client_id?: number }) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
-    if (params?.status) q.set('status', params.status)
+    if (params?.status) {
+      if (Array.isArray(params.status)) {
+        for (const st of params.status) q.append('status[]', st)
+      } else {
+        q.set('status', params.status)
+      }
+    }
     if (params?.page) q.set('page', String(params.page))
     if (params?.client_id) q.set('client_id', String(params.client_id))
     const s = q.toString()
     return api<LaravelPaginator<Invoice>>(`/invoices${s ? `?${s}` : ''}`)
+  },
+  listUnpaid: (params?: { search?: string; page?: number; client_id?: number; status?: string | string[] }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.client_id) q.set('client_id', String(params.client_id))
+    if (params?.status) {
+      if (Array.isArray(params.status)) {
+        for (const st of params.status) q.append('status[]', st)
+      } else {
+        q.set('status', params.status)
+      }
+    }
+    const s = q.toString()
+    return api<LaravelPaginator<Invoice> & { total_amount_due_ttc: string }>(
+      `/invoices/unpaid${s ? `?${s}` : ''}`,
+    )
+  },
+  getPdfLink: (id: number) => api<{ url: string }>(`/invoices/${id}/pdf-link`),
+  openInvoicePdf: async (id: number) => {
+    const { url } = await api<{ url: string }>(`/invoices/${id}/pdf-link`)
+    window.open(url, '_blank', 'noopener,noreferrer')
   },
   get: (id: number) => api<Invoice>(`/invoices/${id}`),
   fromOrders: (orderIds: number[], clientId?: number) =>

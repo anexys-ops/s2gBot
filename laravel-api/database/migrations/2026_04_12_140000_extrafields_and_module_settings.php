@@ -67,6 +67,43 @@ return new class extends Migration
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
+            [
+                'module_key' => 'mobile_labo_terrain',
+                'settings' => json_encode([
+                    'measure_form_templates' => [
+                        [
+                            'id' => 12,
+                            'name' => 'Essai Proctor (démo)',
+                            'fields' => [
+                                [
+                                    'id' => 'f1',
+                                    'key' => 'water_content',
+                                    'label' => 'Teneur en eau',
+                                    'type' => 'number',
+                                    'required' => true,
+                                    'unit' => '%',
+                                    'order' => 10,
+                                    'options' => null,
+                                    'validation' => ['min' => 0, 'max' => 100],
+                                ],
+                                [
+                                    'id' => 'f2',
+                                    'key' => 'observation',
+                                    'label' => 'Observation',
+                                    'type' => 'textarea',
+                                    'required' => false,
+                                    'unit' => null,
+                                    'order' => 20,
+                                    'options' => null,
+                                    'validation' => null,
+                                ],
+                            ],
+                        ],
+                    ],
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
         ]);
     }
 

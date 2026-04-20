@@ -7,11 +7,14 @@ use App\Models\Agency;
 use App\Models\Invoice;
 use App\Models\InvoiceLine;
 use App\Support\AgencyAccess;
+use Illuminate\Database\Eloquent\Builder;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\InvoiceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InvoiceController extends Controller
 {
@@ -45,9 +48,7 @@ class InvoiceController extends Controller
             });
         }
 
-        if ($status = trim((string) $request->query('status', ''))) {
-            $query->where('status', $status);
-        }
+        $this->applyInvoiceStatusFilter($query, $request);
 
         if ($request->filled('client_id')) {
             $query->where('client_id', (int) $request->query('client_id'));
@@ -56,6 +57,74 @@ class InvoiceController extends Controller
         $invoices = $query->orderByDesc('invoice_date')->paginate(15);
 
         return response()->json($invoices);
+    }
+
+    public function unpaid(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $query = Invoice::query()->with([
+            'client',
+            'agency',
+            'orders',
+            'invoiceLines',
+            'billingAddress',
+            'deliveryAddress',
+            'pdfTemplate',
+        ]);
+
+        if (! $user->isLab()) {
+            AgencyAccess::applyInvoiceScope($query, $user);
+        }
+
+        $override = $this->requestedInvoiceStatuses($request);
+        if ($override !== null && count($override) > 0) {
+            $narrow = array_values(array_intersect($override, self::unpaidOverrideAllowedStatuses()));
+            $statuses = count($narrow) > 0 ? $narrow : self::defaultUnpaidStatuses();
+        } else {
+            $statuses = self::defaultUnpaidStatuses();
+        }
+
+        $query->whereIn('status', $statuses);
+
+        if ($search = trim((string) $request->query('search', ''))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('number', 'like', '%'.$search.'%')
+                    ->orWhereHas('client', function ($cq) use ($search) {
+                        $cq->where('name', 'like', '%'.$search.'%');
+                    });
+            });
+        }
+
+        if ($request->filled('client_id') && $user->isLab()) {
+            $query->where('client_id', (int) $request->query('client_id'));
+        }
+
+        $totalDue = number_format((float) (clone $query)->sum('amount_ttc'), 2, '.', '');
+        $invoices = $query->orderByDesc('invoice_date')->paginate(15);
+        $payload = $invoices->toArray();
+        $payload['total_amount_due_ttc'] = $totalDue;
+
+        return response()->json($payload);
+    }
+
+    public function pdfLink(Request $request, Invoice $invoice): JsonResponse
+    {
+        if (! AgencyAccess::userMayAccessInvoice($request->user(), $invoice)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $url = URL::temporarySignedRoute(
+            'invoice.pdf.signed',
+            now()->addMinutes(15),
+            ['invoice' => $invoice->id]
+        );
+
+        return response()->json(['url' => $url]);
+    }
+
+    public function signedPdf(Invoice $invoice, PdfController $pdfController): StreamedResponse
+    {
+        return $pdfController->streamInvoicePdf($invoice, null);
     }
 
     public function fromOrders(Request $request): JsonResponse
@@ -285,5 +354,72 @@ class InvoiceController extends Controller
         $invoice->delete();
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function defaultUnpaidStatuses(): array
+    {
+        return [
+            Invoice::STATUS_VALIDATED,
+            Invoice::STATUS_SIGNED,
+            Invoice::STATUS_SENT,
+            Invoice::STATUS_RELANCED,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function unpaidOverrideAllowedStatuses(): array
+    {
+        return array_values(array_diff(Invoice::statuses(), [
+            Invoice::STATUS_DRAFT,
+            Invoice::STATUS_PAID,
+        ]));
+    }
+
+    private function applyInvoiceStatusFilter(Builder $query, Request $request): void
+    {
+        $statuses = $this->requestedInvoiceStatuses($request);
+        if ($statuses === null || count($statuses) === 0) {
+            return;
+        }
+        $allowed = Invoice::statuses();
+        $filtered = array_values(array_intersect($statuses, $allowed));
+        if (count($filtered) === 0) {
+            return;
+        }
+        if (count($filtered) === 1) {
+            $query->where('status', $filtered[0]);
+        } else {
+            $query->whereIn('status', $filtered);
+        }
+    }
+
+    /**
+     * @return list<string>|null null si le paramètre status est absent
+     */
+    private function requestedInvoiceStatuses(Request $request): ?array
+    {
+        if (! $request->has('status')) {
+            return null;
+        }
+        $raw = $request->query('status');
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+        if (is_array($raw)) {
+            return array_values(array_filter(array_map('trim', $raw), fn ($s) => $s !== ''));
+        }
+        if (is_string($raw) && str_contains($raw, ',')) {
+            return array_values(array_filter(array_map('trim', explode(',', $raw)), fn ($s) => $s !== ''));
+        }
+        if (is_string($raw)) {
+            return [trim($raw)];
+        }
+
+        return [];
     }
 }

@@ -11,6 +11,7 @@ use App\Services\ReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
@@ -97,6 +98,32 @@ class ReportController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
+        return $this->reportFileResponse($report);
+    }
+
+    public function pdfLink(Request $request, Report $report): JsonResponse
+    {
+        $order = $report->order;
+        if (! AgencyAccess::userMayAccessOrder($request->user(), $order)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $url = URL::temporarySignedRoute(
+            'report.pdf.signed',
+            now()->addMinutes(15),
+            ['report' => $report->id]
+        );
+
+        return response()->json(['url' => $url]);
+    }
+
+    public function signedPdf(Report $report): StreamedResponse|JsonResponse
+    {
+        return $this->reportFileResponse($report);
+    }
+
+    private function reportFileResponse(Report $report): StreamedResponse|JsonResponse
+    {
         if (! Storage::disk('local')->exists($report->file_path)) {
             return response()->json(['message' => 'Fichier introuvable'], 404);
         }

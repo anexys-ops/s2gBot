@@ -1,13 +1,9 @@
-/** Statuts chantier (alignés sur `App\Models\Site::STATUSES`). */
-export const SITE_STATUS_KEYS = [
-  'not_started',
-  'in_progress',
-  'blocked',
-  'delivered',
-  'archived',
-] as const
+import { SITE_STATUSES, type SiteStatus } from '../types/enums'
 
-export type SiteStatusKey = (typeof SITE_STATUS_KEYS)[number]
+/** Statuts chantier (alignés sur `App\Models\Site::STATUSES`). */
+export const SITE_STATUS_KEYS = SITE_STATUSES
+
+export type SiteStatusKey = SiteStatus
 
 export const SITE_STATUS_LABELS: Record<SiteStatusKey, string> = {
   not_started: 'Pas commencé',

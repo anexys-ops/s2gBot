@@ -1,9 +1,9 @@
 # LIVRAISON — s2gBot Roadmap (orchestration Cursor ↔ Claude)
 
-**Date** : 2026-04-21  
+**Date** : 2026-04-22  
 **Projet Linear** : [s2gBot — Roadmap améliorations](https://linear.app/anexys/project/s2gbot-roadmap-ameliorations-a6b525d0bfcd) (team Anexys / BDC)  
-**Branche courante** : `feat/s2gbot-09-equipments-calibrations` (tâche 09). Lots 1–8 : `main` / historique `feat/s2gbot-lot1-indexes-invoices-pdf`.  
-**Doc / suivi** : alignement nom fichier + synthèse livrable — [BDC-57](https://linear.app/anexys/issue/BDC-57).
+**Branche courante** : `main` (déploiement runner-push + correctifs version).  
+**Suivi Linear récent** : [BDC-57](https://linear.app/anexys/issue/BDC-57) / [BDC-59](https://linear.app/anexys/issue/BDC-59) (déploiement + `/api/version`) · [BDC-58](https://linear.app/anexys/issue/BDC-58) (cleanup doublons macOS).
 
 ---
 
@@ -19,7 +19,7 @@
 | 06 | Versioning rapports signés                      | 🟢 Done      | [BDC-40](https://linear.app/anexys/issue/BDC-40) | ✅ Validé |
 | 07 | Tests automatisés (coverage ≥ 60 %)             | 🟢 Done      | [BDC-41](https://linear.app/anexys/issue/BDC-41) | ✅ Itération 2 |
 | 08 | Archivage `activity_logs`                       | 🟢 Done      | [BDC-42](https://linear.app/anexys/issue/BDC-42) | ✅ Itération 2 |
-| 09 | Module équipements & étalonnages                | 🟡 PR / revue | [BDC-43](https://linear.app/anexys/issue/BDC-43) | — (attente revue) |
+| 09 | Module équipements & étalonnages                | 🟢 Done      | [BDC-43](https://linear.app/anexys/issue/BDC-43) | ✅ Linear Done |
 | 10 | Non-conformités & CAPA (8D)                     | ⚪ Todo      | [BDC-44](https://linear.app/anexys/issue/BDC-44) | — |
 | 11 | Planning techniciens                            | ⚪ Todo      | [BDC-45](https://linear.app/anexys/issue/BDC-45) | — |
 | 12 | Bilingue FR / AR                                | ⚪ Todo      | [BDC-46](https://linear.app/anexys/issue/BDC-46) | — |
@@ -34,7 +34,7 @@
 | 21 | Multi-tenant strict                             | ⚪ Todo      | [BDC-55](https://linear.app/anexys/issue/BDC-55) | — |
 | 22 | API publique OpenAPI + webhooks                 | ⚪ Todo      | [BDC-56](https://linear.app/anexys/issue/BDC-56) | — |
 
-**Progression** : lots **1–8** revus Claude (**8/8**). **Tâche 09** : code livré sur branche dédiée, **PR / merge + revue** à finaliser — **13** tâches roadmap encore ouvertes (10–22). Vue globale **9/22** avec implémentation poussée (~**41 %** du tableau).
+**Progression** : lots **1–9** livrés (dont **09** mergé `main`, Linear BDC-43 **Done**). **13** tâches roadmap ouvertes (10–22). Correctifs hors numérotation : **BDC-57 / BDC-59** (CI + version API), **BDC-58** (suppression fichiers `* 2.*` / `* 3.*`).
 
 ---
 
@@ -168,6 +168,7 @@ cd react-frontend && npm run test:coverage
 | 2026-04-20 | Claude (revue externe)   | **6/8 validés, 2 à corriger** | Cf. §3. Briefs itération 2 rédigés ci-dessus (tâches 7 et 8) |
 | 2026-04-20 | Cursor itération 2       | OK (lot 7–8)           | Vitest + workflow + `docs/CI.md` ; archive unifiée + purge planifiée ; fix npm `recharts-scale` |
 | 2026-04-21 | Cursor                     | Livré code tâche 09    | Équipements / étalonnages + doc `LIVRAISON.md` ; suivi [BDC-57](https://linear.app/anexys/issue/BDC-57) |
+| 2026-04-22 | Cursor + Linear            | Dette + suivi          | `/api/version` hors `config:cache` ; `docker-compose` `APP_VERSION` ; cleanup doublons [BDC-58](https://linear.app/anexys/issue/BDC-58) ; clôture [BDC-57](https://linear.app/anexys/issue/BDC-57) / [BDC-59](https://linear.app/anexys/issue/BDC-59) |
 
 ---
 

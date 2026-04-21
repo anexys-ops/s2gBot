@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { equipmentsApi, type CalibrationRow } from '../../api/client'
+import { equipmentsApi } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 
 export default function EquipmentDetailPage() {

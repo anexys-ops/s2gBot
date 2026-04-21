@@ -1552,27 +1552,33 @@ th { background: #f9fafb; font-weight: 600; }
   gap: 0.5rem;
   width: 100%;
   margin-top: 0.25rem;
-  padding: 0.85rem 1.25rem;
-  font-size: 1rem;
+  min-height: 3rem;
+  padding: 0.75rem 1.25rem;
+  font-size: clamp(0.95rem, 2.8vw, 1.05rem);
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(165deg, #3b82f6 0%, #2563eb 45%, #1d4ed8 100%);
+  /* Vert laboratoire / BTP — se démarque du bleu des champs (focus) */
+  background: linear-gradient(165deg, #14b8a6 0%, #0d9488 42%, #0f766e 100%);
   border: none;
   border-radius: 12px;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35);
+  box-shadow:
+    0 4px 14px rgba(13, 148, 136, 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.12) inset;
   transition: transform 0.15s, box-shadow 0.2s, filter 0.2s;
 }
 .login-submit:hover:not(:disabled) {
-  filter: brightness(1.04);
-  box-shadow: 0 8px 24px rgba(29, 78, 216, 0.38);
+  filter: brightness(1.05);
+  box-shadow:
+    0 8px 22px rgba(15, 118, 110, 0.45),
+    0 1px 0 rgba(255, 255, 255, 0.14) inset;
   transform: translateY(-1px);
 }
 .login-submit:active:not(:disabled) {
   transform: translateY(0);
 }
 .login-submit:disabled {
-  opacity: 0.85;
+  opacity: 0.88;
   cursor: wait;
   transform: none;
 }
@@ -1618,10 +1624,23 @@ th { background: #f9fafb; font-weight: 600; }
 
 @media (max-width: 840px) {
   .login-screen-content {
-    grid-template-columns: 1fr;
-    max-width: 440px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    max-width: min(440px, 100%);
+    margin-inline: auto;
+    gap: clamp(1.25rem, 4vw, 1.75rem);
+  }
+  .login-screen-topbar {
+    order: 0;
+  }
+  /* Formulaire au-dessus du texte marketing sur mobile / tablette */
+  .login-panel {
+    order: 1;
+    width: 100%;
   }
   .login-hero {
+    order: 2;
     text-align: center;
     padding-bottom: 0;
   }
@@ -1640,12 +1659,32 @@ th { background: #f9fafb; font-weight: 600; }
 
 @media (max-width: 480px) {
   .login-screen {
-    padding: 1rem;
+    padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
     align-items: flex-start;
-    padding-top: 2rem;
   }
   .login-card {
     border-radius: 16px;
+    padding: 1.25rem 1.1rem;
+  }
+  .login-submit {
+    min-height: 2.875rem;
+    border-radius: 14px;
+  }
+  .login-hint {
+    font-size: 0.7rem;
+    padding-inline: 0.25rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .login-card-title {
+    font-size: 1.35rem;
+  }
+  .login-input {
+    font-size: 16px; /* évite le zoom iOS sur focus */
   }
 }
 

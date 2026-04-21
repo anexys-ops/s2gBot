@@ -1,12 +1,14 @@
 <?php
 
-use App\Support\AppVersion;
 use Illuminate\Support\Facades\Facade;
 
 return [
     'name' => env('APP_NAME', 'Lab BTP API'),
-    /** Version GET /api/version : package.json du front si APP_VERSION absent dans .env */
-    'version' => AppVersion::resolve(),
+    /**
+     * Ne pas stocker la version applicative ici : avec `php artisan config:cache`, la valeur
+     * serait figée au moment du cache. Voir {@see \App\Http\Controllers\Api\VersionController}
+     * et {@see \App\Support\AppVersion::resolve()}.
+     */
     'env' => env('APP_ENV', 'production'),
     'debug' => (bool) env('APP_DEBUG', false),
     'url' => env('APP_URL', 'http://localhost'),

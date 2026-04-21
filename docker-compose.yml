@@ -61,6 +61,11 @@ services:
       LOG_CHANNEL: ${LOG_CHANNEL:-single}
       RUN_OPTIMIZE: ${RUN_OPTIMIZE:-1}
       RUN_SEED: ${RUN_SEED:-0}
+      # Version appli exposée par /api/version. Source de vérité = .env.docker,
+      # injecté par deploy.yml à chaque déploiement. Exposé explicitement ici
+      # pour surpasser tout /var/www/html/.env résiduel dans l'image Docker.
+      APP_VERSION: ${APP_VERSION:-}
+      GIT_COMMIT_SHORT: ${GIT_COMMIT_SHORT:-}
     volumes:
       - laravel_storage:/var/www/html/storage
       - laravel_bootstrap_cache:/var/www/html/bootstrap/cache

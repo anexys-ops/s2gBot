@@ -9,12 +9,15 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import { MONEY_UNIT_LABEL } from '../lib/appLocale'
+import SiteStatusPill from '../components/SiteStatusPill'
+import { SITE_STATUS_KEYS, SITE_STATUS_LABELS } from '../lib/siteStatusPresentation'
 
 const emptyForm: Partial<Site> = {
   client_id: 0,
   name: '',
   address: '',
   reference: '',
+  status: 'not_started',
   travel_fee_quote_ht: 0,
   travel_fee_invoice_ht: 0,
   travel_fee_label: '',
@@ -35,6 +38,8 @@ export default function Sites() {
   const { visible, toggle } = usePersistedColumnVisibility('sites', {
     name: true,
     client: true,
+    status: true,
+    created: true,
     reference: true,
     address: true,
     travelQuote: true,
@@ -102,6 +107,7 @@ export default function Sites() {
       name: s.name,
       address: s.address ?? '',
       reference: s.reference ?? '',
+      status: s.status && String(s.status).trim() !== '' ? s.status : 'not_started',
       travel_fee_quote_ht: Number(s.travel_fee_quote_ht ?? 0),
       travel_fee_invoice_ht: Number(s.travel_fee_invoice_ht ?? 0),
       travel_fee_label: s.travel_fee_label ?? '',
@@ -184,6 +190,8 @@ export default function Sites() {
         columns={[
           { id: 'name', label: 'Nom' },
           { id: 'client', label: 'Client' },
+          { id: 'status', label: 'Statut' },
+          { id: 'created', label: 'Création' },
           { id: 'reference', label: 'Référence' },
           { id: 'address', label: 'Adresse' },
           { id: 'travelQuote', label: 'Dépl. devis (HT)' },
@@ -212,6 +220,8 @@ export default function Sites() {
             <tr>
               {visible.name !== false && <th>Nom</th>}
               {visible.client !== false && <th>Client</th>}
+              {visible.status !== false && <th>Statut</th>}
+              {visible.created !== false && <th>Création</th>}
               {visible.reference !== false && <th>Référence</th>}
               {visible.address !== false && <th>Adresse</th>}
               {visible.travelQuote !== false && <th>Dépl. devis (HT)</th>}
@@ -238,6 +248,14 @@ export default function Sites() {
                   </td>
                 )}
                 {visible.client !== false && <td>{s.client?.name}</td>}
+                {visible.status !== false && (
+                  <td>
+                    <SiteStatusPill status={s.status} />
+                  </td>
+                )}
+                {visible.created !== false && (
+                  <td>{s.created_at ? new Date(s.created_at).toLocaleDateString('fr-FR') : '—'}</td>
+                )}
                 {visible.reference !== false && <td>{s.reference ?? '-'}</td>}
                 {visible.address !== false && <td>{s.address ?? '-'}</td>}
                 {visible.travelQuote !== false && <td>{Number(s.travel_fee_quote_ht ?? 0).toFixed(2)}</td>}
@@ -292,6 +310,19 @@ export default function Sites() {
             <div className="form-group">
               <label>Référence</label>
               <input value={form.reference ?? ''} onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Statut chantier</label>
+              <select
+                value={(form.status as string) || 'not_started'}
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+              >
+                {SITE_STATUS_KEYS.map((k) => (
+                  <option key={k} value={k}>
+                    {SITE_STATUS_LABELS[k]}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="form-group">
               <label>Adresse</label>

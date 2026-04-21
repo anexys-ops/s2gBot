@@ -1,5 +1,5 @@
 import { useMemo, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
@@ -8,6 +8,7 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { sitesApi, type Site } from '../api/client'
 import PageBackNav from '../components/PageBackNav'
+import SiteStatusPill from '../components/SiteStatusPill'
 import 'leaflet/dist/leaflet.css'
 
 const OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
@@ -47,6 +48,7 @@ function parseCoord(v: number | string | null | undefined): number | null {
 
 export default function TerrainChantiersCartePage() {
   useFixLeafletIcons()
+  const navigate = useNavigate()
   const { data: sites = [], isLoading, error } = useQuery({
     queryKey: ['sites', 'terrain-map'],
     queryFn: () => sitesApi.list(),
@@ -90,6 +92,14 @@ export default function TerrainChantiersCartePage() {
             <Marker key={m.site.id} position={[m.lat, m.lng]}>
               <Popup>
                 <strong>{m.site.name}</strong>
+                <div style={{ marginTop: 8 }}>
+                  <SiteStatusPill status={m.site.status} />
+                </div>
+                {m.site.created_at ? (
+                  <div style={{ marginTop: 6, fontSize: '0.85rem', color: '#64748b' }}>
+                    Créé le {new Date(m.site.created_at).toLocaleDateString('fr-FR')}
+                  </div>
+                ) : null}
                 <div style={{ marginTop: 6 }}>
                   <Link to={`/sites/${m.site.id}`}>Ouvrir la fiche</Link>
                 </div>
@@ -99,13 +109,17 @@ export default function TerrainChantiersCartePage() {
         </MapContainer>
       </div>
       <div className="card">
-        <h2 style={{ marginTop: 0, fontSize: '1.05rem' }}>Liste</h2>
+        <h2 style={{ marginTop: 0, fontSize: '1.05rem' }}>Liste des chantiers</h2>
+        <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem', marginTop: '-0.25rem' }}>
+          Cliquez sur une ligne pour ouvrir la fiche chantier (onglet Fiche, Missions, Carte).
+        </p>
         <table>
           <thead>
             <tr>
               <th>Chantier</th>
+              <th>Statut</th>
+              <th>Création</th>
               <th>Coordonnées</th>
-              <th />
             </tr>
           </thead>
           <tbody>
@@ -114,8 +128,31 @@ export default function TerrainChantiersCartePage() {
               const lng = parseCoord(s.longitude)
               const ok = lat !== null && lng !== null
               return (
-                <tr key={s.id}>
-                  <td>{s.name}</td>
+                <tr
+                  key={s.id}
+                  className="table-row-link"
+                  role="link"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest('a, button')) return
+                    navigate(`/sites/${s.id}`)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      navigate(`/sites/${s.id}`)
+                    }
+                  }}
+                >
+                  <td>
+                    <Link to={`/sites/${s.id}`} onClick={(ev) => ev.stopPropagation()}>
+                      {s.name}
+                    </Link>
+                  </td>
+                  <td>
+                    <SiteStatusPill status={s.status} />
+                  </td>
+                  <td>{s.created_at ? new Date(s.created_at).toLocaleDateString('fr-FR') : '—'}</td>
                   <td>
                     {ok ? (
                       <code>
@@ -124,9 +161,6 @@ export default function TerrainChantiersCartePage() {
                     ) : (
                       <span style={{ color: 'var(--color-muted)' }}>—</span>
                     )}
-                  </td>
-                  <td>
-                    <Link to={`/sites/${s.id}`}>Fiche</Link>
                   </td>
                 </tr>
               )

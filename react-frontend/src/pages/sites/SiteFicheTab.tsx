@@ -8,6 +8,8 @@ import Modal from '../../components/Modal'
 import type { SiteOutletContext } from './SiteLayout'
 import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import SiteMiniMap from '../../components/maps/SiteMiniMap'
+import SiteStatusPill from '../../components/SiteStatusPill'
+import { SITE_STATUS_KEYS, SITE_STATUS_LABELS } from '../../lib/siteStatusPresentation'
 
 function strCoord(v: unknown): string {
   if (v === null || v === undefined || v === '') return ''
@@ -19,6 +21,7 @@ const emptyForm = (s: Site): Partial<Site> & { latitude?: string; longitude?: st
   name: s.name,
   address: s.address ?? '',
   reference: s.reference ?? '',
+  status: s.status && String(s.status).trim() !== '' ? s.status : 'not_started',
   latitude: strCoord(s.latitude),
   longitude: strCoord(s.longitude),
   travel_fee_quote_ht: Number(s.travel_fee_quote_ht ?? 0),
@@ -123,6 +126,16 @@ export default function SiteFicheTab() {
             <dd>{site.client?.name ?? `#${site.client_id}`}</dd>
           </div>
           <div>
+            <dt>Statut chantier</dt>
+            <dd>
+              <SiteStatusPill status={site.status} />
+            </dd>
+          </div>
+          <div>
+            <dt>Création</dt>
+            <dd>{site.created_at ? new Date(site.created_at).toLocaleString('fr-FR') : '—'}</dd>
+          </div>
+          <div>
             <dt>Référence</dt>
             <dd>{site.reference?.trim() ? site.reference : '—'}</dd>
           </div>
@@ -190,6 +203,19 @@ export default function SiteFicheTab() {
             <div className="form-group">
               <label>Référence</label>
               <input value={form.reference ?? ''} onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Statut chantier</label>
+              <select
+                value={(form.status as string) || 'not_started'}
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+              >
+                {SITE_STATUS_KEYS.map((k) => (
+                  <option key={k} value={k}>
+                    {SITE_STATUS_LABELS[k]}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="form-group">
               <label>Adresse</label>

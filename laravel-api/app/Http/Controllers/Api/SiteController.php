@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Support\AgencyAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SiteController extends Controller
 {
@@ -45,6 +46,7 @@ class SiteController extends Controller
             'name' => 'required|string|max:255',
             'address' => 'nullable|string',
             'reference' => 'nullable|string|max:100',
+            'status' => ['nullable', 'string', Rule::in(Site::STATUSES)],
             'travel_fee_quote_ht' => 'nullable|numeric|min:0',
             'travel_fee_invoice_ht' => 'nullable|numeric|min:0',
             'travel_fee_label' => 'nullable|string|max:255',
@@ -52,6 +54,10 @@ class SiteController extends Controller
             'longitude' => 'nullable|numeric|between:-180,180',
             'meta' => 'nullable|array',
         ]);
+
+        if (! isset($validated['status']) || $validated['status'] === '') {
+            $validated['status'] = 'not_started';
+        }
 
         $clientId = (int) $validated['client_id'];
         $agencyId = isset($validated['agency_id']) ? (int) $validated['agency_id'] : null;
@@ -91,6 +97,7 @@ class SiteController extends Controller
             'name' => 'sometimes|string|max:255',
             'address' => 'nullable|string',
             'reference' => 'nullable|string|max:100',
+            'status' => ['sometimes', 'nullable', 'string', Rule::in(Site::STATUSES)],
             'travel_fee_quote_ht' => 'nullable|numeric|min:0',
             'travel_fee_invoice_ht' => 'nullable|numeric|min:0',
             'travel_fee_label' => 'nullable|string|max:255',

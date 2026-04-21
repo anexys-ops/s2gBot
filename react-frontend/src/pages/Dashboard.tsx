@@ -439,20 +439,23 @@ function renderKpiDetail(id: KpiId, dash: DashboardStatsPayload) {
   }
 }
 
-const METIER_TABS: { id: MetierTab; label: string; hint: string }[] = [
+const METIER_TABS: { id: MetierTab; icon: string; label: string; hint: string }[] = [
   {
     id: 'commerce',
-    label: '🛒 Commerce',
+    icon: '🛒',
+    label: 'Commerce',
     hint: 'Clients, chantiers, commandes, devis, volume factures',
   },
   {
     id: 'compta',
-    label: '💼 Compta',
+    icon: '💼',
+    label: 'Compta',
     hint: 'CA, encaissements, impayés, CA mensuel',
   },
   {
     id: 'labo',
-    label: '🔬 Labo',
+    icon: '🔬',
+    label: 'Labo',
     hint: 'Rapports, échantillons, délais, volume essais',
   },
 ]
@@ -520,7 +523,10 @@ export default function Dashboard() {
                 onClick={() => setMetier(t.id)}
                 title={t.hint}
               >
-                {t.label}
+                <span className="dashboard-metier-tab__icon" aria-hidden>
+                  {t.icon}
+                </span>
+                <span className="dashboard-metier-tab__text">{t.label}</span>
               </button>
             ))}
           </div>

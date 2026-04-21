@@ -12,6 +12,15 @@ class Site extends Model
 {
     use HasFactory;
 
+    /** Statuts chantier (workflow terrain / livraison). */
+    public const STATUSES = [
+        'not_started',
+        'in_progress',
+        'blocked',
+        'delivered',
+        'archived',
+    ];
+
     protected $fillable = [
         'client_id',
         'agency_id',
@@ -20,6 +29,7 @@ class Site extends Model
         'latitude',
         'longitude',
         'reference',
+        'status',
         'travel_fee_quote_ht',
         'travel_fee_invoice_ht',
         'travel_fee_label',

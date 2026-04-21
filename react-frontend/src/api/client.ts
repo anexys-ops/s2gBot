@@ -1139,11 +1139,15 @@ export interface Site {
   latitude?: number | string | null
   longitude?: number | string | null
   reference?: string
+  /** Workflow chantier : not_started | in_progress | blocked | delivered | archived */
+  status?: string | null
   travel_fee_quote_ht?: number
   travel_fee_invoice_ht?: number
   travel_fee_label?: string
   meta?: EntityMetaPayload | null
   client?: Client
+  created_at?: string
+  updated_at?: string
 }
 
 /** Mission géotechnique sur un chantier (terrain / forages). */

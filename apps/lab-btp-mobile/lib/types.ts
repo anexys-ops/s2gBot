@@ -22,6 +22,8 @@ export interface Site {
   client_id: number;
   name: string;
   reference?: string;
+  status?: string | null;
+  created_at?: string;
 }
 
 export interface Order {

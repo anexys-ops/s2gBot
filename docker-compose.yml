@@ -87,6 +87,11 @@ services:
         # Pied de page Vite (__APP_GIT_SHA__) ; sinon « dev » si absent (build sans .git).
         GIT_COMMIT_SHORT: ${GIT_COMMIT_SHORT:-}
     restart: unless-stopped
+    # Même source que `app` (interpolation depuis .env.docker + env shell au `compose up`).
+    # Utile pour `docker compose exec web env | grep APP_VERSION` sans ouvrir l’image.
+    environment:
+      APP_VERSION: ${APP_VERSION:-}
+      GIT_COMMIT_SHORT: ${GIT_COMMIT_SHORT:-}
     ports:
       - '${HTTP_PORT:-8080}:80'
     depends_on:

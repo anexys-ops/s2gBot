@@ -16,6 +16,8 @@ class InvoiceLine extends Model
         'discount_percent',
         'total',
         'order_item_id',
+        'type_ligne',
+        'line_code',
     ];
 
     protected function casts(): array

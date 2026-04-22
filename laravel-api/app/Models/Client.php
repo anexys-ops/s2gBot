@@ -60,6 +60,11 @@ class Client extends Model
         return $this->hasMany(ClientAddress::class);
     }
 
+    public function contacts(): HasMany
+    {
+        return $this->hasMany(ClientContact::class);
+    }
+
     public function attachments(): MorphMany
     {
         return $this->morphMany(Attachment::class, 'attachable');

@@ -1,6 +1,6 @@
 # PROLAB → s2gBot : Spécification Migration
 
-> Date : 2026-04-22  
+> Date : 2026-04-22 · Dernière mise à jour lot : 2026-04-25 (BDC-128, 132, 133, 135 foundation)  
 > Objectif : Intégrer l'architecture fonctionnelle de PROLAB (WinDev/HFSQL) dans s2gBot (Laravel 11 + React 18 + Expo), en conservant le design et les menus existants.
 
 ### État — phase P1 (catalogue produits, Linear)
@@ -107,10 +107,13 @@ OP_Situation (situations de travaux)
 | samples | Échantillons | id, order_item_id, reference, received_at, status |
 | test_results | Résultats essais | id, sample_id, test_type_param_id, value |
 | quotes | Devis | id, number, client_id, site_id, status, amount_ht, amount_ttc |
-| quote_lines | Lignes devis | id, quote_id, description, quantity, unit_price, tva_rate |
+| quote_lines | Lignes devis | … + `type_ligne` (libre\|catalogue\|commentaire), `line_code` |
 | invoices | Factures | id, number, client_id, status, amount_ht, amount_ttc |
-| invoice_lines | Lignes facture | id, invoice_id, order_item_id, quantity, unit_price |
+| invoice_lines | Lignes facture | … + `type_ligne`, `line_code` |
 | client_addresses | Adresses client | id, client_id, type, line1, city, country |
+| client_contacts | Contacts nominatifs par client | id, client_id, nom, prénom, poste, email… |
+| document_sequences | Numérotation annuelle par type | type, year, last_number (service `DocumentSequenceService`) |
+| document_status_histories | Audit changements d’état documents | document_type/id, etat_avant/après, user_id, source |
 | attachments | Pièces jointes | id, attachable (morph), path, mime_type |
 | missions | Missions terrain | id, site_id, reference, title, mission_status |
 | commercial_document_links | Liens documents | source_type/id, target_type/id, relation |

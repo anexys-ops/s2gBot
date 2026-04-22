@@ -7,11 +7,13 @@ use App\Models\Agency;
 use App\Models\Catalogue\Article;
 use App\Models\Catalogue\Package;
 use App\Models\DevisTache;
+use App\Models\DocumentStatusHistory;
 use App\Models\Dossier;
 use App\Models\Quote;
 use App\Models\QuoteLine;
 use App\Models\Site;
 use App\Services\CommercialDocumentTotalsService;
+use App\Services\DocumentStatusService;
 use App\Support\AgencyAccess;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +31,8 @@ class QuoteController extends Controller
         'lines.*.unit_price' => 'required|numeric|min:0',
         'lines.*.tva_rate' => 'nullable|numeric|min:0|max:100',
         'lines.*.discount_percent' => 'nullable|numeric|min:0|max:100',
+        'lines.*.type_ligne' => 'nullable|string|in:libre,catalogue,commentaire',
+        'lines.*.line_code' => 'nullable|string|max:64',
     ];
 
     private const TACHES_RULES = [
@@ -193,6 +197,7 @@ class QuoteController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
+        $oldStatus = $quote->status;
         $statusRule = Rule::in(Quote::statuses());
 
         if ($quote->status !== Quote::STATUS_DRAFT) {
@@ -204,6 +209,7 @@ class QuoteController extends Controller
             ]);
             $quote->fill($validated);
             $quote->save();
+            $this->recordQuoteStatusChange($quote, $oldStatus, $request);
 
             return response()->json($this->loadQuoteForResponse($quote->fresh()));
         }
@@ -277,6 +283,7 @@ class QuoteController extends Controller
 
         $quote->save();
         $this->recalculateQuoteTotals($quote);
+        $this->recordQuoteStatusChange($quote->fresh(), $oldStatus, $request);
 
         return response()->json($this->loadQuoteForResponse($quote->fresh()));
     }
@@ -314,6 +321,21 @@ class QuoteController extends Controller
                 abort(422, 'Une ligne de devis ne peut pas lier à la fois un article et un forfait (package) catalogue.');
             }
         }
+    }
+
+    private function recordQuoteStatusChange(Quote $quote, string $oldStatus, Request $request): void
+    {
+        if ($oldStatus === $quote->status) {
+            return;
+        }
+        app(DocumentStatusService::class)->record(
+            Quote::class,
+            (int) $quote->id,
+            $oldStatus,
+            (string) $quote->status,
+            $request->user(),
+            DocumentStatusHistory::SOURCE_API,
+        );
     }
 
     private function assertDossierForClient(int $clientId, ?int $dossierId, ?int $siteId): void
@@ -396,11 +418,17 @@ class QuoteController extends Controller
                 $unit,
                 $disc,
             );
+            $typeLigne = $line['type_ligne'] ?? null;
+            if ($typeLigne === null) {
+                $typeLigne = ($refArticleId || $refPackageId || ! empty($line['commercial_offering_id'])) ? 'catalogue' : 'libre';
+            }
             QuoteLine::create([
                 'quote_id' => $quote->id,
                 'commercial_offering_id' => isset($line['commercial_offering_id']) ? (int) $line['commercial_offering_id'] : null,
                 'ref_article_id' => $refArticleId,
                 'ref_package_id' => $refPackageId,
+                'type_ligne' => $typeLigne,
+                'line_code' => isset($line['line_code']) ? (string) $line['line_code'] : null,
                 'description' => $description,
                 'quantity' => (int) $line['quantity'],
                 'unit_price' => $unit,

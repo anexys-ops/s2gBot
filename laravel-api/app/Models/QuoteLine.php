@@ -14,6 +14,8 @@ class QuoteLine extends Model
         'commercial_offering_id',
         'ref_article_id',
         'ref_package_id',
+        'type_ligne',
+        'line_code',
         'description',
         'quantity',
         'unit_price',

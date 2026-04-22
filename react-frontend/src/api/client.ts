@@ -250,6 +250,29 @@ export const clientAddressesApi = {
   delete: (addressId: number) => api(`/client-addresses/${addressId}`, { method: 'DELETE' }),
 }
 
+export interface ClientContactRow {
+  id: number
+  client_id: number
+  prenom: string
+  nom: string
+  poste?: string | null
+  departement?: string | null
+  email?: string | null
+  telephone_direct?: string | null
+  telephone_mobile?: string | null
+  is_principal?: boolean
+  notes?: string | null
+}
+
+export const clientContactsApi = {
+  list: (clientId: number) => api<ClientContactRow[]>(`/clients/${clientId}/contacts`),
+  create: (clientId: number, body: Partial<ClientContactRow> & { prenom: string; nom: string }) =>
+    api<ClientContactRow>(`/clients/${clientId}/contacts`, { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: number, body: Partial<ClientContactRow>) =>
+    api<ClientContactRow>(`/client-contacts/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/client-contacts/${id}`, { method: 'DELETE' }),
+}
+
 export const attachmentsApi = {
   list: (attachableType: string, attachableId: number) =>
     api<Attachment[]>(`/attachments?attachable_type=${attachableType}&attachable_id=${attachableId}`),
@@ -1205,6 +1228,11 @@ export interface QuoteLine {
   id?: number
   commercial_offering_id?: number | null
   commercial_offering?: CommercialOffering | null
+  ref_article_id?: number | null
+  ref_package_id?: number | null
+  /** libre | catalogue | commentaire */
+  type_ligne?: string | null
+  line_code?: string | null
   description: string
   quantity: number
   unit_price: number
@@ -1434,6 +1462,7 @@ export interface Client {
   meta?: EntityMetaPayload | null
   sites?: Site[]
   addresses?: ClientAddress[]
+  contacts?: ClientContactRow[]
 }
 
 export interface Site {

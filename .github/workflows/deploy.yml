@@ -111,12 +111,12 @@ jobs:
           # Ne pas s’appuyer sur `envs` (drone-ssh) : variables parfois absentes côté distant → `cd` silencieux + exit 1.
           # On injecte ici avec toJSON (échappement sûr des chemins / versions).
           script: |
-            #!/bin/bash
-            set -euo pipefail
+            set -eu
             DEPLOY_PATH=${{ toJSON(secrets.DEPLOY_PATH) }}
             PKG_VER=${{ toJSON(steps.ver.outputs.pkg_ver) }}
             GIT_SHA_FULL=${{ toJSON(github.sha) }}
-            GIT_COMMIT_SHORT="${GIT_SHA_FULL:0:7}"
+            # POSIX (dash sur /bin/sh) : pas de ${var:0:7} ; ssh n’exécute pas le shebang si script inline
+            GIT_COMMIT_SHORT=$(printf '%.7s' "$GIT_SHA_FULL")
 
             echo "=========================================="
             echo "▶ Deploy s2gBot"
@@ -148,12 +148,12 @@ jobs:
             chmod +x scripts/*.sh 2>/dev/null || true
 
             if grep -q '^APP_VERSION=' .env.docker; then
-              sed -i "s/^APP_VERSION=.*/APP_VERSION=$PKG_VER/" .env.docker
+              sed -i "s|^APP_VERSION=.*|APP_VERSION=$PKG_VER|" .env.docker
             else
               printf '\nAPP_VERSION=%s\n' "$PKG_VER" >> .env.docker
             fi
             if grep -q '^GIT_COMMIT_SHORT=' .env.docker; then
-              sed -i "s/^GIT_COMMIT_SHORT=.*/GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT/" .env.docker
+              sed -i "s|^GIT_COMMIT_SHORT=.*|GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT|" .env.docker
             else
               printf 'GIT_COMMIT_SHORT=%s\n' "$GIT_COMMIT_SHORT" >> .env.docker
             fi

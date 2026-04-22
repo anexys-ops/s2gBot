@@ -2,7 +2,7 @@
 
 Le workflow GitHub Actions [`.github/workflows/tests.yml`](../.github/workflows/tests.yml) exécute :
 
-1. **Laravel** (`laravel-api`) — `composer install` puis `php artisan test --coverage` avec l’extension **PCOV** (voir `setup-php`, `extensions: … pcov`, `coverage: pcov`).
+1. **Laravel** (`laravel-api`) — `composer install` puis `php artisan test --coverage --min=60` (échec CI si la couverture de lignes du périmètre `phpunit.xml` est inférieure à 60 %, voir excl. `app/Http/Controllers/Api/Mobile`) ; extension **PCOV** (voir `setup-php`, `extensions: … pcov`, `coverage: pcov`).
 2. **Frontend** (`react-frontend`) — `npm ci` puis `npm run test:coverage` (Vitest + `@vitest/coverage-v8`).
 3. **Build React** — `npm ci` puis `npm run build`.
 
@@ -20,7 +20,7 @@ cd laravel-api
 php artisan test --coverage
 ```
 
-Seuil global élevé (ex. `--min=60`) est un objectif de roadmap : il suppose une base de tests plus large que l’actuelle sur tout le dossier `app/` (voir `phpunit.xml`, balise `<source>`).
+**DT-4 (BDC-63)** : le job impose `--min=60` sur le code inclus dans `phpunit.xml`. Les tests `ApiRouteSmokeTest` couvrent un grand nombre d’endpoints en lecture côté lab. Le dossier `Api/Mobile` est exclu du calcul tant qu’il n’a pas de feature tests ciblés.
 
 ### Frontend React
 
@@ -28,7 +28,7 @@ Seuil global élevé (ex. `--min=60`) est un objectif de roadmap : il suppose 
 cd react-frontend
 npm ci
 npm run test          # Vitest sans rapport de couverture
-npm run test:coverage # Vitest + v8, seuils sur les pages CRM ciblées (voir `vitest.config.ts`)
+npm run test:coverage # Vitest + v8, seuils (lignes/…/fonctions) sur les pages ciblées — Voir BDC-41 : `functions` volontairement bas sur les gros écrans CRM
 npm run build
 ```
 

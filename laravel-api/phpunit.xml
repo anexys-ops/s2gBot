@@ -20,5 +20,9 @@
         <include>
             <directory>app</directory>
         </include>
+        <!-- Hors périmètre du calcul de couverture (pas de requêtes d’intégration) ; réintégrer quand le mobile aura des feature tests. -->
+        <exclude>
+            <directory>app/Http/Controllers/Api/Mobile</directory>
+        </exclude>
     </source>
 </phpunit>

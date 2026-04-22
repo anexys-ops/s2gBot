@@ -1,6 +1,8 @@
 # Plateforme s2gBot — laboratoire géotechnique / BTP
 
-**Partage (Git)** : voir [PUSH.md](PUSH.md).
+![Tests](https://github.com/anexys-ops/s2gBot/actions/workflows/tests.yml/badge.svg?branch=main)
+
+**Partage (Git)** : voir [PUSH.md](PUSH.md). | CI : [docs/CI.md](docs/CI.md) | Protection `main` : [docs/GITHUB-BRANCH-PROTECTION.md](docs/GITHUB-BRANCH-PROTECTION.md)
 
 ## Une seule application web
 

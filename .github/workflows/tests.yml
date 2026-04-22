@@ -24,7 +24,7 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
       - name: Run tests with coverage
-        run: php artisan test --coverage
+        run: php artisan test --coverage --min=60
 
   frontend-tests:
     name: React Vitest

@@ -18,9 +18,10 @@ export default mergeConfig(
           'src/pages/OrderDetail.tsx',
           'src/pages/clients/ClientCommercialContent.tsx',
         ],
+        // BDC-63 : seuils bloquants (lignes / branches / statements) ; `functions` reste bas (BDC-41, gros écrans CRM)
         thresholds: {
           lines: 40,
-          functions: 10, // pages CRM volumineuses : monter avec des tests d’interaction ciblés
+          functions: 10,
           branches: 35,
           statements: 40,
         },

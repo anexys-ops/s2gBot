@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import {
   clientsApi,
   documentPdfTemplatesApi,
@@ -41,6 +42,7 @@ export default function Invoices() {
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const isAdmin = user?.role === 'lab_admin'
+  const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const [selectedOrderIds, setSelectedOrderIds] = useState<number[]>([])
   const [editInvoice, setEditInvoice] = useState<Invoice | null>(null)
@@ -159,7 +161,7 @@ export default function Invoices() {
   const lastPage = data?.last_page ?? 1
   const statusOptions = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
 
-  const openEdit = (inv: Invoice) => {
+  const openEdit = useCallback((inv: Invoice) => {
     setEditInvoice(inv)
     setEditForm({
       status: inv.status,
@@ -171,7 +173,42 @@ export default function Invoices() {
       travel_fee_tva_rate: Number(inv.travel_fee_tva_rate ?? 20),
       pdf_template_id: inv.pdf_template_id ?? '',
     })
-  }
+  }, [])
+
+  const editFromQuery = searchParams.get('edit')
+  useEffect(() => {
+    if (!editFromQuery || !isAdmin) return
+    const id = Number(editFromQuery)
+    if (!Number.isFinite(id) || id <= 0) return
+    let cancelled = false
+    void invoicesApi
+      .get(id)
+      .then((inv) => {
+        if (cancelled) return
+        openEdit(inv)
+        setSearchParams(
+          (prev) => {
+            const n = new URLSearchParams(prev)
+            n.delete('edit')
+            return n
+          },
+          { replace: true },
+        )
+      })
+      .catch(() => {
+        setSearchParams(
+          (prev) => {
+            const n = new URLSearchParams(prev)
+            n.delete('edit')
+            return n
+          },
+          { replace: true },
+        )
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [editFromQuery, isAdmin, openEdit, setSearchParams])
 
   const submitEdit = (e: React.FormEvent) => {
     e.preventDefault()

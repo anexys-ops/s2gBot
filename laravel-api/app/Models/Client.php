@@ -28,8 +28,10 @@ class Client extends Model
 
     protected $fillable = [
         'name',
+        'prolab_code',
         'address',
         'city',
+        'country',
         'postal_code',
         'email',
         'phone',

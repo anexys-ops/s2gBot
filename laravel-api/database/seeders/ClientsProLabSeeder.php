@@ -2,8 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Models\Client;
+use App\Models\ClientAddress;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class ClientsProLabSeeder extends Seeder
 {
@@ -3841,15 +3842,40 @@ class ClientsProLabSeeder extends Seeder
         ];
 
         foreach ($clients as [$code, $name, $city]) {
-            DB::table('clients')->updateOrInsert(
+            $cityTrim = $city !== '' ? $city : null;
+            $line1 = $cityTrim
+                ? 'Adresse postale complète à saisir — '.$cityTrim.', Maroc'
+                : 'Adresse postale complète à saisir (import PROLAB)';
+            $client = Client::query()->updateOrCreate(
                 ['prolab_code' => $code],
                 [
-                    'name'        => $name,
-                    'city'        => $city ?: null,
-                    'prolab_code' => $code,
-                    'created_at'  => now(),
-                    'updated_at'  => now(),
-                ]
+                    'name' => $name,
+                    'city' => $cityTrim,
+                    'address' => $line1,
+                    'country' => 'MA',
+                    'email' => null,
+                    'phone' => null,
+                    'meta' => [
+                        'prolab_import' => true,
+                        'prolab_code' => $code,
+                        'import_note' => 'Renseigner email, téléphone et adresse complète côté CRM.',
+                    ],
+                ],
+            );
+
+            ClientAddress::query()->updateOrCreate(
+                [
+                    'client_id' => $client->id,
+                    'type' => ClientAddress::TYPE_HEADQUARTERS,
+                ],
+                [
+                    'label' => 'Siège (import PROLAB)',
+                    'line1' => $line1,
+                    'line2' => 'Code tiers PROLAB : '.$code.($cityTrim ? ' — ville : '.$cityTrim : ''),
+                    'city' => $cityTrim,
+                    'country' => 'MA',
+                    'is_default' => true,
+                ],
             );
         }
     }

@@ -5,7 +5,6 @@ import DossierInfosTab from './pages/dossiers/tabs/DossierInfosTab'
 import DossierPlaceholderTab from './pages/dossiers/tabs/DossierPlaceholderTab'
 import DossierDevisTab from './pages/dossiers/tabs/DossierDevisTab'
 import DossierDocumentsTab from './pages/dossiers/tabs/DossierDocumentsTab'
-import CatalogueBtpPage from './pages/back-office/CatalogueBtpPage'
 import CatalogueListePage from './pages/catalogue/CatalogueListePage'
 import ArticleFichePage from './pages/catalogue/ArticleFichePage'
 import DossierNewPage from './pages/dossiers/DossierNewPage'
@@ -17,7 +16,6 @@ import Dashboard from './pages/Dashboard'
 import Orders from './pages/Orders'
 import OrderDetail from './pages/OrderDetail'
 import OrderNew from './pages/OrderNew'
-import Catalog from './pages/Catalog'
 import Invoices from './pages/Invoices'
 import Clients from './pages/Clients'
 import Sites from './pages/Sites'
@@ -129,18 +127,19 @@ function AppRoutes() {
         <Route path="orders" element={<Orders />} />
         <Route path="orders/new" element={<OrderNew />} />
         <Route path="orders/:id" element={<OrderDetail />} />
-        <Route path="catalog" element={<Navigate to="/back-office/catalogue-essais" replace />} />
+        <Route path="catalog" element={<Navigate to="/catalogue" replace />} />
         <Route path="graphiques-essais" element={<GraphiquesEssais />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="devis/nouveau" element={<QuoteEditorPage />} />
         <Route path="devis/:quoteId/editer" element={<QuoteEditorPage />} />
         <Route path="devis" element={<Devis />} />
         <Route path="back-office" element={<Outlet />}>
-          <Route index element={<Navigate to="catalogue-essais" replace />} />
+          <Route index element={<Navigate to="/catalogue" replace />} />
           <Route element={<BackOfficeLayout />}>
-            <Route path="catalogue-essais" element={<Catalog />} />
-            <Route path="catalogue-btp" element={<CatalogueBtpPage />} />
-            <Route path="catalogue-commercial" element={<CommercialCatalogPage />} />
+            <Route path="catalogue-essais" element={<Navigate to="/catalogue" replace />} />
+            <Route path="catalogue-btp" element={<Navigate to="/catalogue" replace />} />
+            <Route path="catalogue-commercial" element={<Navigate to="/catalogue" replace />} />
+            <Route path="offres" element={<CommercialCatalogPage />} />
             <Route path="granulometrie" element={<GranulometryLab />} />
             <Route path="cadrage" element={<Cadrage />} />
             <Route path="exemples-calculs" element={<ExemplesCalculs />} />

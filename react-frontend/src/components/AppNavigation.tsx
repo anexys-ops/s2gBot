@@ -22,12 +22,7 @@ function isCrmModuleActive(pathname: string, isLab: boolean): boolean {
   if (pathname.startsWith('/catalogue')) return true
   if (pathname.startsWith('/devis')) return true
   if (pathname.startsWith('/invoices')) return true
-  if (
-    isLab &&
-    (pathname.startsWith('/back-office/catalogue-commercial') ||
-      pathname.startsWith('/back-office/pdf') ||
-      pathname.startsWith('/back-office/mails'))
-  ) {
+  if (isLab && (pathname.startsWith('/back-office/offres') || pathname.startsWith('/back-office/pdf') || pathname.startsWith('/back-office/mails'))) {
     return true
   }
   return false
@@ -43,10 +38,10 @@ function isLaboModuleActive(pathname: string, isLab: boolean): boolean {
   if (pathname.startsWith('/labo')) return true
   if (pathname.startsWith('/orders')) return true
   if (!pathname.startsWith('/back-office')) return false
-  if (pathname.startsWith('/back-office/catalogue-commercial')) return false
+  if (pathname.startsWith('/back-office/offres')) return false
   if (pathname.startsWith('/back-office/pdf')) return false
   if (pathname.startsWith('/back-office/mails')) return false
-  return isLab || pathname.startsWith('/back-office/catalogue-essais') || pathname.startsWith('/back-office/granulometrie')
+  return isLab || pathname.startsWith('/back-office/granulometrie') || pathname.startsWith('/back-office/cadrage')
 }
 
 function isActivityModuleActive(pathname: string): boolean {
@@ -103,7 +98,7 @@ export default function AppNavigation() {
     ]
     if (isLab) {
       crmItems.push(
-        { to: '/back-office/catalogue-commercial', label: 'Catalogue commercial' },
+        { to: '/back-office/offres', label: 'Offres (lignes de devis)' },
         { to: '/back-office/pdf', label: 'Création PDF' },
         { to: '/back-office/mails', label: 'Gestion des mails' },
       )
@@ -125,7 +120,7 @@ export default function AppNavigation() {
       laboItems.push({ to: '/back-office', label: 'Back office laboratoire' })
     } else {
       laboItems.push(
-        { to: '/back-office/catalogue-essais', label: 'Catalogue des essais' },
+        { to: '/catalogue', label: 'Catalogue PROLAB' },
         { to: '/back-office/granulometrie', label: 'Granulométrie' },
       )
     }

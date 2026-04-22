@@ -92,7 +92,7 @@ export default function Devis() {
           <Link to="/devis/nouveau" className="btn btn-primary">
             Nouveau devis
           </Link>{' '}
-          <Link to="/back-office/catalogue-commercial" className="btn btn-secondary">
+          <Link to="/back-office/offres" className="btn btn-secondary">
             Catalogue produits &amp; prestations
           </Link>
         </p>

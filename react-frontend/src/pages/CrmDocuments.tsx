@@ -4,7 +4,15 @@ import { useQuery } from '@tanstack/react-query'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
-import { invoicesApi, pdfApi, quotesApi, type Invoice, type Quote } from '../api/client'
+import {
+  commercialOfferingsApi,
+  pdfApi,
+  quotesApi,
+  invoicesApi,
+  type CommercialOffering,
+  type Invoice,
+  type Quote,
+} from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import { formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
@@ -30,11 +38,14 @@ const INVOICE_STATUS_LABELS: Record<string, string> = {
   paid: 'Encaissée',
 }
 
-type Tab = 'quotes' | 'invoices'
+type Tab = 'quotes' | 'invoices' | 'offerings'
+
+const OFFERING_KIND_LABEL: Record<string, string> = { product: 'Produit', service: 'Prestation' }
 
 export default function CrmDocuments() {
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
+  const isAdmin = user?.role === 'lab_admin'
   const [tab, setTab] = useState<Tab>('quotes')
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
@@ -52,6 +63,14 @@ export default function CrmDocuments() {
     ttc: true,
     pdf: true,
     crm: true,
+    actions: true,
+    off_code: true,
+    off_name: true,
+    off_kind: true,
+    off_unit: true,
+    off_price: true,
+    off_active: true,
+    off_actions: true,
   })
 
   useEffect(() => {
@@ -80,9 +99,17 @@ export default function CrmDocuments() {
     enabled: tab === 'invoices',
   })
 
-  const loading = tab === 'quotes' ? quotesQ.isLoading : invoicesQ.isLoading
-  const error = tab === 'quotes' ? quotesQ.error : invoicesQ.error
-  const data = tab === 'quotes' ? quotesQ.data : invoicesQ.data
+  const offeringsQ = useQuery({
+    queryKey: ['crm-documents', 'offerings', debouncedSearch, page],
+    queryFn: () => commercialOfferingsApi.list({ search: debouncedSearch.trim() || undefined, per_page: 30, page }),
+    enabled: tab === 'offerings',
+  })
+
+  const loading =
+    tab === 'quotes' ? quotesQ.isLoading : tab === 'invoices' ? invoicesQ.isLoading : offeringsQ.isLoading
+  const error =
+    tab === 'quotes' ? quotesQ.error : tab === 'invoices' ? invoicesQ.error : offeringsQ.error
+  const data = tab === 'quotes' ? quotesQ.data : tab === 'invoices' ? invoicesQ.data : offeringsQ.data
 
   if (loading) {
     return (
@@ -107,20 +134,57 @@ export default function CrmDocuments() {
     )
   }
 
-  const quotes = data && 'data' in data ? (data.data as Quote[]) : []
-  const invoices = data && 'data' in data ? (data.data as Invoice[]) : []
+  const quotes = tab === 'quotes' && data && 'data' in data ? (data.data as Quote[]) : []
+  const invoices = tab === 'invoices' && data && 'data' in data ? (data.data as Invoice[]) : []
+  const offerings = tab === 'offerings' && data && 'data' in data ? (data.data as CommercialOffering[]) : []
   const lastPage = data?.last_page ?? 1
   const currentPage = data?.current_page ?? page
 
   const showClientCol = isLab && visible.client !== false
+  const showDocEditCol = (isLab && tab === 'quotes') || (isAdmin && tab === 'invoices')
+  const toolbarColumns =
+    tab === 'offerings'
+      ? [
+          { id: 'off_code', label: 'Code' },
+          { id: 'off_name', label: 'Libellé' },
+          { id: 'off_kind', label: 'Type' },
+          { id: 'off_unit', label: 'Unité' },
+          { id: 'off_price', label: 'Prix vente HT' },
+          { id: 'off_active', label: 'Actif' },
+          { id: 'off_actions', label: 'Actions' },
+        ]
+      : [
+          ...(isLab ? [{ id: 'client', label: 'Client' }] : []),
+          { id: 'number', label: 'Numéro' },
+          { id: 'date', label: 'Date' },
+          { id: 'status', label: 'Statut' },
+          { id: 'ttc', label: 'Montant TTC' },
+          { id: 'pdf', label: 'PDF' },
+          ...(isLab ? [{ id: 'crm', label: 'Fiche CRM' }] : []),
+          ...(showDocEditCol ? [{ id: 'actions', label: 'Édition' }] : []),
+        ]
 
   return (
     <ModuleEntityShell
       breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'CRM', to: '/crm' }, { label: 'Documents' }]}
       moduleBarLabel="Commercial — Documents"
       title="Documents commerciaux"
-      subtitle="Registre devis & factures — filtres de statut, PDF, lien vers la fiche client (onglet Commerce)"
+      subtitle="Devis, factures et offres (hors arbre PROLAB) — filtre, PDF, fiche client, édition."
     >
+      <div className="crud-actions" style={{ marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <Link className="btn btn-sm btn-primary" to="/devis/nouveau">
+          Nouveau devis
+        </Link>
+        <Link className="btn btn-sm btn-secondary" to="/invoices">
+          Gestion des factures
+        </Link>
+        {isLab && (
+          <Link className="btn btn-sm btn-secondary" to="/back-office/offres">
+            Gérer les offres
+          </Link>
+        )}
+      </div>
+
       <div className="crud-actions" style={{ marginBottom: '1rem', flexWrap: 'wrap' }}>
         <button
           type="button"
@@ -136,24 +200,29 @@ export default function CrmDocuments() {
         >
           Factures
         </button>
+        {isLab && (
+          <button
+            type="button"
+            className={`btn btn-sm ${tab === 'offerings' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setTab('offerings')}
+          >
+            Offres
+          </button>
+        )}
       </div>
 
       <ListTableToolbar
         searchValue={searchInput}
         onSearchChange={setSearchInput}
-        searchPlaceholder={isLab ? 'N°, notes, nom client…' : 'N°, notes…'}
-        statusValue={statusFilter}
-        onStatusChange={setStatusFilter}
-        statusOptions={tab === 'quotes' ? quoteStatusOptions : invoiceStatusOptions}
-        columns={[
-          ...(isLab ? [{ id: 'client', label: 'Client' }] : []),
-          { id: 'number', label: 'Numéro' },
-          { id: 'date', label: 'Date' },
-          { id: 'status', label: 'Statut' },
-          { id: 'ttc', label: 'Montant TTC' },
-          { id: 'pdf', label: 'PDF' },
-          ...(isLab ? [{ id: 'crm', label: 'Fiche CRM' }] : []),
-        ]}
+        searchPlaceholder={
+          tab === 'offerings' ? 'Code, libellé, description…' : isLab ? 'N°, notes, nom client…' : 'N°, notes…'
+        }
+        statusValue={tab === 'offerings' ? '' : statusFilter}
+        onStatusChange={tab === 'offerings' ? undefined : setStatusFilter}
+        statusOptions={
+          tab === 'offerings' ? undefined : tab === 'quotes' ? quoteStatusOptions : invoiceStatusOptions
+        }
+        columns={toolbarColumns}
         visibleColumns={visible}
         onToggleColumn={toggle}
       />
@@ -170,6 +239,7 @@ export default function CrmDocuments() {
                 {visible.ttc !== false && <th>TTC ({MONEY_UNIT_LABEL})</th>}
                 {visible.pdf !== false && <th>PDF</th>}
                 {isLab && visible.crm !== false && <th>Fiche</th>}
+                {showDocEditCol && tab === 'quotes' && visible.actions !== false && <th>Édition</th>}
               </tr>
             </thead>
             <tbody>
@@ -198,6 +268,48 @@ export default function CrmDocuments() {
                       </Link>
                     </td>
                   )}
+                  {showDocEditCol && tab === 'quotes' && visible.actions !== false && (
+                    <td>
+                      <Link className="btn btn-primary btn-sm" to={`/devis/${q.id}/editer`}>
+                        Éditer
+                      </Link>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {tab === 'offerings' && (
+          <table>
+            <thead>
+              <tr>
+                {visible.off_code !== false && <th>Code</th>}
+                {visible.off_name !== false && <th>Libellé</th>}
+                {visible.off_kind !== false && <th>Type</th>}
+                {visible.off_unit !== false && <th>Unité</th>}
+                {visible.off_price !== false && <th>Prix vente HT</th>}
+                {visible.off_active !== false && <th>Actif</th>}
+                {visible.off_actions !== false && <th>CRUD</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {offerings.map((o) => (
+                <tr key={o.id}>
+                  {visible.off_code !== false && <td>{o.code || '—'}</td>}
+                  {visible.off_name !== false && <td>{o.name}</td>}
+                  {visible.off_kind !== false && <td>{OFFERING_KIND_LABEL[o.kind] ?? o.kind}</td>}
+                  {visible.off_unit !== false && <td>{o.unit || '—'}</td>}
+                  {visible.off_price !== false && <td>{formatMoney(Number(o.sale_price_ht))}</td>}
+                  {visible.off_active !== false && <td>{o.active ? 'Oui' : 'Non'}</td>}
+                  {visible.off_actions !== false && (
+                    <td>
+                      <Link className="btn btn-primary btn-sm" to="/back-office/offres">
+                        Gérer
+                      </Link>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -215,6 +327,7 @@ export default function CrmDocuments() {
                 {visible.ttc !== false && <th>TTC ({MONEY_UNIT_LABEL})</th>}
                 {visible.pdf !== false && <th>PDF</th>}
                 {isLab && visible.crm !== false && <th>Fiche</th>}
+                {showDocEditCol && tab === 'invoices' && visible.actions !== false && <th>Édition</th>}
               </tr>
             </thead>
             <tbody>
@@ -243,6 +356,13 @@ export default function CrmDocuments() {
                       </Link>
                     </td>
                   )}
+                  {showDocEditCol && tab === 'invoices' && visible.actions !== false && (
+                    <td>
+                      <Link className="btn btn-primary btn-sm" to={`/invoices?edit=${inv.id}`}>
+                        Modifier
+                      </Link>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -251,6 +371,7 @@ export default function CrmDocuments() {
 
         {tab === 'quotes' && !quotes.length && <p style={{ padding: '1rem' }}>Aucun devis.</p>}
         {tab === 'invoices' && !invoices.length && <p style={{ padding: '1rem' }}>Aucune facture.</p>}
+        {tab === 'offerings' && !offerings.length && <p style={{ padding: '1rem' }}>Aucune offre commerciale.</p>}
       </div>
 
       <PaginationBar page={currentPage} lastPage={lastPage} onPage={setPage} />
@@ -261,6 +382,12 @@ export default function CrmDocuments() {
         <Link to="/devis">Édition des devis</Link>
         {' · '}
         <Link to="/invoices">Édition des factures</Link>
+        {isLab && (
+          <>
+            {' · '}
+            <Link to="/back-office/offres">Offres commerciales (prix, TVA, stock)</Link>
+          </>
+        )}
       </p>
     </ModuleEntityShell>
   )

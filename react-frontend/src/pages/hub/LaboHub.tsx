@@ -44,9 +44,9 @@ export default function LaboHub() {
         ]
       : [
           {
-            to: '/back-office/catalogue-essais',
-            title: 'Catalogue des essais',
-            desc: 'Types d’essais, normes et paramètres.',
+            to: '/catalogue',
+            title: 'Catalogue PROLAB',
+            desc: 'Familles, articles, forfaits, paramètres et tarifs.',
             icon: 'catalog' as const,
           },
           {

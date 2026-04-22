@@ -61,8 +61,15 @@ class ArticleController extends Controller
 
         $data = $request->validate($this->rules($article->id, true));
         $article->update($data);
+        $fresh = $article->fresh();
+        $fresh->load([
+            'famille',
+            'parametresEssai' => fn ($p) => $p->ordonne(),
+            'resultats' => fn ($r) => $r->orderBy('code'),
+            'famillePackages' => fn ($f) => $f->ordonne()->with(['packages' => fn ($x) => $x->ordonne()]),
+        ]);
 
-        return (new ArticleResource($article->fresh()->load('famille')))->response();
+        return (new ArticleResource($fresh))->response();
     }
 
     public function destroy(Request $request, Article $article): JsonResponse

@@ -7,23 +7,11 @@ import { canManageAppConfig } from '../../lib/settingsAccess'
 type PageMeta = { title: string; subtitle: string; crumb: string }
 
 function metaForPath(pathname: string): PageMeta {
-  if (pathname.includes('/catalogue-essais'))
+  if (pathname.includes('/offres'))
     return {
-      title: 'Catalogue des essais',
-      subtitle: 'Types d’essais, normes, tarifs unitaires et paramètres mesurés sur les dossiers.',
-      crumb: 'Catalogue essais',
-    }
-  if (pathname.includes('/catalogue-commercial'))
-    return {
-      title: 'Catalogue commercial',
-      subtitle: 'Produits et prestations : prix d’achat, prix de vente, TVA, stock — alimentation des lignes de devis.',
-      crumb: 'Catalogue commercial',
-    }
-  if (pathname.includes('/catalogue-btp'))
-    return {
-      title: 'Catalogue BTP (PROLAB)',
-      subtitle: 'Référentiel familles, articles et forfaits — migration depuis PROLAB (WinDev).',
-      crumb: 'Catalogue BTP',
+      title: 'Offres & prestations (lignes de devis)',
+      subtitle: 'Catalogue commercial : codes, prix d’achat / vente, TVA — alimentation des lignes de devis (hors référentiel PROLAB).',
+      crumb: 'Offres',
     }
   if (pathname.includes('/granulometrie'))
     return {
@@ -93,17 +81,13 @@ function metaForPath(pathname: string): PageMeta {
     }
   return {
     title: 'Back office',
-    subtitle: 'Référentiels, outils de calcul et suivi — catalogues et configuration sont séparés.',
+    subtitle: 'Outils et configuration — le catalogue produits d’essais (PROLAB) est sous Catalogue PROLAB dans le menu CRM.',
     crumb: 'Back office',
   }
 }
 
-function isBackOfficeCataloguePath(pathname: string): boolean {
-  return (
-    pathname.startsWith('/back-office/catalogue-essais') ||
-    pathname.startsWith('/back-office/catalogue-btp') ||
-    pathname.startsWith('/back-office/catalogue-commercial')
-  )
+function isProlabOffresPath(pathname: string): boolean {
+  return pathname.startsWith('/back-office/offres')
 }
 
 export default function BackOfficeLayout() {
@@ -112,14 +96,13 @@ export default function BackOfficeLayout() {
   const isAdmin = user?.role === 'lab_admin'
   const canAppConfig = canManageAppConfig(user)
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
-  const onCatalogue = isBackOfficeCataloguePath(pathname)
+  const onCatalogue = isProlabOffresPath(pathname)
 
   const meta = useMemo(() => metaForPath(pathname), [pathname])
 
   const catalogueTabs = [
-    { to: '/back-office/catalogue-essais', label: 'Catalogue essais', end: true as const },
-    { to: '/back-office/catalogue-btp', label: 'Catalogue BTP', end: true as const },
-    { to: '/back-office/catalogue-commercial', label: 'Catalogue commercial', end: true as const },
+    { to: '/catalogue', label: 'Catalogue PROLAB', end: true as const },
+    { to: '/back-office/offres', label: 'Offres (devis)', end: true as const },
   ]
 
   const toolsTabs = [
@@ -150,17 +133,17 @@ export default function BackOfficeLayout() {
 
   const tabsAccessory = onCatalogue ? (
     <span className="back-office-tabs-accessory">
-      <span className="back-office-tabs-accessory__label">Configuration et outils</span>
-      <Link to="/back-office/granulometrie">Granulométrie, audit, clients, PDF, mails…</Link>
+      <span className="back-office-tabs-accessory__label">Outils & configuration</span>
+      <Link to="/back-office/granulometrie">Granulométrie, audit, clients, PDF…</Link>
     </span>
   ) : (
     <span className="back-office-tabs-accessory">
-      <span className="back-office-tabs-accessory__label">Catalogues</span>
-      <Link to="/back-office/catalogue-essais">Catalogue essais</Link>
+      <span className="back-office-tabs-accessory__label">Catalogue</span>
+      <Link to="/catalogue">Catalogue PROLAB</Link>
       <span className="back-office-tabs-accessory__sep" aria-hidden>
         ·
       </span>
-      <Link to="/back-office/catalogue-commercial">Catalogue commercial</Link>
+      <Link to="/back-office/offres">Offres (devis)</Link>
     </span>
   )
 
@@ -172,7 +155,7 @@ export default function BackOfficeLayout() {
         { label: 'Laboratoire', to: '/labo' },
         { label: meta.crumb },
       ]}
-      moduleBarLabel={onCatalogue ? 'Laboratoire — Catalogues' : 'Laboratoire — Configuration et outils'}
+      moduleBarLabel={onCatalogue ? 'Catalogue (PROLAB) & offres' : 'Laboratoire — Configuration et outils'}
       title={meta.title}
       subtitle={meta.subtitle}
       tabs={tabs}

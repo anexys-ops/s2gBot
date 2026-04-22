@@ -1413,6 +1413,9 @@ export interface RegisterBody {
 export interface Client {
   id: number
   name: string
+  /** Code tiers import PROLAB (ex. TI0002) */
+  prolab_code?: string | null
+  country?: string | null
   address?: string
   city?: string | null
   postal_code?: string | null
@@ -1430,6 +1433,7 @@ export interface Client {
   capital_social?: number | string | null
   meta?: EntityMetaPayload | null
   sites?: Site[]
+  addresses?: ClientAddress[]
 }
 
 export interface Site {

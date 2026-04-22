@@ -369,3 +369,184 @@ pv_resultats
 | PROC-ISOEN | Proctor ISO/EN | EN 13286-2 |
 
 *(Compléter avec le catalogue complet lors du seed)*
+
+---
+
+## 8. Analyse approfondie PROLAB (WinDev / HFSQL) — portée et limites
+
+**Constat** : le code source WinDev (fenêtres, classes, procedures) n’est **pas** présent dans ce dépôt Git. L’analyse ci‑dessous est donc une **reconstruction fonctionnelle** cohérente avec :
+
+1. La modélisation HFSQL déjà recensée (OP\_Devis, OP\_BCC, OP\_BLC, OP\_ProdTaches, etc.).
+2. Le fonctionnement habituel des ERP labo BTP (séparation **Commercial → Production → Livraison → Facturation**).
+3. L’existant s2gBot (devis / factures / dossiers / missions / équipements `serial_number`).
+
+### 8.1 Chaînes de valeur et points de contrôle (logique type PROLAB)
+
+Chaque document ou étape n’est pas « libre » : il est **dans un circuit** (souvent : saisie → contrôle service → validation → passage au maillon suivant). Sur WinDev, cela se traduit le plus souvent par des **statuts** + des **droit par profil** + parfois une **file d’attente par service** (agenda / liste de production).
+
+| Chaîne | Entités HFSQL (réf.) | Validations typiques | Service souvent responsable |
+|--------|----------------------|----------------------|--------------------------------|
+| **Commercial** | OP\_Devis, OP\_DevisArticles | Montants, conditions, adresses, accord client | Commercial / direction |
+| **Engagement** | OP\_BCC, OP\_BCCArticles | Cohérence devis signé, délais, disponibilité | Adjoint commercial / planification |
+| **Production** | OP\_ProdTaches, ressources | Tâches affectées, dépendances, conformité | Laboratoire / responsable d’exploitation |
+| **Livraison** | OP\_BLC, OP\_BLCArticles | Conformité quantités / références | Magasin / logistique |
+| **Facturation** | OP\_FAC | Pièces justificatives, BL, commande | Comptabilité / admin |
+| **Règlement** | OP\_Reglement | Affectation, lettrage | Comptabilité |
+| **Terrain** | Missions, ordres, déplacements | Périmètre, sécurité, moyens | Géotechnique / terrain |
+
+> **Exigence produit (demande 2026)** : tout devis, commande, BL ou tâche de production devrait **appartenir à un circuit** où l’on sait **quel service valide**, **qui peut modifier** avant envoi à l’étape suivante, et **l’équipe** (ou pôle) **porteuse** de la fiche.
+
+### 8.2 Granularité « équipe / service »
+
+Côté WinDev, cela correspond en général à un **découpage paramétrable** (pôles, bureaux, rôles) mappé sur des **comptes utilisateur**. Côté s2gBot, aujourd’hui : `User.role` (ex. `lab_admin`, `lab_technician`) + `agencies` — **pas** encore de moteur de workflow ni d’affectation systématique par pôle.
+
+### 8.3 Notes de frais (hors cœur livraison actuel)
+
+Dans beaucoup de portails terrain / mission : **dépenses justifiées** (carburant, hôtel, péage) liées à un **dossier** ou à une **mission** ; circuit fréquent : brouillon → **validation responsable d’équipe** → **comptabilité** (ou trésorerie). À modéliser explicitement (absent de la BDD s2gBot aujourd’hui).
+
+### 8.4 Matériel technique, inventaire et fiches
+
+PROLAB côtie « matériel » mélange souvent :
+
+- **Petit outillage / consommables** (stock quantitatif).
+- **Gros appareils** (étiquetés **N° de série**), sujets à **métrologie** / étalonnage, **affectation** temporaire à un technicien ou un véhicule.
+
+Dans s2gBot, la table `equipments` couvre déjà `serial_number`, étalonnages, rattachement `agency_id` — manquent en revanche : **mouvements d’inventaire** (entrée / sortie / prêt), **affectation à une mission ou un ordre**, et **fiche** terrain dédiée (checklists, photos) si on veut parité avec l’existant PROLAB riche.
+
+### 8.5 « Ordres de missions » pour un dossier
+
+Les ERP terrain distinguent souvent **mission longue** (dossier / chantier) et **ordre d’exécution** :
+
+- un **dossier** = enveloppe (client, site, période) ;
+- des **ordres** (sous-projets) : ordre d’**intervention**, d’**échantillonnage**, d’**essai**, de **lancement production**, chacun avec **priorité**, **échéance**, **équipe assignée** et **état du workflow** propre.
+
+Le modèle `missions` côté s2gBot existe (`dossier_id` possible) — à enrichir en **tâches ordonnées** / **étapes** avec validation par service, alignées sur le module workflow cible (voir section 9).
+
+---
+
+## 9. Module **Workflow** (cible s2gBot) — principe
+
+Objectif : **déclarer** des workflows paramétrables (sans redéploiement), affecter chaque enregistrement (devis, BC, BL, tâche, note de frais, fiche matériel…) à un **graphe d’états** + **pôles** + **transitions** nommées.
+
+### 9.1 Concepts
+
+| Concept | Rôle |
+|---------|------|
+| **Définition** | Ex. `workflow_devis_labo`, `workflow_bcc`, `workflow_blc`, `workflow_tache_production` |
+| **Étape (step)** | État + `service` ou `team` responsable, droits (valider, rejeter, renvoyer, modifier) |
+| **Transition** | Passe d’une étape A → B, éventuellement **condition** (seuil, pièce jointe) |
+| **Instance** | Lien `subject_type` / `subject_id` (Eloquent morph) + `current_step_id` + `locked_by` |
+| **File d’attente** | Vue : « Mes validations » = instances où l’équipe de l’utilisateur = équipe requise à l’étape courante |
+| **Historique** | Journal : qui, quand, d’où, où, commentaire, pièces jointes optionnelles |
+
+### 9.2 Schéma SQL (implémentation partielle 2026-04-25)
+
+Les tables `workflow_definitions`, `workflow_steps`, `workflow_transitions`, `workflow_instances` et `workflow_histories` sont **créées** (migration `2026_04_25_100000_create_workflow_engine_tables.php`). **API** : `GET /api/v1/workflow-definitions` et `GET /api/v1/workflow-definitions/{id}` (laboratoire authentifié) — listage des définitions et étapes ; câblage devis/BC/BL et transitions restent à implémenter (BDC-134, BDC-135).
+
+#### Ébauche de schéma (référence, alignée sur le code)
+
+```sql
+workflow_definitions
+  id, code (unique), name, document_type, active
+
+workflow_steps
+  id, workflow_definition_id, code, label, sort_order
+  -- team_id nullable OU service_key (ex. 'commercial'|'labo'|'logistique'|'compta'|'metrologie')
+  can_edit, can_approve, can_reject, sla_days
+
+workflow_transitions
+  id, workflow_definition_id, from_step_id, to_step_id, name
+  is_default, requires_comment
+
+workflow_instances
+  id, workflow_definition_id, current_step_id
+  subject_type, subject_id, started_at, completed_at
+  -- locked_by, meta JSON
+
+workflow_histories
+  id, workflow_instance_id, from_step_id, to_step_id
+  user_id, action, comment, created_at
+```
+
+### 9.3 Affectation utilisateurs / équipes
+
+- Option A : table **`teams`** (pôles) + `team_user` + règles d’inclusion.
+- Option B (complément) : reposer sur `agencies` + extension **sous-équipes** pour multi-pôles au sein d’une agence.
+- Toute transition **approuvée** doit vérifier `Policy` (membre de l’équipe, ou rôle de substitution).
+
+### 9.4 Câblage par entité (roadmap d’intégration)
+
+| Entité s2gBot / PROLAB | Champ statut aujourd’hui | Cible |
+|------------------------|--------------------------|--------|
+| `quotes` | `status` (string) | Instance workflow **ou** miroir : statut dérivé de l’étape (compat API) |
+| BCC (à créer, cf. phase 4) | `statut` | 100% piloté par workflow |
+| BL (à créer) | `statut` | idem + étape « prêt logistique » |
+| Tâches production (à créer) | `statut` | étapes : planifié / contrôle / terminé, service labo |
+| `missions` (terrain) | `mission_status` | Sous-fiches **ordre de mission** avec propre instance workflow |
+| Notes de frais (à créer) | — | Brouillon → valideur équipe → compta |
+| Mouvement matériel (à créer) | — | Résidence / prêt / retour, validation éventuelle métrologie |
+
+### 9.5 UX (principes)
+
+- Chaque fiche (devis, commande, BL, tâche) : bandeau **où** se situe le document dans le circuit, **qui** doit agir, actions **Valider** / **Renvoyer** / **Demande d’éclaircissement** (comme beaucoup de moteurs WinDev maison, mais ici explicite et unifié).
+- Tableau de bord **« Tâches à valider par mon équipe »** (cohérent cross-modules).
+
+---
+
+## 10. Notes de frais (cible)
+
+```sql
+expense_reports
+  id, user_id, dossier_id, mission_id (nullable)
+  amount_total, currency, status, notes, submitted_at, meta
+
+expense_report_lines
+  id, expense_report_id, date, category, amount_ht, vat_rate, attachment_id
+
+expense_report_history (morph vers workflow history ou lié)
+```
+
+- Circuit type : **Brouillon** (utilisateur) → **Validation encadrement (équipe)** → **Compta** (saisie règlement / refus) → **Clôture**.
+- L’instance de workflow (section 9) réutilise le même moteur que le commercial, avec une définition dédiée.
+
+---
+
+## 11. Matériel, inventaire et fiche « parc »
+
+S’appuie sur `equipments` existant, à compléter.
+
+### 11.1 Entités cibles (exemples)
+
+- **`inventory_movements`** : type (réception, affectation, retour, mise au rebut, correction), `equipment_id`, `qty` ou 1× si série, `mission_id` / `user_id` cible, `dossier_id` option.
+- **`equipment_sheets` ou extension `meta`** : fiche terrain (champs pannes, dernière vérif, prochaine vérif) — le besoin de **fiche** détaillée peut aussi être un simple **morph** `Attachment` + formulaire structuré.
+- Lien **workflow** pour prêt d’appareil sensible : validation par **métrologie** ou **chef de labo**.
+
+### 11.2 Synchronisation inventaire
+
+- Tout **BL** (sortie client) / **BCC** (engagement) peut, si c’est le cas chez le client, déclencher un **mouvement** consommable — à règler en paramétrage (optionnel, selon atelier).
+
+---
+
+## 12. Ordres de mission (liés à un `dossier`)
+
+### 12.1 Modélisation cible (léger, évolutif)
+
+- **`dossier_mission_orders`** (ou renommage) : en-tête d’un **ordre d’exécution** dans le dossier : intitulé, dates, `team_id` ou `responsible_id`, `priority`, `order_status`.
+- Lignes **`dossier_mission_order_tasks`** : tâches ordonnées, références optionnelles vers `ref_taches` / catalogues, avec **sous-workflow** (optionnel) ou simple statut (à faire / fait / validé QSE).
+
+### 12.2 Cohabitation avec `missions` (terrain classique)
+
+- `missions` reste la mission **géo** (site, ressource terrain).
+- Les **ordres** sont la **décomposition** du dossier en opérations **numérotables** (OM1, OM2…) avec suivi d’**équipe** + **validations** alignées sur le moteur de la section 9.
+
+---
+
+## 13. Prochaines étapes (linéarisation en tickets)
+
+1. **Dictionnaire** des étapes métier (atelier utilisateurs) : pour chaque type (devis, BCC, BL, tâche, NDF, matériel) lister *qui valide* et *les conditions* — figer avant modèle SQL.
+2. **MVP moteur** : tables section 9 + 1 seul type pilote (ex. **devis** : brouillon → commerciaux → direction → envoyé) — sans tout migrer d’un coup.
+3. **Teams** : tables + UI admin, rattachement utilisateurs.
+4. **Câblage progressif** : BCC, BL, tâches, puis NDF / inventaire, puis ordres de mission dossier.
+5. **Reporting** : file d’attente par pôle, SLA, audit.
+
+> Cette feuille de route complète le schéma initial (sections 3–7) : elle n’invalide pas le catalogue / dossier / devis, mais **superpose** une **couche de pilotage** indispensable pour s’aligner sur les exigences PROLAB/WinDev sur les **circuits** et l’**organisation** par service.

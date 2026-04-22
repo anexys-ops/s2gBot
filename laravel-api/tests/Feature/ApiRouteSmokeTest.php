@@ -48,6 +48,7 @@ class ApiRouteSmokeTest extends TestCase
             '/api/v1/catalogue/arbre',
             '/api/v1/catalogue/articles?per_page=1',
             '/api/v1/catalogue/packages?per_page=1',
+            '/api/v1/workflow-definitions',
             '/api/report-pdf-templates',
             '/api/report-form-definitions',
             '/api/document-pdf-templates',

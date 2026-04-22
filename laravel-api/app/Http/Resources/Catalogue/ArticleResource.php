@@ -36,6 +36,7 @@ class ArticleResource extends JsonResource
                         'id' => $fp->id,
                         'code' => $fp->code,
                         'libelle' => $fp->libelle,
+                        'description' => $fp->description,
                         'ordre' => $fp->ordre,
                         'actif' => $fp->actif,
                         'packages' => $fp->packages,

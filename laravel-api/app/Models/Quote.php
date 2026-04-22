@@ -130,6 +130,11 @@ class Quote extends Model
         return $this->hasMany(QuoteLine::class, 'quote_id');
     }
 
+    public function devisTaches(): HasMany
+    {
+        return $this->hasMany(DevisTache::class, 'quote_id')->orderBy('ordre');
+    }
+
     public function attachments(): MorphMany
     {
         return $this->morphMany(Attachment::class, 'attachable');

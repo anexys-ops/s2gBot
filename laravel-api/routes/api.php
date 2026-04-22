@@ -24,6 +24,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('catalogue/articles/{article}', [App\Http\Controllers\Api\Catalogue\ArticleController::class, 'destroy'])
             ->whereNumber('article');
         Route::get('catalogue/arbre', App\Http\Controllers\Api\Catalogue\CatalogueArbreController::class);
+        Route::get('catalogue/taches', [App\Http\Controllers\Api\Catalogue\TacheController::class, 'index']);
 
         Route::get('dossiers', [App\Http\Controllers\Api\DossierController::class, 'index']);
         Route::post('dossiers', [App\Http\Controllers\Api\DossierController::class, 'store']);

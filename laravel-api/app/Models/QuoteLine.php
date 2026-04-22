@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Catalogue\Article as RefArticle;
+use App\Models\Catalogue\Package as RefPackage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -10,6 +12,8 @@ class QuoteLine extends Model
     protected $fillable = [
         'quote_id',
         'commercial_offering_id',
+        'ref_article_id',
+        'ref_package_id',
         'description',
         'quantity',
         'unit_price',
@@ -37,5 +41,15 @@ class QuoteLine extends Model
     public function commercialOffering(): BelongsTo
     {
         return $this->belongsTo(CommercialOffering::class, 'commercial_offering_id');
+    }
+
+    public function refArticle(): BelongsTo
+    {
+        return $this->belongsTo(RefArticle::class, 'ref_article_id');
+    }
+
+    public function refPackage(): BelongsTo
+    {
+        return $this->belongsTo(RefPackage::class, 'ref_package_id');
     }
 }

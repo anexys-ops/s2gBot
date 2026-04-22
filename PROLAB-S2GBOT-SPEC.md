@@ -15,6 +15,15 @@
 
 Projet Linear : [s2gBot — Migration PROLAB](https://linear.app/anexys/project/s2gbot-migration-prolab-f4833f6c540e/overview). Tickets P1 (BDC-107 … BDC-111) synchronisés avec cet état (voir historique `main`).
 
+### État — phases P2 (dossier) & P3 (devis enrichi)
+
+| Phase | Livrable | Statut | Remarques |
+|-------|----------|--------|-----------|
+| P2 | Dossiers + contacts, `missions.dossier_id`, API `/api/v1/dossiers` | Fait | Voir `DossierController`, UI `/dossiers` |
+| P3 | `quotes.dossier_id`, `quote_lines.ref_article_id` / `ref_package_id`, table `devis_taches`, API lecture `GET /api/v1/catalogue/taches` | Fait (API) | Migrations **idempotentes** (`hasTable` / `hasColumn`) — voir `2026_04_24_100000_*` |
+
+**Prod / anti-régression** : ne jamais écraser le `.env.docker` serveur (mots de passe DB). Le workflow exclut déjà ce fichier. `scripts/docker-prod-refresh.sh` exécute `php artisan migrate --force` à l’étape 5/6 (complémentaire au `migrate` du `docker-entrypoint` au boot).
+
 ---
 
 ## 1. Analyse PROLAB

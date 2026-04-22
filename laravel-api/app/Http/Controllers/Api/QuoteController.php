@@ -4,11 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Agency;
-use App\Models\Site;
+use App\Models\Catalogue\Article;
+use App\Models\Catalogue\Package;
+use App\Models\DevisTache;
+use App\Models\Dossier;
 use App\Models\Quote;
-use App\Support\AgencyAccess;
 use App\Models\QuoteLine;
+use App\Models\Site;
 use App\Services\CommercialDocumentTotalsService;
+use App\Support\AgencyAccess;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,14 +20,25 @@ use Illuminate\Validation\Rule;
 
 class QuoteController extends Controller
 {
-    private const LINE_RULES = [
-        'lines' => 'required|array|min:1',
+    private const QUOTE_LINE_BASE = [
         'lines.*.commercial_offering_id' => 'nullable|exists:commercial_offerings,id',
+        'lines.*.ref_article_id' => 'nullable|exists:ref_articles,id',
+        'lines.*.ref_package_id' => 'nullable|exists:ref_packages,id',
         'lines.*.description' => 'required|string|max:500',
         'lines.*.quantity' => 'required|integer|min:1',
         'lines.*.unit_price' => 'required|numeric|min:0',
         'lines.*.tva_rate' => 'nullable|numeric|min:0|max:100',
         'lines.*.discount_percent' => 'nullable|numeric|min:0|max:100',
+    ];
+
+    private const TACHES_RULES = [
+        'taches' => 'nullable|array',
+        'taches.*.ref_tache_id' => 'required|exists:ref_taches,id',
+        'taches.*.libelle' => 'nullable|string|max:255',
+        'taches.*.quantite' => 'required|integer|min:1',
+        'taches.*.prix_unitaire_ht' => 'required|numeric|min:0',
+        'taches.*.statut' => 'required|string|in:a_faire,en_cours,termine,annule',
+        'taches.*.ordre' => 'nullable|integer|min:0',
     ];
 
     public function index(Request $request): JsonResponse
@@ -33,7 +48,10 @@ class QuoteController extends Controller
             'client',
             'agency',
             'site',
+            'dossier',
             'quoteLines.commercialOffering',
+            'quoteLines.refArticle',
+            'quoteLines.refPackage',
             'billingAddress',
             'deliveryAddress',
             'pdfTemplate',
@@ -71,6 +89,7 @@ class QuoteController extends Controller
         $validated = $request->validate(array_merge([
             'client_id' => 'required|exists:clients,id',
             'site_id' => 'nullable|exists:sites,id',
+            'dossier_id' => 'nullable|exists:dossiers,id',
             'quote_date' => 'required|date',
             'order_date' => 'nullable|date',
             'site_delivery_date' => 'nullable|date',
@@ -88,7 +107,16 @@ class QuoteController extends Controller
             'travel_fee_tva_rate' => 'nullable|numeric|min:0|max:100',
             'apply_site_travel' => 'nullable|boolean',
             'meta' => 'nullable|array',
-        ], self::LINE_RULES));
+        ], [
+            'lines' => 'required|array|min:1',
+        ], self::QUOTE_LINE_BASE, self::TACHES_RULES));
+
+        $this->assertDossierForClient(
+            (int) $validated['client_id'],
+            isset($validated['dossier_id']) ? (int) $validated['dossier_id'] : null,
+            isset($validated['site_id']) ? (int) $validated['site_id'] : null,
+        );
+        $this->assertLinesNoDualRef($validated['lines']);
 
         $number = 'DEV-'.Carbon::now()->format('Ymd').'-'.str_pad((string) (Quote::count() + 1), 4, '0', STR_PAD_LEFT);
         $defaultTva = $validated['tva_rate'] ?? 20;
@@ -118,6 +146,7 @@ class QuoteController extends Controller
             'client_id' => $validated['client_id'],
             'agency_id' => $agencyId,
             'site_id' => $validated['site_id'] ?? null,
+            'dossier_id' => $validated['dossier_id'] ?? null,
             'quote_date' => $validated['quote_date'],
             'order_date' => $validated['order_date'] ?? null,
             'site_delivery_date' => $validated['site_delivery_date'] ?? null,
@@ -139,12 +168,13 @@ class QuoteController extends Controller
             'meta' => $validated['meta'] ?? null,
         ]);
 
-        $this->syncQuoteLines($quote, $validated['lines'], $defaultTva);
+        $this->syncQuoteLines($quote, $validated['lines'], (float) $defaultTva);
         $this->recalculateQuoteTotals($quote);
+        if (array_key_exists('taches', $validated)) {
+            $this->syncDevisTaches($quote, $validated['taches'] ?? []);
+        }
 
-        return response()->json($quote->fresh()->load([
-            'client', 'agency', 'site', 'quoteLines.commercialOffering', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
-        ]), 201);
+        return response()->json($this->loadQuoteForResponse($quote->fresh()), 201);
     }
 
     public function show(Request $request, Quote $quote): JsonResponse
@@ -154,9 +184,7 @@ class QuoteController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        return response()->json($quote->load([
-            'client', 'agency', 'site', 'quoteLines.commercialOffering', 'billingAddress', 'deliveryAddress', 'pdfTemplate', 'attachments',
-        ]));
+        return response()->json($this->loadQuoteForResponse($quote));
     }
 
     public function update(Request $request, Quote $quote): JsonResponse
@@ -177,14 +205,13 @@ class QuoteController extends Controller
             $quote->fill($validated);
             $quote->save();
 
-            return response()->json($quote->fresh()->load([
-                'client', 'site', 'quoteLines.commercialOffering', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
-            ]));
+            return response()->json($this->loadQuoteForResponse($quote->fresh()));
         }
 
         $validated = $request->validate(array_merge([
             'client_id' => 'sometimes|exists:clients,id',
             'site_id' => 'nullable|exists:sites,id',
+            'dossier_id' => 'nullable|exists:dossiers,id',
             'quote_date' => 'sometimes|date',
             'order_date' => 'nullable|date',
             'site_delivery_date' => 'nullable|date',
@@ -205,15 +232,9 @@ class QuoteController extends Controller
             'meta' => 'nullable|array',
         ], [
             'lines' => 'sometimes|array|min:1',
-            'lines.*.commercial_offering_id' => 'nullable|exists:commercial_offerings,id',
-            'lines.*.description' => 'required_with:lines|string|max:500',
-            'lines.*.quantity' => 'required_with:lines|integer|min:1',
-            'lines.*.unit_price' => 'required_with:lines|numeric|min:0',
-            'lines.*.tva_rate' => 'nullable|numeric|min:0|max:100',
-            'lines.*.discount_percent' => 'nullable|numeric|min:0|max:100',
-        ]));
+        ], self::QUOTE_LINE_BASE, self::TACHES_RULES));
 
-        $fill = collect($validated)->except(['lines', 'apply_site_travel'])->toArray();
+        $fill = collect($validated)->except(['lines', 'apply_site_travel', 'taches'])->toArray();
         if (! empty($validated['apply_site_travel']) && ($validated['site_id'] ?? $quote->site_id)) {
             $sid = $validated['site_id'] ?? $quote->site_id;
             $site = Site::find($sid);
@@ -222,6 +243,7 @@ class QuoteController extends Controller
             }
         }
         $quote->fill($fill);
+
         if (array_key_exists('site_id', $fill) || array_key_exists('client_id', $fill)) {
             $cid = (int) $quote->client_id;
             $agencyId = null;
@@ -236,18 +258,27 @@ class QuoteController extends Controller
             }
         }
 
+        $this->assertDossierForClient(
+            (int) $quote->client_id,
+            $quote->dossier_id ? (int) $quote->dossier_id : null,
+            $quote->site_id ? (int) $quote->site_id : null,
+        );
+
         if (isset($validated['lines'])) {
+            $this->assertLinesNoDualRef($validated['lines']);
             $defaultTva = $validated['tva_rate'] ?? $quote->tva_rate;
             $quote->quoteLines()->delete();
             $this->syncQuoteLines($quote, $validated['lines'], (float) $defaultTva);
         }
 
+        if (array_key_exists('taches', $validated)) {
+            $this->syncDevisTaches($quote, $validated['taches'] ?? []);
+        }
+
         $quote->save();
         $this->recalculateQuoteTotals($quote);
 
-        return response()->json($quote->fresh()->load([
-            'client', 'agency', 'site', 'quoteLines.commercialOffering', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
-        ]));
+        return response()->json($this->loadQuoteForResponse($quote->fresh()));
     }
 
     public function destroy(Request $request, Quote $quote): JsonResponse
@@ -261,6 +292,63 @@ class QuoteController extends Controller
         return response()->json(null, 204);
     }
 
+    private function loadQuoteForResponse(Quote $quote): Quote
+    {
+        return $quote->load([
+            'client', 'agency', 'site', 'dossier',
+            'quoteLines.commercialOffering',
+            'quoteLines.refArticle',
+            'quoteLines.refPackage',
+            'devisTaches.refTache',
+            'billingAddress', 'deliveryAddress', 'pdfTemplate', 'attachments',
+        ]);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $lines
+     */
+    private function assertLinesNoDualRef(array $lines): void
+    {
+        foreach ($lines as $i => $line) {
+            if (! empty($line['ref_article_id']) && ! empty($line['ref_package_id'])) {
+                abort(422, 'Une ligne de devis ne peut pas lier à la fois un article et un forfait (package) catalogue.');
+            }
+        }
+    }
+
+    private function assertDossierForClient(int $clientId, ?int $dossierId, ?int $siteId): void
+    {
+        if (! $dossierId) {
+            return;
+        }
+        $d = Dossier::query()->find($dossierId);
+        if (! $d || (int) $d->client_id !== $clientId) {
+            abort(422, 'Dossier invalide pour ce client.');
+        }
+        if ($siteId && $d->site_id && (int) $d->site_id !== $siteId) {
+            abort(422, 'Le dossier ne correspond pas au chantier du devis.');
+        }
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $taches
+     */
+    private function syncDevisTaches(Quote $quote, array $taches): void
+    {
+        DevisTache::query()->where('quote_id', $quote->id)->forceDelete();
+        foreach ($taches as $i => $row) {
+            DevisTache::query()->create([
+                'quote_id' => $quote->id,
+                'ref_tache_id' => (int) $row['ref_tache_id'],
+                'libelle' => $row['libelle'] ?? null,
+                'quantite' => (int) ($row['quantite'] ?? 1),
+                'prix_unitaire_ht' => $row['prix_unitaire_ht'],
+                'statut' => (string) ($row['statut'] ?? DevisTache::STATUT_A_FAIRE),
+                'ordre' => (int) ($row['ordre'] ?? $i),
+            ]);
+        }
+    }
+
     /**
      * @param  array<int, array<string, mixed>>  $lines
      */
@@ -269,17 +357,53 @@ class QuoteController extends Controller
         foreach ($lines as $line) {
             $tva = isset($line['tva_rate']) ? (float) $line['tva_rate'] : $defaultTva;
             $disc = isset($line['discount_percent']) ? (float) $line['discount_percent'] : 0;
+            $refArticleId = ! empty($line['ref_article_id']) ? (int) $line['ref_article_id'] : null;
+            $refPackageId = ! empty($line['ref_package_id']) ? (int) $line['ref_package_id'] : null;
+            $description = (string) $line['description'];
+            $unit = (float) $line['unit_price'];
+
+            if ($refPackageId) {
+                $p = Package::query()->find($refPackageId);
+                if ($p) {
+                    if (trim($description) === '') {
+                        $description = (string) $p->libelle;
+                    }
+                    if ($unit <= 0) {
+                        $unit = (float) $p->prix_ht;
+                    }
+                    if (! isset($line['tva_rate']) && $p->tva_rate !== null) {
+                        $tva = (float) $p->tva_rate;
+                    }
+                }
+                $refArticleId = null;
+            } elseif ($refArticleId) {
+                $a = Article::query()->find($refArticleId);
+                if ($a) {
+                    if (trim($description) === '') {
+                        $description = (string) $a->libelle;
+                    }
+                    if ($unit <= 0) {
+                        $unit = (float) $a->prix_unitaire_ht;
+                    }
+                    if (! isset($line['tva_rate']) && $a->tva_rate !== null) {
+                        $tva = (float) $a->tva_rate;
+                    }
+                }
+            }
+
             $ht = CommercialDocumentTotalsService::lineHt(
                 (float) $line['quantity'],
-                (float) $line['unit_price'],
+                $unit,
                 $disc,
             );
             QuoteLine::create([
                 'quote_id' => $quote->id,
                 'commercial_offering_id' => isset($line['commercial_offering_id']) ? (int) $line['commercial_offering_id'] : null,
-                'description' => $line['description'],
+                'ref_article_id' => $refArticleId,
+                'ref_package_id' => $refPackageId,
+                'description' => $description,
                 'quantity' => (int) $line['quantity'],
-                'unit_price' => $line['unit_price'],
+                'unit_price' => $unit,
                 'tva_rate' => $tva,
                 'discount_percent' => $disc,
                 'total' => $ht,

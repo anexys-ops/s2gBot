@@ -64,6 +64,7 @@ echo "=== 4/6 Démarrage app + web ==="
 "${DC[@]}" up -d app web
 
 echo "=== 5/6 Attente du conteneur app puis migrations + config Laravel ==="
+# migrate --force : appliqué ici (complète docker-entrypoint au boot) — ne pas retirer (déploiement / prod).
 for _ in $(seq 1 30); do
   if "${DC[@]}" exec -T app php artisan --version >/dev/null 2>&1; then
     break

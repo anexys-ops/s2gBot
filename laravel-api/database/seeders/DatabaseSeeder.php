@@ -128,6 +128,8 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->call(MailTemplateSeeder::class);
+        $this->call(ClientsProLabSeeder::class);
+        $this->call(CatalogueProLabSeeder::class);
         $this->call(CommercialOfferingSeeder::class);
         $this->call(DemoEssaisGraphiquesSeeder::class);
         $this->call(DemoFullDatasetSeeder::class);

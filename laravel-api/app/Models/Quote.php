@@ -48,6 +48,7 @@ class Quote extends Model
         'client_id',
         'agency_id',
         'site_id',
+        'dossier_id',
         'quote_date',
         'order_date',
         'site_delivery_date',
@@ -102,6 +103,11 @@ class Quote extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function dossier(): BelongsTo
+    {
+        return $this->belongsTo(Dossier::class, 'dossier_id');
     }
 
     public function billingAddress(): BelongsTo

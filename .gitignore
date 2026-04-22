@@ -25,3 +25,8 @@ laravel-api/storage/framework/views/*
 laravel-api/bootstrap/cache/*.php
 *.tsbuildinfo
 laravel-api/.phpunit.result.cache
+
+# Données / exports locaux (volumineux, hors dépôt)
+/PROLAB/
+/BD_S2G_PROLAB/
+/21.zip

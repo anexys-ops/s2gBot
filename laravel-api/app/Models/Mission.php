@@ -13,6 +13,7 @@ class Mission extends Model
 
     protected $fillable = [
         'site_id',
+        'dossier_id',
         'reference',
         'title',
         'mission_status',
@@ -33,6 +34,11 @@ class Mission extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function dossier(): BelongsTo
+    {
+        return $this->belongsTo(Dossier::class);
     }
 
     public function boreholes(): HasMany

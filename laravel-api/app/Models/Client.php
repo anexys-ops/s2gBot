@@ -97,4 +97,9 @@ class Client extends Model
     {
         return $this->hasMany(Quote::class);
     }
+
+    public function dossiers(): HasMany
+    {
+        return $this->hasMany(Dossier::class);
+    }
 }

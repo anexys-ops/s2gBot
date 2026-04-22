@@ -25,5 +25,6 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\App\Models\Invoice::class, \App\Policies\InvoicePolicy::class);
         Gate::policy(\App\Models\Report::class, \App\Policies\ReportPolicy::class);
         Gate::policy(\App\Models\Quote::class, \App\Policies\QuotePolicy::class);
+        Gate::policy(\App\Models\Catalogue\Article::class, \App\Policies\ArticlePolicy::class);
     }
 }

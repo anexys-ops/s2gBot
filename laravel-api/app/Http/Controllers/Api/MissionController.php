@@ -41,6 +41,7 @@ class MissionController extends Controller
 
         $validated = $request->validate([
             'reference' => 'required|string|max:255|unique:missions,reference',
+            'dossier_id' => 'nullable|integer|exists:dossiers,id',
             'title' => 'nullable|string|max:255',
             'mission_status' => 'nullable|in:g1,g2,g3,g4,g5',
             'maitre_ouvrage_name' => 'nullable|string|max:255',
@@ -82,6 +83,7 @@ class MissionController extends Controller
 
         $validated = $request->validate([
             'reference' => 'sometimes|string|max:255|unique:missions,reference,'.$mission->id,
+            'dossier_id' => 'nullable|integer|exists:dossiers,id',
             'title' => 'nullable|string|max:255',
             'mission_status' => 'sometimes|in:g1,g2,g3,g4,g5',
             'maitre_ouvrage_name' => 'nullable|string|max:255',

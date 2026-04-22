@@ -18,6 +18,8 @@ function isCrmModuleActive(pathname: string, isLab: boolean): boolean {
   if (pathname.startsWith('/crm')) return true
   if (pathname.startsWith('/clients')) return true
   if (pathname.startsWith('/sites')) return true
+  if (pathname.startsWith('/dossiers')) return true
+  if (pathname.startsWith('/catalogue')) return true
   if (pathname.startsWith('/devis')) return true
   if (pathname.startsWith('/invoices')) return true
   if (
@@ -94,6 +96,8 @@ export default function AppNavigation() {
       { to: '/crm/documents', label: 'Documents commerciaux' },
       { to: '/clients', label: 'Clients' },
       { to: '/sites', label: 'Chantiers' },
+      { to: '/dossiers', label: 'Dossiers chantier' },
+      { to: '/catalogue', label: 'Catalogue PROLAB' },
       { to: '/devis', label: 'Devis' },
       { to: '/invoices', label: 'Factures' },
     ]

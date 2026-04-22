@@ -72,6 +72,11 @@ class Site extends Model
         return $this->hasMany(Mission::class);
     }
 
+    public function dossiers(): HasMany
+    {
+        return $this->hasMany(Dossier::class);
+    }
+
     public function attachments(): MorphMany
     {
         return $this->morphMany(Attachment::class, 'attachable');

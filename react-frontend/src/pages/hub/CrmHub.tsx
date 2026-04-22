@@ -27,6 +27,18 @@ export default function CrmHub() {
       desc: 'Liste avec filtre par client ; fiche chantier, missions, carte OSM.',
       icon: 'building',
     },
+    {
+      to: '/dossiers',
+      title: 'Dossiers chantier',
+      desc: 'Dossiers techniques (PROLAB) : client, chantier, statut, contacts et onglets métier.',
+      icon: 'orders',
+    },
+    {
+      to: '/catalogue',
+      title: 'Catalogue PROLAB',
+      desc: 'Arbre familles d’essais, articles, forfaits — aligné sur la migration WinDev.',
+      icon: 'catalog',
+    },
     { to: '/devis', title: 'Devis', desc: isLab ? 'Propositions commerciales.' : 'Vos devis.', icon: 'quote' },
     { to: '/invoices', title: 'Factures', desc: 'Suivi facturation et paiements.', icon: 'invoice' },
   ]

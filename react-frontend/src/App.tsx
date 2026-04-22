@@ -1,4 +1,14 @@
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import DossiersListPage from './pages/dossiers/DossiersListPage'
+import DossierFichePage from './pages/dossiers/DossierFichePage'
+import DossierInfosTab from './pages/dossiers/tabs/DossierInfosTab'
+import DossierPlaceholderTab from './pages/dossiers/tabs/DossierPlaceholderTab'
+import DossierDevisTab from './pages/dossiers/tabs/DossierDevisTab'
+import DossierDocumentsTab from './pages/dossiers/tabs/DossierDocumentsTab'
+import CatalogueBtpPage from './pages/back-office/CatalogueBtpPage'
+import CatalogueListePage from './pages/catalogue/CatalogueListePage'
+import ArticleFichePage from './pages/catalogue/ArticleFichePage'
+import DossierNewPage from './pages/dossiers/DossierNewPage'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
@@ -85,6 +95,29 @@ function AppRoutes() {
         </Route>
         <Route path="crm" element={<CrmHub />} />
         <Route path="crm/documents" element={<CrmDocuments />} />
+        <Route path="catalogue" element={<CatalogueListePage />} />
+        <Route path="catalogue/articles/:id" element={<ArticleFichePage />} />
+        <Route path="dossiers/new" element={<DossierNewPage />} />
+        <Route path="dossiers" element={<DossiersListPage />} />
+        <Route path="dossiers/:id" element={<DossierFichePage />}>
+          <Route index element={<Navigate to="infos" replace />} />
+          <Route path="infos" element={<DossierInfosTab />} />
+          <Route path="devis" element={<DossierDevisTab />} />
+          <Route
+            path="bc-bl"
+            element={
+              <DossierPlaceholderTab
+                label="Bons de commande / bons de livraison"
+                description="Flux logistique et suivi des envois d’échantillons / documents."
+              />
+            }
+          />
+          <Route
+            path="essais"
+            element={<DossierPlaceholderTab label="Essais" description="Lien vers commandes d’essai et résultats." />}
+          />
+          <Route path="documents" element={<DossierDocumentsTab />} />
+        </Route>
         <Route path="terrain" element={<TerrainHub />} />
         <Route path="terrain/mesures" element={<TerrainMesuresPage />} />
         <Route path="terrain/chantiers" element={<TerrainChantiersCartePage />} />
@@ -104,6 +137,7 @@ function AppRoutes() {
           <Route index element={<Navigate to="catalogue-essais" replace />} />
           <Route element={<BackOfficeLayout />}>
             <Route path="catalogue-essais" element={<Catalog />} />
+            <Route path="catalogue-btp" element={<CatalogueBtpPage />} />
             <Route path="catalogue-commercial" element={<CommercialCatalogPage />} />
             <Route path="granulometrie" element={<GranulometryLab />} />
             <Route path="cadrage" element={<Cadrage />} />

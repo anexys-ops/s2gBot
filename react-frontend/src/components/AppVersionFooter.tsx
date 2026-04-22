@@ -30,12 +30,14 @@ type Props = {
   variant?: Variant
   /** Barre fixe en bas (app connectée). */
   dock?: boolean
+  /** Ligne supplémentaire sous les versions (ex. compte démo sur l’écran de connexion). */
+  demoHint?: string
 }
 
 /**
  * Versions : bundle front + API (GET /api/version). Une ligne en mode dock ; détails au survol.
  */
-export default function AppVersionFooter({ variant = 'app', dock = false }: Props) {
+export default function AppVersionFooter({ variant = 'app', dock = false, demoHint }: Props) {
   const [apiInfo, setApiInfo] = useState<ApiVersionPayload | null>(null)
   const [apiError, setApiError] = useState(false)
 
@@ -115,7 +117,17 @@ export default function AppVersionFooter({ variant = 'app', dock = false }: Prop
       >
         <div className="app-version-footer__inner app-version-footer__inner--single">
           <span className={dotClass} title={statusText} aria-hidden />
-          <span className="app-version-footer__dock-text">{dockLine}</span>
+          <div className="app-version-footer__stack">
+            <span className="app-version-footer__dock-text">{dockLine}</span>
+            {variant === 'auth' ? (
+              <span className="app-version-footer__detail" title={apiLabel}>
+                {apiLabel}
+              </span>
+            ) : null}
+            {variant === 'auth' && demoHint ? (
+              <span className="app-version-footer__demo-hint">{demoHint}</span>
+            ) : null}
+          </div>
         </div>
       </footer>
       {variant === 'auth' ? <SupportFab anchor="auth" /> : null}

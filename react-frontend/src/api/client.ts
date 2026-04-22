@@ -386,6 +386,211 @@ export const moduleSettingsApi = {
     }),
 }
 
+export interface RefPackageRow {
+  id: number
+  ref_famille_package_id: number
+  code: string
+  libelle: string
+  description?: string | null
+  prix_ht: string
+  prix_ht_formate?: string
+  tva_rate: string
+  actif: boolean
+  famille_package?: RefFamillePackageRow & { article?: RefArticleRow }
+}
+
+export interface RefFamillePackageRow {
+  id: number
+  ref_article_id: number
+  code: string
+  libelle: string
+  description?: string | null
+  ordre: number
+  actif: boolean
+  packages?: RefPackageRow[]
+}
+
+export interface RefResultatRow {
+  id: number
+  ref_article_id: number
+  code: string
+  libelle: string
+  norme?: string | null
+  valeur_seuil?: string | null
+}
+
+export interface RefParametreEssaiRow {
+  id: number
+  ref_article_id: number
+  code: string
+  libelle: string
+  unite?: string | null
+  valeur_min?: string | null
+  valeur_max?: string | null
+  ordre: number
+}
+
+export interface RefArticleRow {
+  id: number
+  ref_famille_article_id: number
+  code: string
+  libelle: string
+  description?: string | null
+  unite: string
+  prix_unitaire_ht: string
+  prix_unitaire_ht_formate?: string
+  tva_rate: string
+  duree_estimee: number
+  normes?: string | null
+  actif: boolean
+  famille?: RefFamilleArticleRow
+  famille_packages?: RefFamillePackageRow[]
+  parametres_essai?: RefParametreEssaiRow[]
+  resultats?: RefResultatRow[]
+}
+
+export interface RefFamilleArticleRow {
+  id: number
+  code: string
+  libelle: string
+  description?: string | null
+  ordre: number
+  actif: boolean
+  articles?: RefArticleRow[]
+}
+
+export const catalogueApi = {
+  familles: (params?: { with_inactif?: boolean }) => {
+    const q = new URLSearchParams()
+    if (params?.with_inactif) q.set('with_inactif', '1')
+    const s = q.toString()
+    return api<RefFamilleArticleRow[]>(`/v1/catalogue/familles${s ? `?${s}` : ''}`)
+  },
+  arbre: (params?: { with_inactif?: boolean }) => {
+    const q = new URLSearchParams()
+    if (params?.with_inactif) q.set('with_inactif', '1')
+    const s = q.toString()
+    return api<RefFamilleArticleRow[]>(`/v1/catalogue/arbre${s ? `?${s}` : ''}`)
+  },
+  articlesByFamille: (familleId: number, params?: { with_inactif?: boolean }) => {
+    const q = new URLSearchParams()
+    if (params?.with_inactif) q.set('with_inactif', '1')
+    const s = q.toString()
+    return api<RefArticleRow[]>(`/v1/catalogue/familles/${familleId}/articles${s ? `?${s}` : ''}`)
+  },
+  articles: (params?: { ref_famille_article_id?: number; with_inactif?: boolean; q?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.ref_famille_article_id) q.set('ref_famille_article_id', String(params.ref_famille_article_id))
+    if (params?.with_inactif) q.set('with_inactif', '1')
+    if (params?.q?.trim()) q.set('q', params.q.trim())
+    const s = q.toString()
+    return api<RefArticleRow[]>(`/v1/catalogue/articles${s ? `?${s}` : ''}`)
+  },
+  packages: (params?: { ref_article_id?: number; ref_famille_package_id?: number; with_inactif?: boolean }) => {
+    const q = new URLSearchParams()
+    if (params?.ref_article_id) q.set('ref_article_id', String(params.ref_article_id))
+    if (params?.ref_famille_package_id) q.set('ref_famille_package_id', String(params.ref_famille_package_id))
+    if (params?.with_inactif) q.set('with_inactif', '1')
+    const s = q.toString()
+    return api<RefPackageRow[]>(`/v1/catalogue/packages${s ? `?${s}` : ''}`)
+  },
+  article: (id: number) => api<RefArticleRow>(`/v1/catalogue/articles/${id}`),
+  createArticle: (body: Partial<RefArticleRow> & { ref_famille_article_id: number; code: string; libelle: string }) =>
+    api<RefArticleRow>('/v1/catalogue/articles', { method: 'POST', body: JSON.stringify(body) }),
+  updateArticle: (id: number, body: Partial<RefArticleRow>) =>
+    api<RefArticleRow>(`/v1/catalogue/articles/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteArticle: (id: number) => api<null>(`/v1/catalogue/articles/${id}`, { method: 'DELETE' }),
+}
+
+export type DossierStatut = 'brouillon' | 'en_cours' | 'cloture' | 'archive'
+
+export type DossierCreateInput = {
+  titre: string
+  client_id: number
+  site_id: number
+  statut: DossierStatut
+  date_debut: string
+  mission_id?: number | null
+  date_fin_prevue?: string | null
+  maitre_ouvrage?: string | null
+  entreprise_chantier?: string | null
+  notes?: string | null
+  reference?: string | null
+  contacts?: DossierContactInput[]
+}
+
+export interface DossierContactInput {
+  id?: number
+  nom: string
+  prenom?: string | null
+  email?: string | null
+  telephone?: string | null
+  role?: string | null
+}
+
+export interface DossierRow {
+  id: number
+  reference: string
+  titre: string
+  client_id: number
+  site_id: number
+  mission_id?: number | null
+  statut: DossierStatut
+  date_debut: string
+  date_fin_prevue?: string | null
+  maitre_ouvrage?: string | null
+  entreprise_chantier?: string | null
+  notes?: string | null
+  created_by: number
+  client?: Client
+  site?: Site
+  createur?: Pick<User, 'id' | 'name' | 'email'>
+  mission?: { id: number; reference: string; title?: string | null } | null
+  contacts?: DossierContactRow[]
+  missions?: { id: number; reference: string; title?: string | null; dossier_id?: number | null }[]
+  quotes?: Quote[]
+  attachments?: Attachment[]
+}
+
+export interface DossierContactRow {
+  id: number
+  dossier_id: number
+  nom: string
+  prenom?: string | null
+  email?: string | null
+  telephone?: string | null
+  role?: string | null
+}
+
+export const dossiersApi = {
+  list: (params?: {
+    client_id?: number
+    statut?: DossierStatut
+    site_id?: number
+    date_debut_from?: string
+    date_debut_to?: string
+  }) => {
+    const q = new URLSearchParams()
+    if (params?.client_id) q.set('client_id', String(params.client_id))
+    if (params?.statut) q.set('statut', params.statut)
+    if (params?.site_id) q.set('site_id', String(params.site_id))
+    if (params?.date_debut_from) q.set('date_debut_from', params.date_debut_from)
+    if (params?.date_debut_to) q.set('date_debut_to', params.date_debut_to)
+    const s = q.toString()
+    return api<DossierRow[]>(`/v1/dossiers${s ? `?${s}` : ''}`)
+  },
+  get: (id: number) => api<DossierRow>(`/v1/dossiers/${id}`),
+  create: (body: DossierCreateInput) => api<DossierRow>('/v1/dossiers', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: number, body: Partial<DossierCreateInput>) =>
+    api<DossierRow>(`/v1/dossiers/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api<null>(`/v1/dossiers/${id}`, { method: 'DELETE' }),
+  devis: (id: number) => api<Quote[]>(`/v1/dossiers/${id}/devis`),
+  bons: (id: number) =>
+    api<{ bons_commande: unknown[]; bons_livraison: unknown[]; message?: string }>(`/v1/dossiers/${id}/bons`),
+  addContact: (id: number, body: Omit<DossierContactInput, 'id'>) =>
+    api<DossierContactRow>(`/v1/dossiers/${id}/contacts`, { method: 'POST', body: JSON.stringify(body) }),
+}
+
 export const brandingApi = {
   get: () => api<{ logo_url: string | null }>('/branding'),
   async uploadLogo(file: File): Promise<{ logo_url: string | null; logo_public_path?: string }> {

@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Attachment;
 use App\Models\Calibration;
 use App\Models\Client;
+use App\Models\Dossier;
 use App\Models\Equipment;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Quote;
 use App\Models\Site;
+use App\Support\AgencyAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -22,7 +24,7 @@ class AttachmentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order', 'site', 'equipment', 'calibration'])],
+            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order', 'site', 'equipment', 'calibration', 'dossier'])],
             'attachable_id' => 'required|integer',
         ]);
 
@@ -39,7 +41,7 @@ class AttachmentController extends Controller
     {
         $validated = $request->validate([
             'file' => 'required|file|max:15360',
-            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order', 'site', 'equipment', 'calibration'])],
+            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order', 'site', 'equipment', 'calibration', 'dossier'])],
             'attachable_id' => 'required|integer',
         ]);
 
@@ -109,12 +111,16 @@ class AttachmentController extends Controller
             'site' => Site::class,
             'equipment' => Equipment::class,
             'calibration' => Calibration::class,
+            'dossier' => Dossier::class,
             default => Client::class,
         };
     }
 
     private function userCanAccessAttachmentContext($user, object $model): bool
     {
+        if ($model instanceof Dossier) {
+            return AgencyAccess::userMayAccessDossier($user, $model);
+        }
         if ($user->isLab()) {
             return true;
         }

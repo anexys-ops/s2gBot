@@ -19,6 +19,12 @@ function metaForPath(pathname: string): PageMeta {
       subtitle: 'Produits et prestations : prix d’achat, prix de vente, TVA, stock — alimentation des lignes de devis.',
       crumb: 'Catalogue commercial',
     }
+  if (pathname.includes('/catalogue-btp'))
+    return {
+      title: 'Catalogue BTP (PROLAB)',
+      subtitle: 'Référentiel familles, articles et forfaits — migration depuis PROLAB (WinDev).',
+      crumb: 'Catalogue BTP',
+    }
   if (pathname.includes('/granulometrie'))
     return {
       title: 'Granulométrie — indicateurs',
@@ -89,6 +95,7 @@ function metaForPath(pathname: string): PageMeta {
 function isBackOfficeCataloguePath(pathname: string): boolean {
   return (
     pathname.startsWith('/back-office/catalogue-essais') ||
+    pathname.startsWith('/back-office/catalogue-btp') ||
     pathname.startsWith('/back-office/catalogue-commercial')
   )
 }
@@ -105,6 +112,7 @@ export default function BackOfficeLayout() {
 
   const catalogueTabs = [
     { to: '/back-office/catalogue-essais', label: 'Catalogue essais', end: true as const },
+    { to: '/back-office/catalogue-btp', label: 'Catalogue BTP', end: true as const },
     { to: '/back-office/catalogue-commercial', label: 'Catalogue commercial', end: true as const },
   ]
 

@@ -17,7 +17,7 @@ type Props = {
   /** Titre principal de la fiche ou de la liste */
   title: string
   /** Sous-titre ou référence (#123) */
-  subtitle?: string
+  subtitle?: ReactNode
   /** Onglets style Dolibarr (Fiche, Documents…) */
   tabs?: ModuleTab[]
   /** Entre l’en-tête et les onglets : raccourcis (ex. liens vers une autre zone du module). */
@@ -62,7 +62,13 @@ export default function ModuleEntityShell({
         <header className="module-shell__header">
           <div className="module-shell__titles">
             <h1 className="module-shell__title">{title}</h1>
-            {subtitle ? <p className="module-shell__subtitle">{subtitle}</p> : null}
+            {subtitle != null && subtitle !== '' ? (
+              typeof subtitle === 'string' ? (
+                <p className="module-shell__subtitle">{subtitle}</p>
+              ) : (
+                <div className="module-shell__subtitle">{subtitle}</div>
+              )
+            ) : null}
           </div>
           {actions ? <div className="module-shell__actions">{actions}</div> : null}
         </header>

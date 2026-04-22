@@ -11,6 +11,36 @@ Route::get('/version', [App\Http\Controllers\Api\VersionController::class, 'show
 Route::get('/openapi.json', [App\Http\Controllers\Api\OpenApiController::class, 'show']);
 
 Route::middleware('auth:sanctum')->group(function () {
+    Route::prefix('v1')->group(function () {
+        Route::get('catalogue/familles', [App\Http\Controllers\Api\Catalogue\FamilleArticleController::class, 'index']);
+        Route::get('catalogue/familles/{famille}/articles', [App\Http\Controllers\Api\Catalogue\FamilleArticleController::class, 'articles']);
+        Route::get('catalogue/articles', [App\Http\Controllers\Api\Catalogue\ArticleController::class, 'index']);
+        Route::get('catalogue/packages', [App\Http\Controllers\Api\Catalogue\PackageController::class, 'index']);
+        Route::get('catalogue/articles/{article}', [App\Http\Controllers\Api\Catalogue\ArticleController::class, 'show'])
+            ->whereNumber('article');
+        Route::post('catalogue/articles', [App\Http\Controllers\Api\Catalogue\ArticleController::class, 'store']);
+        Route::put('catalogue/articles/{article}', [App\Http\Controllers\Api\Catalogue\ArticleController::class, 'update'])
+            ->whereNumber('article');
+        Route::delete('catalogue/articles/{article}', [App\Http\Controllers\Api\Catalogue\ArticleController::class, 'destroy'])
+            ->whereNumber('article');
+        Route::get('catalogue/arbre', App\Http\Controllers\Api\Catalogue\CatalogueArbreController::class);
+
+        Route::get('dossiers', [App\Http\Controllers\Api\DossierController::class, 'index']);
+        Route::post('dossiers', [App\Http\Controllers\Api\DossierController::class, 'store']);
+        Route::get('dossiers/{dossier}/devis', [App\Http\Controllers\Api\DossierController::class, 'devis'])
+            ->whereNumber('dossier');
+        Route::get('dossiers/{dossier}/bons', [App\Http\Controllers\Api\DossierController::class, 'bons'])
+            ->whereNumber('dossier');
+        Route::post('dossiers/{dossier}/contacts', [App\Http\Controllers\Api\DossierController::class, 'addContact'])
+            ->whereNumber('dossier');
+        Route::get('dossiers/{dossier}', [App\Http\Controllers\Api\DossierController::class, 'show'])
+            ->whereNumber('dossier');
+        Route::put('dossiers/{dossier}', [App\Http\Controllers\Api\DossierController::class, 'update'])
+            ->whereNumber('dossier');
+        Route::delete('dossiers/{dossier}', [App\Http\Controllers\Api\DossierController::class, 'destroy'])
+            ->whereNumber('dossier');
+    });
+
     Route::post('/logout', [App\Http\Controllers\Api\AuthController::class, 'logout']);
     Route::get('/user', [App\Http\Controllers\Api\AuthController::class, 'user']);
 

@@ -6,10 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-# Aligné sur deploy.yml : évite l’avertissement Node 20 des actions (checkout, etc.)
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   laravel:
     name: Laravel API
@@ -18,7 +14,7 @@ jobs:
       run:
         working-directory: laravel-api
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
@@ -37,8 +33,8 @@ jobs:
       run:
         working-directory: react-frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: npm
@@ -55,8 +51,8 @@ jobs:
       run:
         working-directory: react-frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: npm

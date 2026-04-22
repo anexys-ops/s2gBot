@@ -31,12 +31,9 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # GitHub : éviter l’avertissement Node 20 sur actions/checkout (voir changelog Actions 2025-09)
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
 
@@ -99,7 +96,7 @@ jobs:
           echo "✓ Code synchronisé"
 
       - name: Déployer sur serveur (SSH)
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}

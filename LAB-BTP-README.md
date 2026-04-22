@@ -164,6 +164,28 @@ Menu **Back office → Calculs BTP** : formules courantes avec exemples et mini-
 
 API : `GET /api/btp-calculations/exemples`, `POST /api/btp-calculations/calculer` (body : `{ "id", "valeurs" }`).
 
+## Production Docker (serveur, ex. `/opt/s2gBot`)
+
+Le fichier **`.env.docker`** à la racine du dépôt **n’est pas** dans Git et est **exclu** du rsync de déploiement (secrets + config locale). S’il manque, `docker-prod-refresh.sh` et `./scripts/docker-artisan.sh` échouent.
+
+**Création une fois sur le serveur** (puis édition des mots de passe, `APP_KEY`, `APP_URL` / `FRONTEND_URL`, `HTTP_PORT` si besoin) :
+
+```bash
+cd /opt/s2gBot   # ou le chemin réel
+cp docker/env.docker.example .env.docker
+# Éditer .env.docker — aligner DB_* sur le volume MySQL déjà en place si la base existe déjà
+```
+
+**Artisan dans le conteneur `app`** (migrations, seeders ciblés) :
+
+```bash
+./scripts/docker-artisan.sh migrate --force
+./scripts/docker-artisan.sh db:seed --class=ClientsProLabSeeder --force
+./scripts/docker-artisan.sh db:seed --class=CatalogueProLabSeeder --force
+```
+
+**Variable optionnelle** : `ENV_DOCKER_FILE=/chemin/vers/.env.docker ./scripts/docker-artisan.sh …` si le fichier n’est pas nommé exactement `.env.docker` à la racine.
+
 ### Graphiques essais
 
 Menu **Graphiques essais** : visualisation des essais avec plusieurs onglets.

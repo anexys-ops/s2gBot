@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# Aligné sur deploy.yml : évite l’avertissement Node 20 des actions (checkout, etc.)
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   laravel:
     name: Laravel API

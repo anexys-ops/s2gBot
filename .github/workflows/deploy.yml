@@ -100,10 +100,6 @@ jobs:
 
       - name: Déployer sur serveur (SSH)
         uses: appleboy/ssh-action@v1.2.0
-        env:
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          GIT_SHA_FULL: ${{ github.sha }}
-          PKG_VER: ${{ steps.ver.outputs.pkg_ver }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -111,11 +107,16 @@ jobs:
           port: 167
           # Build Docker (NO_CACHE=1 par défaut) peut dépasser le délai implicite court
           command_timeout: 45m
-          envs: DEPLOY_PATH,GIT_SHA_FULL,PKG_VER
           script_stop: true
+          # Ne pas s’appuyer sur `envs` (drone-ssh) : variables parfois absentes côté distant → `cd` silencieux + exit 1.
+          # On injecte ici avec toJSON (échappement sûr des chemins / versions).
           script: |
+            #!/bin/bash
             set -euo pipefail
-            export GIT_COMMIT_SHORT="${GIT_SHA_FULL:0:7}"
+            DEPLOY_PATH=${{ toJSON(secrets.DEPLOY_PATH) }}
+            PKG_VER=${{ toJSON(steps.ver.outputs.pkg_ver) }}
+            GIT_SHA_FULL=${{ toJSON(github.sha) }}
+            GIT_COMMIT_SHORT="${GIT_SHA_FULL:0:7}"
 
             echo "=========================================="
             echo "▶ Deploy s2gBot"
@@ -124,12 +125,19 @@ jobs:
             echo "▶ Cible : $DEPLOY_PATH"
             echo "=========================================="
 
+            if [ -z "$DEPLOY_PATH" ]; then
+              echo "❌ DEPLOY_PATH vide (secret GitHub Actions manquant ?)"
+              exit 1
+            fi
             if [ ! -d "$DEPLOY_PATH" ]; then
               echo "❌ Répertoire inexistant : $DEPLOY_PATH"
               exit 1
             fi
 
-            cd "$DEPLOY_PATH"
+            if ! cd "$DEPLOY_PATH"; then
+              echo "❌ Impossible d’accéder au répertoire (permissions ?) : $DEPLOY_PATH"
+              exit 1
+            fi
             if [ ! -f .env.docker ]; then
               echo "❌ Fichier .env.docker absent (obligatoire pour docker compose / docker-prod-refresh.sh)."
               echo "   Le rsync n’envoie pas ce fichier. Sur le serveur, une fois :"

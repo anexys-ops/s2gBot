@@ -787,6 +787,102 @@ export const equipmentsApi = {
     api(`/equipments/${equipmentId}/calibrations/${calibrationId}`, { method: 'DELETE' }),
 }
 
+export type NonConformityRow = {
+  id: number
+  reference: string
+  detected_at: string
+  detected_by: number
+  sample_id: number | null
+  equipment_id: number | null
+  order_id: number | null
+  severity: string
+  description: string
+  status: string
+  meta?: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+  detected_by_user?: { id: number; name: string; email: string }
+  sample?: { id: number; reference: string } | null
+  equipment?: { id: number; name: string; code: string } | null
+  order?: { id: number; reference: string } | null
+  corrective_actions?: CorrectiveActionRow[]
+}
+
+export type CorrectiveActionRow = {
+  id: number
+  non_conformity_id: number
+  title: string
+  responsible_user_id: number | null
+  due_date: string | null
+  status: string
+  verification_notes: string | null
+  created_at: string
+  updated_at: string
+  responsible_user?: { id: number; name: string; email: string } | null
+}
+
+export const nonConformitiesApi = {
+  stats: () => api<{ open: number; closed: number; avg_resolution_days: number | null }>('/non-conformities/stats'),
+  list: (params?: { status?: string; severity?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.severity) q.set('severity', params.severity)
+    const s = q.toString()
+    return api<NonConformityRow[]>(`/non-conformities${s ? `?${s}` : ''}`)
+  },
+  get: (id: number) => api<NonConformityRow>(`/non-conformities/${id}`),
+  create: (body: {
+    detected_at: string
+    detected_by: number
+    sample_id?: number | null
+    equipment_id?: number | null
+    order_id?: number | null
+    severity: string
+    description: string
+    status: string
+    meta?: Record<string, unknown> | null
+  }) => api<NonConformityRow>('/non-conformities', { method: 'POST', body: JSON.stringify(body) }),
+  update: (
+    id: number,
+    body: Partial<{
+      detected_at: string
+      detected_by: number
+      sample_id: number | null
+      equipment_id: number | null
+      order_id: number | null
+      severity: string
+      description: string
+      status: string
+      meta: Record<string, unknown> | null
+    }>,
+  ) => api<NonConformityRow>(`/non-conformities/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/non-conformities/${id}`, { method: 'DELETE' }),
+  createAction: (
+    ncId: number,
+    body: {
+      title: string
+      responsible_user_id?: number | null
+      due_date?: string | null
+      status: string
+      verification_notes?: string | null
+    },
+  ) =>
+    api<CorrectiveActionRow>(`/non-conformities/${ncId}/corrective-actions`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateAction: (
+    id: number,
+    body: Partial<{
+      title: string
+      responsible_user_id: number | null
+      due_date: string | null
+      status: string
+      verification_notes: string | null
+    }>,
+  ) => api<CorrectiveActionRow>(`/corrective-actions/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+}
+
 export const testTypesApi = {
   list: () => api<TestType[]>('/test-types'),
   get: (id: number) => api<TestType>(`/test-types/${id}`),

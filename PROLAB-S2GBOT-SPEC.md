@@ -3,6 +3,18 @@
 > Date : 2026-04-22  
 > Objectif : Intégrer l'architecture fonctionnelle de PROLAB (WinDev/HFSQL) dans s2gBot (Laravel 11 + React 18 + Expo), en conservant le design et les menus existants.
 
+### État — phase P1 (catalogue produits, Linear)
+
+| Livrable | Statut | Emplacement principal |
+|----------|--------|------------------------|
+| Migrations `ref_*` (familles, articles, packages, tâches, paramètres, résultats) | Fait | `laravel-api/database/migrations/2026_04_22_1000*.php`, `...12000*.php` |
+| Modèles + relations + scopes `actif` / `ordonne` | Fait | `laravel-api/app/Models/Catalogue/*` |
+| API v1 CRUD articles + lecture familles / arbre / packages | Fait | `laravel-api/routes/api.php` (prefix `v1/catalogue`), `.../Api/Catalogue/*` |
+| Seeder 14 familles + ~60 articles + résultats | Fait | `database/seeders/CatalogueProLabSeeder.php` (appelé par `DatabaseSeeder`) |
+| UI `/catalogue`, fiche article | Fait | `react-frontend/src/pages/catalogue/*`, `components/Catalogue/ArbreCatalogue.tsx` |
+
+Projet Linear : [s2gBot — Migration PROLAB](https://linear.app/anexys/project/s2gbot-migration-prolab-f4833f6c540e/overview). Tickets P1 (BDC-107 … BDC-111) synchronisés avec cet état (voir historique `main`).
+
 ---
 
 ## 1. Analyse PROLAB

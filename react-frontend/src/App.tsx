@@ -30,6 +30,8 @@ import GranulometryLab from './pages/back-office/GranulometryLab'
 import ActivityLogPage from './pages/back-office/ActivityLogPage'
 import EquipmentsPage from './pages/back-office/EquipmentsPage'
 import EquipmentDetailPage from './pages/back-office/EquipmentDetailPage'
+import NonConformitiesPage from './pages/back-office/NonConformitiesPage'
+import NonConformityDetailPage from './pages/back-office/NonConformityDetailPage'
 import BackOfficeLayout from './pages/back-office/BackOfficeLayout'
 import GraphiquesEssais from './pages/GraphiquesEssais'
 import CrmHub from './pages/hub/CrmHub'
@@ -145,6 +147,8 @@ function AppRoutes() {
             <Route path="journal-audit" element={<ActivityLogPage />} />
             <Route path="equipements" element={<EquipmentsPage />} />
             <Route path="equipements/:id" element={<EquipmentDetailPage />} />
+            <Route path="non-conformites" element={<NonConformitiesPage />} />
+            <Route path="non-conformites/:id" element={<NonConformityDetailPage />} />
             <Route path="modeles-rapports-pdf" element={<ReportPdfTemplates />} />
             <Route path="modeles-documents-pdf" element={<DocumentPdfTemplates />} />
             <Route path="configuration" element={<ModuleConfigurationPage />} />

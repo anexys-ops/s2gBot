@@ -92,6 +92,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('equipments/{equipment}/calibrations/{calibration}', [App\Http\Controllers\Api\CalibrationController::class, 'update']);
     Route::patch('equipments/{equipment}/calibrations/{calibration}', [App\Http\Controllers\Api\CalibrationController::class, 'update']);
     Route::delete('equipments/{equipment}/calibrations/{calibration}', [App\Http\Controllers\Api\CalibrationController::class, 'destroy']);
+    // ISO 17025 — non-conformités & actions correctives (CAPA / 8D)
+    Route::get('non-conformities/stats', [App\Http\Controllers\Api\NonConformityController::class, 'stats']);
+    Route::apiResource('non-conformities', App\Http\Controllers\Api\NonConformityController::class);
+    Route::post('non-conformities/{non_conformity}/corrective-actions', [App\Http\Controllers\Api\CorrectiveActionController::class, 'store']);
+    Route::patch('corrective-actions/{corrective_action}', [App\Http\Controllers\Api\CorrectiveActionController::class, 'update']);
+    Route::delete('corrective-actions/{corrective_action}', [App\Http\Controllers\Api\CorrectiveActionController::class, 'destroy']);
     Route::apiResource('orders', App\Http\Controllers\Api\OrderController::class);
     Route::get('orders/{order}/samples', [App\Http\Controllers\Api\SampleController::class, 'index']);
     Route::apiResource('samples', App\Http\Controllers\Api\SampleController::class)->except(['index']);

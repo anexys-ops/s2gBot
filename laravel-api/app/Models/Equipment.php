@@ -59,4 +59,9 @@ class Equipment extends Model
     {
         return $this->morphMany(Attachment::class, 'attachable');
     }
+
+    public function nonConformities(): HasMany
+    {
+        return $this->hasMany(NonConformity::class);
+    }
 }

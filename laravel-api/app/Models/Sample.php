@@ -51,4 +51,9 @@ class Sample extends Model
     {
         return $this->hasMany(TestResult::class);
     }
+
+    public function nonConformities(): HasMany
+    {
+        return $this->hasMany(NonConformity::class);
+    }
 }

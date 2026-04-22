@@ -55,6 +55,12 @@ function metaForPath(pathname: string): PageMeta {
       subtitle: 'Parc matériel, rattachement aux essais et suivi des échéances (SNIMA / ISO 17025).',
       crumb: 'Équipements',
     }
+  if (pathname.includes('/non-conformites'))
+    return {
+      title: 'Non-conformités (CAPA)',
+      subtitle: 'Suivi des écarts ISO 17025, actions correctives et indicateurs d’ouverture / clôture.',
+      crumb: 'Non-conformités',
+    }
   if (pathname.includes('/modeles-rapports-pdf'))
     return {
       title: 'Modèles PDF — rapports d’essais',
@@ -122,6 +128,7 @@ export default function BackOfficeLayout() {
     { to: '/back-office/exemples-calculs', label: 'Calculs BTP', end: true as const },
     { to: '/back-office/journal-audit', label: 'Journal d’audit', end: true as const },
     { to: '/back-office/equipements', label: 'Équipements', end: true as const },
+    { to: '/back-office/non-conformites', label: 'Non-conformités', end: true as const },
     { to: '/clients', label: 'Clients' },
     { to: '/sites', label: 'Chantiers' },
     ...(isLab

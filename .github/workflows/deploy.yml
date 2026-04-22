@@ -31,6 +31,9 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # GitHub : éviter l’avertissement Node 20 sur actions/checkout (voir changelog Actions 2025-09)
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -106,6 +109,8 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 167
+          # Build Docker (NO_CACHE=1 par défaut) peut dépasser le délai implicite court
+          command_timeout: 45m
           envs: DEPLOY_PATH,GIT_SHA_FULL,PKG_VER
           script_stop: true
           script: |
@@ -125,23 +130,26 @@ jobs:
             fi
 
             cd "$DEPLOY_PATH"
+            if [ ! -f .env.docker ]; then
+              echo "❌ Fichier .env.docker absent (obligatoire pour docker compose / docker-prod-refresh.sh)."
+              echo "   Le rsync n’envoie pas ce fichier. Sur le serveur, une fois :"
+              echo "   cp $DEPLOY_PATH/docker/env.docker.example $DEPLOY_PATH/.env.docker"
+              echo "   Puis éditer DB, APP_KEY, HTTP_PORT, etc., puis relancer le workflow (ou push)."
+              exit 1
+            fi
             chmod +x scripts/*.sh 2>/dev/null || true
 
-            if [ -f .env.docker ]; then
-              if grep -q '^APP_VERSION=' .env.docker; then
-                sed -i "s/^APP_VERSION=.*/APP_VERSION=$PKG_VER/" .env.docker
-              else
-                printf '\nAPP_VERSION=%s\n' "$PKG_VER" >> .env.docker
-              fi
-              if grep -q '^GIT_COMMIT_SHORT=' .env.docker; then
-                sed -i "s/^GIT_COMMIT_SHORT=.*/GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT/" .env.docker
-              else
-                printf 'GIT_COMMIT_SHORT=%s\n' "$GIT_COMMIT_SHORT" >> .env.docker
-              fi
-              echo "✓ .env.docker mis à jour (APP_VERSION=$PKG_VER, GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT)"
+            if grep -q '^APP_VERSION=' .env.docker; then
+              sed -i "s/^APP_VERSION=.*/APP_VERSION=$PKG_VER/" .env.docker
             else
-              echo "⚠️  .env.docker absent — à créer à partir de .env.docker.example"
+              printf '\nAPP_VERSION=%s\n' "$PKG_VER" >> .env.docker
             fi
+            if grep -q '^GIT_COMMIT_SHORT=' .env.docker; then
+              sed -i "s/^GIT_COMMIT_SHORT=.*/GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT/" .env.docker
+            else
+              printf 'GIT_COMMIT_SHORT=%s\n' "$GIT_COMMIT_SHORT" >> .env.docker
+            fi
+            echo "✓ .env.docker mis à jour (APP_VERSION=$PKG_VER, GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT)"
 
             echo "▶ Exécution docker-prod-refresh.sh"
             ./scripts/docker-prod-refresh.sh

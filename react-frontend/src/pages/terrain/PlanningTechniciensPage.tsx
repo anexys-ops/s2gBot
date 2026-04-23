@@ -19,6 +19,38 @@ function addDays(d: Date, n: number) {
   return x
 }
 
+/** Lundi 00:00 (local) de la semaine contenant `d`. */
+function startOfWeekMonday(d: Date): Date {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const dow = (x.getDay() + 6) % 7
+  x.setDate(x.getDate() - dow)
+  return x
+}
+
+function parseYmdLocal(ymd: string): Date {
+  const [y, m, day] = ymd.split('-').map(Number)
+  return new Date(y, (m ?? 1) - 1, day ?? 1)
+}
+
+function ymdLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function weekDaysFrom(ymdFrom: string): Date[] {
+  const start = startOfWeekMonday(parseYmdLocal(ymdFrom))
+  return Array.from({ length: 7 }, (_, i) => addDays(start, i))
+}
+
+function affectationOnDay(
+  a: { date_debut: string; date_fin: string },
+  day: Date
+): boolean {
+  const t = ymdLocal(day)
+  const ds = String(a.date_debut).slice(0, 10)
+  const de = String(a.date_fin).slice(0, 10)
+  return t >= ds && t <= de
+}
+
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
 
 export default function PlanningTechniciensPage() {
@@ -94,7 +126,7 @@ export default function PlanningTechniciensPage() {
       ]}
       moduleBarLabel="Chantier"
       title="Planning techniciens"
-      subtitle="Affectations rattachées aux lignes des bons de commande (période prévue + créneau technicien)."
+      subtitle="Affectations rattachées aux lignes des bons de commande — vue semaine (grille) + tableau, création depuis les BC."
     >
       <div
         className="table-wrap"
@@ -145,7 +177,64 @@ export default function PlanningTechniciensPage() {
       {isLoading && <p className="text-muted">Chargement…</p>}
       {error && <p className="error">{(error as Error).message}</p>}
 
-      {!isLoading && affectations && (
+      {!isLoading && affectations !== undefined && (
+        <>
+          <section style={{ marginBottom: '1.5rem' }} aria-label="Aperçu semaine calendrier">
+            <h2 className="h2" style={{ fontSize: '1rem', marginBottom: '0.35rem' }}>
+              Aperçu semaine
+            </h2>
+            <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+              Semaine contenant la date « Du » ({from}) — lundi → dimanche. Même filtre période / technicien que le
+              tableau.
+            </p>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+                gap: 6,
+              }}
+            >
+              {weekDaysFrom(from).map((day) => {
+                const label = day.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+                const dayA = affectations.filter((a) => affectationOnDay(a, day))
+                return (
+                  <div
+                    key={ymdLocal(day)}
+                    className="card"
+                    style={{ padding: '0.5rem', fontSize: '0.8rem', minWidth: 0 }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        marginBottom: 6,
+                        borderBottom: '1px solid var(--color-border, #ddd)',
+                        paddingBottom: 4,
+                      }}
+                    >
+                      {label}
+                    </div>
+                    {dayA.length === 0 && <span className="text-muted">—</span>}
+                    {dayA.map((a) => {
+                      const bc = a.bon_commande_ligne?.bon_commande
+                      return (
+                        <div key={a.id} style={{ marginBottom: 6, lineHeight: 1.3 }}>
+                          {a.user?.name?.split(' ')[0] ?? `U${a.user_id}`}
+                          {bc && (
+                            <>
+                              {' '}
+                              <Link to={`/bons-commande/${bc.id}`} className="link-inline">
+                                {bc.numero}
+                              </Link>
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
         <div className="table-wrap" style={{ marginBottom: '2rem' }}>
           <table className="data-table data-table--compact" style={{ width: '100%' }}>
             <thead>
@@ -216,6 +305,7 @@ export default function PlanningTechniciensPage() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {lab && techniciens && bonsListe && (

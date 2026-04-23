@@ -252,8 +252,9 @@ export default function Clients() {
         }
       />
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table>
-          <thead>
+        <div className="table-wrap">
+          <table className="data-table data-table--compact">
+            <thead>
             <tr>
               {visible.name !== false && <th>Nom</th>}
               {visible.email !== false && <th>Email</th>}
@@ -262,9 +263,9 @@ export default function Clients() {
               {visible.ice !== false && <th>ICE</th>}
               {visible.siret !== false && <th>SIRET / autre</th>}
               {isLab && visible.commercial !== false && <th>Commerce</th>}
-              {isAdmin && visible.actions !== false && <th>Actions</th>}
+              {isAdmin && visible.actions !== false && <th className="data-table__actions">Actions</th>}
             </tr>
-          </thead>
+            </thead>
           <tbody>
             {list.map((c) => (
               <tr
@@ -305,19 +306,27 @@ export default function Clients() {
                   </td>
                 )}
                 {isAdmin && visible.actions !== false && (
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <div className="crud-actions">
-                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEdit(c)}>
-                        Modifier
+                  <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
+                    <div className="data-table__actions-inner">
+                      <button
+                        type="button"
+                        className="ds-icon-btn"
+                        title="Modifier"
+                        aria-label="Modifier le client"
+                        onClick={() => openEdit(c)}
+                      >
+                        ✏️
                       </button>
                       <button
                         type="button"
-                        className="btn btn-secondary btn-sm btn-danger-outline"
+                        className="ds-icon-btn ds-icon-btn--danger"
+                        title="Supprimer définitivement"
+                        aria-label="Supprimer définitivement le client"
                         onClick={() => {
                           if (window.confirm(`Supprimer le client « ${c.name} » ?`)) deleteMut.mutate(c.id)
                         }}
                       >
-                        Supprimer
+                        🗑️
                       </button>
                     </div>
                   </td>
@@ -325,7 +334,8 @@ export default function Clients() {
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
         {!list.length && <p style={{ padding: '1rem' }}>Aucun client pour cette vue.</p>}
       </div>
 

@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { equipmentsApi } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
+import StatusBadge, { equipementStatutBadgeProps } from '../../components/ds/StatusBadge'
 
 export default function EquipmentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -54,102 +55,117 @@ export default function EquipmentDetailPage() {
     return <Navigate to="/back-office/equipements" replace />
   }
 
+  const eqSt = eq ? equipementStatutBadgeProps(eq.status) : null
+
   return (
-    <div className="design-card">
+    <div className="container">
       <p>
         <Link to="/back-office/equipements">← Liste équipements</Link>
       </p>
-      {isLoading && <p className="design-card__muted">Chargement…</p>}
+      {isLoading && <p className="text-muted">Chargement…</p>}
       {error && <p className="error">{(error as Error).message}</p>}
       {eq && (
         <>
-          <h2 style={{ marginTop: 0 }}>
-            {eq.code} — {eq.name}
-          </h2>
-          <dl className="meta-dl" style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8 }}>
-            <dt className="design-card__muted">Statut</dt>
-            <dd>{eq.status}</dd>
-            <dt className="design-card__muted">Marque / modèle</dt>
+          <div className="card" style={{ marginBottom: '1.25rem' }}>
+            <div className="card__header" style={{ marginTop: 0, paddingTop: 0, border: 'none' }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem' }}>
+                {eq.code} — {eq.name}
+              </h2>
+            </div>
+            <dl className="meta-dl" style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, margin: 0 }}>
+            <dt className="text-muted" style={{ fontSize: '0.85rem' }}>Statut</dt>
+            <dd style={{ margin: 0 }}>
+              {eqSt && (
+                <StatusBadge variant={eqSt.variant} size="md">
+                  {eqSt.label}
+                </StatusBadge>
+              )}
+            </dd>
+            <dt className="text-muted" style={{ fontSize: '0.85rem' }}>Marque / modèle</dt>
             <dd>
               {[eq.brand, eq.model].filter(Boolean).join(' · ') || '—'}
             </dd>
-            <dt className="design-card__muted">N° série</dt>
+            <dt className="text-muted" style={{ fontSize: '0.85rem' }}>N° série</dt>
             <dd>{eq.serial_number ?? '—'}</dd>
-            <dt className="design-card__muted">Emplacement</dt>
+            <dt className="text-muted" style={{ fontSize: '0.85rem' }}>Emplacement</dt>
             <dd>{eq.location ?? '—'}</dd>
-            <dt className="design-card__muted">Agence</dt>
+            <dt className="text-muted" style={{ fontSize: '0.85rem' }}>Agence</dt>
             <dd>{eq.agency?.name ?? '—'}</dd>
-            <dt className="design-card__muted">Types d’essai</dt>
+            <dt className="text-muted" style={{ fontSize: '0.85rem' }}>Types d’essai</dt>
             <dd>{eq.test_types?.map((t) => t.name).join(', ') || '—'}</dd>
-          </dl>
+            </dl>
+          </div>
 
-          <h3>Étalonnages</h3>
-          <div className="activity-table-wrap">
-            <table className="activity-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Prochaine échéance</th>
-                  <th>Fournisseur</th>
-                  <th>Résultat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(eq.calibrations ?? []).map((c) => (
-                  <tr key={c.id}>
-                    <td>{c.calibration_date ? new Date(c.calibration_date).toLocaleDateString('fr-FR') : '—'}</td>
-                    <td>{c.next_due_date ? new Date(c.next_due_date).toLocaleDateString('fr-FR') : '—'}</td>
-                    <td>{c.provider ?? '—'}</td>
-                    <td>{c.result}</td>
+          <div className="card">
+            <div className="card__header">
+              <h3>Étalonnages</h3>
+            </div>
+            <div className="table-wrap">
+              <table className="data-table data-table--compact" style={{ width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Prochaine échéance</th>
+                    <th>Fournisseur</th>
+                    <th>Résultat</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {(eq.calibrations ?? []).map((c) => (
+                    <tr key={c.id}>
+                      <td>{c.calibration_date ? new Date(c.calibration_date).toLocaleDateString('fr-FR') : '—'}</td>
+                      <td>{c.next_due_date ? new Date(c.next_due_date).toLocaleDateString('fr-FR') : '—'}</td>
+                      <td>{c.provider ?? '—'}</td>
+                      <td>{c.result}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {(eq.calibrations ?? []).length === 0 && (
-              <p className="design-card__muted">Aucun étalonnage enregistré.</p>
+              <p className="text-muted" style={{ padding: '0.5rem 0 0' }}>Aucun étalonnage enregistré.</p>
             )}
           </div>
 
           {isAdmin && (
             <form
-              style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 420 }}
+              className="card"
+              style={{ maxWidth: 480, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}
               onSubmit={(e) => {
                 e.preventDefault()
                 addCal.mutate()
               }}
             >
-              <h4>Ajouter un étalonnage</h4>
-              <label>
-                <span className="design-card__muted">Date d’étalonnage</span>
+              <h3 className="ds-form-section__title" style={{ margin: '0 0 0.5rem' }}>
+                Ajouter un étalonnage
+              </h3>
+              <div className="form-group" style={{ marginBottom: 8 }}>
+                <label>Date d’étalonnage</label>
                 <input
                   type="date"
-                  className="input"
                   value={calForm.calibration_date}
                   onChange={(e) => setCalForm((f) => ({ ...f, calibration_date: e.target.value }))}
                   required
                 />
-              </label>
-              <label>
-                <span className="design-card__muted">Prochaine échéance</span>
+              </div>
+              <div className="form-group" style={{ marginBottom: 8 }}>
+                <label>Prochaine échéance</label>
                 <input
                   type="date"
-                  className="input"
                   value={calForm.next_due_date}
                   onChange={(e) => setCalForm((f) => ({ ...f, next_due_date: e.target.value }))}
                 />
-              </label>
-              <label>
-                <span className="design-card__muted">Fournisseur</span>
+              </div>
+              <div className="form-group" style={{ marginBottom: 8 }}>
+                <label>Fournisseur</label>
                 <input
-                  className="input"
                   value={calForm.provider}
                   onChange={(e) => setCalForm((f) => ({ ...f, provider: e.target.value }))}
                 />
-              </label>
-              <label>
-                <span className="design-card__muted">Résultat</span>
+              </div>
+              <div className="form-group" style={{ marginBottom: 8 }}>
+                <label>Résultat</label>
                 <select
-                  className="input"
                   value={calForm.result}
                   onChange={(e) =>
                     setCalForm((f) => ({
@@ -162,18 +178,13 @@ export default function EquipmentDetailPage() {
                   <option value="ok_with_reserve">ok_with_reserve</option>
                   <option value="failed">failed</option>
                 </select>
-              </label>
-              <label>
-                <span className="design-card__muted">Notes</span>
-                <textarea
-                  className="input"
-                  rows={2}
-                  value={calForm.notes}
-                  onChange={(e) => setCalForm((f) => ({ ...f, notes: e.target.value }))}
-                />
-              </label>
+              </div>
+              <div className="form-group" style={{ marginBottom: 8 }}>
+                <label>Notes</label>
+                <textarea rows={2} value={calForm.notes} onChange={(e) => setCalForm((f) => ({ ...f, notes: e.target.value }))} />
+              </div>
               {addCal.isError && <p className="error">{(addCal.error as Error).message}</p>}
-              <button type="submit" className="btn btn--primary" disabled={addCal.isPending}>
+              <button type="submit" className="btn btn-primary" disabled={addCal.isPending}>
                 Enregistrer
               </button>
             </form>

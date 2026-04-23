@@ -56,6 +56,7 @@ use App\Http\Controllers\Api\V1\BonCommandeController;
 use App\Http\Controllers\Api\V1\BonLivraisonController;
 use App\Http\Controllers\Api\V1\DevisTransformController;
 use App\Http\Controllers\Api\V1\InvoiceCreditController;
+use App\Http\Controllers\Api\V1\PlanningTerrainController;
 use App\Http\Controllers\Api\V1\ReglementController;
 use App\Http\Controllers\Api\V1\SituationTravauxController;
 use App\Http\Controllers\Api\VersionController;
@@ -103,10 +104,20 @@ Route::middleware('auth:sanctum')->group(function () {
             ->whereNumber('bonCommande');
         Route::put('bons-commande/{bonCommande}', [BonCommandeController::class, 'update'])
             ->whereNumber('bonCommande');
+        Route::put('bons-commande/{bonCommande}/lignes/{ligne}', [BonCommandeController::class, 'updateLigne'])
+            ->whereNumber('bonCommande')
+            ->whereNumber('ligne');
         Route::post('bons-commande/{bonCommande}/confirmer', [BonCommandeController::class, 'confirmer'])
             ->whereNumber('bonCommande');
         Route::post('bons-commande/{bonCommande}/transformer-bl', [BonCommandeController::class, 'transformerBl'])
             ->whereNumber('bonCommande');
+        Route::get('planning-terrain/techniciens', [PlanningTerrainController::class, 'techniciens']);
+        Route::get('planning-terrain', [PlanningTerrainController::class, 'index']);
+        Route::post('planning-terrain', [PlanningTerrainController::class, 'store']);
+        Route::put('planning-terrain/{bcLignePlanningAffectation}', [PlanningTerrainController::class, 'update'])
+            ->whereNumber('bcLignePlanningAffectation');
+        Route::delete('planning-terrain/{bcLignePlanningAffectation}', [PlanningTerrainController::class, 'destroy'])
+            ->whereNumber('bcLignePlanningAffectation');
         Route::get('bons-livraison', [BonLivraisonController::class, 'index']);
         Route::get('bons-livraison/{bonLivraison}', [BonLivraisonController::class, 'show'])
             ->whereNumber('bonLivraison');

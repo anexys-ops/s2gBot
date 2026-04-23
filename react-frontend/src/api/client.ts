@@ -585,6 +585,17 @@ export interface DossierContactRow {
   role?: string | null
 }
 
+export type BcLignePlanningAffectation = {
+  id: number
+  bon_commande_ligne_id: number
+  user_id: number
+  date_debut: string
+  date_fin: string
+  notes?: string | null
+  created_by?: number | null
+  user?: { id: number; name: string; email: string; role: string }
+}
+
 export type BonCommandeLigne = {
   id: number
   libelle: string
@@ -593,6 +604,9 @@ export type BonCommandeLigne = {
   tva_rate: string | number
   montant_ht: string | number
   ref_article_id?: number | null
+  date_debut_prevue?: string | null
+  date_fin_prevue?: string | null
+  planning_affectations?: BcLignePlanningAffectation[]
 }
 
 export type BonCommande = {
@@ -682,6 +696,49 @@ export const bonsCommandeApi = {
     api<BonCommande>(`/v1/bons-commande/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   confirmer: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}/confirmer`, { method: 'POST' }),
   transformerBl: (id: number) => api<BonLivraison>(`/v1/bons-commande/${id}/transformer-bl`, { method: 'POST' }),
+  updateLigne: (
+    bcId: number,
+    ligneId: number,
+    body: { date_debut_prevue?: string | null; date_fin_prevue?: string | null }
+  ) =>
+    api<BonCommandeLigne>(`/v1/bons-commande/${bcId}/lignes/${ligneId}`, { method: 'PUT', body: JSON.stringify(body) }),
+}
+
+/** Réponse list GET planning-terrain (affectation + relations). */
+export type PlanningTerrainAffectationRow = BcLignePlanningAffectation & {
+  bon_commande_ligne?: {
+    id: number
+    libelle: string
+    date_debut_prevue?: string | null
+    date_fin_prevue?: string | null
+    bon_commande?: {
+      id: number
+      numero: string
+      dossier_id: number
+      client?: { id: number; name: string }
+    }
+  }
+}
+
+export const planningTerrainApi = {
+  techniciens: () => api<Array<{ id: number; name: string; email: string; role: string }>>(`/v1/planning-terrain/techniciens`),
+  list: (params: { from: string; to: string; user_id?: number }) => {
+    const q = new URLSearchParams()
+    q.set('from', params.from)
+    q.set('to', params.to)
+    if (params.user_id) q.set('user_id', String(params.user_id))
+    return api<PlanningTerrainAffectationRow[]>(`/v1/planning-terrain?${q.toString()}`)
+  },
+  create: (body: {
+    bon_commande_ligne_id: number
+    user_id: number
+    date_debut: string
+    date_fin: string
+    notes?: string | null
+  }) => api<BcLignePlanningAffectation>('/v1/planning-terrain', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: number, body: Partial<{ user_id: number; date_debut: string; date_fin: string; notes: string | null }>) =>
+    api<BcLignePlanningAffectation>(`/v1/planning-terrain/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api<null>(`/v1/planning-terrain/${id}`, { method: 'DELETE' }),
 }
 
 export const bonsLivraisonApi = {

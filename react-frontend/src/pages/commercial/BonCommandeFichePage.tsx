@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { bonsCommandeApi } from '../../api/client'
+import { bonsCommandeApi, type BonCommandeLigne } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -14,6 +14,7 @@ export default function BonCommandeFichePage() {
   const qc = useQueryClient()
   const lab = isLab(user?.role)
   const [notes, setNotes] = useState('')
+  const [ligneEdits, setLigneEdits] = useState<Record<number, { debut: string; fin: string }>>({})
 
   const { data: bc, isLoading, error } = useQuery({
     queryKey: ['bon-commande', bcId],
@@ -26,6 +27,22 @@ export default function BonCommandeFichePage() {
     setNotes(typeof bc.notes === 'string' ? bc.notes : '')
   }, [bc?.id])
 
+  useEffect(() => {
+    if (!bc?.lignes?.length) {
+      setLigneEdits({})
+      return
+    }
+    const next: Record<number, { debut: string; fin: string }> = {}
+    for (const l of bc.lignes) {
+      const dl = l as BonCommandeLigne
+      next[l.id] = {
+        debut: dl.date_debut_prevue ? String(dl.date_debut_prevue).slice(0, 10) : '',
+        fin: dl.date_fin_prevue ? String(dl.date_fin_prevue).slice(0, 10) : '',
+      }
+    }
+    setLigneEdits(next)
+  }, [bc?.id, bc?.lignes])
+
   const mutUpdate = useMutation({
     mutationFn: () => bonsCommandeApi.update(bcId, { notes: notes || undefined }),
     onSuccess: () => {
@@ -34,6 +51,25 @@ export default function BonCommandeFichePage() {
   })
   const mutConfirmer = useMutation({
     mutationFn: () => bonsCommandeApi.confirmer(bcId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
+    },
+  })
+  const mutLignesPeriodes = useMutation({
+    mutationFn: async () => {
+      if (!bc?.lignes?.length) return
+      for (const l of bc.lignes) {
+        const e = ligneEdits[l.id]
+        if (!e) continue
+        const prevD = l.date_debut_prevue ? String(l.date_debut_prevue).slice(0, 10) : ''
+        const prevF = l.date_fin_prevue ? String(l.date_fin_prevue).slice(0, 10) : ''
+        if (e.debut === prevD && e.fin === prevF) continue
+        await bonsCommandeApi.updateLigne(bcId, l.id, {
+          date_debut_prevue: e.debut || null,
+          date_fin_prevue: e.fin || null,
+        })
+      }
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
     },
@@ -145,6 +181,12 @@ export default function BonCommandeFichePage() {
                 <th>Qté</th>
                 <th>PU HT</th>
                 <th>Montant HT</th>
+                {lab && (
+                  <>
+                    <th>Début terrain (prévu)</th>
+                    <th>Fin terrain (prévu)</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -154,10 +196,56 @@ export default function BonCommandeFichePage() {
                   <td>{l.quantite}</td>
                   <td>{l.prix_unitaire_ht}</td>
                   <td>{l.montant_ht}</td>
+                  {lab && (
+                    <>
+                      <td>
+                        <input
+                          type="date"
+                          value={ligneEdits[l.id]?.debut ?? ''}
+                          onChange={(e) =>
+                            setLigneEdits((s) => ({
+                              ...s,
+                              [l.id]: { ...s[l.id], debut: e.target.value, fin: s[l.id]?.fin ?? '' },
+                            }))
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="date"
+                          value={ligneEdits[l.id]?.fin ?? ''}
+                          onChange={(e) =>
+                            setLigneEdits((s) => ({
+                              ...s,
+                              [l.id]: { debut: s[l.id]?.debut ?? '', fin: e.target.value },
+                            }))
+                          }
+                        />
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {lab && !!bc.lignes?.length && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={() => mutLignesPeriodes.mutate()}
+            disabled={mutLignesPeriodes.isPending}
+          >
+            Enregistrer les périodes terrain (lignes)
+          </button>
+          {mutLignesPeriodes.isError && (
+            <p className="error" style={{ marginTop: '0.5rem' }}>
+              {(mutLignesPeriodes.error as Error)?.message}
+            </p>
+          )}
         </div>
       )}
 

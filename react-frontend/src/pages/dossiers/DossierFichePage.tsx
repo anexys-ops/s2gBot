@@ -2,13 +2,7 @@ import { Outlet, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { dossiersApi, type DossierRow } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
-
-const STATUT_BADGE: Record<string, string> = {
-  brouillon: 'dossier-badge dossier-badge--brouillon',
-  en_cours: 'dossier-badge dossier-badge--cours',
-  cloture: 'dossier-badge dossier-badge--cloture',
-  archive: 'dossier-badge dossier-badge--archive',
-}
+import StatusBadge, { dossierStatutBadgeProps } from '../../components/ds/StatusBadge'
 
 const TABS = [
   { to: 'infos', label: 'Infos' },
@@ -64,6 +58,7 @@ export default function DossierFichePage() {
   }
 
   const base = `/dossiers/${dossierId}`
+  const st = dossierStatutBadgeProps(dossier.statut)
 
   return (
     <ModuleEntityShell
@@ -78,7 +73,9 @@ export default function DossierFichePage() {
       subtitle={
         <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
           <code>{dossier.reference}</code>
-          <span className={STATUT_BADGE[dossier.statut] ?? 'dossier-badge'}>{dossier.statut}</span>
+          <StatusBadge variant={st.variant} size="lg">
+            {st.label}
+          </StatusBadge>
           <span>
             {dossier.client?.name ?? ''} — {dossier.site?.name ?? ''}
           </span>

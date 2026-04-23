@@ -71,7 +71,9 @@ export default function QuoteFormFields({
 
   return (
     <>
-      <div className="quote-form-grid">
+      <section className="ds-form-section">
+        <h3 className="ds-form-section__title">Client, chantier et conditions</h3>
+        <div className="quote-form-grid">
         <label>
           Client *
           <select
@@ -310,14 +312,17 @@ export default function QuoteFormFields({
             ))}
           </select>
         </label>
-      </div>
-      <label>
-        Notes
-        <textarea value={form.notes ?? ''} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={2} />
-      </label>
+        </div>
+        <label>
+          Notes
+          <textarea value={form.notes ?? ''} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={2} />
+        </label>
+      </section>
 
+      <section className="ds-form-section">
+        <h3 className="ds-form-section__title">Lignes de devis</h3>
       <div className="quote-lines-toolbar">
-        <h4>Lignes du devis</h4>
+        <h4 style={{ margin: 0, fontSize: '1rem' }}>Détail des prestations</h4>
         <div className="quote-lines-toolbar__btns">
           <button type="button" className="btn btn-secondary btn-sm" onClick={addLine}>
             + 1 ligne
@@ -433,6 +438,7 @@ export default function QuoteFormFields({
           </tbody>
         </table>
       </div>
+      </section>
     </>
   )
 }

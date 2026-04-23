@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Catalogue\Article;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BonCommandeLigne extends Model
 {
@@ -21,7 +22,17 @@ class BonCommandeLigne extends Model
         'prix_unitaire_ht',
         'tva_rate',
         'montant_ht',
+        'date_debut_prevue',
+        'date_fin_prevue',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'date_debut_prevue' => 'date',
+            'date_fin_prevue' => 'date',
+        ];
+    }
 
     public function bonCommande(): BelongsTo
     {
@@ -31,5 +42,10 @@ class BonCommandeLigne extends Model
     public function article(): BelongsTo
     {
         return $this->belongsTo(Article::class, 'ref_article_id');
+    }
+
+    public function planningAffectations(): HasMany
+    {
+        return $this->hasMany(BcLignePlanningAffectation::class, 'bon_commande_ligne_id');
     }
 }

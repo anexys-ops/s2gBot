@@ -5,6 +5,7 @@ import { clientsApi, dossiersApi, type DossierStatut } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import DossierCard from '../../components/Dossiers/DossierCard'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import StatusBadge, { dossierStatutBadgeProps } from '../../components/ds/StatusBadge'
 
 const STATUTS: { v: DossierStatut | ''; l: string }[] = [
   { v: '', l: 'Tous les statuts' },
@@ -162,7 +163,9 @@ export default function DossiersListPage() {
               </tr>
             </thead>
             <tbody>
-              {dossiers.map((d) => (
+              {dossiers.map((d) => {
+                const st = dossierStatutBadgeProps(d.statut)
+                return (
                 <tr key={d.id}>
                   <td>
                     <code>{d.reference}</code>
@@ -170,7 +173,11 @@ export default function DossiersListPage() {
                   <td>{d.titre}</td>
                   <td>{d.client?.name ?? clientMap.get(d.client_id) ?? `#${d.client_id}`}</td>
                   <td>{d.site?.name ?? `Chantier #${d.site_id}`}</td>
-                  <td>{d.statut}</td>
+                  <td>
+                    <StatusBadge variant={st.variant} size="md">
+                      {st.label}
+                    </StatusBadge>
+                  </td>
                   <td>{d.date_debut?.slice(0, 10)}</td>
                   <td>
                     <Link to={`/dossiers/${d.id}`} className="link-inline">
@@ -178,7 +185,8 @@ export default function DossiersListPage() {
                     </Link>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>

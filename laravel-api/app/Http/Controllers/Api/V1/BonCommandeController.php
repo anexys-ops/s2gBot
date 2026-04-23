@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\BonCommande;
+use App\Models\BonCommandeLigne;
 use App\Services\CommercialDocumentWorkflowService;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
@@ -47,7 +48,14 @@ class BonCommandeController extends Controller
         if (! AgencyAccess::userMayAccessBonCommande($request->user(), $bonCommande)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
-        $bonCommande->load(['lignes', 'dossier', 'client', 'clientContact', 'quote', 'bonsLivraison.lignes']);
+        $bonCommande->load([
+            'lignes.planningAffectations.user',
+            'dossier',
+            'client',
+            'clientContact',
+            'quote',
+            'bonsLivraison.lignes',
+        ]);
 
         return response()->json($bonCommande);
     }
@@ -74,7 +82,54 @@ class BonCommandeController extends Controller
             ClientContactDocument::assertBelongsToClient($bonCommande->contact_id, (int) $bonCommande->client_id);
         }
 
-        return response()->json($bonCommande->fresh()->load(['lignes', 'dossier', 'client', 'clientContact']));
+        return response()->json($bonCommande->fresh()->load([
+            'lignes.planningAffectations.user',
+            'dossier',
+            'client',
+            'clientContact',
+        ]));
+    }
+
+    public function updateLigne(
+        Request $request,
+        BonCommande $bonCommande,
+        BonCommandeLigne $ligne
+    ): JsonResponse {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if (! AgencyAccess::userMayAccessBonCommande($request->user(), $bonCommande)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if ((int) $ligne->bon_commande_id !== (int) $bonCommande->id) {
+            return response()->json(['message' => 'Ligne introuvable pour ce bon de commande.'], 404);
+        }
+
+        $data = $request->validate([
+            'date_debut_prevue' => 'sometimes|nullable|date',
+            'date_fin_prevue' => 'sometimes|nullable|date',
+        ]);
+        if ($data === []) {
+            $ligne->load('planningAffectations.user');
+
+            return response()->json($ligne);
+        }
+        if (array_key_exists('date_debut_prevue', $data)) {
+            $ligne->date_debut_prevue = $data['date_debut_prevue'];
+        }
+        if (array_key_exists('date_fin_prevue', $data)) {
+            $ligne->date_fin_prevue = $data['date_fin_prevue'];
+        }
+        if ($ligne->date_debut_prevue && $ligne->date_fin_prevue
+            && $ligne->date_debut_prevue->format('Y-m-d') > $ligne->date_fin_prevue->format('Y-m-d')
+        ) {
+            return response()->json(['message' => 'La date de début ne peut pas être postérieure à la date de fin.'], 422);
+        }
+
+        $ligne->save();
+        $ligne->load('planningAffectations.user');
+
+        return response()->json($ligne);
     }
 
     public function confirmer(Request $request, BonCommande $bonCommande): JsonResponse

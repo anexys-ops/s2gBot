@@ -1,0 +1,31 @@
+# Changelog — s2gBot
+
+## [1.0.26] — 2026-04-02
+
+### Migration PROLAB
+- Import 84 utilisateurs depuis WinDev/HFSQL (`SYS_Utilisateur.FIC`) → seeder `ProlabUsersSeeder`
+- Extraction structure catalogue WinDev/HFSQL : familles, articles, packages, tâches, paramètres
+- Nettoyage base clients : suppression 3831 entrées vides/doublons, conservation 4 clients actifs
+- Groupes PROLAB identifiés : BAHA, BAIH, GHCH, KHKH, RHCH (mapping workflow à venir)
+
+### Infrastructure
+- Nettoyage Docker build cache serveur (−9.2 Go)
+- Fix port mapping HTTP_PORT=80 (proxy Proxmox → LXC)
+- Ajout `php artisan migrate --force` dans `docker-prod-refresh.sh`
+
+### Linear — Tickets créés (BDC-128 à BDC-138)
+- [CLIENT] Contacts multiples par client (`client_contacts`)
+- [CLIENT] Enrichissement fiche client (type, secteur, remise, paiement)
+- [CATALOGUE] Enrichissement `ref_articles` (ref_interne, tarifs, sous-traitance)
+- [DOC] CRUD complet documents commerciaux
+- [DOC] Lignes libres sur devis/factures/BC/BL
+- [DOC] Numérotation séquentielle unique (DOS/DEV/BC/BL/FAC/OM)
+- [WORKFLOW] Moteur de validation configurable par service/équipe
+- [WORKFLOW] Audit trail transitions d'états
+- [MISSION] Ordres de mission terrain
+- [MATERIEL] Inventaire matériel technique (n° série, calibration)
+- [NDF] Notes de frais (saisie, validation, remboursement)
+
+### Tickets clôturés
+- BDC-107 à BDC-115 : catalogue produits P1 + dossiers P2 + devis enrichi P3
+- BDC-128, 132, 133, 134, 135 : contacts clients, lignes libres, séquences, workflow BDD, audit trail

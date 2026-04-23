@@ -70,6 +70,8 @@ import BonCommandeFichePage from './pages/commercial/BonCommandeFichePage'
 import BonsLivraisonListPage from './pages/commercial/BonsLivraisonListPage'
 import BonLivraisonFichePage from './pages/commercial/BonLivraisonFichePage'
 import ComptaFondationPage from './pages/commercial/ComptaFondationPage'
+import MaterielHub from './pages/hub/MaterielHub'
+import PlanningTechniciensPage from './pages/terrain/PlanningTechniciensPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -124,6 +126,8 @@ function AppRoutes() {
         <Route path="terrain" element={<TerrainHub />} />
         <Route path="terrain/mesures" element={<TerrainMesuresPage />} />
         <Route path="terrain/chantiers" element={<TerrainChantiersCartePage />} />
+        <Route path="terrain/planning" element={<PlanningTechniciensPage />} />
+        <Route path="materiel" element={<MaterielHub />} />
         <Route path="labo" element={<LaboHub />} />
         <Route path="labo/essais" element={<LaboEssaisPage />} />
         <Route path="aide" element={<HelpOpenApiPage />} />

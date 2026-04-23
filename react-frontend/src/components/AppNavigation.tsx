@@ -4,9 +4,17 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { brandingApi } from '../api/client'
 
-type SubItem = { to: string; label: string }
+type SubItem = { to: string; label: string; labOnly?: boolean }
 
-type MenuGroupId = 'crm' | 'terrain' | 'labo' | 'activity' | 'reports'
+type MenuGroupId =
+  | 'catalogue'
+  | 'clients'
+  | 'commercial'
+  | 'chantier'
+  | 'materiel'
+  | 'laboratoire'
+  | 'configuration'
+  | 'rapports'
 
 type MenuGroup = {
   id: MenuGroupId
@@ -14,56 +22,78 @@ type MenuGroup = {
   items: SubItem[]
 }
 
-function isCrmModuleActive(pathname: string, isLab: boolean): boolean {
+function isCatalogueActive(pathname: string): boolean {
+  return pathname === '/catalogue' || pathname.startsWith('/catalogue/')
+}
+
+function isClientsActive(pathname: string): boolean {
+  return pathname === '/clients' || pathname.startsWith('/clients/')
+}
+
+function isCommercialActive(pathname: string): boolean {
   if (pathname.startsWith('/crm')) return true
-  if (pathname.startsWith('/clients')) return true
-  if (pathname.startsWith('/sites')) return true
   if (pathname.startsWith('/dossiers')) return true
-  if (pathname.startsWith('/catalogue')) return true
   if (pathname.startsWith('/devis')) return true
   if (pathname.startsWith('/invoices')) return true
-  if (isLab && (pathname.startsWith('/back-office/offres') || pathname.startsWith('/back-office/pdf') || pathname.startsWith('/back-office/mails'))) {
-    return true
-  }
+  if (pathname.startsWith('/bons-commande')) return true
+  if (pathname.startsWith('/bons-livraison')) return true
+  if (pathname.startsWith('/compta-fondation')) return true
+  if (pathname.startsWith('/back-office/offres')) return true
   return false
 }
 
-function isTerrainModuleActive(pathname: string): boolean {
-  if (pathname.startsWith('/graphiques-essais')) return false
-  return pathname.startsWith('/terrain')
+function isChantierActive(pathname: string): boolean {
+  return pathname === '/sites' || pathname.startsWith('/sites/') || pathname.startsWith('/terrain')
 }
 
-function isLaboModuleActive(pathname: string, isLab: boolean): boolean {
-  if (pathname.startsWith('/graphiques-essais')) return false
+function isMaterielActive(pathname: string): boolean {
+  return pathname.startsWith('/materiel') || pathname.startsWith('/back-office/equipements')
+}
+
+function isLaboratoireActive(pathname: string): boolean {
+  if (pathname.startsWith('/graphiques-essais')) return true
   if (pathname.startsWith('/labo')) return true
   if (pathname.startsWith('/orders')) return true
-  if (!pathname.startsWith('/back-office')) return false
-  if (pathname.startsWith('/back-office/offres')) return false
-  if (pathname.startsWith('/back-office/pdf')) return false
-  if (pathname.startsWith('/back-office/mails')) return false
-  return isLab || pathname.startsWith('/back-office/granulometrie') || pathname.startsWith('/back-office/cadrage')
+  if (pathname.startsWith('/back-office/granulometrie')) return true
+  if (pathname.startsWith('/back-office/cadrage')) return true
+  if (pathname.startsWith('/back-office/exemples-calculs')) return true
+  return false
 }
 
-function isActivityModuleActive(pathname: string): boolean {
-  return pathname.startsWith('/graphiques-essais')
+function isConfigurationActive(pathname: string): boolean {
+  if (pathname.startsWith('/settings')) return true
+  if (pathname === '/aide' || pathname.startsWith('/aide/')) return true
+  if (pathname.startsWith('/back-office/pdf')) return true
+  if (pathname.startsWith('/back-office/mails')) return true
+  if (pathname.startsWith('/back-office/modeles-')) return true
+  if (pathname.startsWith('/back-office/configuration')) return true
+  if (pathname.startsWith('/back-office/journal-audit')) return true
+  if (pathname.startsWith('/back-office/non-conformites')) return true
+  return false
 }
 
-function isReportsModuleActive(pathname: string): boolean {
+function isReportsActive(pathname: string): boolean {
   return pathname.startsWith('/rapports')
 }
 
-function isGroupActive(id: MenuGroupId, pathname: string, isLab: boolean): boolean {
+function isGroupActive(id: MenuGroupId, pathname: string): boolean {
   switch (id) {
-    case 'crm':
-      return isCrmModuleActive(pathname, isLab)
-    case 'terrain':
-      return isTerrainModuleActive(pathname)
-    case 'labo':
-      return isLaboModuleActive(pathname, isLab)
-    case 'activity':
-      return isActivityModuleActive(pathname)
-    case 'reports':
-      return isReportsModuleActive(pathname)
+    case 'catalogue':
+      return isCatalogueActive(pathname)
+    case 'clients':
+      return isClientsActive(pathname)
+    case 'commercial':
+      return isCommercialActive(pathname)
+    case 'chantier':
+      return isChantierActive(pathname)
+    case 'materiel':
+      return isMaterielActive(pathname)
+    case 'laboratoire':
+      return isLaboratoireActive(pathname)
+    case 'configuration':
+      return isConfigurationActive(pathname)
+    case 'rapports':
+      return isReportsActive(pathname)
     default:
       return false
   }
@@ -86,55 +116,92 @@ export default function AppNavigation() {
   const navRef = useRef<HTMLElement>(null)
 
   const groups: MenuGroup[] = useMemo(() => {
-    const crmItems: SubItem[] = [
-      { to: '/crm', label: 'Vue d’ensemble CRM' },
-      { to: '/crm/documents', label: 'Documents commerciaux' },
-      { to: '/clients', label: 'Clients' },
-      { to: '/sites', label: 'Chantiers' },
-      { to: '/dossiers', label: 'Dossiers chantier' },
-      { to: '/catalogue', label: 'Catalogue PROLAB' },
-      { to: '/devis', label: 'Devis' },
-      { to: '/invoices', label: 'Factures' },
-    ]
-    if (isLab) {
-      crmItems.push(
-        { to: '/back-office/offres', label: 'Offres (lignes de devis)' },
-        { to: '/back-office/pdf', label: 'Création PDF' },
-        { to: '/back-office/mails', label: 'Gestion des mails' },
-      )
-    }
-
-    const terrainItems: SubItem[] = [
-      { to: '/terrain', label: 'Vue d’ensemble terrain' },
-      { to: '/terrain/mesures', label: 'Mesures terrain' },
-      { to: '/terrain/chantiers', label: 'Chantiers & carte GPS' },
-    ]
-
-    const laboItems: SubItem[] = [
-      { to: '/labo', label: 'Vue d’ensemble laboratoire' },
-      { to: '/labo/essais', label: 'Essais & graphiques' },
-      { to: '/orders', label: 'Dossiers & commandes' },
-      { to: '/orders/new', label: 'Nouvelle commande' },
-    ]
-    if (isLab) {
-      laboItems.push({ to: '/back-office', label: 'Back office laboratoire' })
-    } else {
-      laboItems.push(
-        { to: '/catalogue', label: 'Catalogue PROLAB' },
-        { to: '/back-office/granulometrie', label: 'Granulométrie' },
-      )
-    }
-
-    const activityItems: SubItem[] = [{ to: '/graphiques-essais', label: 'Graphiques essais' }]
-
-    const rapportsItems: SubItem[] = [{ to: '/rapports/compta', label: 'Tous les rapports' }]
+    const filterItems = (items: SubItem[]) => items.filter((i) => !i.labOnly || isLab)
 
     return [
-      { id: 'crm', label: 'CRM', items: crmItems },
-      { id: 'terrain', label: 'Terrain', items: terrainItems },
-      { id: 'labo', label: 'Laboratoire', items: laboItems },
-      { id: 'activity', label: 'Activité', items: activityItems },
-      { id: 'reports', label: 'Rapports', items: rapportsItems },
+      {
+        id: 'catalogue',
+        label: 'Catalogue',
+        items: filterItems([{ to: '/catalogue', label: 'Articles et familles (PROLAB)' }]),
+      },
+      {
+        id: 'clients',
+        label: 'Clients',
+        items: filterItems([
+          { to: '/clients', label: 'Clients et contacts' },
+        ]),
+      },
+      {
+        id: 'commercial',
+        label: 'Commercial',
+        items: filterItems([
+          { to: '/crm', label: 'Vue d’ensemble' },
+          { to: '/crm/documents', label: 'Devis, factures (registre)' },
+          { to: '/devis', label: 'Devis' },
+          { to: '/dossiers', label: 'Dossiers (pièces, suivi PROLAB)' },
+          { to: '/invoices', label: 'Factures' },
+          { to: '/bons-commande', label: 'Bons de commande' },
+          { to: '/bons-livraison', label: 'Bons de livraison' },
+          { to: '/compta-fondation', label: 'Compta (fondation)', labOnly: true },
+          { to: '/back-office/offres', label: 'Offres (lignes de devis)', labOnly: true },
+        ]),
+      },
+      {
+        id: 'chantier',
+        label: 'Chantier',
+        items: filterItems([
+          { to: '/sites', label: 'Chantiers' },
+          { to: '/terrain', label: 'Vue terrain' },
+          { to: '/terrain/mesures', label: 'Mesures terrain' },
+          { to: '/terrain/chantiers', label: 'Carte chantiers' },
+          { to: '/terrain/planning', label: 'Planning techniciens' },
+        ]),
+      },
+      {
+        id: 'materiel',
+        label: 'Matériel',
+        items: filterItems([
+          { to: '/materiel', label: 'Vue d’ensemble' },
+          { to: '/back-office/equipements', label: 'Parc équipements' },
+        ]),
+      },
+      {
+        id: 'laboratoire',
+        label: 'Laboratoire',
+        items: filterItems([
+          { to: '/labo', label: 'Vue laboratoire' },
+          { to: '/labo/essais', label: 'Essais et graphiques' },
+          { to: '/graphiques-essais', label: 'Graphiques d’essais' },
+          { to: '/orders', label: 'Dossiers et commandes' },
+          { to: '/orders/new', label: 'Nouvelle commande' },
+          { to: '/back-office/granulometrie', label: 'Granulométrie', labOnly: true },
+          { to: '/back-office/cadrage', label: 'Cadrage' },
+          { to: '/back-office/exemples-calculs', label: 'Exemples de calculs' },
+        ]),
+      },
+      {
+        id: 'configuration',
+        label: 'Config',
+        items: filterItems([
+          { to: '/settings', label: 'Compte, sécurité, marque' },
+          { to: '/settings/utilisateurs', label: 'Utilisateurs', labOnly: true },
+          { to: '/settings/groupes', label: 'Groupes et accès', labOnly: true },
+          { to: '/settings/charte', label: 'Charte (logo, couleurs)', labOnly: true },
+          { to: '/back-office/modeles-documents-pdf', label: 'Modèles de documents PDF', labOnly: true },
+          { to: '/back-office/modeles-rapports-pdf', label: 'Modèles de rapports PDF', labOnly: true },
+          { to: '/back-office/pdf', label: 'Création de PDF' },
+          { to: '/back-office/mails', label: 'Mails', labOnly: true },
+          { to: '/back-office/configuration', label: 'Modules (activation)', labOnly: true },
+          { to: '/back-office/journal-audit', label: 'Journal d’audit', labOnly: true },
+          { to: '/back-office/non-conformites', label: 'Non-conformités' },
+          { to: '/aide', label: 'API (OpenAPI)' },
+        ]),
+      },
+      {
+        id: 'rapports',
+        label: 'Rapports',
+        items: filterItems([{ to: '/rapports', label: 'Rapports (compta, ventes, délais)' }]),
+      },
     ]
   }, [isLab])
 
@@ -205,7 +272,7 @@ export default function AppNavigation() {
         >
           <nav className="nav-menu" aria-label="Navigation principale">
             {groups.map((group) => {
-              const routeActive = isGroupActive(group.id, pathname, isLab)
+              const routeActive = isGroupActive(group.id, pathname)
               return (
                 <div
                   key={group.id}
@@ -229,7 +296,7 @@ export default function AppNavigation() {
                   </button>
                   <ul className="nav-dropdown-panel" role="menu">
                     {group.items.map((item) => (
-                      <li key={item.to} role="none">
+                      <li key={`${item.to}-${item.label}`} role="none">
                         <NavLink
                           to={item.to}
                           className={({ isActive }) =>
@@ -260,7 +327,7 @@ export default function AppNavigation() {
             <NavLink
               to="/settings"
               className={({ isActive }) => `nav-settings-gear${isActive ? ' nav-settings-gear--active' : ''}`}
-              title="Paramètres du compte"
+              title="Paramètres"
               aria-label="Paramètres"
               onClick={closeAll}
             >

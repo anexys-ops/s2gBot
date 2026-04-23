@@ -1,5 +1,10 @@
 # Changelog — s2gBot
 
+## [1.0.37] — 2026-04-23
+
+### Interface
+- Navigation unifiée en regroupements : **Catalogue**, **Clients**, **Commercial**, **Chantier**, **Matériel**, **Laboratoire**, **Config**, **Rapports** ; raccourcis Aide + Paramètres conservés. Hub matériel `/materiel`, placeholder planning techniciens `/terrain/planning`.
+
 ## [1.0.36] — 2026-04-23
 
 ### Versions (alignement)

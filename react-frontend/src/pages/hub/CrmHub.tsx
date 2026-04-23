@@ -4,6 +4,10 @@ import { useAuth } from '../../contexts/AuthContext'
 
 type Card = { to: string; title: string; desc: string; icon: HubIconId }
 
+/**
+ * Hub **Commercial** : devis, dossiers, pièces jointes (via dossier), factures, BC/BL.
+ * Le catalogue, les clients et les chantiers ont des entrées de menu dédiées.
+ */
 export default function CrmHub() {
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
@@ -11,77 +15,49 @@ export default function CrmHub() {
   const cards: Card[] = [
     {
       to: '/crm/documents',
-      title: 'Documents commerciaux',
-      desc: 'Registre devis & factures : recherche, filtres, PDF, lien vers la vue commerciale par client.',
+      title: 'Registre documents',
+      desc: 'Devis et factures : recherche, filtres, PDF, lien client.',
       icon: 'documents',
     },
-    {
-      to: '/clients',
-      title: 'Clients',
-      desc: 'Fiches tiers (onglets Fiche, Commerce, Documents) ; liste avec filtres de vue et accès fiche en un clic.',
-      icon: 'users',
-    },
-    {
-      to: '/sites',
-      title: 'Chantiers',
-      desc: 'Liste avec filtre par client ; fiche chantier, missions, carte OSM.',
-      icon: 'building',
-    },
+    { to: '/devis', title: 'Devis', desc: isLab ? 'Propositions commerciales.' : 'Vos devis.', icon: 'quote' },
     {
       to: '/dossiers',
-      title: 'Dossiers chantier',
-      desc: 'Dossiers techniques (PROLAB) : client, chantier, statut, contacts et onglets métier.',
+      title: 'Dossiers PROLAB',
+      desc: 'Dossier technique : onglets devis, BC/BL, pièces, documents.',
       icon: 'orders',
     },
+    { to: '/invoices', title: 'Factures', desc: 'Facturation et suivi des paiements.', icon: 'invoice' },
     {
       to: '/bons-commande',
       title: 'Bons de commande',
-      desc: 'Liste BCC, fiche, confirmation et génération de BL (actions lab).',
+      desc: 'BCC, confirmation, génération de BL (actions lab).',
       icon: 'orders',
     },
     {
       to: '/bons-livraison',
       title: 'Bons de livraison',
-      desc: 'Liste BLC, quantités livrées et validation.',
+      desc: 'BLC, quantités livrées, validation.',
       icon: 'orders',
     },
-    {
-      to: '/compta-fondation',
-      title: 'Compta — fondation',
-      desc: 'Règlements, situations de travaux et avoirs (BDC-139, lecture).',
-      icon: 'invoice',
-    },
-    {
-      to: '/catalogue',
-      title: 'Catalogue PROLAB',
-      desc: 'Arbre familles d’essais, articles, forfaits — aligné sur la migration WinDev.',
-      icon: 'catalog',
-    },
-    { to: '/devis', title: 'Devis', desc: isLab ? 'Propositions commerciales.' : 'Vos devis.', icon: 'quote' },
-    { to: '/invoices', title: 'Factures', desc: 'Suivi facturation et paiements.', icon: 'invoice' },
   ]
 
   if (isLab) {
-    cards.push(
-      {
-        to: '/back-office/offres',
-        title: 'Offres (lignes de devis)',
-        desc: 'Produits et prestations : PA / PV HT, TVA — alimentation des lignes de devis (hors arbre PROLAB).',
-        icon: 'catalog',
-      },
-      { to: '/back-office/mails', title: 'Mails', desc: 'Modèles et envois liés aux dossiers.', icon: 'mail' },
-      { to: '/back-office/pdf', title: 'Création PDF', desc: 'Rapports et documents générés.', icon: 'printer' },
-    )
+    cards.push({
+      to: '/compta-fondation',
+      title: 'Compta (fondation)',
+      desc: 'Règlements, situations, avoirs (lecture).',
+      icon: 'invoice',
+    })
   }
 
   return (
     <div className="hub-page hub-page--crm hub-page--v2">
       <header className="hub-header hub-header--v2">
-        <p className="hub-kicker">Relation client</p>
-        <h1>CRM — commercial & relation client</h1>
+        <p className="hub-kicker">Commercial</p>
+        <h1>Vente et documents</h1>
         <p className="hub-lead">
-          Devis, chantiers, facturation et communications. Navigation cohérente avec l’espace terrain &
-          laboratoire.
+          Devis, dossiers, factures, bons de commande et de livraison. Le catalogue d’articles et l’annuaire clients
+          sont dans le menu <strong>Catalogue</strong> et <strong>Clients</strong>.
         </p>
       </header>
       <div className="hub-grid hub-grid--v2">
@@ -96,12 +72,24 @@ export default function CrmHub() {
         ))}
       </div>
       <p className="hub-footnote hub-footnote--switch">
+        <Link to="/catalogue" className="hub-footnote__link">
+          Catalogue PROLAB
+        </Link>
+        {' · '}
+        <Link to="/clients" className="hub-footnote__link">
+          Clients
+        </Link>
+        {' · '}
+        <Link to="/sites" className="hub-footnote__link">
+          Chantiers
+        </Link>
+        {' · '}
         <Link to="/terrain" className="hub-footnote__link">
-          Terrain →
+          Terrain
         </Link>
         {' · '}
         <Link to="/labo" className="hub-footnote__link">
-          Laboratoire →
+          Laboratoire
         </Link>
       </p>
     </div>

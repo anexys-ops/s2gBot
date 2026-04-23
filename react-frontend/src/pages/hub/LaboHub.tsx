@@ -4,6 +4,10 @@ import { useAuth } from '../../contexts/AuthContext'
 
 type Card = { to: string; title: string; desc: string; icon: HubIconId }
 
+/**
+ * Essais, commandes lab, outils d’analyse. Le **catalogue PROLAB** est sous le menu Catalogue.
+ * Le **matériel** (parc, étalonnage) est sous le menu Matériel.
+ */
 export default function LaboHub() {
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
@@ -11,52 +15,40 @@ export default function LaboHub() {
   const cards: Card[] = [
     {
       to: '/labo/essais',
-      title: 'Essais & graphiques',
-      desc: 'Visualisation des séries de résultats et indicateurs d’essais.',
+      title: 'Essais et graphiques',
+      desc: 'Résultats, séries, indicateurs.',
+      icon: 'trend',
+    },
+    {
+      to: '/graphiques-essais',
+      title: 'Graphiques d’essais',
+      desc: 'Visualisations des séries de tests.',
       icon: 'trend',
     },
     {
       to: '/orders',
-      title: 'Dossiers & commandes',
-      desc: 'Prélèvements, échantillons, statuts et rapports PDF.',
+      title: 'Dossiers et commandes',
+      desc: 'Prélèvements, échantillons, statuts, rapports PDF.',
       icon: 'orders',
     },
     {
       to: '/orders/new',
       title: 'Nouvelle commande',
-      desc: 'Créer un dossier laboratoire.',
+      desc: 'Créer un dossier de commande laboratoire.',
       icon: 'plus',
     },
-    ...(isLab
-      ? [
-          {
-            to: '/back-office/equipements',
-            title: 'Équipements & étalonnages',
-            desc: 'Parc matériel, certificats et échéances.',
-            icon: 'calculator' as const,
-          },
-          {
-            to: '/back-office',
-            title: 'Back office laboratoire',
-            desc: 'Catalogues, modèles PDF, configuration, mails…',
-            icon: 'lab' as const,
-          },
-        ]
-      : [
-          {
-            to: '/catalogue',
-            title: 'Catalogue PROLAB',
-            desc: 'Familles, articles, forfaits, paramètres et tarifs.',
-            icon: 'catalog' as const,
-          },
-          {
-            to: '/back-office/granulometrie',
-            title: 'Granulométrie',
-            desc: 'Courbes tamis, indicateurs NF EN ISO 17892-4.',
-            icon: 'granulo' as const,
-          },
-        ]),
   ]
+
+  if (isLab) {
+    cards.push(
+      { to: '/back-office/granulometrie', title: 'Granulométrie', desc: 'NF EN ISO 17892-4, courbes.', icon: 'granulo' },
+      { to: '/back-office/cadrage', title: 'Cadrage', desc: 'Données de cadrage laboratoire.', icon: 'lab' },
+    )
+  } else {
+    cards.push(
+      { to: '/back-office/granulometrie', title: 'Granulométrie', desc: 'Courbes et tamis.', icon: 'granulo' },
+    )
+  }
 
   return (
     <div className="hub-page hub-page--terrain terrain-touch hub-page--v2">
@@ -64,7 +56,8 @@ export default function LaboHub() {
         <p className="hub-kicker">Laboratoire</p>
         <h1>Laboratoire</h1>
         <p className="hub-lead">
-          Essais, graphiques et dossiers techniques — distinct du volet terrain (mesures et chantiers).
+          Commandes d’essai, analyses et outils. Le catalogue PROLAB est dans le menu <strong>Catalogue</strong> ; le
+          parc matériel est dans le menu <strong>Matériel</strong>.
         </p>
       </header>
       <div className="hub-grid hub-grid--terrain hub-grid--v2">
@@ -80,7 +73,11 @@ export default function LaboHub() {
       </div>
       <p className="hub-footnote hub-footnote--switch">
         <Link to="/terrain" className="hub-footnote__link">
-          Retour terrain →
+          Terrain (chantier) →
+        </Link>
+        {' · '}
+        <Link to="/materiel" className="hub-footnote__link">
+          Matériel →
         </Link>
       </p>
     </div>

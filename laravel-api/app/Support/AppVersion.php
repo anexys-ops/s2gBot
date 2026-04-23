@@ -22,7 +22,7 @@ class AppVersion
             }
         }
 
-        return '1.0.36';
+        return '1.0.37';
     }
 
     public static function resolve(): string

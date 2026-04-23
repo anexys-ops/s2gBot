@@ -1,6 +1,6 @@
 # PROLAB → s2gBot : Spécification Migration
 
-> Date : 2026-04-22 · Dernière mise à jour lot : 2026-04-23 (cartographie PROLAB, BDC-118 BCC/BL BDD, BDC-139 compta)  
+> Date : 2026-04-22 · Dernière mise à jour lot : **2026-04-23** (workflow BC/BL, compta fondation, `contact_id`, navigation v1.0.37, tickets Linear **BDC-140 … BDC-147**)  
 > Objectif : Intégrer l'architecture fonctionnelle de PROLAB (WinDev/HFSQL) dans s2gBot (Laravel 11 + React 18 + Expo), en conservant le design et les menus existants.
 
 ### Cartographie PROLAB (HFSQL) ↔ s2gBot — état code (2026-04)
@@ -10,16 +10,31 @@
 | `REF_*` (familles, articles, packages, tâches, paramètres, résultats) | Migrations `ref_*`, `App\Models\Catalogue\*`, API `api/v1/catalogue/*`, seeder, UI `/catalogue` | Cohérence à valider vs données HFSQL exportées (Nextcloud) ; champs commerciaux | BDC-107 → BDC-111, BDC-130 |
 | `OP_Dossier` + contacts chantier | `dossiers`, `dossier_contacts`, `DossierController` | Sous-ensembles techniques PROLAB (ex. `OP_DossierBéton*`) = hors périmètre cœur (plus tard) | BDC-112, BDC-113, BDC-114 |
 | `OP_Devis` / `OP_DevisArticles` / tâches | `quotes`, `quote_lines` (+ `type_ligne`), `devis_taches` | UI éditeur (catalogue + lignes libres), PDF devis, audit statut **sur devis** ; `DocumentSequenceService` pas encore appelé à la création | BDC-115, BDC-116, BDC-117, BDC-131, BDC-132, BDC-133, BDC-135 |
-| `OP_BCC` / `OP_BLC` | Tables `bons_commande` (+`bons_commande_lignes`), `bons_livraison` (+`bons_livraison_lignes`) ; `GET /api/v1/dossiers/{id}/bons` | CRUD API dédié, transformation devis→BC→BL, UI, PDF | BDC-118 (BDD + modèles + index bons) ; BDC-119, BDC-120, BDC-121 |
-| `OP_FAC` + lignes | `invoices`, `invoice_lines` | CRUD / PDF côté UI partiels ; règlements / lettrage non modélisés (voir ligne suivante) | BDC-131, facturation existante, **BDC-139** |
-| `OP_Reglement`, `OP_Situation`, avoirs | Export compta / factures, pas d’entités métier dédiées | Modèle BDD + API + lien factures & BL (alignement HFSQL) | **BDC-139** |
+| `OP_BCC` / `OP_BLC` | Tables `bons_commande` (+`bons_commande_lignes`), `bons_livraison` (+`bons_livraison_lignes`) ; `GET /api/v1/dossiers/{id}/bons` ; API v1 CRUD + transformation devis→BC→BL ; `contact_id` nullable | **Fait** (API + UI listes/fiches + onglet dossier) ; PDF BL/BC, règles Word non finalisés | BDC-118–120 **livrés** ; PDF / finitions **BDC-121** ; récap **BDC-140** |
+| `OP_FAC` + lignes | `invoices`, `invoice_lines` ; `contact_id` nullable | CRUD / PDF côté UI partiels ; règlements / lettrage côté compta (voir ci‑dessous) | BDC-131, facturation existante, **BDC-139** |
+| `OP_Reglement`, `OP_Situation`, avoirs | Tables `reglements`, `situations_travaux`, `invoice_credits` + API v1 + tests | **Fait** (BDD + API) ; UI saisie lab **à faire** | **BDC-139** (base) ; formulaires UI **BDC-144** |
+| Contacts sur documents | `client_contacts` + `contact_id` sur `quotes`, `invoices`, `bons_commande`, `bons_livraison` | **Fait** (validation client) ; sélecteur UI devis/facture **BDC-141** | **BDC-128** (API) |
+| Navigation applicative | Menus par pôle : Catalogue, Clients, Commercial, Chantier, Matériel, Labo, Config, Rapports ; `/materiel`, `/terrain/planning` | Hubs alignés ; fil d’Ariane « CRM » à unifier | **BDC-140** ; libellés **BDC-146** |
 | `OP_ProdTaches` + attachements / PJ | `devis_taches` (périmètre devis uniquement) | Tâches **production** post-BCC, PJ alignés `OP_Attachement*` | BDC-122, BDC-123 |
 | PV / essais (vs `orders`/`samples`/`reports`) | Chaîne labo s2gBot (commandes, échantillons, rapports) | PV structuré par type d’essai (béton, proctor, etc.) | BDC-124, BDC-125, BDC-126 |
 | `SYS_Utilisateur` / profils | `users` + rôles + `agencies` | Moteur workflow : tables + API définitions (instances non branchées partout) | BDC-134, BDC-135 |
-| NDF, matériel, ordres de mission | Peu (équipements/alertes calib.) | Spécification §8.3–5 | BDC-136, BDC-137, BDC-138 |
+| NDF, matériel, ordres de mission | Peu (équipements/alertes calib.) ; hub `/materiel` (v1.0.37) | Spécification §8.3–5 ; inventaire / prêt / localisation | BDC-136, BDC-137, BDC-138 ; **BDC-143** |
 | Fichiers HFSQL (ex. `21.zip` → extraction `scripts/extract_hfsql_21_zip.py`) | Inventaire possible sur poste de décompression | Taille décompressée ~150–450 Go — import métier = hors scope automatique ici | — (doc + atelier) |
 
-**Ordre de dépendance recommandé (lot suivant) :** BDC-118 → BDC-119 → BDC-120 / BDC-121 ; BDC-122+123 après lignes BCC ; compta **BDC-139** en parallèle de la finalisation factures (BDC-131).
+**Ordre de dépendance (mis à jour 2026-04-23) :** lots BCC/BL **livrés** (voir **BDC-140**). Suite prioritaire : **BDC-141** (UI contact) → **BDC-145** (numérotation DOS/DEV/FAC) → **BDC-144** (saisies compta) en lien factures ; en parallèle **BDC-142** (planning terrain), **BDC-143** (matériel mission), **BDC-147** (seeders groupes), **BDC-146** (libellés). Puis BDC-122+123 (tâches prod post-BCC), PV/essais BDC-124–126.
+
+### Suivi Linear — tickets générés (2026-04-23)
+
+| Ticket | Sujet | État cible |
+|--------|--------|------------|
+| [BDC-140](https://linear.app/anexys/issue/BDC-140) | Récap livré lot avril 2026 (BC/BL, compta, contact, navigation) | Done |
+| [BDC-141](https://linear.app/anexys/issue/BDC-141) | Sélecteur `contact_id` sur éditeur devis / facture | Backlog |
+| [BDC-142](https://linear.app/anexys/issue/BDC-142) | Planning techniciens (calendrier réel) | Backlog |
+| [BDC-143](https://linear.app/anexys/issue/BDC-143) | Matériel : inventaire, localisation, prêt mission | Backlog |
+| [BDC-144](https://linear.app/anexys/issue/BDC-144) | Compta : formulaires saisie règlement / situation / avoir (lab) | Backlog |
+| [BDC-145](https://linear.app/anexys/issue/BDC-145) | `DocumentSequenceService` sur dossier, devis, facture | Backlog |
+| [BDC-146](https://linear.app/anexys/issue/BDC-146) | Fils d’Ariane : CRM → Commercial | Backlog |
+| [BDC-147](https://linear.app/anexys/issue/BDC-147) | Seeder groupes/agences + documentation | Backlog |
 
 ### État — phase P1 (catalogue produits, Linear)
 
@@ -124,10 +139,14 @@ OP_Situation (situations de travaux)
 | order_items | Lignes commande | id, order_id, test_type_id, quantity |
 | samples | Échantillons | id, order_item_id, reference, received_at, status |
 | test_results | Résultats essais | id, sample_id, test_type_param_id, value |
-| quotes | Devis | id, number, client_id, site_id, status, amount_ht, amount_ttc |
+| quotes | Devis | id, number, client_id, `contact_id` (→ `client_contacts`), site_id, status, amount_ht, amount_ttc |
+| bons_commande, bons_livraison | BCC/BLC | + `contact_id` (→ `client_contacts`) |
 | quote_lines | Lignes devis | … + `type_ligne` (libre\|catalogue\|commentaire), `line_code` |
-| invoices | Factures | id, number, client_id, status, amount_ht, amount_ttc |
+| invoices | Factures | id, number, client_id, `contact_id` (→ `client_contacts`), status, amount_ht, amount_ttc |
 | invoice_lines | Lignes facture | … + `type_ligne`, `line_code` |
+| reglements | Règlements (compta) | `numero`, `client_id`, `invoice_id`, `bon_livraison_id` nullable, `amount_ttc`, `payment_mode`, `payment_date` |
+| situations_travaux | Situations de travaux | `numero`, `dossier_id`, `label`, `percent_complete`, `amount_ht`, `status` |
+| invoice_credits | Avoirs | `numero`, `client_id`, `source_invoice_id`, `amount_ttc`, `status` |
 | client_addresses | Adresses client | id, client_id, type, line1, city, country |
 | client_contacts | Contacts nominatifs par client | id, client_id, nom, prénom, poste, email… |
 | document_sequences | Numérotation annuelle par type | type, year, last_number (service `DocumentSequenceService`) |

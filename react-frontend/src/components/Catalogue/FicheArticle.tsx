@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { RefArticleRow } from '../../api/client'
-import { MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import { formatMoney } from '../../lib/appLocale'
+import { formatOptionalNumber, formatRefArticlePrice, formatTvaPercent } from '../../lib/catalogueFormat'
 
 type Props = { article: RefArticleRow }
 
@@ -8,107 +9,103 @@ export default function FicheArticle({ article }: Props) {
   const fpkgs = article.famille_packages ?? []
   const params = article.parametres_essai ?? []
   const resultats = article.resultats ?? []
+  const prixHt = formatRefArticlePrice(article)
 
   return (
     <div className="fiche-article">
-      <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-        ID {article.id} — {article.actif ? <strong>Actif</strong> : <strong>Inactif</strong>}
-        {typeof article.duree_estimee === 'number' && (
-          <> — durée estimée {article.duree_estimee} min</>
-        )}
-      </p>
-
-      <div
-        className="entity-meta-grid"
-        style={{ display: 'grid', gap: '0.75rem', maxWidth: 720, marginBottom: '1.5rem' }}
-      >
-        <div>
-          <span className="text-muted" style={{ fontSize: '0.75rem' }}>
-            Code
-          </span>
+      <div className="fiche-article__summary card">
+        <h2 className="fiche-article__summary-title">Caractéristiques</h2>
+        <dl className="module-fiche-grid fiche-article__dl">
           <div>
-            <code>{article.code}</code>
+            <dt>Code</dt>
+            <dd>
+              <code className="fiche-article__code">{article.code}</code>
+            </dd>
           </div>
-        </div>
-        <div>
-          <span className="text-muted" style={{ fontSize: '0.75rem' }}>
-            Libellé
-          </span>
-          <div>{article.libelle}</div>
-        </div>
-        <div>
-          <span className="text-muted" style={{ fontSize: '0.75rem' }}>
-            Famille
-          </span>
-          <div>{article.famille ? `${article.famille.code} — ${article.famille.libelle}` : '—'}</div>
-        </div>
-        <div>
-          <span className="text-muted" style={{ fontSize: '0.75rem' }}>
-            Prix unitaire HT
-          </span>
-          <div>{article.prix_unitaire_ht_formate ?? `${article.prix_unitaire_ht} €`}</div>
-        </div>
-        <div>
-          <span className="text-muted" style={{ fontSize: '0.75rem' }}>
-            TVA
-          </span>
-          <div>{article.tva_rate} %</div>
-        </div>
-        <div>
-          <span className="text-muted" style={{ fontSize: '0.75rem' }}>
-            Unité
-          </span>
-          <div>{article.unite || '—'}</div>
-        </div>
-        {article.normes && (
-          <div style={{ gridColumn: '1 / -1' }}>
-            <span className="text-muted" style={{ fontSize: '0.75rem' }}>
-              Norme(s)
-            </span>
-            <div>{article.normes}</div>
+          <div>
+            <dt>Libellé</dt>
+            <dd>{article.libelle || '—'}</dd>
+          </div>
+          <div>
+            <dt>Famille</dt>
+            <dd>
+              {article.famille ? (
+                <>
+                  <span className="fiche-article__family-code">{article.famille.code}</span>
+                  <span className="text-muted"> — {article.famille.libelle}</span>
+                </>
+              ) : (
+                '—'
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Prix unitaire HT</dt>
+            <dd className="fiche-article__amount">{prixHt}</dd>
+          </div>
+          <div>
+            <dt>TVA</dt>
+            <dd>{formatTvaPercent(article.tva_rate)}</dd>
+          </div>
+          <div>
+            <dt>Unité</dt>
+            <dd>{article.unite?.trim() ? article.unite : '—'}</dd>
+          </div>
+          {typeof article.duree_estimee === 'number' && article.duree_estimee > 0 && (
+            <div>
+              <dt>Durée estimée</dt>
+              <dd>{article.duree_estimee} min</dd>
+            </div>
+          )}
+        </dl>
+        <p className="fiche-article__id-line text-muted">
+          Réf. interne #{article.id} — {article.actif ? <span className="status-pill status-pill--ok">Actif</span> : <span className="status-pill status-pill--muted">Inactif</span>}
+        </p>
+        {article.normes && String(article.normes).trim() !== '' && (
+          <div className="fiche-article__normes">
+            <h3 className="fiche-article__h3">Norme(s)</h3>
+            <p className="fiche-article__normes-text">{article.normes}</p>
           </div>
         )}
       </div>
 
       {article.description && String(article.description).trim() !== '' && (
-        <section style={{ marginBottom: '1.5rem' }}>
-          <h2 className="h2" style={{ fontSize: '1.05rem' }}>
-            Description
-          </h2>
-          <p style={{ whiteSpace: 'pre-wrap', margin: '0.5rem 0 0' }}>{article.description}</p>
+        <section className="fiche-article__section card">
+          <h2 className="fiche-article__h2">Description</h2>
+          <p className="fiche-article__body">{article.description}</p>
         </section>
       )}
 
       {fpkgs.length > 0 && (
-        <section style={{ marginBottom: '1.5rem' }}>
-          <h2 className="h2" style={{ fontSize: '1.05rem' }}>
-            Catégories de forfaits &amp; packages
-          </h2>
-          <ul className="list-plain" style={{ listStyle: 'none', padding: 0, margin: '0.5rem 0 0' }}>
+        <section className="fiche-article__section card">
+          <h2 className="fiche-article__h2">Forfaits &amp; packages</h2>
+          <ul className="fiche-article__forfait-list">
             {fpkgs.map((fp) => (
-              <li
-                key={fp.id}
-                style={{
-                  marginBottom: '0.75rem',
-                  border: '1px solid var(--color-border, #e2e8f0)',
-                  borderRadius: 6,
-                  padding: '0.5rem 0.75rem',
-                }}
-              >
-                <strong>{fp.code}</strong> — {fp.libelle}
-                {fp.description && <p className="text-muted" style={{ margin: '0.25rem 0 0', fontSize: '0.9rem' }}>{fp.description}</p>}
-                <ul style={{ margin: '0.35rem 0 0 1rem' }}>
-                  {(fp.packages ?? []).map((p) => (
-                    <li key={p.id}>
-                      <code>{p.code}</code> {p.libelle}
-                      {p.description && <span className="text-muted"> — {p.description}</span>}
-                      <span className="text-muted">
-                        {' '}
-                        ({p.prix_ht_formate ?? p.prix_ht} {MONEY_UNIT_LABEL} HT — TVA {p.tva_rate} % —{' '}
-                        {p.actif ? 'actif' : 'inactif'})
-                      </span>
-                    </li>
-                  ))}
+              <li key={fp.id} className="fiche-article__forfait">
+                <div className="fiche-article__forfait-head">
+                  <strong>{fp.code}</strong>
+                  <span className="text-muted"> — {fp.libelle}</span>
+                </div>
+                {fp.description && <p className="fiche-article__forfait-desc text-muted">{fp.description}</p>}
+                <ul className="fiche-article__pkg-list">
+                  {(fp.packages ?? []).map((p) => {
+                    const px =
+                      p.prix_ht_formate && String(p.prix_ht_formate).trim() !== ''
+                        ? p.prix_ht_formate
+                        : p.prix_ht != null && Number.isFinite(Number(p.prix_ht))
+                          ? formatMoney(Number(p.prix_ht))
+                          : '—'
+                    return (
+                      <li key={p.id}>
+                        <code>{p.code}</code> {p.libelle}
+                        {p.description && <span className="text-muted"> — {p.description}</span>}
+                        <span className="text-muted fiche-article__pkg-meta">
+                          {' '}
+                          · {px} HT · TVA {formatTvaPercent(p.tva_rate)} · {p.actif ? 'actif' : 'inactif'}
+                        </span>
+                      </li>
+                    )
+                  })}
                 </ul>
               </li>
             ))}
@@ -116,13 +113,11 @@ export default function FicheArticle({ article }: Props) {
         </section>
       )}
 
-      {(params?.length ?? 0) > 0 && (
-        <section style={{ marginBottom: '1.5rem' }}>
-          <h2 className="h2" style={{ fontSize: '1.05rem' }}>
-            Paramètres d’essai
-          </h2>
+      {params.length > 0 && (
+        <section className="fiche-article__section card">
+          <h2 className="fiche-article__h2">Paramètres d’essai</h2>
           <div className="table-wrap">
-            <table className="data-table data-table--compact" style={{ width: '100%' }}>
+            <table className="data-table data-table--compact">
               <thead>
                 <tr>
                   <th>Ordre</th>
@@ -134,7 +129,7 @@ export default function FicheArticle({ article }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {params!.map((p) => (
+                {params.map((p) => (
                   <tr key={p.id}>
                     <td>{p.ordre}</td>
                     <td>
@@ -142,8 +137,8 @@ export default function FicheArticle({ article }: Props) {
                     </td>
                     <td>{p.libelle}</td>
                     <td>{p.unite ?? '—'}</td>
-                    <td>{p.valeur_min ?? '—'}</td>
-                    <td>{p.valeur_max ?? '—'}</td>
+                    <td>{formatOptionalNumber(p.valeur_min)}</td>
+                    <td>{formatOptionalNumber(p.valeur_max)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -153,12 +148,10 @@ export default function FicheArticle({ article }: Props) {
       )}
 
       {resultats.length > 0 && (
-        <section style={{ marginBottom: '1.5rem' }}>
-          <h2 className="h2" style={{ fontSize: '1.05rem' }}>
-            Résultats attendus
-          </h2>
+        <section className="fiche-article__section card">
+          <h2 className="fiche-article__h2">Résultats attendus</h2>
           <div className="table-wrap">
-            <table className="data-table data-table--compact" style={{ width: '100%' }}>
+            <table className="data-table data-table--compact">
               <thead>
                 <tr>
                   <th>Code</th>
@@ -184,8 +177,8 @@ export default function FicheArticle({ article }: Props) {
         </section>
       )}
 
-      <p style={{ marginTop: '1.5rem' }}>
-        <Link to="/catalogue" className="link-inline">
+      <p className="fiche-article__back">
+        <Link to="/catalogue" className="btn btn-secondary btn-sm">
           ← Retour au catalogue
         </Link>
       </p>

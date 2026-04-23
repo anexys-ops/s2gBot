@@ -40,21 +40,9 @@ export default function CatalogueListePage() {
         ) : null
       }
     >
-      <div
-        className="card catalogue-liste__toolbar"
-        style={{
-          marginBottom: '1rem',
-          padding: '0.75rem 1rem',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          alignItems: 'flex-end',
-        }}
-      >
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 200 }}>
-          <span className="text-muted" style={{ fontSize: '0.8rem' }}>
-            Famille
-          </span>
+      <div className="card catalogue-liste__toolbar list-filter-row">
+        <label className="catalogue-liste__field">
+          <span className="catalogue-liste__label">Famille</span>
           <select
             className="form-control"
             value={familleId === '' ? '' : String(familleId)}
@@ -68,10 +56,8 @@ export default function CatalogueListePage() {
             ))}
           </select>
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 220px' }}>
-          <span className="text-muted" style={{ fontSize: '0.8rem' }}>
-            Recherche (code / libellé)
-          </span>
+        <label className="catalogue-liste__field catalogue-liste__field--search">
+          <span className="catalogue-liste__label">Recherche (code / libellé)</span>
           <input
             type="search"
             className="form-control"
@@ -80,18 +66,22 @@ export default function CatalogueListePage() {
             placeholder="Ex. BETON, FC28, compactage…"
           />
         </label>
-        <label
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}
-        >
+        <label className="catalogue-liste__checkbox">
           <input type="checkbox" checked={withInactif} onChange={(e) => setWithInactif(e.target.checked)} />
-          <span style={{ fontSize: '0.9rem' }}>Inclure inactifs</span>
+          <span>Inclure inactifs</span>
         </label>
       </div>
 
-      <p className="catalogue-liste__legend text-muted" style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-        <span aria-hidden>🧱</span> Béton &nbsp;
-        <span aria-hidden>⚙️</span> Sols / compactage &nbsp;
-        <span aria-hidden>📐</span> Produits manufacturés
+      <p className="catalogue-liste__legend" role="note">
+        <span className="catalogue-liste__legend-item" title="Béton">
+          🧱 Béton
+        </span>
+        <span className="catalogue-liste__legend-item" title="Sols / compactage">
+          ⚙️ Sols / compactage
+        </span>
+        <span className="catalogue-liste__legend-item" title="Produits manufacturés">
+          📐 Produits manufacturés
+        </span>
       </p>
 
       <ArbreCatalogue

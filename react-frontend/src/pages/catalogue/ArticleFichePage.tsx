@@ -6,14 +6,19 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import FicheArticle from '../../components/Catalogue/FicheArticle'
 import { useAuth } from '../../contexts/AuthContext'
 
+function safeNum(v: unknown, fallback: number): number {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : fallback
+}
+
 function ArticleProlabEditor({ article, onUpdated }: { article: RefArticleRow; onUpdated: () => void }) {
   const [form, setForm] = useState({
     libelle: article.libelle,
     description: article.description ?? '',
-    unite: article.unite,
-    prix_unitaire_ht: Number(article.prix_unitaire_ht),
-    tva_rate: Number(article.tva_rate),
-    duree_estimee: article.duree_estimee,
+    unite: article.unite ?? '',
+    prix_unitaire_ht: safeNum(article.prix_unitaire_ht, 0),
+    tva_rate: safeNum(article.tva_rate, 20),
+    duree_estimee: article.duree_estimee ?? 0,
     normes: article.normes ?? '',
     actif: article.actif,
   })
@@ -26,32 +31,33 @@ function ArticleProlabEditor({ article, onUpdated }: { article: RefArticleRow; o
     setForm({
       libelle: article.libelle,
       description: article.description ?? '',
-      unite: article.unite,
-      prix_unitaire_ht: Number(article.prix_unitaire_ht),
-      tva_rate: Number(article.tva_rate),
-      duree_estimee: article.duree_estimee,
+      unite: article.unite ?? '',
+      prix_unitaire_ht: safeNum(article.prix_unitaire_ht, 0),
+      tva_rate: safeNum(article.tva_rate, 20),
+      duree_estimee: article.duree_estimee ?? 0,
       normes: article.normes ?? '',
       actif: article.actif,
     })
   }, [article])
 
   return (
-    <section className="card" style={{ marginTop: '1.5rem', maxWidth: 640 }}>
-      <h2 className="h2" style={{ fontSize: '1.05rem' }}>
-        Édition (laboratoire)
-      </h2>
-      <p className="text-muted" style={{ fontSize: '0.85rem' }}>Mise à jour de l’article en base (champs commerciaux &amp; pédagogiques).</p>
+    <section className="card lab-article-editor">
+      <h2 className="lab-article-editor__title">Édition (laboratoire)</h2>
+      <p className="lab-article-editor__intro text-muted">
+        Mise à jour de l’article en base (champs commerciaux &amp; pédagogiques).
+      </p>
       <form
-        className="quote-form-grid"
-        style={{ marginTop: '0.75rem' }}
+        className="quote-form-grid lab-article-editor__form"
         onSubmit={(e) => {
           e.preventDefault()
+          const prix = Number(form.prix_unitaire_ht)
+          const tva = Number(form.tva_rate)
           mut.mutate({
             libelle: form.libelle,
             description: form.description || null,
             unite: form.unite || null,
-            prix_unitaire_ht: form.prix_unitaire_ht,
-            tva_rate: form.tva_rate,
+            prix_unitaire_ht: Number.isFinite(prix) ? prix : 0,
+            tva_rate: Number.isFinite(tva) ? tva : 20,
             duree_estimee: form.duree_estimee,
             normes: form.normes || null,
             actif: form.actif,
@@ -71,13 +77,21 @@ function ArticleProlabEditor({ article, onUpdated }: { article: RefArticleRow; o
           <input value={form.unite} onChange={(e) => setForm((f) => ({ ...f, unite: e.target.value }))} />
         </label>
         <label>
-          Prix unitaire HT
+          Prix unitaire HT (DH)
           <input
             type="number"
             min={0}
             step={0.01}
-            value={form.prix_unitaire_ht}
-            onChange={(e) => setForm((f) => ({ ...f, prix_unitaire_ht: Number(e.target.value) }))}
+            value={Number.isFinite(form.prix_unitaire_ht) ? form.prix_unitaire_ht : ''}
+            onChange={(e) => {
+              const v = e.target.value
+              if (v === '') {
+                setForm((f) => ({ ...f, prix_unitaire_ht: 0 }))
+                return
+              }
+              const n = Number(v)
+              setForm((f) => ({ ...f, prix_unitaire_ht: Number.isFinite(n) ? n : 0 }))
+            }}
           />
         </label>
         <label>
@@ -87,8 +101,11 @@ function ArticleProlabEditor({ article, onUpdated }: { article: RefArticleRow; o
             min={0}
             max={100}
             step={0.01}
-            value={form.tva_rate}
-            onChange={(e) => setForm((f) => ({ ...f, tva_rate: Number(e.target.value) }))}
+            value={Number.isFinite(form.tva_rate) ? form.tva_rate : ''}
+            onChange={(e) => {
+              const n = Number(e.target.value)
+              setForm((f) => ({ ...f, tva_rate: Number.isFinite(n) ? n : 20 }))
+            }}
           />
         </label>
         <label>
@@ -96,8 +113,11 @@ function ArticleProlabEditor({ article, onUpdated }: { article: RefArticleRow; o
           <input
             type="number"
             min={0}
-            value={form.duree_estimee}
-            onChange={(e) => setForm((f) => ({ ...f, duree_estimee: parseInt(e.target.value, 10) || 0 }))}
+            value={form.duree_estimee ?? 0}
+            onChange={(e) => {
+              const n = parseInt(e.target.value, 10)
+              setForm((f) => ({ ...f, duree_estimee: Number.isFinite(n) ? n : 0 }))
+            }}
           />
         </label>
         <label className="quote-form-checkbox-row">
@@ -192,11 +212,16 @@ export default function ArticleFichePage() {
         { label: article.code },
       ]}
       moduleBarLabel="Catalogue — Fiche article"
-      title={article.code}
-      subtitle={article.libelle}
+      title={article.libelle}
+      subtitle={
+        <div className="article-fiche__title-row">
+          <code className="code-badge">{article.code}</code>
+          {article.actif ? <span className="status-pill status-pill--ok">Actif</span> : <span className="status-pill status-pill--muted">Inactif</span>}
+        </div>
+      }
       actions={
         <Link to="/catalogue" className="btn btn-secondary btn-sm">
-          ← Liste
+          ← Retour catalogue
         </Link>
       }
     >

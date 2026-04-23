@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { quotesApi, pdfApi, type EntityMetaPayload } from '../api/client'
 import EntityMetaCard from '../components/module/EntityMetaCard'
+import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
@@ -81,23 +82,61 @@ export default function Devis() {
   const lastPage = data?.last_page ?? 1
   const statusOptions = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
 
-  if (isLoading) return <p>Chargement...</p>
-  if (error) return <p className="error">Erreur : {String(error)}</p>
+  if (isLoading) {
+    return (
+      <ModuleEntityShell
+        shellClassName="module-shell--crm"
+        breadcrumbs={[
+          { label: 'Accueil', to: '/' },
+          { label: 'Devis' },
+        ]}
+        moduleBarLabel="Commercial — Devis"
+        title="Devis"
+        subtitle="Chargement…"
+      >
+        <p className="text-muted">Chargement des devis…</p>
+      </ModuleEntityShell>
+    )
+  }
+  if (error) {
+    return (
+      <ModuleEntityShell
+        shellClassName="module-shell--crm"
+        breadcrumbs={[
+          { label: 'Accueil', to: '/' },
+          { label: 'Devis' },
+        ]}
+        moduleBarLabel="Commercial — Devis"
+        title="Devis"
+      >
+        <p className="error">Erreur : {String(error)}</p>
+      </ModuleEntityShell>
+    )
+  }
 
   return (
-    <div>
-      <h1>Devis</h1>
-      {isLab && (
-        <p style={{ marginBottom: '1rem' }}>
-          <Link to="/devis/nouveau" className="btn btn-primary">
-            Nouveau devis
-          </Link>{' '}
-          <Link to="/back-office/offres" className="btn btn-secondary">
-            Catalogue produits &amp; prestations
-          </Link>
-        </p>
-      )}
-
+    <ModuleEntityShell
+      shellClassName="module-shell--crm"
+      breadcrumbs={[
+        { label: 'Accueil', to: '/' },
+        { label: 'Devis' },
+      ]}
+      moduleBarLabel="Commercial — Devis"
+      title="Devis"
+      subtitle="Propositions commerciales : brouillons, signature, suivi des montants TTC et frais de déplacement."
+      actions={
+        isLab ? (
+          <>
+            <Link to="/devis/nouveau" className="btn btn-primary btn-sm">
+              Nouveau devis
+            </Link>
+            <Link to="/back-office/offres" className="btn btn-secondary btn-sm">
+              Offres (catalogue)
+            </Link>
+          </>
+        ) : null
+      }
+    >
       <ListTableToolbar
         searchValue={searchInput}
         onSearchChange={(v) => {
@@ -245,6 +284,6 @@ export default function Devis() {
           />
         </Modal>
       )}
-    </div>
+    </ModuleEntityShell>
   )
 }

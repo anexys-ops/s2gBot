@@ -174,7 +174,7 @@ export default function Clients() {
       <ModuleEntityShell
         breadcrumbs={[
           { label: 'Accueil', to: '/' },
-          { label: 'CRM', to: '/crm' },
+          { label: 'Commercial', to: '/crm' },
           { label: 'Clients' },
         ]}
         moduleBarLabel="Tiers — Clients"
@@ -191,7 +191,7 @@ export default function Clients() {
       <ModuleEntityShell
         breadcrumbs={[
           { label: 'Accueil', to: '/' },
-          { label: 'CRM', to: '/crm' },
+          { label: 'Commercial', to: '/crm' },
           { label: 'Clients' },
         ]}
         moduleBarLabel="Tiers — Clients"
@@ -206,7 +206,7 @@ export default function Clients() {
     <ModuleEntityShell
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'CRM', to: '/crm' },
+        { label: 'Commercial', to: '/crm' },
         { label: 'Clients' },
       ]}
       moduleBarLabel="Tiers — Clients"

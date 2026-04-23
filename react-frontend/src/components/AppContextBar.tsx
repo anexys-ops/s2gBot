@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 
 /**
  * Barre légère sous l’en-tête : navigation historique uniquement.
- * Les entrées métier (CRM, factures, rapports…) restent dans {@link AppNavigation}.
+ * Les entrées métier (commercial, factures, rapports…) restent dans {@link AppNavigation}.
  */
 export default function AppContextBar() {
   const navigate = useNavigate()

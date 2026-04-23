@@ -52,10 +52,10 @@ export default function DossiersListPage() {
       shellClassName="module-shell--crm"
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'CRM', to: '/crm' },
+        { label: 'Commercial', to: '/crm' },
         { label: 'Dossiers chantier' },
       ]}
-      moduleBarLabel="CRM — Dossiers chantier"
+      moduleBarLabel="Commercial — Dossiers chantier"
       title="Dossiers chantier (PROLAB)"
       subtitle="Dossiers techniques BTP rattachés à un client et un chantier, avec référence de type DOS-ANNEE-SEQUENCE."
       actions={

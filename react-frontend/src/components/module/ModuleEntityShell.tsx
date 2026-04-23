@@ -10,7 +10,7 @@ export type ModuleTab = {
 }
 
 type Props = {
-  /** Fil d’Ariane (ex. CRM › Clients › Société X) */
+  /** Fil d’Ariane (ex. Commercial › Clients › Société X) */
   breadcrumbs: ModuleBreadcrumb[]
   /** Libellé court dans la barre bleue (ex. Tiers, Commercial) */
   moduleBarLabel: string

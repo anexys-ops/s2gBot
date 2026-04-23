@@ -134,5 +134,8 @@ class DatabaseSeeder extends Seeder
         $this->call(DemoEssaisGraphiquesSeeder::class);
         $this->call(DemoFullDatasetSeeder::class);
         $this->call(DemoMarocExamplesSeeder::class);
+
+        /** Groupes d’accès PROLAB + rattachement agence (utilisateurs @labo.ma) — voir BDC-147. */
+        $this->call(ProlabGroupsAgenciesSeeder::class);
     }
 }

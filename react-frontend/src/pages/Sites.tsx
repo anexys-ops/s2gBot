@@ -138,7 +138,7 @@ export default function Sites() {
       <ModuleEntityShell
         breadcrumbs={[
           { label: 'Accueil', to: '/' },
-          { label: 'CRM', to: '/crm' },
+          { label: 'Commercial', to: '/crm' },
           { label: 'Chantiers' },
         ]}
         moduleBarLabel="Projets — Chantiers"
@@ -154,7 +154,7 @@ export default function Sites() {
       <ModuleEntityShell
         breadcrumbs={[
           { label: 'Accueil', to: '/' },
-          { label: 'CRM', to: '/crm' },
+          { label: 'Commercial', to: '/crm' },
           { label: 'Chantiers' },
         ]}
         moduleBarLabel="Projets — Chantiers"
@@ -169,7 +169,7 @@ export default function Sites() {
     <ModuleEntityShell
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'CRM', to: '/crm' },
+        { label: 'Commercial', to: '/crm' },
         { label: 'Chantiers' },
       ]}
       moduleBarLabel="Projets — Chantiers"

@@ -41,7 +41,7 @@ export default function SiteLayout() {
       <ModuleEntityShell
         breadcrumbs={[
           { label: 'Accueil', to: '/' },
-          { label: 'CRM', to: '/crm' },
+          { label: 'Commercial', to: '/crm' },
           { label: 'Chantiers', to: '/sites' },
           { label: '…' },
         ]}
@@ -58,7 +58,7 @@ export default function SiteLayout() {
       <ModuleEntityShell
         breadcrumbs={[
           { label: 'Accueil', to: '/' },
-          { label: 'CRM', to: '/crm' },
+          { label: 'Commercial', to: '/crm' },
           { label: 'Chantiers', to: '/sites' },
           { label: 'Erreur' },
         ]}
@@ -88,7 +88,7 @@ export default function SiteLayout() {
     <ModuleEntityShell
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'CRM', to: '/crm' },
+        { label: 'Commercial', to: '/crm' },
         { label: 'Chantiers', to: '/sites' },
         { label: site.name },
       ]}

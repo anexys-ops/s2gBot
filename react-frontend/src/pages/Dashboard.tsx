@@ -584,7 +584,7 @@ export default function Dashboard() {
                   Stats ventes & rapports
                 </Link>
                 <Link to="/crm" className="dashboard-report-link">
-                  Espace CRM
+                  Vue Commercial
                 </Link>
                 <Link to="/devis" className="dashboard-report-link">
                   Devis
@@ -756,8 +756,8 @@ export default function Dashboard() {
             <span className="dashboard-panel-icon" aria-hidden>
               <OutlineIcon id="handshake" />
             </span>
-            <span className="dashboard-panel-label">CRM</span>
-            <strong>Commercial & clients</strong>
+            <span className="dashboard-panel-label">Commercial</span>
+            <strong>Clients & documents</strong>
             <span className="dashboard-panel-hint">
               Clients, chantiers, devis, factures, mails et PDF — avec champs et indicateurs personnalisables sur les
               fiches.

@@ -47,7 +47,7 @@ export default function Login() {
 
           <div className="login-card-header">
             <h1 className="login-card-title">Connexion</h1>
-            <p className="login-card-sub">Accédez à votre espace sécurisé (CRM, terrain, laboratoire).</p>
+            <p className="login-card-sub">Accédez à votre espace sécurisé (commercial, terrain, laboratoire).</p>
           </div>
 
           <form className="login-form" onSubmit={handleSubmit} noValidate>

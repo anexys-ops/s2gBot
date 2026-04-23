@@ -81,7 +81,7 @@ function metaForPath(pathname: string): PageMeta {
     }
   return {
     title: 'Back office',
-    subtitle: 'Outils et configuration — le catalogue produits d’essais (PROLAB) est sous Catalogue PROLAB dans le menu CRM.',
+    subtitle: 'Outils et configuration — le catalogue produits d’essais (PROLAB) est sous Catalogue PROLAB dans le menu principal.',
     crumb: 'Back office',
   }
 }

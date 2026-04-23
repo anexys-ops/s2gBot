@@ -258,8 +258,8 @@ export default function Invoices() {
       <PageBackNav
         back={{ to: '/', label: 'Tableau de bord' }}
         extras={[
-          { to: '/crm', label: 'CRM' },
-          { to: '/crm/documents', label: 'Documents CRM' },
+          { to: '/crm', label: 'Commercial' },
+          { to: '/crm/documents', label: 'Registre documents' },
           ...(isAdmin ? [{ to: '/back-office/configuration', label: 'Configuration' }] : []),
         ]}
       />

@@ -16,7 +16,7 @@ export default function BonsCommandeListPage() {
       shellClassName="module-shell--crm"
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'CRM', to: '/crm' },
+        { label: 'Commercial', to: '/crm' },
         { label: 'Bons de commande' },
       ]}
       moduleBarLabel="Commercial"

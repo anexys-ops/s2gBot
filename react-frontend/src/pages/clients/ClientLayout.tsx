@@ -44,7 +44,7 @@ export default function ClientLayout() {
       <ModuleEntityShell
         breadcrumbs={[
           { label: 'Accueil', to: '/' },
-          { label: 'CRM', to: '/crm' },
+          { label: 'Commercial', to: '/crm' },
           { label: 'Clients', to: '/clients' },
           { label: '…' },
         ]}
@@ -61,7 +61,7 @@ export default function ClientLayout() {
       <ModuleEntityShell
         breadcrumbs={[
           { label: 'Accueil', to: '/' },
-          { label: 'CRM', to: '/crm' },
+          { label: 'Commercial', to: '/crm' },
           { label: 'Clients', to: '/clients' },
           { label: 'Erreur' },
         ]}
@@ -99,7 +99,7 @@ export default function ClientLayout() {
     <ModuleEntityShell
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'CRM', to: '/crm' },
+        { label: 'Commercial', to: '/crm' },
         { label: 'Clients', to: '/clients' },
         { label: client.name },
       ]}

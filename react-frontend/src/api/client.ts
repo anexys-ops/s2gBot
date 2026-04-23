@@ -747,6 +747,15 @@ export const comptaV1Api = {
       return api<Reglement[]>(`/v1/reglements${s ? `?${s}` : ''}`)
     },
     get: (id: number) => api<Reglement>(`/v1/reglements/${id}`),
+    create: (body: {
+      client_id: number
+      invoice_id?: number | null
+      bon_livraison_id?: number | null
+      amount_ttc: number
+      payment_mode?: string
+      payment_date: string
+      notes?: string | null
+    }) => api<Reglement>('/v1/reglements', { method: 'POST', body: JSON.stringify(body) }),
   },
   situations: {
     list: (params?: { dossier_id?: number }) => {
@@ -756,6 +765,14 @@ export const comptaV1Api = {
       return api<SituationTravauxRow[]>(`/v1/situations-travaux${s ? `?${s}` : ''}`)
     },
     get: (id: number) => api<SituationTravauxRow>(`/v1/situations-travaux/${id}`),
+    create: (body: {
+      dossier_id: number
+      invoice_id?: number | null
+      label: string
+      percent_complete?: number
+      amount_ht?: number
+      status?: string
+    }) => api<SituationTravauxRow>('/v1/situations-travaux', { method: 'POST', body: JSON.stringify(body) }),
   },
   avoirs: {
     list: (params?: { client_id?: number; source_invoice_id?: number }) => {
@@ -766,6 +783,13 @@ export const comptaV1Api = {
       return api<InvoiceCredit[]>(`/v1/invoice-credits${s ? `?${s}` : ''}`)
     },
     get: (id: number) => api<InvoiceCredit>(`/v1/invoice-credits/${id}`),
+    create: (body: {
+      client_id: number
+      source_invoice_id: number
+      amount_ttc: number
+      reason?: string | null
+      status?: string
+    }) => api<InvoiceCredit>('/v1/invoice-credits', { method: 'POST', body: JSON.stringify(body) }),
   },
 }
 

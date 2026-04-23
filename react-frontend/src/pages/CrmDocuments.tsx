@@ -114,7 +114,7 @@ export default function CrmDocuments() {
   if (loading) {
     return (
       <ModuleEntityShell
-        breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'CRM', to: '/crm' }, { label: 'Documents' }]}
+        breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Commercial', to: '/crm' }, { label: 'Documents' }]}
         moduleBarLabel="Commercial — Documents"
         title="Documents commerciaux"
       >
@@ -125,7 +125,7 @@ export default function CrmDocuments() {
   if (error) {
     return (
       <ModuleEntityShell
-        breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'CRM', to: '/crm' }, { label: 'Documents' }]}
+        breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Commercial', to: '/crm' }, { label: 'Documents' }]}
         moduleBarLabel="Commercial — Documents"
         title="Documents commerciaux"
       >
@@ -160,13 +160,13 @@ export default function CrmDocuments() {
           { id: 'status', label: 'Statut' },
           { id: 'ttc', label: 'Montant TTC' },
           { id: 'pdf', label: 'PDF' },
-          ...(isLab ? [{ id: 'crm', label: 'Fiche CRM' }] : []),
+          ...(isLab ? [{ id: 'crm', label: 'Fiche client' }] : []),
           ...(showDocEditCol ? [{ id: 'actions', label: 'Édition' }] : []),
         ]
 
   return (
     <ModuleEntityShell
-      breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'CRM', to: '/crm' }, { label: 'Documents' }]}
+      breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Commercial', to: '/crm' }, { label: 'Documents' }]}
       moduleBarLabel="Commercial — Documents"
       title="Documents commerciaux"
       subtitle="Devis, factures et offres (hors arbre PROLAB) — filtre, PDF, fiche client, édition."

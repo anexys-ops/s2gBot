@@ -1,7 +1,25 @@
 # PROLAB → s2gBot : Spécification Migration
 
-> Date : 2026-04-22 · Dernière mise à jour lot : 2026-04-25 (BDC-128, 132, 133, 135 foundation)  
+> Date : 2026-04-22 · Dernière mise à jour lot : 2026-04-23 (cartographie PROLAB, BDC-118 BCC/BL BDD, BDC-139 compta)  
 > Objectif : Intégrer l'architecture fonctionnelle de PROLAB (WinDev/HFSQL) dans s2gBot (Laravel 11 + React 18 + Expo), en conservant le design et les menus existants.
+
+### Cartographie PROLAB (HFSQL) ↔ s2gBot — état code (2026-04)
+
+| PROLAB (tables / concepts) | s2gBot aujourd’hui | Écart principal | Tickets Linear |
+|----------------------------|-------------------|-----------------|----------------|
+| `REF_*` (familles, articles, packages, tâches, paramètres, résultats) | Migrations `ref_*`, `App\Models\Catalogue\*`, API `api/v1/catalogue/*`, seeder, UI `/catalogue` | Cohérence à valider vs données HFSQL exportées (Nextcloud) ; champs commerciaux | BDC-107 → BDC-111, BDC-130 |
+| `OP_Dossier` + contacts chantier | `dossiers`, `dossier_contacts`, `DossierController` | Sous-ensembles techniques PROLAB (ex. `OP_DossierBéton*`) = hors périmètre cœur (plus tard) | BDC-112, BDC-113, BDC-114 |
+| `OP_Devis` / `OP_DevisArticles` / tâches | `quotes`, `quote_lines` (+ `type_ligne`), `devis_taches` | UI éditeur (catalogue + lignes libres), PDF devis, audit statut **sur devis** ; `DocumentSequenceService` pas encore appelé à la création | BDC-115, BDC-116, BDC-117, BDC-131, BDC-132, BDC-133, BDC-135 |
+| `OP_BCC` / `OP_BLC` | Tables `bons_commande` (+`bons_commande_lignes`), `bons_livraison` (+`bons_livraison_lignes`) ; `GET /api/v1/dossiers/{id}/bons` | CRUD API dédié, transformation devis→BC→BL, UI, PDF | BDC-118 (BDD + modèles + index bons) ; BDC-119, BDC-120, BDC-121 |
+| `OP_FAC` + lignes | `invoices`, `invoice_lines` | CRUD / PDF côté UI partiels ; règlements / lettrage non modélisés (voir ligne suivante) | BDC-131, facturation existante, **BDC-139** |
+| `OP_Reglement`, `OP_Situation`, avoirs | Export compta / factures, pas d’entités métier dédiées | Modèle BDD + API + lien factures & BL (alignement HFSQL) | **BDC-139** |
+| `OP_ProdTaches` + attachements / PJ | `devis_taches` (périmètre devis uniquement) | Tâches **production** post-BCC, PJ alignés `OP_Attachement*` | BDC-122, BDC-123 |
+| PV / essais (vs `orders`/`samples`/`reports`) | Chaîne labo s2gBot (commandes, échantillons, rapports) | PV structuré par type d’essai (béton, proctor, etc.) | BDC-124, BDC-125, BDC-126 |
+| `SYS_Utilisateur` / profils | `users` + rôles + `agencies` | Moteur workflow : tables + API définitions (instances non branchées partout) | BDC-134, BDC-135 |
+| NDF, matériel, ordres de mission | Peu (équipements/alertes calib.) | Spécification §8.3–5 | BDC-136, BDC-137, BDC-138 |
+| Fichiers HFSQL (ex. `21.zip` → extraction `scripts/extract_hfsql_21_zip.py`) | Inventaire possible sur poste de décompression | Taille décompressée ~150–450 Go — import métier = hors scope automatique ici | — (doc + atelier) |
+
+**Ordre de dépendance recommandé (lot suivant) :** BDC-118 → BDC-119 → BDC-120 / BDC-121 ; BDC-122+123 après lignes BCC ; compta **BDC-139** en parallèle de la finalisation factures (BDC-131).
 
 ### État — phase P1 (catalogue produits, Linear)
 

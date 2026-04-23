@@ -123,6 +123,16 @@ class Dossier extends Model
         return $this->hasMany(Quote::class, 'dossier_id');
     }
 
+    public function bonsCommande(): HasMany
+    {
+        return $this->hasMany(BonCommande::class, 'dossier_id');
+    }
+
+    public function bonsLivraison(): HasMany
+    {
+        return $this->hasMany(BonLivraison::class, 'dossier_id');
+    }
+
     public function attachments(): MorphMany
     {
         return $this->morphMany(Attachment::class, 'attachable');

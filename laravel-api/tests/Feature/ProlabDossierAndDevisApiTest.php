@@ -119,4 +119,31 @@ class ProlabDossierAndDevisApiTest extends TestCase
         $q->assertJsonPath('devis_taches.0.ref_tache_id', $tache->id);
         $q->assertJsonPath('devis_taches.0.quantite', 2);
     }
+
+    public function test_dossier_bons_index_returns_bcc_bl_arrays(): void
+    {
+        $client = Client::query()->create(['name' => 'BC/BL Dossier Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Chantier B']);
+        $lab = User::factory()->create([
+            'role' => User::ROLE_LAB_ADMIN,
+            'client_id' => null,
+            'site_id' => null,
+        ]);
+
+        $d = $this->actingAs($lab, 'sanctum')->postJson('/api/v1/dossiers', [
+            'titre' => 'Dossier bons',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => 'brouillon',
+            'date_debut' => '2026-02-01',
+        ]);
+        $d->assertCreated();
+        $dossierId = (int) $d->json('id');
+
+        $r = $this->actingAs($lab, 'sanctum')->getJson("/api/v1/dossiers/{$dossierId}/bons");
+        $r->assertOk();
+        $r->assertJsonStructure(['bons_commande', 'bons_livraison']);
+        $this->assertSame([], $r->json('bons_commande'));
+        $this->assertSame([], $r->json('bons_livraison'));
+    }
 }

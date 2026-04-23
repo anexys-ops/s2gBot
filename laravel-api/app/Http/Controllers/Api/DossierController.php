@@ -158,10 +158,20 @@ class DossierController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
+        $bc = $dossier->bonsCommande()
+            ->with(['lignes'])
+            ->orderByDesc('date_commande')
+            ->orderByDesc('id')
+            ->get();
+        $bl = $dossier->bonsLivraison()
+            ->with(['lignes'])
+            ->orderByDesc('date_livraison')
+            ->orderByDesc('id')
+            ->get();
+
         return response()->json([
-            'bons_commande' => [],
-            'bons_livraison' => [],
-            'message' => 'Tables BC/BL — à brancher (tickets ultérieurs).',
+            'bons_commande' => $bc,
+            'bons_livraison' => $bl,
         ]);
     }
 

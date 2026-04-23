@@ -46,6 +46,7 @@ class Quote extends Model
     protected $fillable = [
         'number',
         'client_id',
+        'contact_id',
         'agency_id',
         'site_id',
         'dossier_id',
@@ -93,6 +94,11 @@ class Quote extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function clientContact(): BelongsTo
+    {
+        return $this->belongsTo(ClientContact::class, 'contact_id');
     }
 
     public function agency(): BelongsTo

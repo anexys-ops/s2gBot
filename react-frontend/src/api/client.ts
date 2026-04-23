@@ -601,6 +601,7 @@ export type BonCommande = {
   quote_id: number | null
   dossier_id: number
   client_id: number
+  contact_id?: number | null
   statut: string
   date_commande: string
   date_livraison_prevue?: string | null
@@ -610,6 +611,7 @@ export type BonCommande = {
   notes?: string | null
   lignes?: BonCommandeLigne[]
   client?: { id: number; name: string }
+  clientContact?: ClientContactRow
   dossier?: DossierRow
 }
 
@@ -627,11 +629,13 @@ export type BonLivraison = {
   bon_commande_id: number | null
   dossier_id: number
   client_id: number
+  contact_id?: number | null
   statut: string
   date_livraison: string
   notes?: string | null
   lignes?: BonLivraisonLigne[]
   client?: { id: number; name: string }
+  clientContact?: ClientContactRow
   dossier?: DossierRow
 }
 
@@ -1396,6 +1400,7 @@ export interface Quote {
   id: number
   number: string
   client_id: number
+  contact_id?: number | null
   site_id?: number
   quote_date: string
   order_date?: string
@@ -1417,6 +1422,7 @@ export interface Quote {
   notes?: string
   meta?: EntityMetaPayload | null
   client?: Client
+  client_contact?: ClientContactRow
   site?: Site
   billing_address?: ClientAddress
   delivery_address?: ClientAddress
@@ -1441,6 +1447,7 @@ export const quotesApi = {
 
 export interface QuoteCreateBody {
   client_id: number
+  contact_id?: number | null
   site_id?: number
   quote_date: string
   order_date?: string

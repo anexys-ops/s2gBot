@@ -7,6 +7,7 @@ use App\Models\Agency;
 use App\Models\Invoice;
 use App\Models\InvoiceLine;
 use App\Support\AgencyAccess;
+use App\Support\ClientContactDocument;
 use Illuminate\Database\Eloquent\Builder;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\InvoiceService;
@@ -27,6 +28,7 @@ class InvoiceController extends Controller
         $user = $request->user();
         $query = Invoice::query()->with([
             'client',
+            'clientContact',
             'agency',
             'orders',
             'invoiceLines',
@@ -64,6 +66,7 @@ class InvoiceController extends Controller
         $user = $request->user();
         $query = Invoice::query()->with([
             'client',
+            'clientContact',
             'agency',
             'orders',
             'invoiceLines',
@@ -183,7 +186,13 @@ class InvoiceController extends Controller
             'lines.*.tva_rate' => 'nullable|numeric|min:0|max:100',
             'lines.*.discount_percent' => 'nullable|numeric|min:0|max:100',
             'meta' => 'nullable|array',
+            'contact_id' => 'nullable|exists:client_contacts,id',
         ]);
+
+        ClientContactDocument::assertBelongsToClient(
+            isset($validated['contact_id']) ? (int) $validated['contact_id'] : null,
+            (int) $validated['client_id'],
+        );
 
         $tvaRate = $validated['tva_rate'] ?? 20;
 
@@ -195,6 +204,7 @@ class InvoiceController extends Controller
         $invoice = Invoice::create([
             'number' => $validated['number'],
             'client_id' => $validated['client_id'],
+            'contact_id' => $validated['contact_id'] ?? null,
             'agency_id' => $agencyId,
             'invoice_date' => $validated['invoice_date'],
             'order_date' => $validated['order_date'] ?? null,
@@ -245,7 +255,7 @@ class InvoiceController extends Controller
         }
 
         return response()->json($invoice->fresh()->load([
-            'client', 'orders', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
+            'client', 'clientContact', 'orders', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
         ]), 201);
     }
 
@@ -257,7 +267,7 @@ class InvoiceController extends Controller
         }
 
         return response()->json($invoice->load([
-            'client', 'agency', 'orders', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate', 'attachments',
+            'client', 'clientContact', 'agency', 'orders', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate', 'attachments',
         ]));
     }
 
@@ -275,11 +285,14 @@ class InvoiceController extends Controller
                 'due_date' => 'nullable|date',
                 'pdf_template_id' => 'nullable|exists:document_pdf_templates,id',
                 'meta' => 'nullable|array',
+                'contact_id' => 'nullable|exists:client_contacts,id',
             ]);
             $invoice->update($validated);
+            $invoice->refresh();
+            ClientContactDocument::assertBelongsToClient($invoice->contact_id, (int) $invoice->client_id);
 
             return response()->json($invoice->fresh()->load([
-                'client', 'orders', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
+                'client', 'clientContact', 'orders', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
             ]));
         }
 
@@ -308,9 +321,11 @@ class InvoiceController extends Controller
             'lines.*.tva_rate' => 'nullable|numeric|min:0|max:100',
             'lines.*.discount_percent' => 'nullable|numeric|min:0|max:100',
             'meta' => 'nullable|array',
+            'contact_id' => 'nullable|exists:client_contacts,id',
         ]);
 
         $invoice->fill(collect($validated)->except('lines')->toArray());
+        ClientContactDocument::assertBelongsToClient($invoice->contact_id, (int) $invoice->client_id);
 
         if (isset($validated['lines'])) {
             $defaultTva = $validated['tva_rate'] ?? $invoice->tva_rate;
@@ -341,7 +356,7 @@ class InvoiceController extends Controller
         }
 
         return response()->json($invoice->fresh()->load([
-            'client', 'orders', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
+            'client', 'clientContact', 'orders', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
         ]));
     }
 

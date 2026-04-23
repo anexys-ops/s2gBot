@@ -24,6 +24,7 @@ class BonLivraison extends Model
         'bon_commande_id',
         'dossier_id',
         'client_id',
+        'contact_id',
         'statut',
         'date_livraison',
         'notes',
@@ -50,6 +51,11 @@ class BonLivraison extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function clientContact(): BelongsTo
+    {
+        return $this->belongsTo(ClientContact::class, 'contact_id');
     }
 
     public function createur(): BelongsTo

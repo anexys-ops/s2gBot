@@ -28,6 +28,7 @@ class BonCommande extends Model
         'quote_id',
         'dossier_id',
         'client_id',
+        'contact_id',
         'statut',
         'date_commande',
         'date_livraison_prevue',
@@ -54,6 +55,11 @@ class BonCommande extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function clientContact(): BelongsTo
+    {
+        return $this->belongsTo(ClientContact::class, 'contact_id');
     }
 
     public function quote(): BelongsTo

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BonLivraison;
 use App\Models\BonLivraisonLigne;
 use App\Support\AgencyAccess;
+use App\Support\ClientContactDocument;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,7 +15,7 @@ class BonLivraisonController extends Controller
     public function index(Request $request): JsonResponse
     {
         $q = BonLivraison::query()
-            ->with(['dossier', 'client', 'lignes'])
+            ->with(['dossier', 'client', 'clientContact', 'lignes'])
             ->orderByDesc('date_livraison')
             ->orderByDesc('id');
         if ($request->filled('dossier_id')) {
@@ -42,7 +43,7 @@ class BonLivraisonController extends Controller
         if (! AgencyAccess::userMayAccessBonLivraison($request->user(), $bonLivraison)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
-        $bonLivraison->load(['lignes', 'dossier', 'client', 'bonCommande']);
+        $bonLivraison->load(['lignes', 'dossier', 'client', 'clientContact', 'bonCommande']);
 
         return response()->json($bonLivraison);
     }
@@ -59,16 +60,19 @@ class BonLivraisonController extends Controller
         $data = $request->validate([
             'notes' => 'sometimes|nullable|string',
             'date_livraison' => 'sometimes|date',
+            'contact_id' => 'sometimes|nullable|exists:client_contacts,id',
             'lignes' => 'sometimes|array',
             'lignes.*.id' => 'required|integer|exists:bons_livraison_lignes,id',
             'lignes.*.quantite_livree' => 'required|numeric|min:0',
         ]);
-        if (array_key_exists('notes', $data) || array_key_exists('date_livraison', $data)) {
-            $u = array_intersect_key($data, array_flip(['notes', 'date_livraison']));
+        if (array_key_exists('notes', $data) || array_key_exists('date_livraison', $data) || array_key_exists('contact_id', $data)) {
+            $u = array_intersect_key($data, array_flip(['notes', 'date_livraison', 'contact_id']));
             if ($u !== []) {
                 $bonLivraison->update($u);
             }
         }
+        $bonLivraison->refresh();
+        ClientContactDocument::assertBelongsToClient($bonLivraison->contact_id, (int) $bonLivraison->client_id);
         if (! empty($data['lignes'])) {
             foreach ($data['lignes'] as $row) {
                 $lid = (int) $row['id'];
@@ -82,7 +86,7 @@ class BonLivraisonController extends Controller
             }
         }
 
-        return response()->json($bonLivraison->fresh()->load('lignes'));
+        return response()->json($bonLivraison->fresh()->load(['lignes', 'clientContact']));
     }
 
     public function valider(Request $request, BonLivraison $bonLivraison): JsonResponse
@@ -98,6 +102,6 @@ class BonLivraisonController extends Controller
         }
         $bonLivraison->update(['statut' => BonLivraison::STATUT_LIVRE]);
 
-        return response()->json($bonLivraison->fresh()->load('lignes'));
+        return response()->json($bonLivraison->fresh()->load(['lignes', 'clientContact']));
     }
 }

@@ -15,6 +15,7 @@ use App\Models\Site;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\DocumentStatusService;
 use App\Support\AgencyAccess;
+use App\Support\ClientContactDocument;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,6 +51,7 @@ class QuoteController extends Controller
         $user = $request->user();
         $query = Quote::query()->with([
             'client',
+            'clientContact',
             'agency',
             'site',
             'dossier',
@@ -94,6 +96,7 @@ class QuoteController extends Controller
             'client_id' => 'required|exists:clients,id',
             'site_id' => 'nullable|exists:sites,id',
             'dossier_id' => 'nullable|exists:dossiers,id',
+            'contact_id' => 'nullable|exists:client_contacts,id',
             'quote_date' => 'required|date',
             'order_date' => 'nullable|date',
             'site_delivery_date' => 'nullable|date',
@@ -119,6 +122,10 @@ class QuoteController extends Controller
             (int) $validated['client_id'],
             isset($validated['dossier_id']) ? (int) $validated['dossier_id'] : null,
             isset($validated['site_id']) ? (int) $validated['site_id'] : null,
+        );
+        ClientContactDocument::assertBelongsToClient(
+            isset($validated['contact_id']) ? (int) $validated['contact_id'] : null,
+            (int) $validated['client_id'],
         );
         $this->assertLinesNoDualRef($validated['lines']);
 
@@ -148,6 +155,7 @@ class QuoteController extends Controller
         $quote = Quote::create([
             'number' => $number,
             'client_id' => $validated['client_id'],
+            'contact_id' => $validated['contact_id'] ?? null,
             'agency_id' => $agencyId,
             'site_id' => $validated['site_id'] ?? null,
             'dossier_id' => $validated['dossier_id'] ?? null,
@@ -206,8 +214,13 @@ class QuoteController extends Controller
                 'notes' => 'nullable|string',
                 'pdf_template_id' => 'nullable|exists:document_pdf_templates,id',
                 'meta' => 'nullable|array',
+                'contact_id' => 'nullable|exists:client_contacts,id',
             ]);
             $quote->fill($validated);
+            ClientContactDocument::assertBelongsToClient(
+                $quote->contact_id,
+                (int) $quote->client_id,
+            );
             $quote->save();
             $this->recordQuoteStatusChange($quote, $oldStatus, $request);
 
@@ -218,6 +231,7 @@ class QuoteController extends Controller
             'client_id' => 'sometimes|exists:clients,id',
             'site_id' => 'nullable|exists:sites,id',
             'dossier_id' => 'nullable|exists:dossiers,id',
+            'contact_id' => 'nullable|exists:client_contacts,id',
             'quote_date' => 'sometimes|date',
             'order_date' => 'nullable|date',
             'site_delivery_date' => 'nullable|date',
@@ -269,6 +283,10 @@ class QuoteController extends Controller
             $quote->dossier_id ? (int) $quote->dossier_id : null,
             $quote->site_id ? (int) $quote->site_id : null,
         );
+        ClientContactDocument::assertBelongsToClient(
+            $quote->contact_id,
+            (int) $quote->client_id,
+        );
 
         if (isset($validated['lines'])) {
             $this->assertLinesNoDualRef($validated['lines']);
@@ -302,7 +320,7 @@ class QuoteController extends Controller
     private function loadQuoteForResponse(Quote $quote): Quote
     {
         return $quote->load([
-            'client', 'agency', 'site', 'dossier',
+            'client', 'clientContact', 'agency', 'site', 'dossier',
             'quoteLines.commercialOffering',
             'quoteLines.refArticle',
             'quoteLines.refPackage',

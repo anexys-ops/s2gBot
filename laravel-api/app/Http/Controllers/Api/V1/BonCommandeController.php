@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BonCommande;
 use App\Services\CommercialDocumentWorkflowService;
 use App\Support\AgencyAccess;
+use App\Support\ClientContactDocument;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,7 +19,7 @@ class BonCommandeController extends Controller
     public function index(Request $request): JsonResponse
     {
         $q = BonCommande::query()
-            ->with(['dossier', 'client', 'lignes'])
+            ->with(['dossier', 'client', 'clientContact', 'lignes'])
             ->orderByDesc('date_commande')
             ->orderByDesc('id');
         if ($request->filled('dossier_id')) {
@@ -46,7 +47,7 @@ class BonCommandeController extends Controller
         if (! AgencyAccess::userMayAccessBonCommande($request->user(), $bonCommande)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
-        $bonCommande->load(['lignes', 'dossier', 'client', 'quote', 'bonsLivraison.lignes']);
+        $bonCommande->load(['lignes', 'dossier', 'client', 'clientContact', 'quote', 'bonsLivraison.lignes']);
 
         return response()->json($bonCommande);
     }
@@ -65,12 +66,15 @@ class BonCommandeController extends Controller
             'date_livraison_prevue' => 'sometimes|nullable|date',
             'montant_ht' => 'sometimes|numeric|min:0',
             'montant_ttc' => 'sometimes|numeric|min:0',
+            'contact_id' => 'sometimes|nullable|exists:client_contacts,id',
         ]);
         if ($data !== []) {
             $bonCommande->update($data);
+            $bonCommande->refresh();
+            ClientContactDocument::assertBelongsToClient($bonCommande->contact_id, (int) $bonCommande->client_id);
         }
 
-        return response()->json($bonCommande->fresh()->load(['lignes', 'dossier', 'client']));
+        return response()->json($bonCommande->fresh()->load(['lignes', 'dossier', 'client', 'clientContact']));
     }
 
     public function confirmer(Request $request, BonCommande $bonCommande): JsonResponse

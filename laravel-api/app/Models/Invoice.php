@@ -37,6 +37,7 @@ class Invoice extends Model
     protected $fillable = [
         'number',
         'client_id',
+        'contact_id',
         'agency_id',
         'invoice_date',
         'order_date',
@@ -85,6 +86,11 @@ class Invoice extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function clientContact(): BelongsTo
+    {
+        return $this->belongsTo(ClientContact::class, 'contact_id');
     }
 
     public function agency(): BelongsTo

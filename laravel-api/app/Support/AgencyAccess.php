@@ -2,6 +2,10 @@
 
 namespace App\Support;
 
+use App\Models\Agency;
+use App\Models\BonCommande;
+use App\Models\BonLivraison;
+use App\Models\Client;
 use App\Models\Dossier;
 use App\Models\Invoice;
 use App\Models\Order;
@@ -11,7 +15,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Filtrage multi-agences : siège = {@see \App\Models\Client}, agences = {@see \App\Models\Agency}.
+ * Filtrage multi-agences : siège = {@see Client}, agences = {@see Agency}.
  * Si l'utilisateur n'a aucune ligne dans agency_user → accès à toutes les agences du client (comportement historique).
  */
 final class AgencyAccess
@@ -202,6 +206,46 @@ final class AgencyAccess
                 $q->whereIn('agency_id', $ids);
             });
         }
+    }
+
+    public static function userMayAccessBonCommande(User $user, BonCommande $bc): bool
+    {
+        if ($user->isLab()) {
+            return true;
+        }
+        if (! $user->client_id || (int) $bc->client_id !== (int) $user->client_id) {
+            return false;
+        }
+        $ids = self::restrictedAgencyIds($user);
+        if ($ids === null) {
+            return true;
+        }
+        $bc->loadMissing('dossier.site');
+        if (! $bc->dossier?->site?->agency_id) {
+            return false;
+        }
+
+        return in_array((int) $bc->dossier->site->agency_id, $ids, true);
+    }
+
+    public static function userMayAccessBonLivraison(User $user, BonLivraison $bl): bool
+    {
+        if ($user->isLab()) {
+            return true;
+        }
+        if (! $user->client_id || (int) $bl->client_id !== (int) $user->client_id) {
+            return false;
+        }
+        $ids = self::restrictedAgencyIds($user);
+        if ($ids === null) {
+            return true;
+        }
+        $bl->loadMissing('dossier.site');
+        if (! $bl->dossier?->site?->agency_id) {
+            return false;
+        }
+
+        return in_array((int) $bl->dossier->site->agency_id, $ids, true);
     }
 
     public static function userMayAccessDossier(User $user, Dossier $dossier): bool

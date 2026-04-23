@@ -11,6 +11,12 @@ class BonLivraison extends Model
 {
     use SoftDeletes;
 
+    public const STATUT_BROUILLON = 'brouillon';
+
+    public const STATUT_LIVRE = 'livre';
+
+    public const STATUT_SIGNE = 'signe';
+
     protected $table = 'bons_livraison';
 
     protected $fillable = [

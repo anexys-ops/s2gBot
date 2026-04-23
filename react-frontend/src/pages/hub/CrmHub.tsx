@@ -34,6 +34,24 @@ export default function CrmHub() {
       icon: 'orders',
     },
     {
+      to: '/bons-commande',
+      title: 'Bons de commande',
+      desc: 'Liste BCC, fiche, confirmation et génération de BL (actions lab).',
+      icon: 'orders',
+    },
+    {
+      to: '/bons-livraison',
+      title: 'Bons de livraison',
+      desc: 'Liste BLC, quantités livrées et validation.',
+      icon: 'orders',
+    },
+    {
+      to: '/compta-fondation',
+      title: 'Compta — fondation',
+      desc: 'Règlements, situations de travaux et avoirs (BDC-139, lecture).',
+      icon: 'invoice',
+    },
+    {
       to: '/catalogue',
       title: 'Catalogue PROLAB',
       desc: 'Arbre familles d’essais, articles, forfaits — aligné sur la migration WinDev.',

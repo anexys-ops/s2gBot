@@ -3,6 +3,7 @@ import DossiersListPage from './pages/dossiers/DossiersListPage'
 import DossierFichePage from './pages/dossiers/DossierFichePage'
 import DossierInfosTab from './pages/dossiers/tabs/DossierInfosTab'
 import DossierPlaceholderTab from './pages/dossiers/tabs/DossierPlaceholderTab'
+import DossierBcBlTab from './pages/dossiers/tabs/DossierBcBlTab'
 import DossierDevisTab from './pages/dossiers/tabs/DossierDevisTab'
 import DossierDocumentsTab from './pages/dossiers/tabs/DossierDocumentsTab'
 import CatalogueListePage from './pages/catalogue/CatalogueListePage'
@@ -64,6 +65,11 @@ import SettingsSecurityPage from './pages/settings/SettingsSecurityPage'
 import SettingsUsersPage from './pages/settings/SettingsUsersPage'
 import SettingsGroupsPage from './pages/settings/SettingsGroupsPage'
 import SettingsBrandingPage from './pages/settings/SettingsBrandingPage'
+import BonsCommandeListPage from './pages/commercial/BonsCommandeListPage'
+import BonCommandeFichePage from './pages/commercial/BonCommandeFichePage'
+import BonsLivraisonListPage from './pages/commercial/BonsLivraisonListPage'
+import BonLivraisonFichePage from './pages/commercial/BonLivraisonFichePage'
+import ComptaFondationPage from './pages/commercial/ComptaFondationPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -95,6 +101,11 @@ function AppRoutes() {
         </Route>
         <Route path="crm" element={<CrmHub />} />
         <Route path="crm/documents" element={<CrmDocuments />} />
+        <Route path="bons-commande" element={<BonsCommandeListPage />} />
+        <Route path="bons-commande/:id" element={<BonCommandeFichePage />} />
+        <Route path="bons-livraison" element={<BonsLivraisonListPage />} />
+        <Route path="bons-livraison/:id" element={<BonLivraisonFichePage />} />
+        <Route path="compta-fondation" element={<ComptaFondationPage />} />
         <Route path="catalogue" element={<CatalogueListePage />} />
         <Route path="catalogue/articles/:id" element={<ArticleFichePage />} />
         <Route path="dossiers/new" element={<DossierNewPage />} />
@@ -103,15 +114,7 @@ function AppRoutes() {
           <Route index element={<Navigate to="infos" replace />} />
           <Route path="infos" element={<DossierInfosTab />} />
           <Route path="devis" element={<DossierDevisTab />} />
-          <Route
-            path="bc-bl"
-            element={
-              <DossierPlaceholderTab
-                label="Bons de commande / bons de livraison"
-                description="Flux logistique et suivi des envois d’échantillons / documents."
-              />
-            }
-          />
+          <Route path="bc-bl" element={<DossierBcBlTab />} />
           <Route
             path="essais"
             element={<DossierPlaceholderTab label="Essais" description="Lien vers commandes d’essai et résultats." />}

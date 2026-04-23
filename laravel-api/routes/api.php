@@ -52,6 +52,12 @@ use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\TestResultController;
 use App\Http\Controllers\Api\TestTypeController;
 use App\Http\Controllers\Api\UserManagementController;
+use App\Http\Controllers\Api\V1\BonCommandeController;
+use App\Http\Controllers\Api\V1\BonLivraisonController;
+use App\Http\Controllers\Api\V1\DevisTransformController;
+use App\Http\Controllers\Api\V1\InvoiceCreditController;
+use App\Http\Controllers\Api\V1\ReglementController;
+use App\Http\Controllers\Api\V1\SituationTravauxController;
 use App\Http\Controllers\Api\VersionController;
 use App\Http\Controllers\Api\Workflow\WorkflowDefinitionController;
 use Illuminate\Support\Facades\Route;
@@ -90,6 +96,35 @@ Route::middleware('auth:sanctum')->group(function () {
             ->whereNumber('dossier');
         Route::get('dossiers/{dossier}/bons', [DossierController::class, 'bons'])
             ->whereNumber('dossier');
+        Route::post('devis/{quote}/transformer-bc', [DevisTransformController::class, 'store'])
+            ->whereNumber('quote');
+        Route::get('bons-commande', [BonCommandeController::class, 'index']);
+        Route::get('bons-commande/{bonCommande}', [BonCommandeController::class, 'show'])
+            ->whereNumber('bonCommande');
+        Route::put('bons-commande/{bonCommande}', [BonCommandeController::class, 'update'])
+            ->whereNumber('bonCommande');
+        Route::post('bons-commande/{bonCommande}/confirmer', [BonCommandeController::class, 'confirmer'])
+            ->whereNumber('bonCommande');
+        Route::post('bons-commande/{bonCommande}/transformer-bl', [BonCommandeController::class, 'transformerBl'])
+            ->whereNumber('bonCommande');
+        Route::get('bons-livraison', [BonLivraisonController::class, 'index']);
+        Route::get('bons-livraison/{bonLivraison}', [BonLivraisonController::class, 'show'])
+            ->whereNumber('bonLivraison');
+        Route::put('bons-livraison/{bonLivraison}', [BonLivraisonController::class, 'update'])
+            ->whereNumber('bonLivraison');
+        Route::post('bons-livraison/{bonLivraison}/valider', [BonLivraisonController::class, 'valider'])
+            ->whereNumber('bonLivraison');
+        Route::get('reglements', [ReglementController::class, 'index']);
+        Route::post('reglements', [ReglementController::class, 'store']);
+        Route::get('reglements/{reglement}', [ReglementController::class, 'show'])->whereNumber('reglement');
+        Route::get('situations-travaux', [SituationTravauxController::class, 'index']);
+        Route::post('situations-travaux', [SituationTravauxController::class, 'store']);
+        Route::get('situations-travaux/{situationTravaux}', [SituationTravauxController::class, 'show'])
+            ->whereNumber('situationTravaux');
+        Route::get('invoice-credits', [InvoiceCreditController::class, 'index']);
+        Route::post('invoice-credits', [InvoiceCreditController::class, 'store']);
+        Route::get('invoice-credits/{invoiceCredit}', [InvoiceCreditController::class, 'show'])
+            ->whereNumber('invoiceCredit');
         Route::post('dossiers/{dossier}/contacts', [DossierController::class, 'addContact'])
             ->whereNumber('dossier');
         Route::get('dossiers/{dossier}', [DossierController::class, 'show'])

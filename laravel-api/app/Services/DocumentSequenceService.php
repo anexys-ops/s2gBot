@@ -46,6 +46,9 @@ class DocumentSequenceService
             DocumentSequence::TYPE_BON_LIVRAISON => 'BLC',
             DocumentSequence::TYPE_FACTURE => 'FAC',
             DocumentSequence::TYPE_ORDRE_MISSION => 'OM',
+            DocumentSequence::TYPE_REGLEMENT => 'REG',
+            DocumentSequence::TYPE_SITUATION => 'SIT',
+            DocumentSequence::TYPE_AVOIR => 'AVO',
             default => strtoupper(substr($type, 0, 3)),
         };
     }

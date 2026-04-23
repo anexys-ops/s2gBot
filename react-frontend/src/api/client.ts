@@ -585,6 +585,56 @@ export interface DossierContactRow {
   role?: string | null
 }
 
+export type BonCommandeLigne = {
+  id: number
+  libelle: string
+  quantite: string | number
+  prix_unitaire_ht: string | number
+  tva_rate: string | number
+  montant_ht: string | number
+  ref_article_id?: number | null
+}
+
+export type BonCommande = {
+  id: number
+  numero: string
+  quote_id: number | null
+  dossier_id: number
+  client_id: number
+  statut: string
+  date_commande: string
+  date_livraison_prevue?: string | null
+  montant_ht: string | number
+  montant_ttc: string | number
+  tva_rate: string | number
+  notes?: string | null
+  lignes?: BonCommandeLigne[]
+  client?: { id: number; name: string }
+  dossier?: DossierRow
+}
+
+export type BonLivraisonLigne = {
+  id: number
+  libelle: string
+  quantite_livree: string | number
+  ref_article_id?: number | null
+  bon_commande_ligne_id?: number | null
+}
+
+export type BonLivraison = {
+  id: number
+  numero: string
+  bon_commande_id: number | null
+  dossier_id: number
+  client_id: number
+  statut: string
+  date_livraison: string
+  notes?: string | null
+  lignes?: BonLivraisonLigne[]
+  client?: { id: number; name: string }
+  dossier?: DossierRow
+}
+
 export const dossiersApi = {
   list: (params?: {
     client_id?: number
@@ -609,9 +659,110 @@ export const dossiersApi = {
   delete: (id: number) => api<null>(`/v1/dossiers/${id}`, { method: 'DELETE' }),
   devis: (id: number) => api<Quote[]>(`/v1/dossiers/${id}/devis`),
   bons: (id: number) =>
-    api<{ bons_commande: unknown[]; bons_livraison: unknown[]; message?: string }>(`/v1/dossiers/${id}/bons`),
+    api<{ bons_commande: BonCommande[]; bons_livraison: BonLivraison[] }>(`/v1/dossiers/${id}/bons`),
   addContact: (id: number, body: Omit<DossierContactInput, 'id'>) =>
     api<DossierContactRow>(`/v1/dossiers/${id}/contacts`, { method: 'POST', body: JSON.stringify(body) }),
+}
+
+export const bonsCommandeApi = {
+  list: (params?: { dossier_id?: number; client_id?: number; statut?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.dossier_id) q.set('dossier_id', String(params.dossier_id))
+    if (params?.client_id) q.set('client_id', String(params.client_id))
+    if (params?.statut) q.set('statut', params.statut)
+    const s = q.toString()
+    return api<BonCommande[]>(`/v1/bons-commande${s ? `?${s}` : ''}`)
+  },
+  get: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}`),
+  update: (id: number, body: { notes?: string; date_livraison_prevue?: string; montant_ht?: number; montant_ttc?: number }) =>
+    api<BonCommande>(`/v1/bons-commande/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  confirmer: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}/confirmer`, { method: 'POST' }),
+  transformerBl: (id: number) => api<BonLivraison>(`/v1/bons-commande/${id}/transformer-bl`, { method: 'POST' }),
+}
+
+export const bonsLivraisonApi = {
+  list: (params?: { dossier_id?: number; client_id?: number; statut?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.dossier_id) q.set('dossier_id', String(params.dossier_id))
+    if (params?.client_id) q.set('client_id', String(params.client_id))
+    if (params?.statut) q.set('statut', params.statut)
+    const s = q.toString()
+    return api<BonLivraison[]>(`/v1/bons-livraison${s ? `?${s}` : ''}`)
+  },
+  get: (id: number) => api<BonLivraison>(`/v1/bons-livraison/${id}`),
+  update: (
+    id: number,
+    body: { notes?: string; date_livraison?: string; lignes?: { id: number; quantite_livree: number }[] },
+  ) => api<BonLivraison>(`/v1/bons-livraison/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  valider: (id: number) => api<BonLivraison>(`/v1/bons-livraison/${id}/valider`, { method: 'POST' }),
+}
+
+export const devisV1Api = {
+  /** Devis (quote) → Bon de commande (lab uniquement) */
+  transformerBc: (quoteId: number) => api<BonCommande>(`/v1/devis/${quoteId}/transformer-bc`, { method: 'POST' }),
+}
+
+export type Reglement = {
+  id: number
+  numero: string
+  client_id: number
+  invoice_id: number | null
+  amount_ttc: string | number
+  payment_mode: string
+  payment_date: string
+  notes?: string | null
+}
+
+export type SituationTravauxRow = {
+  id: number
+  numero: string
+  dossier_id: number
+  label: string
+  percent_complete: string | number
+  amount_ht: string | number
+  status: string
+}
+
+export type InvoiceCredit = {
+  id: number
+  numero: string
+  client_id: number
+  source_invoice_id: number
+  amount_ttc: string | number
+  status: string
+  reason?: string | null
+}
+
+export const comptaV1Api = {
+  reglements: {
+    list: (params?: { client_id?: number; invoice_id?: number }) => {
+      const q = new URLSearchParams()
+      if (params?.client_id) q.set('client_id', String(params.client_id))
+      if (params?.invoice_id) q.set('invoice_id', String(params.invoice_id))
+      const s = q.toString()
+      return api<Reglement[]>(`/v1/reglements${s ? `?${s}` : ''}`)
+    },
+    get: (id: number) => api<Reglement>(`/v1/reglements/${id}`),
+  },
+  situations: {
+    list: (params?: { dossier_id?: number }) => {
+      const q = new URLSearchParams()
+      if (params?.dossier_id) q.set('dossier_id', String(params.dossier_id))
+      const s = q.toString()
+      return api<SituationTravauxRow[]>(`/v1/situations-travaux${s ? `?${s}` : ''}`)
+    },
+    get: (id: number) => api<SituationTravauxRow>(`/v1/situations-travaux/${id}`),
+  },
+  avoirs: {
+    list: (params?: { client_id?: number; source_invoice_id?: number }) => {
+      const q = new URLSearchParams()
+      if (params?.client_id) q.set('client_id', String(params.client_id))
+      if (params?.source_invoice_id) q.set('source_invoice_id', String(params.source_invoice_id))
+      const s = q.toString()
+      return api<InvoiceCredit[]>(`/v1/invoice-credits${s ? `?${s}` : ''}`)
+    },
+    get: (id: number) => api<InvoiceCredit>(`/v1/invoice-credits/${id}`),
+  },
 }
 
 export const brandingApi = {

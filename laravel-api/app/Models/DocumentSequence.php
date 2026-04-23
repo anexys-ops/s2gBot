@@ -18,6 +18,12 @@ class DocumentSequence extends Model
 
     public const TYPE_ORDRE_MISSION = 'ordre_mission';
 
+    public const TYPE_REGLEMENT = 'reglement';
+
+    public const TYPE_SITUATION = 'situation_travaux';
+
+    public const TYPE_AVOIR = 'avoir';
+
     protected $fillable = [
         'type',
         'year',

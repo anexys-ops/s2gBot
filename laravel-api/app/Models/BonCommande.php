@@ -11,6 +11,16 @@ class BonCommande extends Model
 {
     use SoftDeletes;
 
+    public const STATUT_BROUILLON = 'brouillon';
+
+    public const STATUT_CONFIRME = 'confirme';
+
+    public const STATUT_EN_COURS = 'en_cours';
+
+    public const STATUT_LIVRE = 'livre';
+
+    public const STATUT_ANNULE = 'annule';
+
     protected $table = 'bons_commande';
 
     protected $fillable = [
@@ -59,5 +69,10 @@ class BonCommande extends Model
     public function lignes(): HasMany
     {
         return $this->hasMany(BonCommandeLigne::class, 'bon_commande_id');
+    }
+
+    public function bonsLivraison(): HasMany
+    {
+        return $this->hasMany(BonLivraison::class, 'bon_commande_id');
     }
 }

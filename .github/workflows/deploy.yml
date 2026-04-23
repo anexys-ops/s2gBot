@@ -91,6 +91,15 @@ jobs:
             --exclude='laravel-api/storage/framework/views/*' \
             --exclude='react-frontend/dist' \
             --exclude='.run' \
+            --exclude='PROLAB/' \
+            --exclude='BD_S2G_PROLAB/' \
+            --exclude='*.zip' \
+            --exclude='*.fic' \
+            --exclude='*.FIC' \
+            --exclude='*.ndx' \
+            --exclude='*.pptx' \
+            --exclude='*.html' \
+            --exclude='cursor-tasks/' \
             -e "ssh -i ~/.ssh/deploy_key -p 167 -o StrictHostKeyChecking=accept-new" \
             ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
           echo "✓ Code synchronisé"

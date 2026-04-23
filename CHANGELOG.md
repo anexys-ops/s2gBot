@@ -1,5 +1,11 @@
 # Changelog — s2gBot
 
+## [1.0.36] — 2026-04-23
+
+### Versions (alignement)
+- **Source de vérité** : `react-frontend/package.json` → reprise dans le bundle (`__APP_VERSION__`), le footer Lab BTP, et `AppVersion::detect()` côté Laravel (`GET /api/version` si `APP_VERSION` absent).
+- Alignement explicite après un affichage **1.0.26** en production (bump de version lié au lot PROLAB 2026-04-02) alors que l’app était déjà au-delà de **1.0.30** : pas de retrait de fonctionnalités, uniquement une **même version** partout (≥ 1.0.30) pour le déploiement et le support.
+
 ## [1.0.26] — 2026-04-02
 
 ### Migration PROLAB

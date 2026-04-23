@@ -4,10 +4,35 @@ namespace App\Support;
 
 /**
  * Version affichée par /api/version : alignée sur le frontend (package.json du monorepo).
- * Surcharge possible via APP_VERSION dans .env si besoin ponctuel.
+ * Surcharge possible via APP_VERSION (souvent injectée en prod par Docker / .env.docker).
+ *
+ * Ne pas s'appuyer sur {@see env()} seul : avec `config:cache`, le helper `env()` renvoie
+ * null hors des fichiers de config, alors que la variable d'environnement du conteneur
+ * reste disponible via {@see getenv()}.
  */
 class AppVersion
 {
+    /**
+     * @return non-empty-string|null
+     */
+    public static function versionFromEnvironment(): ?string
+    {
+        $fromGetenv = getenv('APP_VERSION');
+        $candidates = [
+            env('APP_VERSION'),
+            ($fromGetenv !== false && is_string($fromGetenv)) ? $fromGetenv : null,
+            isset($_ENV['APP_VERSION']) && is_string($_ENV['APP_VERSION']) ? $_ENV['APP_VERSION'] : null,
+            isset($_SERVER['APP_VERSION']) && is_string($_SERVER['APP_VERSION']) ? $_SERVER['APP_VERSION'] : null,
+        ];
+        foreach ($candidates as $v) {
+            if (is_string($v) && trim($v) !== '') {
+                return trim($v);
+            }
+        }
+
+        return null;
+    }
+
     public static function detect(): string
     {
         $root = dirname(__DIR__, 3);
@@ -27,9 +52,9 @@ class AppVersion
 
     public static function resolve(): string
     {
-        $fromEnv = env('APP_VERSION');
-        if (is_string($fromEnv) && trim($fromEnv) !== '') {
-            return trim($fromEnv);
+        $fromEnv = self::versionFromEnvironment();
+        if ($fromEnv !== null) {
+            return $fromEnv;
         }
 
         return self::detect();

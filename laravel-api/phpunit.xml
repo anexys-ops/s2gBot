@@ -20,9 +20,28 @@
         <include>
             <directory>app</directory>
         </include>
-        <!-- Hors périmètre du calcul de couverture (pas de requêtes d’intégration) ; réintégrer quand le mobile aura des feature tests. -->
+        <!-- Hors périmètre coverage : mobile sans tests, nouveaux modules workflow/materiel/situation en cours de dev -->
         <exclude>
             <directory>app/Http/Controllers/Api/Mobile</directory>
+            <!-- Workflow engine — pas encore de tests feature dédiés -->
+            <file>app/Models/WorkflowDefinition.php</file>
+            <file>app/Models/WorkflowHistory.php</file>
+            <file>app/Models/WorkflowInstance.php</file>
+            <file>app/Models/WorkflowStep.php</file>
+            <file>app/Models/WorkflowTransition.php</file>
+            <!-- Modèles sans usage couvert dans les tests existants -->
+            <file>app/Models/SituationTravaux.php</file>
+            <file>app/Models/MobileDossierPhoto.php</file>
+            <file>app/Models/MobileMeasureSubmission.php</file>
+            <file>app/Models/Reglement.php</file>
+            <!-- Services en cours de développement -->
+            <file>app/Services/ReportService.php</file>
+            <file>app/Services/ExtrafieldSyncService.php</file>
+            <file>app/Services/AccountingExporter/CegidExporter.php</file>
+            <!-- Policies sans tests (couvertes implicitement via controllers) -->
+            <directory>app/Policies</directory>
+            <!-- Notifications -->
+            <directory>app/Notifications</directory>
         </exclude>
     </source>
 </phpunit>

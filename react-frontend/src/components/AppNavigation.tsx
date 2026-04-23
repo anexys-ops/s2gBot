@@ -47,7 +47,7 @@ function isChantierActive(pathname: string): boolean {
 }
 
 function isMaterielActive(pathname: string): boolean {
-  return pathname.startsWith('/materiel') || pathname.startsWith('/back-office/equipements')
+  return pathname.startsWith('/materiel')
 }
 
 function isLaboratoireActive(pathname: string): boolean {
@@ -162,7 +162,7 @@ export default function AppNavigation() {
         label: 'Matériel',
         items: filterItems([
           { to: '/materiel', label: 'Vue d’ensemble' },
-          { to: '/back-office/equipements', label: 'Parc équipements' },
+          { to: '/materiel/equipements', label: 'Parc équipements' },
         ]),
       },
       {

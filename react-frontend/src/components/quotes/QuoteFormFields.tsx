@@ -1,10 +1,17 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { clientContactsApi, type ClientAddress, type ClientContactRow, type DocumentPdfTemplateRow, type DossierRow, type Site, type EntityMetaPayload } from '../../api/client'
+import {
+  getEffectiveDevisParcours,
+  lineKeyForRow,
+  filterDevisParcoursRemoveJalon,
+} from '../../lib/devisParcours'
 import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import { lineHt, type DocumentTotalsResult } from '../../lib/quoteTotals'
 
 export type QuoteLineDraft = {
+  /** Clé client pour ordre d’affichage (lignes / jalons entremêlés) — jamais envoyée à l’API. */
+  row_key?: string
   commercial_offering_id?: number | null
   ref_article_id?: number | null
   ref_package_id?: number | null
@@ -60,6 +67,8 @@ type Props = {
   removeLine: (index: number) => void
   onOpenCommercialCatalog: (lineIndex: number) => void
   onOpenProlabCatalog: (lineIndex: number) => void
+  onOpenCommercialCatalogForJalon: (jalonIndex: number) => void
+  onOpenProlabCatalogForJalon: (jalonIndex: number) => void
   totals: DocumentTotalsResult
   clientLabel: string
   siteLabel: string
@@ -95,6 +104,8 @@ export default function QuoteFormFields({
   removeLine,
   onOpenCommercialCatalog,
   onOpenProlabCatalog,
+  onOpenCommercialCatalogForJalon,
+  onOpenProlabCatalogForJalon,
   totals,
   clientLabel,
   siteLabel,
@@ -208,34 +219,95 @@ export default function QuoteFormFields({
   }
 
   const addJalon = () => {
-    setForm((f) => ({
-      ...f,
-      meta: {
-        ...f.meta,
-        devis_jalons: [
-          ...(f.meta?.devis_jalons ?? []),
-          { id: `j${Date.now()}`, libelle: '', montant_ht: undefined },
-        ],
-      },
-    }))
+    setForm((f) => {
+      const jid = `j${Date.now()}`
+      const nextJ = [
+        ...(f.meta?.devis_jalons ?? []),
+        {
+          id: jid,
+          libelle: '',
+          montant_ht: undefined,
+          ref_article_id: null,
+          commercial_offering_id: null,
+        },
+      ]
+      const base =
+        f.meta.devis_parcours && f.meta.devis_parcours.length > 0
+          ? f.meta.devis_parcours
+          : getEffectiveDevisParcours(f.lines, f.meta)
+      return {
+        ...f,
+        meta: {
+          ...f.meta,
+          devis_jalons: nextJ,
+          devis_parcours: [...base, { kind: 'jalon' as const, id: jid }],
+        },
+      }
+    })
   }
 
-  const updateJalon = (i: number, field: 'libelle' | 'montant_ht', v: string | number | undefined) => {
+  type JalonField = 'libelle' | 'montant_ht' | 'ref_article_id' | 'commercial_offering_id'
+  const updateJalon = (i: number, field: JalonField, v: string | number | null | undefined) => {
     setForm((f) => {
       const list = [...(f.meta?.devis_jalons ?? [])]
       if (!list[i]) return f
-      if (field === 'libelle') list[i] = { ...list[i], libelle: String(v) }
-      else list[i] = { ...list[i], montant_ht: v === '' || v === undefined ? undefined : Number(v) }
+      const cur = { ...list[i] }
+      if (field === 'libelle') {
+        cur.libelle = String(v)
+      } else if (field === 'montant_ht') {
+        cur.montant_ht = v === '' || v === undefined ? undefined : Number(v)
+      } else if (field === 'ref_article_id') {
+        const n = v === null || v === undefined || v === '' ? null : Number(v)
+        cur.ref_article_id = n
+        if (n) cur.commercial_offering_id = null
+      } else if (field === 'commercial_offering_id') {
+        const n = v === null || v === undefined || v === '' ? null : Number(v)
+        cur.commercial_offering_id = n
+        if (n) cur.ref_article_id = null
+      }
+      list[i] = cur
       return { ...f, meta: { ...f.meta, devis_jalons: list } }
     })
   }
 
-  const removeJalon = (i: number) => {
-    setForm((f) => ({
-      ...f,
-      meta: { ...f.meta, devis_jalons: (f.meta?.devis_jalons ?? []).filter((_, j) => j !== i) },
-    }))
+  const clearJalonProduct = (i: number) => {
+    setForm((f) => {
+      const list = [...(f.meta?.devis_jalons ?? [])]
+      if (!list[i]) return f
+      list[i] = { ...list[i], ref_article_id: null, commercial_offering_id: null }
+      return { ...f, meta: { ...f.meta, devis_jalons: list } }
+    })
   }
+
+  const removeJalon = (jalonId: string) => {
+    setForm((f) => {
+      const list = (f.meta?.devis_jalons ?? []).filter((j) => j.id !== jalonId)
+      const p = f.meta.devis_parcours ?? getEffectiveDevisParcours(f.lines, f.meta)
+      const nextP = filterDevisParcoursRemoveJalon(p, jalonId)
+      const meta: EntityMetaPayload = { ...f.meta, devis_jalons: list }
+      if (nextP.length > 0) meta.devis_parcours = nextP
+      else delete meta.devis_parcours
+      return { ...f, meta }
+    })
+  }
+
+  const moveDevisParcours = (i: number, dir: -1 | 1) => {
+    setForm((f) => {
+      const p = [...getEffectiveDevisParcours(f.lines, f.meta)]
+      const j = i + dir
+      if (j < 0 || j >= p.length) return f
+      const next = [...p]
+      const tmp = next[i]
+      next[i] = next[j]!
+      next[j] = tmp!
+      return { ...f, meta: { ...f.meta, devis_parcours: next } }
+    })
+  }
+
+  const devisParcoursView = useMemo(
+    () => getEffectiveDevisParcours(form.lines, form.meta),
+    [form.lines, form.meta],
+  )
 
   return (
     <>
@@ -684,34 +756,130 @@ export default function QuoteFormFields({
           )}
 
           <h4 className="ds-form-section__title" style={{ marginTop: '1.5rem' }}>
-            Jalons (rappel facturation / suivi)
+            Jalons et enchaînement (lignes et jalons)
           </h4>
-          <p className="text-muted" style={{ fontSize: '0.85rem' }}>Métadonnées du devis, utiles pour le suivi (PDF / interne selon intégration future).</p>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={addJalon}>
+          <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+            Ordre d’affichage (produit, jalon, produit, …). Chaque jalon peut être lié à une <strong>offre</strong> (catalogue
+            devis) ou à un <strong>article PROLAB</strong> — jamais les deux à la fois.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+            {devisParcoursView.map((item, pi) => {
+              if (item.kind === 'ligne') {
+                const li = form.lines.findIndex((l, idx) => lineKeyForRow(l, idx) === item.id)
+                const line = li >= 0 ? form.lines[li] : undefined
+                const preview =
+                  line?.description?.trim() ? line.description.trim().slice(0, 100) : '(ligne sans libellé)'
+                return (
+                  <div
+                    key={`l-${item.id}`}
+                    className="card"
+                    style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '0.6rem' }}
+                  >
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Ligne</span>
+                    <span style={{ flex: 1, minWidth: 140 }}>{li >= 0 ? `Ligne ${li + 1} — ${preview}` : 'Ligne (réf. inconnue)'}</span>
+                    <span className="text-muted" style={{ fontSize: '0.8rem' }}>Modif. dans le tableau</span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={pi === 0}
+                      onClick={() => moveDevisParcours(pi, -1)}
+                      aria-label="Monter"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={pi >= devisParcoursView.length - 1}
+                      onClick={() => moveDevisParcours(pi, 1)}
+                      aria-label="Descendre"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                )
+              }
+              const ji = (form.meta.devis_jalons ?? []).findIndex((j) => j.id === item.id)
+              const j = ji >= 0 ? (form.meta.devis_jalons ?? [])[ji] : undefined
+              if (!j) {
+                return (
+                  <div key={`j-miss-${item.id}`} className="card" style={{ padding: '0.5rem' }}>
+                    <span className="text-muted">Jalon orphelin (réf. {item.id})</span>
+                  </div>
+                )
+              }
+              return (
+                <div key={`j-${item.id}`} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0.6rem' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Jalon</span>
+                    <input
+                      style={{ flex: 1, minWidth: 140 }}
+                      placeholder="Libellé (ex. Acompte 30 %)"
+                      value={j.libelle}
+                      onChange={(e) => updateJalon(ji, 'libelle', e.target.value)}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      placeholder="HT"
+                      style={{ width: 100 }}
+                      value={j.montant_ht ?? ''}
+                      onChange={(e) => updateJalon(ji, 'montant_ht', e.target.value === '' ? undefined : Number(e.target.value))}
+                    />
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => onOpenCommercialCatalogForJalon(ji)}>
+                      Offre
+                    </button>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => onOpenProlabCatalogForJalon(ji)}>
+                      PROLAB
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => clearJalonProduct(ji)}
+                      title="Retirer le lien produit"
+                    >
+                      ⊗
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={pi === 0}
+                      onClick={() => moveDevisParcours(pi, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={pi >= devisParcoursView.length - 1}
+                      onClick={() => moveDevisParcours(pi, 1)}
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => j.id && removeJalon(j.id)}
+                      aria-label="Supprimer le jalon"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>
+                    {j.commercial_offering_id
+                      ? `Lien : offre commerciale n°${j.commercial_offering_id}`
+                      : j.ref_article_id
+                        ? `Lien : article PROLAB n°${j.ref_article_id}`
+                        : 'Aucun produit lié'}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={addJalon} style={{ marginTop: '0.5rem' }}>
             + Jalon
           </button>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-            {(form.meta?.devis_jalons ?? []).map((j, i) => (
-              <div key={j.id ?? i} className="card" style={{ display: 'grid', gridTemplateColumns: '1fr 120px 40px', gap: 8, padding: '0.6rem' }}>
-                <input
-                  placeholder="Libellé (ex. Acompte 30 %)"
-                  value={j.libelle}
-                  onChange={(e) => updateJalon(i, 'libelle', e.target.value)}
-                />
-                <input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  placeholder="HT"
-                  value={j.montant_ht ?? ''}
-                  onChange={(e) => updateJalon(i, 'montant_ht', e.target.value === '' ? undefined : Number(e.target.value))}
-                />
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => removeJalon(i)} aria-label="Supprimer">
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
         </section>
       )}
 

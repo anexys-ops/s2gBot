@@ -1399,12 +1399,15 @@ export const statsApi = {
 export type EntityMetaPayload = {
   indicateurs?: Record<string, string>
   champs_perso?: Record<string, string>
-  /** Jalons devis (optionnel) : libellé, montant, lien article PROLAB optionnel */
+  /** Ordre d’affichage : enchaîner lignes et jalons (produit, jalon, produit, …). */
+  devis_parcours?: Array<{ kind: 'ligne' | 'jalon'; id: string }>
+  /** Jalons devis (optionnel) : libellé, montant, lien offre ou article PROLAB */
   devis_jalons?: Array<{
     id?: string
     libelle: string
     montant_ht?: number
     ref_article_id?: number | null
+    commercial_offering_id?: number | null
   }>
   /** Tarif forfaitaire lorsqu’il n’y a pas de lignes article (optionnel) */
   tarif_global_hors_lignes_ht?: number

@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 
 const cards = [
   {
-    to: '/back-office/equipements',
+    to: '/materiel/equipements',
     title: 'Parc équipements',
     desc: 'Liste du matériel, étalonnages, fiches détaillées et alertes de calibration.',
     icon: 'calculator' as const,

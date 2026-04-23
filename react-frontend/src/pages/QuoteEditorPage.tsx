@@ -25,9 +25,21 @@ import { useAuth } from '../contexts/AuthContext'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { formatMoney } from '../lib/appLocale'
 import { computeQuoteFormDocumentTotals, sumFraisSupplementairesTtc } from '../lib/quoteTotals'
+import {
+  getEffectiveDevisParcours,
+  buildDefaultDevisParcours,
+  lineKeyForRow,
+  filterDevisParcoursRemoveLigne,
+  normalizeDevisParcoursInMeta,
+} from '../lib/devisParcours'
+
+function newLineRowKey() {
+  return `L-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+}
 
 function emptyLine(defaultTva: number): QuoteLineDraft {
   return {
+    row_key: newLineRowKey(),
     description: '',
     quantity: 1,
     unit_price: 0,
@@ -94,6 +106,8 @@ function toApiBody(form: QuoteFormState): QuoteCreateBody {
   if (meta.tarif_global_hors_lignes_ht == null) delete meta.tarif_global_hors_lignes_ht
   if (meta.frais_supplementaires && meta.frais_supplementaires.length === 0) delete meta.frais_supplementaires
   if (meta.ligne_masque_prix_pdf && !meta.ligne_masque_prix_pdf.some(Boolean)) delete meta.ligne_masque_prix_pdf
+  normalizeDevisParcoursInMeta(form.lines, meta.devis_jalons, meta)
+  if (meta.devis_parcours && meta.devis_parcours.length === 0) delete meta.devis_parcours
   const hasMeta = Object.keys(meta).length > 0
 
   return {
@@ -133,8 +147,9 @@ export default function QuoteEditorPage() {
   const isCreate = editingNumericId === null || Number.isNaN(editingNumericId)
 
   const [form, setForm] = useState<QuoteFormState>(emptyForm)
-  const [catalogLineIndex, setCatalogLineIndex] = useState<number | null>(null)
-  const [prolabLineIndex, setProlabLineIndex] = useState<number | null>(null)
+  type LineOrJalon = { target: 'line'; index: number } | { target: 'jalon'; jalonIndex: number }
+  const [catalogPick, setCatalogPick] = useState<LineOrJalon | null>(null)
+  const [prolabPick, setProlabPick] = useState<LineOrJalon | null>(null)
   const [catalogSearch, setCatalogSearch] = useState('')
   const [prolabFamilleId, setProlabFamilleId] = useState<number | ''>('')
   const catalogDebounced = useDebouncedValue(catalogSearch, 250)
@@ -166,7 +181,7 @@ export default function QuoteEditorPage() {
   const { data: arbreProlab } = useQuery({
     queryKey: ['catalogue-arbre', 'quote-pick'],
     queryFn: () => catalogueApi.arbre(),
-    enabled: isLab && prolabLineIndex !== null,
+    enabled: isLab && prolabPick !== null,
   })
 
   const { data: addrForm } = useQuery({
@@ -190,7 +205,7 @@ export default function QuoteEditorPage() {
   const { data: catalogData, isLoading: catalogLoading } = useQuery({
     queryKey: ['commercial-offerings-picker', catalogDebounced],
     queryFn: () => commercialOfferingsApi.list({ search: catalogDebounced.trim() || undefined, active_only: true, per_page: 80 }),
-    enabled: catalogLineIndex !== null,
+    enabled: catalogPick !== null,
   })
 
   useEffect(() => {
@@ -234,6 +249,7 @@ export default function QuoteEditorPage() {
     const ql = quote.quote_lines ?? []
     const defaultTva = Number(quote.tva_rate ?? 20)
     const lines: QuoteLineDraft[] = ql.map((l) => ({
+      row_key: l.id != null ? `line-${l.id}` : newLineRowKey(),
       commercial_offering_id: l.commercial_offering_id ?? undefined,
       ref_article_id: l.ref_article_id ?? undefined,
       ref_package_id: l.ref_package_id ?? undefined,
@@ -244,6 +260,17 @@ export default function QuoteEditorPage() {
       discount_percent: Number(l.discount_percent ?? 0),
       part_of_package: false,
     }))
+    const baseMeta: EntityMetaPayload = { ...((quote.meta as EntityMetaPayload) ?? {}) }
+    const devisJalons = (baseMeta.devis_jalons ?? []).map((j, i) => ({
+      ...j,
+      id: j.id ?? `j-${i}-${Date.now()}`,
+      ref_article_id: j.ref_article_id ?? null,
+      commercial_offering_id: j.commercial_offering_id ?? null,
+    }))
+    baseMeta.devis_jalons = devisJalons
+    if (!baseMeta.devis_parcours || baseMeta.devis_parcours.length === 0) {
+      baseMeta.devis_parcours = buildDefaultDevisParcours(lines, devisJalons)
+    }
     setForm({
       contextMode: inferContextMode(quote),
       client_id: quote.client_id,
@@ -267,7 +294,7 @@ export default function QuoteEditorPage() {
       pdf_template_id: quote.pdf_template_id,
       notes: quote.notes ?? '',
       lines,
-      meta: (quote.meta as EntityMetaPayload) ?? {},
+      meta: baseMeta,
     })
   }, [quote, isCreate, navigate])
 
@@ -357,10 +384,20 @@ export default function QuoteEditorPage() {
   )
 
   const addLine = () => {
-    setForm((f) => ({
-      ...f,
-      lines: [...f.lines, emptyLine(f.tva_rate ?? 20)],
-    }))
+    setForm((f) => {
+      const newLine = emptyLine(f.tva_rate ?? 20)
+      const key = newLine.row_key!
+      const nextLines = [...f.lines, newLine]
+      const base =
+        f.meta.devis_parcours && f.meta.devis_parcours.length > 0
+          ? f.meta.devis_parcours
+          : getEffectiveDevisParcours(f.lines, f.meta)
+      return {
+        ...f,
+        lines: nextLines,
+        meta: { ...f.meta, devis_parcours: [...base, { kind: 'ligne' as const, id: key }] },
+      }
+    })
   }
 
   const updateLine = (index: number, field: keyof QuoteLineDraft, value: string | number | null | boolean) => {
@@ -372,6 +409,8 @@ export default function QuoteEditorPage() {
 
   const removeLine = (index: number) => {
     setForm((f) => {
+      const removed = f.lines[index]
+      const lineKey = removed ? lineKeyForRow(removed, index) : null
       const nextLines = f.lines.filter((_, i) => i !== index)
       const prevM = f.meta.ligne_masque_prix_pdf
       const nextM = prevM ? prevM.filter((_, i) => i !== index) : undefined
@@ -379,6 +418,15 @@ export default function QuoteEditorPage() {
       if (nextM && nextM.length > 0) {
         if (nextM.some(Boolean)) meta.ligne_masque_prix_pdf = nextM
         else delete meta.ligne_masque_prix_pdf
+      }
+      if (lineKey) {
+        const p = f.meta.devis_parcours ?? getEffectiveDevisParcours(f.lines, f.meta)
+        const nextP = filterDevisParcoursRemoveLigne(p, lineKey)
+        if (nextP.length > 0) {
+          meta.devis_parcours = nextP
+        } else {
+          delete meta.devis_parcours
+        }
       }
       return { ...f, lines: nextLines, meta }
     })
@@ -401,7 +449,22 @@ export default function QuoteEditorPage() {
           : l,
       ),
     }))
-    setCatalogLineIndex(null)
+    setCatalogPick(null)
+    setCatalogSearch('')
+  }
+
+  function applyOfferingToJalon(jalonIndex: number, o: CommercialOffering) {
+    setForm((f) => {
+      const list = [...(f.meta.devis_jalons ?? [])]
+      if (!list[jalonIndex]) return f
+      list[jalonIndex] = {
+        ...list[jalonIndex],
+        commercial_offering_id: o.id,
+        ref_article_id: null,
+      }
+      return { ...f, meta: { ...f.meta, devis_jalons: list } }
+    })
+    setCatalogPick(null)
     setCatalogSearch('')
   }
 
@@ -422,7 +485,22 @@ export default function QuoteEditorPage() {
           : l,
       ),
     }))
-    setProlabLineIndex(null)
+    setProlabPick(null)
+    setProlabFamilleId('')
+  }
+
+  function applyProlabArticleToJalon(jalonIndex: number, art: RefArticleRow) {
+    setForm((f) => {
+      const list = [...(f.meta.devis_jalons ?? [])]
+      if (!list[jalonIndex]) return f
+      list[jalonIndex] = {
+        ...list[jalonIndex],
+        commercial_offering_id: null,
+        ref_article_id: art.id,
+      }
+      return { ...f, meta: { ...f.meta, devis_jalons: list } }
+    })
+    setProlabPick(null)
     setProlabFamilleId('')
   }
 
@@ -520,11 +598,19 @@ export default function QuoteEditorPage() {
           siteLabel={siteLabel}
           dossierLabel={dossierLabel}
           onOpenCommercialCatalog={(i) => {
-            setCatalogLineIndex(i)
+            setCatalogPick({ target: 'line', index: i })
             setCatalogSearch('')
           }}
           onOpenProlabCatalog={(i) => {
-            setProlabLineIndex(i)
+            setProlabPick({ target: 'line', index: i })
+            setProlabFamilleId('')
+          }}
+          onOpenCommercialCatalogForJalon={(ji) => {
+            setCatalogPick({ target: 'jalon', jalonIndex: ji })
+            setCatalogSearch('')
+          }}
+          onOpenProlabCatalogForJalon={(ji) => {
+            setProlabPick({ target: 'jalon', jalonIndex: ji })
             setProlabFamilleId('')
           }}
         />
@@ -542,8 +628,11 @@ export default function QuoteEditorPage() {
         />
       </form>
 
-      {catalogLineIndex !== null && (
-        <Modal title="Catalogue commercial (offre)" onClose={() => setCatalogLineIndex(null)}>
+      {catalogPick !== null && (
+        <Modal
+          title={catalogPick.target === 'jalon' ? 'Offre (jalon de devis)' : 'Catalogue commercial (offre)'}
+          onClose={() => setCatalogPick(null)}
+        >
           <input
             type="search"
             placeholder="Filtrer…"
@@ -560,7 +649,11 @@ export default function QuoteEditorPage() {
                   key={o.id}
                   type="button"
                   className="catalog-picker-row"
-                  onClick={() => applyOfferingToLine(catalogLineIndex, o)}
+                  onClick={() => {
+                    if (!catalogPick) return
+                    if (catalogPick.target === 'line') applyOfferingToLine(catalogPick.index, o)
+                    else applyOfferingToJalon(catalogPick.jalonIndex, o)
+                  }}
                 >
                   <span className="catalog-picker-row__name">{o.name}</span>
                   <span className="catalog-picker-row__meta">
@@ -575,8 +668,11 @@ export default function QuoteEditorPage() {
         </Modal>
       )}
 
-      {prolabLineIndex !== null && (
-        <Modal title="Catalogue PROLAB (famille → produit)" onClose={() => setProlabLineIndex(null)}>
+      {prolabPick !== null && (
+        <Modal
+          title={prolabPick.target === 'jalon' ? 'Article PROLAB (jalon de devis)' : 'Catalogue PROLAB (famille → produit)'}
+          onClose={() => setProlabPick(null)}
+        >
           <p className="text-muted" style={{ fontSize: '0.88rem' }}>
             Sélectionnez d’abord la famille, puis l’article. Les libellés et prix proviennent de l’arbre importé (PROLAB).
           </p>
@@ -602,7 +698,11 @@ export default function QuoteEditorPage() {
                   key={a.id}
                   type="button"
                   className="catalog-picker-row"
-                  onClick={() => prolabLineIndex !== null && applyProlabArticleToLine(prolabLineIndex, a)}
+                  onClick={() => {
+                    if (!prolabPick) return
+                    if (prolabPick.target === 'line') applyProlabArticleToLine(prolabPick.index, a)
+                    else applyProlabArticleToJalon(prolabPick.jalonIndex, a)
+                  }}
                 >
                   <span className="catalog-picker-row__name">{a.libelle}</span>
                   <span className="catalog-picker-row__meta">

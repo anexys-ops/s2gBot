@@ -71,6 +71,11 @@ import BonsLivraisonListPage from './pages/commercial/BonsLivraisonListPage'
 import BonLivraisonFichePage from './pages/commercial/BonLivraisonFichePage'
 import ComptaFondationPage from './pages/commercial/ComptaFondationPage'
 import MaterielHub from './pages/hub/MaterielHub'
+import MaterielModuleLayout from './pages/materiel/MaterielModuleLayout'
+import {
+  BackOfficeEquipementsListRedirect,
+  BackOfficeEquipementDetailRedirect,
+} from './pages/back-office/BackOfficeMaterielRedirects'
 import PlanningTechniciensPage from './pages/terrain/PlanningTechniciensPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -127,7 +132,11 @@ function AppRoutes() {
         <Route path="terrain/mesures" element={<TerrainMesuresPage />} />
         <Route path="terrain/chantiers" element={<TerrainChantiersCartePage />} />
         <Route path="terrain/planning" element={<PlanningTechniciensPage />} />
-        <Route path="materiel" element={<MaterielHub />} />
+        <Route path="materiel" element={<MaterielModuleLayout />}>
+          <Route index element={<MaterielHub />} />
+          <Route path="equipements" element={<EquipmentsPage />} />
+          <Route path="equipements/:id" element={<EquipmentDetailPage />} />
+        </Route>
         <Route path="labo" element={<LaboHub />} />
         <Route path="labo/essais" element={<LaboEssaisPage />} />
         <Route path="aide" element={<HelpOpenApiPage />} />
@@ -141,6 +150,8 @@ function AppRoutes() {
         <Route path="devis/:quoteId/editer" element={<QuoteEditorPage />} />
         <Route path="devis" element={<Devis />} />
         <Route path="back-office" element={<Outlet />}>
+          <Route path="equipements" element={<BackOfficeEquipementsListRedirect />} />
+          <Route path="equipements/:id" element={<BackOfficeEquipementDetailRedirect />} />
           <Route index element={<Navigate to="/catalogue" replace />} />
           <Route element={<BackOfficeLayout />}>
             <Route path="catalogue-essais" element={<Navigate to="/catalogue" replace />} />
@@ -151,8 +162,6 @@ function AppRoutes() {
             <Route path="cadrage" element={<Cadrage />} />
             <Route path="exemples-calculs" element={<ExemplesCalculs />} />
             <Route path="journal-audit" element={<ActivityLogPage />} />
-            <Route path="equipements" element={<EquipmentsPage />} />
-            <Route path="equipements/:id" element={<EquipmentDetailPage />} />
             <Route path="non-conformites" element={<NonConformitiesPage />} />
             <Route path="non-conformites/:id" element={<NonConformityDetailPage />} />
             <Route path="modeles-rapports-pdf" element={<ReportPdfTemplates />} />

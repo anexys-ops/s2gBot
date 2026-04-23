@@ -69,6 +69,9 @@ export default function EquipmentsPage() {
 
   return (
     <div className="design-card">
+      <p style={{ marginBottom: 8 }}>
+        <Link to="/materiel">← Matériel (vue d’ensemble)</Link>
+      </p>
       <div className="design-card__toolbar" style={{ marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <label className="design-card__muted" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           Statut
@@ -121,7 +124,7 @@ export default function EquipmentsPage() {
               {rows.map((eq) => (
                 <tr key={eq.id}>
                   <td>
-                    <Link to={`/back-office/equipements/${eq.id}`}>{eq.code}</Link>
+                    <Link to={`/materiel/equipements/${eq.id}`}>{eq.code}</Link>
                   </td>
                   <td>{eq.name}</td>
                   <td>{eq.status}</td>

@@ -52,7 +52,7 @@ export default function EquipmentDetailPage() {
     return <Navigate to="/" replace />
   }
   if (!Number.isFinite(equipmentId)) {
-    return <Navigate to="/back-office/equipements" replace />
+    return <Navigate to="/materiel/equipements" replace />
   }
 
   const eqSt = eq ? equipementStatutBadgeProps(eq.status) : null
@@ -60,7 +60,7 @@ export default function EquipmentDetailPage() {
   return (
     <div className="container">
       <p>
-        <Link to="/back-office/equipements">← Liste équipements</Link>
+        <Link to="/materiel/equipements">← Liste équipements</Link>
       </p>
       {isLoading && <p className="text-muted">Chargement…</p>}
       {error && <p className="error">{(error as Error).message}</p>}

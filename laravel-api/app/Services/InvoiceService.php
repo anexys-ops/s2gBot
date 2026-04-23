@@ -3,13 +3,17 @@
 namespace App\Services;
 
 use App\Models\Agency;
+use App\Models\DocumentSequence;
 use App\Models\Invoice;
 use App\Models\InvoiceLine;
 use App\Models\Order;
-use Illuminate\Support\Carbon;
 
 class InvoiceService
 {
+    public function __construct(
+        private readonly DocumentSequenceService $documentSequences
+    ) {}
+
     public function fromOrders(array $orderIds, ?int $clientId = null): Invoice
     {
         $orders = Order::query()
@@ -35,7 +39,7 @@ class InvoiceService
             throw new \InvalidArgumentException('Toutes les commandes doivent appartenir à la même agence.');
         }
 
-        $number = 'FAC-'.Carbon::now()->format('Ymd').'-'.str_pad((string) (Invoice::count() + 1), 4, '0', STR_PAD_LEFT);
+        $number = $this->documentSequences->next(DocumentSequence::TYPE_FACTURE);
 
         $hqId = Agency::query()->where('client_id', $clientId)->where('is_headquarters', true)->value('id');
         $agencyId = $agencyIds->first() ?? $hqId;
@@ -44,8 +48,8 @@ class InvoiceService
             'number' => $number,
             'client_id' => $clientId,
             'agency_id' => $agencyId,
-            'invoice_date' => Carbon::now()->toDateString(),
-            'due_date' => Carbon::now()->addDays(30)->toDateString(),
+            'invoice_date' => now()->toDateString(),
+            'due_date' => now()->addDays(30)->toDateString(),
             'amount_ht' => 0,
             'amount_ttc' => 0,
             'tva_rate' => 20,

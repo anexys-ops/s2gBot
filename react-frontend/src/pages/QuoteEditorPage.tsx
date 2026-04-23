@@ -10,6 +10,7 @@ import {
   clientsApi,
   sitesApi,
   clientAddressesApi,
+  clientContactsApi,
   documentPdfTemplatesApi,
   commercialOfferingsApi,
   type QuoteCreateBody,
@@ -36,6 +37,7 @@ function emptyForm(): QuoteFormState {
   const tva = 20
   return {
     client_id: 0,
+    contact_id: undefined,
     quote_date: new Date().toISOString().slice(0, 10),
     order_date: '',
     site_delivery_date: '',
@@ -83,6 +85,7 @@ function toApiBody(form: QuoteFormState): QuoteCreateBody {
     delivery_address_id: form.delivery_address_id,
     pdf_template_id: form.pdf_template_id,
     notes: form.notes,
+    contact_id: form.contact_id,
     lines,
   }
 }
@@ -123,6 +126,12 @@ export default function QuoteEditorPage() {
   const { data: addrForm } = useQuery({
     queryKey: ['client-addresses', form.client_id],
     queryFn: () => clientAddressesApi.list(form.client_id),
+    enabled: isLab && form.client_id > 0,
+  })
+
+  const { data: clientContactsData = [] } = useQuery({
+    queryKey: ['client-contacts', form.client_id],
+    queryFn: () => clientContactsApi.list(form.client_id),
     enabled: isLab && form.client_id > 0,
   })
 
@@ -176,6 +185,7 @@ export default function QuoteEditorPage() {
     }
     setForm({
       client_id: quote.client_id,
+      contact_id: quote.contact_id ?? undefined,
       site_id: quote.site_id,
       quote_date: quote.quote_date?.slice(0, 10) ?? '',
       order_date: quote.order_date?.slice(0, 10) ?? '',
@@ -224,6 +234,7 @@ export default function QuoteEditorPage() {
 
   const clients = Array.isArray(clientsData) ? clientsData : []
   const sites = Array.isArray(sitesData) ? sitesData : []
+  const clientContacts = Array.isArray(clientContactsData) ? clientContactsData : []
   const addressesForm = addrForm ?? []
   const quoteTemplates = tplQuote?.data ?? []
 
@@ -341,6 +352,7 @@ export default function QuoteEditorPage() {
           form={form}
           setForm={setForm}
           clients={clients}
+          clientContacts={clientContacts}
           sites={sites}
           addresses={addressesForm}
           quoteTemplates={quoteTemplates}

@@ -2,13 +2,13 @@
 
 namespace App\Models;
 
+use App\Services\DocumentSequenceService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\DB;
 
 class Dossier extends Model
 {
@@ -69,23 +69,7 @@ class Dossier extends Model
 
     public function newReference(): string
     {
-        $year = (int) now()->format('Y');
-        $prefix = 'DOS-'.$year.'-';
-
-        return DB::transaction(function () use ($prefix) {
-            $last = static::query()
-                ->where('reference', 'like', $prefix.'%')
-                ->lockForUpdate()
-                ->orderByDesc('reference')
-                ->value('reference');
-
-            $n = 1;
-            if (is_string($last) && preg_match('/^DOS-\d{4}-(\d{1,4})$/', $last, $m)) {
-                $n = (int) $m[1] + 1;
-            }
-
-            return $prefix.str_pad((string) $n, 4, '0', STR_PAD_LEFT);
-        });
+        return app(DocumentSequenceService::class)->next(DocumentSequence::TYPE_DOSSIER);
     }
 
     public function client(): BelongsTo

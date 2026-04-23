@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Agency;
+use App\Models\DocumentSequence;
 use App\Models\Invoice;
 use App\Models\InvoiceLine;
+use App\Services\DocumentSequenceService;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,7 +22,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class InvoiceController extends Controller
 {
     public function __construct(
-        private InvoiceService $invoiceService
+        private InvoiceService $invoiceService,
+        private DocumentSequenceService $documentSequences
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -161,7 +164,7 @@ class InvoiceController extends Controller
         }
 
         $validated = $request->validate([
-            'number' => 'required|string|max:50|unique:invoices,number',
+            'number' => 'nullable|string|max:50|unique:invoices,number',
             'client_id' => 'required|exists:clients,id',
             'invoice_date' => 'required|date',
             'order_date' => 'nullable|date',
@@ -201,8 +204,12 @@ class InvoiceController extends Controller
             ->where('is_headquarters', true)
             ->value('id');
 
+        $number = isset($validated['number']) && trim((string) $validated['number']) !== ''
+            ? (string) $validated['number']
+            : $this->documentSequences->next(DocumentSequence::TYPE_FACTURE);
+
         $invoice = Invoice::create([
-            'number' => $validated['number'],
+            'number' => $number,
             'client_id' => $validated['client_id'],
             'contact_id' => $validated['contact_id'] ?? null,
             'agency_id' => $agencyId,

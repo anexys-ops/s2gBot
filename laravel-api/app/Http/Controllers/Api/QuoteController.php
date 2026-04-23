@@ -12,17 +12,22 @@ use App\Models\Dossier;
 use App\Models\Quote;
 use App\Models\QuoteLine;
 use App\Models\Site;
+use App\Models\DocumentSequence;
 use App\Services\CommercialDocumentTotalsService;
+use App\Services\DocumentSequenceService;
 use App\Services\DocumentStatusService;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
-use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class QuoteController extends Controller
 {
+    public function __construct(
+        private readonly DocumentSequenceService $documentSequences
+    ) {}
+
     private const QUOTE_LINE_BASE = [
         'lines.*.commercial_offering_id' => 'nullable|exists:commercial_offerings,id',
         'lines.*.ref_article_id' => 'nullable|exists:ref_articles,id',
@@ -129,7 +134,7 @@ class QuoteController extends Controller
         );
         $this->assertLinesNoDualRef($validated['lines']);
 
-        $number = 'DEV-'.Carbon::now()->format('Ymd').'-'.str_pad((string) (Quote::count() + 1), 4, '0', STR_PAD_LEFT);
+        $number = $this->documentSequences->next(DocumentSequence::TYPE_DEVIS);
         $defaultTva = $validated['tva_rate'] ?? 20;
 
         $travelHt = (float) ($validated['travel_fee_ht'] ?? 0);

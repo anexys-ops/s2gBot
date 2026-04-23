@@ -1816,6 +1816,7 @@ export interface Invoice {
   id: number
   number: string
   client_id: number
+  contact_id?: number | null
   invoice_date: string
   order_date?: string
   site_delivery_date?: string
@@ -1835,6 +1836,7 @@ export interface Invoice {
   status: string
   meta?: EntityMetaPayload | null
   client?: Client
+  client_contact?: ClientContactRow
   orders?: Order[]
   invoice_lines?: InvoiceLine[]
   billing_address?: ClientAddress

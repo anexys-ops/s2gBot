@@ -1,4 +1,4 @@
-import type { ClientAddress, DocumentPdfTemplateRow, Site } from '../../api/client'
+import type { ClientAddress, ClientContactRow, DocumentPdfTemplateRow, Site } from '../../api/client'
 import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 
 export type QuoteLineDraft = {
@@ -14,6 +14,7 @@ export type QuoteLineDraft = {
 
 export type QuoteFormState = {
   client_id: number
+  contact_id?: number | null
   site_id?: number
   quote_date: string
   order_date?: string
@@ -38,6 +39,7 @@ type Props = {
   form: QuoteFormState
   setForm: React.Dispatch<React.SetStateAction<QuoteFormState>>
   clients: { id: number; name: string }[]
+  clientContacts: ClientContactRow[]
   sites: Site[]
   addresses: ClientAddress[]
   quoteTemplates: DocumentPdfTemplateRow[]
@@ -52,6 +54,7 @@ export default function QuoteFormFields({
   form,
   setForm,
   clients,
+  clientContacts,
   sites,
   addresses,
   quoteTemplates,
@@ -73,13 +76,40 @@ export default function QuoteFormFields({
           Client *
           <select
             value={form.client_id}
-            onChange={(e) => setForm((f) => ({ ...f, client_id: Number(e.target.value) }))}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                client_id: Number(e.target.value),
+                contact_id: undefined,
+              }))
+            }
             required
           >
             <option value={0}>Choisir...</option>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Contact client
+          <select
+            value={form.contact_id ?? ''}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                contact_id: e.target.value ? Number(e.target.value) : undefined,
+              }))
+            }
+            disabled={form.client_id <= 0}
+          >
+            <option value="">—</option>
+            {clientContacts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {[c.prenom, c.nom].filter(Boolean).join(' ').trim() || `Contact #${c.id}`}
+                {c.email ? ` — ${c.email}` : ''}
               </option>
             ))}
           </select>

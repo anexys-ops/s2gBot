@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import {
+  clientContactsApi,
   clientsApi,
   documentPdfTemplatesApi,
   invoicesApi,
@@ -55,6 +56,7 @@ export default function Invoices() {
     travel_fee_ht: 0,
     travel_fee_tva_rate: 20,
     pdf_template_id: '' as number | '',
+    contact_id: '' as number | '',
   })
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
@@ -108,6 +110,12 @@ export default function Invoices() {
     enabled: isLab && !!editInvoice,
   })
   const pdfTemplates = pdfTplData?.data ?? []
+
+  const { data: invoiceEditContacts = [] } = useQuery({
+    queryKey: ['client-contacts', 'invoice-edit', editInvoice?.client_id],
+    queryFn: () => clientContactsApi.list(editInvoice!.client_id),
+    enabled: isLab && !!editInvoice && editInvoice.client_id > 0,
+  })
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['invoices', debouncedSearch, statusFilter, clientFilter, page],
@@ -172,6 +180,7 @@ export default function Invoices() {
       travel_fee_ht: Number(inv.travel_fee_ht ?? 0),
       travel_fee_tva_rate: Number(inv.travel_fee_tva_rate ?? 20),
       pdf_template_id: inv.pdf_template_id ?? '',
+      contact_id: inv.contact_id != null && inv.contact_id > 0 ? inv.contact_id : '',
     })
   }, [])
 
@@ -220,6 +229,7 @@ export default function Invoices() {
           status: editForm.status,
           due_date: editForm.due_date || undefined,
           pdf_template_id: editForm.pdf_template_id === '' ? undefined : editForm.pdf_template_id,
+          contact_id: editForm.contact_id === '' ? undefined : editForm.contact_id,
         },
       })
       return
@@ -235,6 +245,7 @@ export default function Invoices() {
         travel_fee_ht: editForm.travel_fee_ht,
         travel_fee_tva_rate: editForm.travel_fee_tva_rate,
         pdf_template_id: editForm.pdf_template_id === '' ? undefined : editForm.pdf_template_id,
+        contact_id: editForm.contact_id === '' ? undefined : editForm.contact_id,
       },
     })
   }
@@ -464,6 +475,26 @@ export default function Invoices() {
                   <option key={t.id} value={t.id}>
                     {t.name}
                     {t.is_default ? ' (défaut)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Contact client</label>
+              <select
+                value={editForm.contact_id === '' ? '' : String(editForm.contact_id)}
+                onChange={(e) =>
+                  setEditForm((f) => ({
+                    ...f,
+                    contact_id: e.target.value === '' ? '' : Number(e.target.value),
+                  }))
+                }
+              >
+                <option value="">—</option>
+                {invoiceEditContacts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {[c.prenom, c.nom].filter(Boolean).join(' ').trim() || `Contact #${c.id}`}
+                    {c.email ? ` — ${c.email}` : ''}
                   </option>
                 ))}
               </select>

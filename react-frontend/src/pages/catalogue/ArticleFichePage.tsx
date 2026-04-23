@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { catalogueApi, type RefArticleRow } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import FicheArticle from '../../components/Catalogue/FicheArticle'
@@ -15,13 +15,29 @@ function ArticleProlabEditor({ article, onUpdated }: { article: RefArticleRow; o
   const [form, setForm] = useState({
     libelle: article.libelle,
     description: article.description ?? '',
+    description_commerciale: article.description_commerciale ?? '',
+    description_technique: article.description_technique ?? '',
+    tags: (article.tags ?? []).join(', '),
+    code_interne: article.code_interne ?? '',
+    sku: article.sku ?? '',
     unite: article.unite ?? '',
+    hfsql_unite: article.hfsql_unite ?? '',
     prix_unitaire_ht: safeNum(article.prix_unitaire_ht, 0),
+    prix_revient_ht: article.prix_revient_ht != null && String(article.prix_revient_ht).trim() !== '' ? safeNum(article.prix_revient_ht, 0) : undefined as number | undefined,
     tva_rate: safeNum(article.tva_rate, 20),
     duree_estimee: article.duree_estimee ?? 0,
     normes: article.normes ?? '',
     actif: article.actif,
+    ref_article_lie_id: article.ref_article_lie_id != null ? String(article.ref_article_lie_id) : '',
   })
+  const { data: articlesLiePick = [] } = useQuery({
+    queryKey: ['catalogue-articles', 'lie-pick'],
+    queryFn: () => catalogueApi.articles({ with_inactif: true }),
+  })
+  const lieOptions = useMemo(
+    () => articlesLiePick.filter((a) => a.id !== article.id).sort((a, b) => a.code.localeCompare(b.code, 'fr')),
+    [articlesLiePick, article.id],
+  )
   const mut = useMutation({
     mutationFn: (body: Record<string, unknown>) => catalogueApi.updateArticle(article.id, body),
     onSuccess: () => onUpdated(),
@@ -31,12 +47,20 @@ function ArticleProlabEditor({ article, onUpdated }: { article: RefArticleRow; o
     setForm({
       libelle: article.libelle,
       description: article.description ?? '',
+      description_commerciale: article.description_commerciale ?? '',
+      description_technique: article.description_technique ?? '',
+      tags: (article.tags ?? []).join(', '),
+      code_interne: article.code_interne ?? '',
+      sku: article.sku ?? '',
       unite: article.unite ?? '',
+      hfsql_unite: article.hfsql_unite ?? '',
       prix_unitaire_ht: safeNum(article.prix_unitaire_ht, 0),
+      prix_revient_ht: article.prix_revient_ht != null && String(article.prix_revient_ht).trim() !== '' ? safeNum(article.prix_revient_ht, 0) : undefined,
       tva_rate: safeNum(article.tva_rate, 20),
       duree_estimee: article.duree_estimee ?? 0,
       normes: article.normes ?? '',
       actif: article.actif,
+      ref_article_lie_id: article.ref_article_lie_id != null ? String(article.ref_article_lie_id) : '',
     })
   }, [article])
 
@@ -52,15 +76,28 @@ function ArticleProlabEditor({ article, onUpdated }: { article: RefArticleRow; o
           e.preventDefault()
           const prix = Number(form.prix_unitaire_ht)
           const tva = Number(form.tva_rate)
+          const tags = form.tags
+            .split(/[,;]+/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+          const pr = form.prix_revient_ht
           mut.mutate({
             libelle: form.libelle,
             description: form.description || null,
+            description_commerciale: form.description_commerciale?.trim() || null,
+            description_technique: form.description_technique?.trim() || null,
+            tags: tags.length ? tags : null,
+            code_interne: form.code_interne?.trim() || null,
+            sku: form.sku?.trim() || null,
             unite: form.unite || null,
+            hfsql_unite: form.hfsql_unite?.trim() || null,
             prix_unitaire_ht: Number.isFinite(prix) ? prix : 0,
+            prix_revient_ht: pr != null && Number.isFinite(pr) && pr >= 0 ? pr : null,
             tva_rate: Number.isFinite(tva) ? tva : 20,
             duree_estimee: form.duree_estimee,
             normes: form.normes || null,
             actif: form.actif,
+            ref_article_lie_id: form.ref_article_lie_id ? Number(form.ref_article_lie_id) : null,
           })
         }}
       >
@@ -73,8 +110,54 @@ function ArticleProlabEditor({ article, onUpdated }: { article: RefArticleRow; o
           />
         </label>
         <label>
-          Unité
-          <input value={form.unite} onChange={(e) => setForm((f) => ({ ...f, unite: e.target.value }))} />
+          Code interne
+          <input
+            value={form.code_interne}
+            onChange={(e) => setForm((f) => ({ ...f, code_interne: e.target.value }))}
+            placeholder="Réf. interne labo"
+          />
+        </label>
+        <label>
+          SKU
+          <input value={form.sku} onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))} />
+        </label>
+        <label>
+          Unité (devis / cotation)
+          <input
+            value={form.unite}
+            onChange={(e) => setForm((f) => ({ ...f, unite: e.target.value }))}
+            title="C’est cette unité qui alimente les devis. À aligner sur l’import HFSQL si besoin."
+          />
+        </label>
+        <label>
+          Unité HFSQL (telle qu’en base import)
+          <input
+            value={form.hfsql_unite}
+            onChange={(e) => setForm((f) => ({ ...f, hfsql_unite: e.target.value }))}
+            placeholder="ex. m³, u, h — copie HFSQL"
+          />
+        </label>
+        <label>
+          Regroupement (même offre, autre fiche)
+          <select
+            value={form.ref_article_lie_id}
+            onChange={(e) => setForm((f) => ({ ...f, ref_article_lie_id: e.target.value }))}
+          >
+            <option value="">— Aucun —</option>
+            {lieOptions.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.code} — {a.libelle}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Tags (séparés par virgules)
+          <input
+            value={form.tags}
+            onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
+            placeholder="Béton, Urgent, Dalle…"
+          />
         </label>
         <label>
           Prix unitaire HT (DH)
@@ -91,6 +174,24 @@ function ArticleProlabEditor({ article, onUpdated }: { article: RefArticleRow; o
               }
               const n = Number(v)
               setForm((f) => ({ ...f, prix_unitaire_ht: Number.isFinite(n) ? n : 0 }))
+            }}
+          />
+        </label>
+        <label>
+          Prix de revient HT
+          <input
+            type="number"
+            min={0}
+            step={0.01}
+            value={form.prix_revient_ht === undefined ? '' : form.prix_revient_ht}
+            onChange={(e) => {
+              const v = e.target.value
+              if (v === '') {
+                setForm((f) => ({ ...f, prix_revient_ht: undefined }))
+                return
+              }
+              const n = Number(v)
+              setForm((f) => ({ ...f, prix_revient_ht: Number.isFinite(n) ? n : undefined }))
             }}
           />
         </label>
@@ -129,11 +230,27 @@ function ArticleProlabEditor({ article, onUpdated }: { article: RefArticleRow; o
           Article actif
         </label>
         <label style={{ gridColumn: '1 / -1' }}>
-          Description
+          Description (legacy / alias)
           <textarea
-            rows={4}
+            rows={2}
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+          />
+        </label>
+        <label style={{ gridColumn: '1 / -1' }}>
+          Description commerciale
+          <textarea
+            rows={3}
+            value={form.description_commerciale}
+            onChange={(e) => setForm((f) => ({ ...f, description_commerciale: e.target.value }))}
+          />
+        </label>
+        <label style={{ gridColumn: '1 / -1' }}>
+          Description technique
+          <textarea
+            rows={4}
+            value={form.description_technique}
+            onChange={(e) => setForm((f) => ({ ...f, description_technique: e.target.value }))}
           />
         </label>
         <label style={{ gridColumn: '1 / -1' }}>
@@ -233,6 +350,8 @@ export default function ArticleFichePage() {
             void queryClient.invalidateQueries({ queryKey: ['catalogue-article', articleId] })
             void queryClient.invalidateQueries({ queryKey: ['catalogue'] })
             void queryClient.invalidateQueries({ queryKey: ['catalogue-arbre'] })
+            void queryClient.invalidateQueries({ queryKey: ['catalogue-articles'] })
+            void queryClient.invalidateQueries({ queryKey: ['catalogue-articles-flat'] })
           }}
         />
       )}

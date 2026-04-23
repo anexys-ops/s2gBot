@@ -15,12 +15,29 @@ export default function FicheArticle({ article }: Props) {
     <div className="fiche-article">
       <div className="fiche-article__summary card">
         <h2 className="fiche-article__summary-title">Caractéristiques</h2>
+        {article.tags && article.tags.length > 0 && (
+          <div className="fiche-article__tags">
+            {article.tags.map((t, i) => (
+              <span key={i} className="catalogue-prolab-tag catalogue-prolab-tag--a">
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
         <dl className="module-fiche-grid fiche-article__dl">
           <div>
-            <dt>Code</dt>
+            <dt>Code article</dt>
             <dd>
               <code className="fiche-article__code">{article.code}</code>
             </dd>
+          </div>
+          <div>
+            <dt>Code interne</dt>
+            <dd>{article.code_interne?.trim() || '—'}</dd>
+          </div>
+          <div>
+            <dt>SKU</dt>
+            <dd>{article.sku?.trim() || '—'}</dd>
           </div>
           <div>
             <dt>Libellé</dt>
@@ -44,13 +61,39 @@ export default function FicheArticle({ article }: Props) {
             <dd className="fiche-article__amount">{prixHt}</dd>
           </div>
           <div>
+            <dt>Prix de revient HT</dt>
+            <dd>
+              {article.prix_revient_ht != null && String(article.prix_revient_ht).trim() !== '' && Number(article.prix_revient_ht) > 0
+                ? formatMoney(Number(article.prix_revient_ht))
+                : '—'}
+            </dd>
+          </div>
+          <div>
             <dt>TVA</dt>
             <dd>{formatTvaPercent(article.tva_rate)}</dd>
           </div>
           <div>
-            <dt>Unité</dt>
+            <dt>Unité (cotation / devis)</dt>
             <dd>{article.unite?.trim() ? article.unite : '—'}</dd>
           </div>
+          <div>
+            <dt>Unité HFSQL (import)</dt>
+            <dd>
+              {article.hfsql_unite?.trim() || (
+                <span className="text-muted">Identique ou non renseigné</span>
+              )}
+            </dd>
+          </div>
+          {article.article_lie && (
+            <div>
+              <dt>Regroupement (autre article)</dt>
+              <dd>
+                <Link to={`/catalogue/articles/${article.article_lie.id}`} className="link-inline">
+                  {article.article_lie.code} — {article.article_lie.libelle}
+                </Link>
+              </dd>
+            </div>
+          )}
           {typeof article.duree_estimee === 'number' && article.duree_estimee > 0 && (
             <div>
               <dt>Durée estimée</dt>
@@ -69,10 +112,19 @@ export default function FicheArticle({ article }: Props) {
         )}
       </div>
 
-      {article.description && String(article.description).trim() !== '' && (
+      {((article.description_commerciale && article.description_commerciale.trim()) ||
+        (article.description && String(article.description).trim())) && (
         <section className="fiche-article__section card">
-          <h2 className="fiche-article__h2">Description</h2>
-          <p className="fiche-article__body">{article.description}</p>
+          <h2 className="fiche-article__h2">Description commerciale</h2>
+          <p className="fiche-article__body">
+            {(article.description_commerciale && article.description_commerciale.trim()) || article.description}
+          </p>
+        </section>
+      )}
+      {article.description_technique && String(article.description_technique).trim() !== '' && (
+        <section className="fiche-article__section card">
+          <h2 className="fiche-article__h2">Description technique</h2>
+          <p className="fiche-article__body fiche-article__body--tech">{article.description_technique}</p>
         </section>
       )}
 

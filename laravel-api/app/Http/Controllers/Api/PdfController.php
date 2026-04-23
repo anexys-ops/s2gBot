@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\DocumentPdfTemplate;
 use App\Models\Invoice;
+use App\Models\ModuleSetting;
 use App\Models\Order;
 use App\Models\Quote;
 use App\Services\ReportService;
@@ -66,18 +67,28 @@ class PdfController extends Controller
         $id = (int) $validated['id'];
 
         if ($type === 'quote') {
-            $quote = Quote::with(['client', 'site', 'quoteLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate'])->find($id);
+            $quote = Quote::with([
+                'client',
+                'site',
+                'quoteLines.commercialOffering.equipment',
+                'billingAddress',
+                'deliveryAddress',
+                'pdfTemplate',
+            ])->find($id);
             if (! $quote) {
                 return response()->json(['message' => 'Devis introuvable'], 404);
             }
             $template = $this->resolvePdfTemplate('quote', $validated['template_id'] ?? null, $quote->pdf_template_id);
             $view = $template?->blade_view ?? 'pdf.quote';
             $layoutConfig = AppBranding::mergeLayoutConfig($template?->layout_config);
+            $catalogSettings = ModuleSetting::query()->where('module_key', 'commercial_catalog')->value('settings') ?? [];
+            $showEquipmentOnQuotePdf = (bool) ($catalogSettings['show_equipment_on_quote_pdf'] ?? true);
             $html = view($view, [
                 'quote' => $quote,
                 'template' => $template,
                 'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
                 'layoutConfig' => $layoutConfig,
+                'showEquipmentOnQuotePdf' => $showEquipmentOnQuotePdf,
             ])->render();
             $filename = 'devis-'.$quote->number.'.pdf';
         } elseif ($type === 'invoice') {

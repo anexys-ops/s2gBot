@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { catalogueApi, type RefFamilleArticleRow } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import ArbreCatalogue from '../../components/Catalogue/ArbreCatalogue'
+import CatalogueProlabListe from '../../components/Catalogue/CatalogueProlabListe'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 
 /**
@@ -14,6 +15,7 @@ export default function CatalogueListePage() {
   const [familleId, setFamilleId] = useState<number | ''>('')
   const [search, setSearch] = useState('')
   const [withInactif, setWithInactif] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'tree'>('list')
 
   const { data: familles } = useQuery({
     queryKey: ['catalogue-familles', withInactif],
@@ -21,6 +23,17 @@ export default function CatalogueListePage() {
   })
 
   const familleOptions = useMemo(() => familles ?? [], [familles])
+
+  const { data: articlesFlat = [], isLoading: loadingFlat } = useQuery({
+    queryKey: ['catalogue-articles-flat', familleId, withInactif, search],
+    queryFn: () =>
+      catalogueApi.articles({
+        ref_famille_article_id: familleId === '' ? undefined : familleId,
+        with_inactif: withInactif,
+        q: search.trim() || undefined,
+      }),
+    enabled: viewMode === 'list',
+  })
 
   return (
     <ModuleEntityShell
@@ -31,15 +44,33 @@ export default function CatalogueListePage() {
       ]}
       moduleBarLabel="Catalogue — PROLAB"
       title="Catalogue produits & essais"
-      subtitle="Famille d’articles → article → forfaits (packages). Données alignées sur la migration PROLAB."
+      subtitle="Vue liste (tarifs, tags, textes, unités HFSQL) ou vue arbre classique. Données alignées import PROLAB / HFSQL."
       actions={
         isAdmin ? (
           <span className="text-muted" style={{ fontSize: '0.85rem' }}>
-            Création / archivage d’articles : API admin ou prochain écran dédié.
+            Création / archivage d’articles : fiche article ou API.
           </span>
         ) : null
       }
     >
+      <div className="catalogue-liste__view-toggle" role="tablist" aria-label="Mode d’affichage catalogue">
+        <button
+          type="button"
+          role="tab"
+          className={`btn btn-sm ${viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setViewMode('list')}
+        >
+          Liste &amp; replis
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className={`btn btn-sm ${viewMode === 'tree' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setViewMode('tree')}
+        >
+          Vue arbre
+        </button>
+      </div>
       <div className="card catalogue-liste__toolbar list-filter-row">
         <label className="catalogue-liste__field">
           <span className="catalogue-liste__label">Famille</span>
@@ -72,24 +103,31 @@ export default function CatalogueListePage() {
         </label>
       </div>
 
-      <p className="catalogue-liste__legend" role="note">
-        <span className="catalogue-liste__legend-item" title="Béton">
-          🧱 Béton
-        </span>
-        <span className="catalogue-liste__legend-item" title="Sols / compactage">
-          ⚙️ Sols / compactage
-        </span>
-        <span className="catalogue-liste__legend-item" title="Produits manufacturés">
-          📐 Produits manufacturés
-        </span>
-      </p>
+      {viewMode === 'list' && (
+        <CatalogueProlabListe articles={articlesFlat} isLoading={loadingFlat} />
+      )}
 
-      <ArbreCatalogue
-        withInactif={withInactif}
-        familleIdFilter={familleId === '' ? undefined : familleId}
-        searchQuery={search}
-        linkToArticleFiche
-      />
+      {viewMode === 'tree' && (
+        <>
+          <p className="catalogue-liste__legend" role="note">
+            <span className="catalogue-liste__legend-item" title="Béton">
+              🧱 Béton
+            </span>
+            <span className="catalogue-liste__legend-item" title="Sols / compactage">
+              ⚙️ Sols / compactage
+            </span>
+            <span className="catalogue-liste__legend-item" title="Produits manufacturés">
+              📐 Produits manufacturés
+            </span>
+          </p>
+          <ArbreCatalogue
+            withInactif={withInactif}
+            familleIdFilter={familleId === '' ? undefined : familleId}
+            searchQuery={search}
+            linkToArticleFiche
+          />
+        </>
+      )}
     </ModuleEntityShell>
   )
 }

@@ -3985,6 +3985,111 @@ th {
   align-items: center;
   gap: 0.5rem;
 }
+.quote-devis-header {
+  margin-bottom: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.quote-editor-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.75rem 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.quote-editor-tabs__btn {
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.quote-editor-tabs__btn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-accent-soft, #fff4ed);
+}
+.quote-editor-tabs__btn--active {
+  border-color: var(--color-primary);
+  background: var(--color-accent-soft, #fff4ed);
+  color: var(--color-text);
+  box-shadow: 0 0 0 1px rgba(199, 84, 26, 0.2);
+}
+.quote-editor-sticky-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  padding: 0.65rem max(var(--layout-padding-x), 0.75rem) calc(0.65rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface) 95%, #f0ede8);
+  box-shadow: 0 -4px 20px rgba(26, 24, 22, 0.08);
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+@media (min-width: 900px) {
+  .quote-editor-sticky-footer {
+    left: max(0px, calc(50% - var(--layout-max-width) / 2));
+    right: max(0px, calc(50% - var(--layout-max-width) / 2));
+    max-width: var(--layout-max-width);
+  }
+}
+.quote-editor-sticky-footer__totals {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  min-width: min(100%, 16rem);
+}
+.quote-editor-sticky-footer__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--color-text-muted);
+}
+.quote-editor-sticky-footer__row--ttc {
+  margin-top: 0.2rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+.quote-editor-sticky-footer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.quote-contact-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+}
+.quote-contact-slide {
+  width: min(100%, 26rem);
+  max-width: 100%;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.12);
+  padding: 1.1rem 1.2rem;
+  overflow-y: auto;
+}
 .quote-lines-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -4566,4 +4671,169 @@ a.catalogue-tree__link-article:hover {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+}
+.catalogue-liste__view-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+/* Liste PROLAB — replis */
+.catalogue-prolab-liste__hint {
+  font-size: 0.86rem;
+  line-height: 1.45;
+  margin: 0 0 0.75rem;
+  max-width: 64ch;
+}
+.catalogue-prolab-liste__ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.catalogue-prolab-card__details {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface, #fff);
+  overflow: hidden;
+}
+.catalogue-prolab-card__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: var(--color-surface-2, #f8fafc);
+}
+.catalogue-prolab-card__summary::-webkit-details-marker {
+  display: none;
+}
+.catalogue-prolab-card__row1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  font-size: 0.8rem;
+}
+.catalogue-prolab-card__fam-code {
+  font-weight: 700;
+  color: var(--color-primary, #c7541a);
+}
+.catalogue-prolab-card__row2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.75rem;
+}
+.catalogue-prolab-card__code {
+  font-size: 0.8rem;
+  color: #475569;
+  background: #e2e8f0;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+.catalogue-prolab-card__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+.catalogue-prolab-card__row3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  font-size: 0.86rem;
+}
+.catalogue-prolab-card__fiche {
+  margin-left: auto;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.catalogue-prolab-card__body {
+  padding: 0.75rem 0.9rem 0.9rem;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.catalogue-prolab-dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+  gap: 0.5rem 0.75rem;
+  margin: 0 0 0.75rem;
+}
+.catalogue-prolab-dl dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin: 0 0 0.1rem;
+}
+.catalogue-prolab-dl dd {
+  margin: 0;
+  font-weight: 500;
+}
+.catalogue-prolab-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.catalogue-prolab-block__h {
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+.catalogue-prolab-block__p--tech {
+  font-family: ui-monospace, monospace;
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+}
+.catalogue-prolab-normes {
+  margin: 0.5rem 0 0;
+  font-size: 0.86rem;
+  color: #334155;
+}
+.catalogue-prolab-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.catalogue-prolab-tag--a {
+  background: #fff4ed;
+  color: #9a3412;
+  border-color: #fdba74;
+}
+.catalogue-prolab-tag--b {
+  background: #f0fdfa;
+  color: #0f766e;
+  border-color: #5eead4;
+}
+.catalogue-prolab-tag--c {
+  background: #f8fafc;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+.catalogue-prolab-tag--d {
+  background: #f5f3ff;
+  color: #5b21b6;
+  border-color: #c4b5fd;
+}
+.fiche-article__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 0.5rem;
+}
+.fiche-article__body--tech {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  line-height: 1.5;
 }

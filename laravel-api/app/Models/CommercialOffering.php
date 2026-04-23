@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CommercialOffering extends Model
@@ -23,6 +24,7 @@ class CommercialOffering extends Model
         'stock_quantity',
         'track_stock',
         'active',
+        'equipment_id',
     ];
 
     protected function casts(): array
@@ -40,5 +42,10 @@ class CommercialOffering extends Model
     public function quoteLines(): HasMany
     {
         return $this->hasMany(QuoteLine::class, 'commercial_offering_id');
+    }
+
+    public function equipment(): BelongsTo
+    {
+        return $this->belongsTo(Equipment::class, 'equipment_id');
     }
 }

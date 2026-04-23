@@ -16,7 +16,7 @@ class ArticleController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $q = Article::query()->with('famille');
+        $q = Article::query()->with(['famille', 'articleLie:id,code,libelle']);
         if (! $request->boolean('with_inactif')) {
             $q->actif();
         }
@@ -26,7 +26,9 @@ class ArticleController extends Controller
         if ($search = trim((string) $request->query('q', ''))) {
             $q->where(function ($b) use ($search) {
                 $b->where('code', 'like', '%'.$search.'%')
-                    ->orWhere('libelle', 'like', '%'.$search.'%');
+                    ->orWhere('libelle', 'like', '%'.$search.'%')
+                    ->orWhere('code_interne', 'like', '%'.$search.'%')
+                    ->orWhere('sku', 'like', '%'.$search.'%');
             });
         }
 
@@ -37,6 +39,7 @@ class ArticleController extends Controller
     {
         $article->load([
             'famille',
+            'articleLie:id,code,libelle',
             'parametresEssai' => fn ($p) => $p->ordonne(),
             'resultats' => fn ($r) => $r->orderBy('code'),
             'famillePackages' => fn ($f) => $f->ordonne()->with(['packages' => fn ($x) => $x->ordonne()]),
@@ -100,13 +103,31 @@ class ArticleController extends Controller
 
         $libelle = $partial ? 'sometimes|string|max:255' : 'required|string|max:255';
 
+        $lie = ['nullable', 'integer', 'exists:ref_articles,id'];
+        if ($ignoreId !== null) {
+            $lie = [
+                'nullable',
+                'integer',
+                Rule::exists('ref_articles', 'id')->whereNot('id', $ignoreId),
+            ];
+        }
+
         return [
             'ref_famille_article_id' => $famille,
+            'ref_article_lie_id' => $lie,
             'code' => $code,
+            'code_interne' => 'nullable|string|max:64',
+            'sku' => 'nullable|string|max:64',
             'libelle' => $libelle,
             'description' => 'nullable|string',
+            'description_commerciale' => 'nullable|string',
+            'description_technique' => 'nullable|string',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string|max:64',
             'unite' => 'nullable|string|max:32',
+            'hfsql_unite' => 'nullable|string|max:64',
             'prix_unitaire_ht' => 'nullable|numeric|min:0',
+            'prix_revient_ht' => 'nullable|numeric|min:0',
             'tva_rate' => 'nullable|numeric|min:0|max:100',
             'duree_estimee' => 'nullable|integer|min:0',
             'normes' => 'nullable|string',

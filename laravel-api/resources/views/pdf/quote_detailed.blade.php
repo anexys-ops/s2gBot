@@ -59,7 +59,7 @@
         <tbody>
             @foreach($quote->quoteLines as $line)
             <tr>
-                <td>{{ $line->description }}</td>
+                <td>@include('pdf.partials.quote-line-designation', ['line' => $line, 'showEquipmentOnQuotePdf' => $showEquipmentOnQuotePdf ?? true])</td>
                 <td class="text-right">{{ $line->quantity }}</td>
                 <td class="text-right">{{ number_format($line->unit_price, 2, ',', ' ') }} {{ $currencyLabel }}</td>
                 <td class="text-right">{{ number_format($line->discount_percent, 2, ',', ' ') }}</td>

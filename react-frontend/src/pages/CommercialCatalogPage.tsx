@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { commercialOfferingsApi, type CommercialOffering } from '../api/client'
+import { commercialOfferingsApi, equipmentsApi, moduleSettingsApi, type CommercialOffering, type EquipmentRow } from '../api/client'
 import Modal from '../components/Modal'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
@@ -19,6 +19,7 @@ const emptyRow = (): Partial<CommercialOffering> & { name: string; kind: 'produc
   stock_quantity: 0,
   track_stock: false,
   active: true,
+  equipment_id: undefined,
 })
 
 export default function CommercialCatalogPage() {
@@ -35,8 +36,37 @@ export default function CommercialCatalogPage() {
     queryFn: () => commercialOfferingsApi.list({ search: debounced.trim() || undefined, per_page: 30, page }),
   })
 
+  const { data: catalogMod } = useQuery({
+    queryKey: ['module-settings', 'commercial_catalog'],
+    queryFn: () => moduleSettingsApi.get('commercial_catalog'),
+    retry: false,
+  })
+
+  const allowEquipmentLink =
+    catalogMod?.settings == null
+      ? true
+      : (catalogMod.settings.link_equipment_to_products as boolean | undefined) !== false
+
+  const { data: equipmentList = [] } = useQuery({
+    queryKey: ['equipments', 'catalog-offering'],
+    queryFn: () => equipmentsApi.list(),
+    enabled: !!modal && allowEquipmentLink,
+  })
+
+  const equipmentSorted = useMemo(() => {
+    return [...equipmentList].sort((a: EquipmentRow, b: EquipmentRow) =>
+      `${a.code}`.localeCompare(b.code, 'fr', { sensitivity: 'base' }),
+    )
+  }, [equipmentList])
+
   const createMut = useMutation({
-    mutationFn: () => commercialOfferingsApi.create(form as Parameters<typeof commercialOfferingsApi.create>[0]),
+    mutationFn: () =>
+      commercialOfferingsApi.create({
+        ...(form as Parameters<typeof commercialOfferingsApi.create>[0]),
+        name: form.name!,
+        kind: form.kind!,
+        equipment_id: form.equipment_id ?? null,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['commercial-offerings'] })
       setModal(null)
@@ -45,7 +75,7 @@ export default function CommercialCatalogPage() {
   })
 
   const updateMut = useMutation({
-    mutationFn: () => commercialOfferingsApi.update(editing!.id, form),
+    mutationFn: () => commercialOfferingsApi.update(editing!.id, { ...form, equipment_id: form.equipment_id ?? null }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['commercial-offerings'] })
       setModal(null)
@@ -77,6 +107,7 @@ export default function CommercialCatalogPage() {
       stock_quantity: row.stock_quantity,
       track_stock: row.track_stock,
       active: row.active,
+      equipment_id: row.equipment_id ?? undefined,
     })
     setModal('edit')
   }
@@ -90,7 +121,8 @@ export default function CommercialCatalogPage() {
         <h2 style={{ margin: 0 }}>Catalogue produits &amp; prestations</h2>
         <p className="text-muted" style={{ margin: '0.35rem 0 0', maxWidth: '52rem' }}>
           Référentiel pour les lignes de devis : prix d&apos;achat (référence interne), prix de vente HT, TVA par défaut,
-          stock pour les produits. Les prestations peuvent avoir le suivi de stock désactivé.
+          stock pour les produits, lien optionnel vers le <strong>matériel</strong> (inventaire) pour affichage sur les
+          documents si la configuration l&apos;autorise. Les prestations peuvent avoir le suivi de stock désactivé.
         </p>
         <div className="commercial-catalog-page__toolbar">
           <input
@@ -122,6 +154,7 @@ export default function CommercialCatalogPage() {
               <th>PA HT ({MONEY_UNIT_LABEL})</th>
               <th>PV HT ({MONEY_UNIT_LABEL})</th>
               <th>TVA %</th>
+              <th>Matériel</th>
               <th>Stock</th>
               <th>Actif</th>
               <th />
@@ -140,6 +173,16 @@ export default function CommercialCatalogPage() {
                 <td>{formatMoney(Number(r.purchase_price_ht))}</td>
                 <td>{formatMoney(Number(r.sale_price_ht))}</td>
                 <td>{Number(r.default_tva_rate).toFixed(2)}</td>
+                <td className="text-muted" style={{ fontSize: '0.85rem', maxWidth: 200 }}>
+                  {r.equipment ? (
+                    <>
+                      {r.equipment.name}
+                      {r.equipment.numero_inventaire ? ` · ${r.equipment.numero_inventaire}` : ''}
+                    </>
+                  ) : (
+                    '—'
+                  )}
+                </td>
                 <td>
                   {r.track_stock ? Number(r.stock_quantity).toFixed(r.stock_quantity % 1 ? 3 : 0) : '—'}
                 </td>
@@ -234,6 +277,31 @@ export default function CommercialCatalogPage() {
                 onChange={(e) => setForm((f) => ({ ...f, default_tva_rate: Number(e.target.value) }))}
               />
             </label>
+            {allowEquipmentLink && (
+              <label style={{ gridColumn: '1 / -1' }}>
+                Matériel (inventaire) — optionnel
+                <select
+                  value={form.equipment_id ?? ''}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      equipment_id: e.target.value === '' ? undefined : Number(e.target.value),
+                    }))
+                  }
+                >
+                  <option value="">— Aucun —</option>
+                  {equipmentSorted.map((eq) => (
+                    <option key={eq.id} value={eq.id}>
+                      {eq.code} — {eq.name}
+                      {eq.numero_inventaire ? ` (Inv. ${eq.numero_inventaire})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-muted" style={{ display: 'block', fontSize: '0.78rem', marginTop: 4 }}>
+                  Sera mentionné sur le PDF devis (onglet configuration &gt; catalogue) si l&apos;option est activée.
+                </span>
+              </label>
+            )}
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <input
                 type="checkbox"

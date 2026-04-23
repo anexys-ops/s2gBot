@@ -17,11 +17,19 @@ class Article extends Model
 
     protected $fillable = [
         'ref_famille_article_id',
+        'ref_article_lie_id',
         'code',
+        'code_interne',
+        'sku',
         'libelle',
         'description',
+        'description_commerciale',
+        'description_technique',
+        'tags',
         'unite',
+        'hfsql_unite',
         'prix_unitaire_ht',
+        'prix_revient_ht',
         'tva_rate',
         'duree_estimee',
         'normes',
@@ -36,9 +44,11 @@ class Article extends Model
     {
         return [
             'prix_unitaire_ht' => 'decimal:2',
+            'prix_revient_ht' => 'decimal:2',
             'tva_rate' => 'decimal:2',
             'duree_estimee' => 'integer',
             'actif' => 'boolean',
+            'tags' => 'array',
         ];
     }
 
@@ -52,6 +62,18 @@ class Article extends Model
     public function famille(): BelongsTo
     {
         return $this->belongsTo(FamilleArticle::class, 'ref_famille_article_id');
+    }
+
+    /** Article de regroupement (autre fiche liée) — ex. HFSQL regroupement */
+    public function articleLie(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'ref_article_lie_id');
+    }
+
+    /** Fiches référençant celle-ci comme liée */
+    public function articlesEnLienDepuisIci(): HasMany
+    {
+        return $this->hasMany(self::class, 'ref_article_lie_id');
     }
 
     public function famillePackages(): HasMany

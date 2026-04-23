@@ -17,7 +17,7 @@ class CommercialOfferingController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $q = CommercialOffering::query()->orderBy('name');
+        $q = CommercialOffering::query()->with('equipment')->orderBy('name');
 
         if ($request->boolean('active_only', false)) {
             $q->where('active', true);
@@ -58,6 +58,7 @@ class CommercialOfferingController extends Controller
             'stock_quantity' => 'nullable|numeric|min:0',
             'track_stock' => 'nullable|boolean',
             'active' => 'nullable|boolean',
+            'equipment_id' => 'nullable|integer|exists:equipments,id',
         ]);
 
         $row = CommercialOffering::create([
@@ -72,9 +73,10 @@ class CommercialOfferingController extends Controller
             'stock_quantity' => $validated['stock_quantity'] ?? 0,
             'track_stock' => $validated['track_stock'] ?? false,
             'active' => $validated['active'] ?? true,
+            'equipment_id' => $validated['equipment_id'] ?? null,
         ]);
 
-        return response()->json($row, 201);
+        return response()->json($row->load('equipment'), 201);
     }
 
     public function show(Request $request, CommercialOffering $commercialOffering): JsonResponse
@@ -83,7 +85,7 @@ class CommercialOfferingController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        return response()->json($commercialOffering);
+        return response()->json($commercialOffering->load('equipment'));
     }
 
     public function update(Request $request, CommercialOffering $commercialOffering): JsonResponse
@@ -104,12 +106,13 @@ class CommercialOfferingController extends Controller
             'stock_quantity' => 'nullable|numeric|min:0',
             'track_stock' => 'nullable|boolean',
             'active' => 'nullable|boolean',
+            'equipment_id' => 'nullable|integer|exists:equipments,id',
         ]);
 
         $commercialOffering->fill($validated);
         $commercialOffering->save();
 
-        return response()->json($commercialOffering->fresh());
+        return response()->json($commercialOffering->fresh()->load('equipment'));
     }
 
     public function destroy(Request $request, CommercialOffering $commercialOffering): JsonResponse

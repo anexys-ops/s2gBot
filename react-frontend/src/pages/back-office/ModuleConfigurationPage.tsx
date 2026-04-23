@@ -39,6 +39,7 @@ const MODULE_KEYS = [
   { key: 'invoices', label: 'Factures — listes déroulantes' },
   { key: 'quotes', label: 'Devis — listes' },
   { key: 'orders', label: 'Commandes — listes' },
+  { key: 'commercial_catalog', label: 'Catalogue commercial / matériel' },
 ] as const
 
 type MainTab = 'extrafields' | 'modules'
@@ -203,6 +204,8 @@ function ModuleListsSection() {
   const [orderStatuses, setOrderStatuses] = useState<string[]>([])
   const [quotesTva, setQuotesTva] = useState<string>('')
   const [ordersPriority, setOrdersPriority] = useState<string>('')
+  const [linkEquipmentToProducts, setLinkEquipmentToProducts] = useState(true)
+  const [showEquipmentOnQuotePdf, setShowEquipmentOnQuotePdf] = useState(true)
 
   useEffect(() => {
     if (!data?.settings) return
@@ -217,6 +220,10 @@ function ModuleListsSection() {
     }
     if (activeKey === 'orders') {
       setOrdersPriority(((s.default_priority_options as string[]) ?? []).join(', '))
+    }
+    if (activeKey === 'commercial_catalog') {
+      setLinkEquipmentToProducts(s.link_equipment_to_products !== false)
+      setShowEquipmentOnQuotePdf(s.show_equipment_on_quote_pdf !== false)
     }
   }, [data, activeKey])
 
@@ -244,11 +251,20 @@ function ModuleListsSection() {
           .filter((n) => !Number.isNaN(n))
         return moduleSettingsApi.update('quotes', { tva_rate_options })
       }
-      const default_priority_options = ordersPriority
-        .split(/[,;]+/)
-        .map((x) => x.trim())
-        .filter(Boolean)
-      return moduleSettingsApi.update('orders', { default_priority_options })
+      if (activeKey === 'orders') {
+        const default_priority_options = ordersPriority
+          .split(/[,;]+/)
+          .map((x) => x.trim())
+          .filter(Boolean)
+        return moduleSettingsApi.update('orders', { default_priority_options })
+      }
+      if (activeKey === 'commercial_catalog') {
+        return moduleSettingsApi.update('commercial_catalog', {
+          link_equipment_to_products: linkEquipmentToProducts,
+          show_equipment_on_quote_pdf: showEquipmentOnQuotePdf,
+        })
+      }
+      return Promise.reject(new Error('Module de configuration non géré.'))
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['module-settings', activeKey] })
@@ -339,6 +355,35 @@ function ModuleListsSection() {
                 placeholder="normal, urgent, basse"
               />
             </div>
+          )}
+          {activeKey === 'commercial_catalog' && (
+            <>
+              <p className="text-muted" style={{ maxWidth: '64ch' }}>
+                Contrôle l&apos;association d&apos;une fiche <strong>matériel / inventaire</strong> à une référence du
+                catalogue produits, et l&apos;affichage de cette mention sur le <strong>PDF devis</strong> (désignation
+                de ligne).
+              </p>
+              <div className="form-group" style={{ marginTop: '0.75rem' }}>
+                <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={linkEquipmentToProducts}
+                    onChange={(e) => setLinkEquipmentToProducts(e.target.checked)}
+                  />
+                  Proposer le choix du matériel sur les fiches catalogue
+                </label>
+              </div>
+              <div className="form-group">
+                <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={showEquipmentOnQuotePdf}
+                    onChange={(e) => setShowEquipmentOnQuotePdf(e.target.checked)}
+                  />
+                  Afficher le matériel lié sur le PDF devis
+                </label>
+              </div>
+            </>
           )}
           <button type="button" className="btn btn-primary" disabled={saveMut.isPending} onClick={() => saveMut.mutate()}>
             {saveMut.isPending ? 'Enregistrement…' : 'Enregistrer'}

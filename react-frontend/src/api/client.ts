@@ -456,17 +456,29 @@ export interface RefParametreEssaiRow {
 export interface RefArticleRow {
   id: number
   ref_famille_article_id: number
+  ref_article_lie_id?: number | null
   code: string
+  code_interne?: string | null
+  sku?: string | null
   libelle: string
   description?: string | null
+  description_commerciale?: string | null
+  description_technique?: string | null
+  /** Étiquettes métier (import HFSQL / manuel) */
+  tags?: string[] | null
   unite: string
+  /** Unité telle qu’importée / référence HFSQL (souvent alignée sur `unite`) */
+  hfsql_unite?: string | null
   prix_unitaire_ht: string
+  prix_revient_ht?: string | null
   prix_unitaire_ht_formate?: string
   tva_rate: string
   duree_estimee: number
   normes?: string | null
   actif: boolean
   famille?: RefFamilleArticleRow
+  /** Article lié pour regroupement (PROLAB) */
+  article_lie?: { id: number; code: string; libelle: string } | null
   famille_packages?: RefFamillePackageRow[]
   parametres_essai?: RefParametreEssaiRow[]
   resultats?: RefResultatRow[]
@@ -954,6 +966,8 @@ export interface EquipmentRow {
   id: number
   name: string
   code: string
+  /** Numéro d’inventaire (parc matériel) */
+  numero_inventaire?: string | null
   type?: string | null
   brand?: string | null
   model?: string | null
@@ -1385,6 +1399,24 @@ export const statsApi = {
 export type EntityMetaPayload = {
   indicateurs?: Record<string, string>
   champs_perso?: Record<string, string>
+  /** Jalons devis (optionnel) : libellé, montant, lien article PROLAB optionnel */
+  devis_jalons?: Array<{
+    id?: string
+    libelle: string
+    montant_ht?: number
+    ref_article_id?: number | null
+  }>
+  /** Tarif forfaitaire lorsqu’il n’y a pas de lignes article (optionnel) */
+  tarif_global_hors_lignes_ht?: number
+  /** Un booléen par ligne (même ordre) : ne pas afficher le prix sur le PDF */
+  ligne_masque_prix_pdf?: boolean[]
+  /** Frais complémentaires (brouillon / PDF — le recalcul API n’intègre que port & déplacement) */
+  frais_supplementaires?: Array<{
+    id?: string
+    description: string
+    montant_ht: number
+    tva_rate: number
+  }>
 }
 
 export interface DashboardStatsPayload {
@@ -1439,6 +1471,9 @@ export interface CommercialOffering {
   stock_quantity: number
   track_stock: boolean
   active: boolean
+  /** Lien optionnel vers une fiche matériel (inventaire) */
+  equipment_id?: number | null
+  equipment?: Pick<EquipmentRow, 'id' | 'name' | 'code' | 'numero_inventaire' | 'serial_number'> | null
 }
 
 export const commercialOfferingsApi = {
@@ -1483,6 +1518,7 @@ export interface Quote {
   client_id: number
   contact_id?: number | null
   site_id?: number
+  dossier_id?: number | null
   quote_date: string
   order_date?: string
   site_delivery_date?: string
@@ -1530,6 +1566,8 @@ export interface QuoteCreateBody {
   client_id: number
   contact_id?: number | null
   site_id?: number
+  dossier_id?: number | null
+  meta?: EntityMetaPayload | null
   quote_date: string
   order_date?: string
   site_delivery_date?: string
@@ -1548,6 +1586,10 @@ export interface QuoteCreateBody {
   notes?: string
   lines: Array<{
     commercial_offering_id?: number | null
+    ref_article_id?: number | null
+    ref_package_id?: number | null
+    type_ligne?: string
+    line_code?: string | null
     description: string
     quantity: number
     unit_price: number

@@ -120,7 +120,7 @@ class QuoteController extends Controller
             'apply_site_travel' => 'nullable|boolean',
             'meta' => 'nullable|array',
         ], [
-            'lines' => 'required|array|min:1',
+            'lines' => 'required|array|min:0',
         ], self::QUOTE_LINE_BASE, self::TACHES_RULES));
 
         $this->assertDossierForClient(
@@ -256,7 +256,7 @@ class QuoteController extends Controller
             'apply_site_travel' => 'nullable|boolean',
             'meta' => 'nullable|array',
         ], [
-            'lines' => 'sometimes|array|min:1',
+            'lines' => 'sometimes|array|min:0',
         ], self::QUOTE_LINE_BASE, self::TACHES_RULES));
 
         $fill = collect($validated)->except(['lines', 'apply_site_travel', 'taches'])->toArray();

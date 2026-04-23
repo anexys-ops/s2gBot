@@ -64,4 +64,9 @@ class Equipment extends Model
     {
         return $this->hasMany(NonConformity::class);
     }
+
+    public function commercialOfferings(): HasMany
+    {
+        return $this->hasMany(CommercialOffering::class, 'equipment_id');
+    }
 }

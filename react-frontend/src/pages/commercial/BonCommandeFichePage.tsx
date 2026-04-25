@@ -5,6 +5,7 @@ import { bonsCommandeApi, type BonCommandeLigne } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
+import ClientContactPicker from '../../components/clients/ClientContactPicker'
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
 
@@ -15,6 +16,7 @@ export default function BonCommandeFichePage() {
   const qc = useQueryClient()
   const lab = isLab(user?.role)
   const [notes, setNotes] = useState('')
+  const [contactId, setContactId] = useState<number | null>(null)
   const [ligneEdits, setLigneEdits] = useState<Record<number, { debut: string; fin: string }>>({})
 
   const { data: bc, isLoading, error } = useQuery({
@@ -26,6 +28,7 @@ export default function BonCommandeFichePage() {
   useEffect(() => {
     if (!bc) return
     setNotes(typeof bc.notes === 'string' ? bc.notes : '')
+    setContactId(bc.contact_id ?? null)
   }, [bc?.id])
 
   useEffect(() => {
@@ -45,7 +48,7 @@ export default function BonCommandeFichePage() {
   }, [bc?.id, bc?.lignes])
 
   const mutUpdate = useMutation({
-    mutationFn: () => bonsCommandeApi.update(bcId, { notes: notes || undefined }),
+    mutationFn: () => bonsCommandeApi.update(bcId, { notes: notes || undefined, contact_id: contactId }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
     },
@@ -165,9 +168,34 @@ export default function BonCommandeFichePage() {
                 </td>
               </tr>
             )}
+            <tr>
+              <th>Contact client</th>
+              <td>
+                {bc.clientContact
+                  ? `${bc.clientContact.prenom} ${bc.clientContact.nom}${bc.clientContact.poste ? ` — ${bc.clientContact.poste}` : ‘’}`
+                  : ‘—‘}
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
+
+      {lab && (
+        <div className="card" style={{ marginBottom: ‘1.25rem’ }}>
+          <ClientContactPicker
+            clientId={bc.client_id}
+            value={contactId}
+            onChange={(id) => setContactId(id)}
+            label="Contact commercial (BC)"
+            contactType="commercial"
+          />
+          <div style={{ marginTop: ‘0.5rem’ }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => mutUpdate.mutate()} disabled={mutUpdate.isPending}>
+              Enregistrer le contact
+            </button>
+          </div>
+        </div>
+      )}
 
       <h2 className="h2" style={{ fontSize: '1.05rem' }}>
         Lignes

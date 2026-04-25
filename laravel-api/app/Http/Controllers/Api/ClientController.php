@@ -9,14 +9,22 @@ use Illuminate\Http\Request;
 
 class ClientController extends Controller
 {
+    private const REFERENT_RELATIONS = [
+        'commercial:id,name,email',
+        'responsableTechnique:id,name,email',
+        'responsableFacturation:id,name,email',
+        'responsableRecouvrement:id,name,email',
+    ];
+
     public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $query = Client::query()->with('sites');
+        $user  = $request->user();
+        $query = Client::query()->with([
+            'sites',
+            ...self::REFERENT_RELATIONS,
+        ]);
 
-        if ($user->isClient()) {
-            $query->where('id', $user->client_id);
-        } elseif ($user->isSiteContact()) {
+        if ($user->isClient() || $user->isSiteContact()) {
             $query->where('id', $user->client_id);
         }
 
@@ -33,6 +41,16 @@ class ClientController extends Controller
             });
         }
 
+        // Filtre par commercial S2G (pour la vue carte)
+        if ($commercialId = $request->query('commercial_id')) {
+            $query->where('commercial_id', $commercialId);
+        }
+
+        // Seulement les clients avec GPS (pour la carte)
+        if ($request->boolean('with_gps')) {
+            $query->whereNotNull('lat')->whereNotNull('lng');
+        }
+
         $clients = $query->orderBy('name')->get();
 
         return response()->json($clients);
@@ -44,41 +62,26 @@ class ClientController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'address' => 'nullable|string',
-            'city' => 'nullable|string|max:128',
-            'postal_code' => 'nullable|string|max:16',
-            'email' => 'nullable|email',
-            'phone' => 'nullable|string|max:50',
-            'whatsapp' => 'nullable|string|max:50',
-            'siret' => 'nullable|string|max:20',
-            'ice' => 'nullable|string|max:32',
-            'rc' => 'nullable|string|max:80',
-            'patente' => 'nullable|string|max:64',
-            'if_number' => 'nullable|string|max:32',
-            'legal_form' => 'nullable|string|max:64',
-            'cnss_employer' => 'nullable|string|max:32',
-            'capital_social' => 'nullable|numeric|min:0',
-            'meta' => 'nullable|array',
-        ]);
+        $validated = $request->validate($this->rules());
+        $client    = Client::create($validated);
 
-        $client = Client::create($validated);
-
-        return response()->json($client->load('sites'), 201);
+        return response()->json($client->load(['sites', ...self::REFERENT_RELATIONS]), 201);
     }
 
     public function show(Request $request, Client $client): JsonResponse
     {
         $user = $request->user();
-        if ($user->isClient() && $client->id !== $user->client_id) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
-        if ($user->isSiteContact() && $client->id !== $user->client_id) {
+        if (($user->isClient() || $user->isSiteContact()) && $client->id !== $user->client_id) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        return response()->json($client->load(['sites.agency', 'agencies', 'addresses', 'contacts']));
+        return response()->json($client->load([
+            'sites.agency',
+            'agencies',
+            'addresses',
+            'contacts',
+            ...self::REFERENT_RELATIONS,
+        ]));
     }
 
     public function update(Request $request, Client $client): JsonResponse
@@ -87,28 +90,10 @@ class ClientController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'address' => 'nullable|string',
-            'city' => 'nullable|string|max:128',
-            'postal_code' => 'nullable|string|max:16',
-            'email' => 'nullable|email',
-            'phone' => 'nullable|string|max:50',
-            'whatsapp' => 'nullable|string|max:50',
-            'siret' => 'nullable|string|max:20',
-            'ice' => 'nullable|string|max:32',
-            'rc' => 'nullable|string|max:80',
-            'patente' => 'nullable|string|max:64',
-            'if_number' => 'nullable|string|max:32',
-            'legal_form' => 'nullable|string|max:64',
-            'cnss_employer' => 'nullable|string|max:32',
-            'capital_social' => 'nullable|numeric|min:0',
-            'meta' => 'nullable|array',
-        ]);
-
+        $validated = $request->validate($this->rules(sometimes: true));
         $client->update($validated);
 
-        return response()->json($client->load('sites'));
+        return response()->json($client->load(['sites', ...self::REFERENT_RELATIONS]));
     }
 
     public function destroy(Request $request, Client $client): JsonResponse
@@ -120,5 +105,42 @@ class ClientController extends Controller
         $client->delete();
 
         return response()->json(null, 204);
+    }
+
+    // ----------------------------------------------------------------
+    // Helpers
+    // ----------------------------------------------------------------
+
+    private function rules(bool $sometimes = false): array
+    {
+        $p = $sometimes ? 'sometimes|' : '';
+
+        return [
+            'name'                        => $p.'required|string|max:255',
+            'address'                     => 'nullable|string',
+            'city'                        => 'nullable|string|max:128',
+            'postal_code'                 => 'nullable|string|max:16',
+            'country'                     => 'nullable|string|max:4',
+            'email'                       => 'nullable|email',
+            'phone'                       => 'nullable|string|max:50',
+            'whatsapp'                    => 'nullable|string|max:50',
+            'siret'                       => 'nullable|string|max:20',
+            'ice'                         => 'nullable|string|max:32',
+            'rc'                          => 'nullable|string|max:80',
+            'patente'                     => 'nullable|string|max:64',
+            'if_number'                   => 'nullable|string|max:32',
+            'legal_form'                  => 'nullable|string|max:64',
+            'cnss_employer'               => 'nullable|string|max:32',
+            'capital_social'              => 'nullable|numeric|min:0',
+            'meta'                        => 'nullable|array',
+            // Référents S2G
+            'commercial_id'               => 'nullable|exists:users,id',
+            'responsable_technique_id'    => 'nullable|exists:users,id',
+            'responsable_facturation_id'  => 'nullable|exists:users,id',
+            'responsable_recouvrement_id' => 'nullable|exists:users,id',
+            // GPS
+            'lat'                         => 'nullable|numeric|between:-90,90',
+            'lng'                         => 'nullable|numeric|between:-180,180',
+        ];
     }
 }

@@ -49,6 +49,7 @@ import ClientCommerceTab from './pages/clients/ClientCommerceTab'
 import ClientDocumentsTab from './pages/clients/ClientDocumentsTab'
 import ClientContactsPage from './pages/clients/ClientContactsPage'
 import ClientExtrafieldsTab from './pages/clients/ClientExtrafieldsTab'
+import ClientsMapPage from './pages/clients/ClientsMapPage'
 import SiteLayout from './pages/sites/SiteLayout'
 import SiteFicheTab from './pages/sites/SiteFicheTab'
 import SiteMissionsTab from './pages/sites/SiteMissionsTab'
@@ -183,6 +184,7 @@ function AppRoutes() {
           </Route>
         </Route>
         <Route path="clients" element={<Clients />} />
+        <Route path="clients/carte" element={<ClientsMapPage />} />
         <Route path="clients/contacts" element={<ClientContactsPage />} />
         <Route path="clients/:clientId" element={<ClientLayout />}>
           <Route index element={<Navigate to="fiche" replace />} />

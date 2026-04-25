@@ -135,6 +135,7 @@ export default function AppNavigation() {
         items: filterItems([
           { to: '/clients', label: 'Clients' },
           { to: '/clients/contacts', label: 'Contacts' },
+          { to: '/clients/carte', label: 'Carte' },
         ]),
       },
       {

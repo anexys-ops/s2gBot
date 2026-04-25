@@ -184,9 +184,11 @@ export const agenciesApi = {
 }
 
 export const clientsApi = {
-  list: (params?: { search?: string }) => {
+  list: (params?: { search?: string; commercial_id?: number; with_gps?: boolean }) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
+    if (params?.commercial_id) q.set('commercial_id', String(params.commercial_id))
+    if (params?.with_gps) q.set('with_gps', '1')
     const s = q.toString()
     return api<Client[]>(`/clients${s ? `?${s}` : ''}`)
   },
@@ -596,6 +598,9 @@ export interface DossierRow {
   entreprise_chantier?: string | null
   notes?: string | null
   created_by: number
+  /** Contact client S2G (technique) — FK client_contacts */
+  contact_id?: number | null
+  clientContact?: ClientContactRow | null
   client?: Client
   site?: Site
   createur?: Pick<User, 'id' | 'name' | 'email'>
@@ -1743,6 +1748,12 @@ export interface RegisterBody {
   site_id?: number
 }
 
+export interface ClientReferent {
+  id: number
+  name: string
+  email?: string
+}
+
 export interface Client {
   id: number
   name: string
@@ -1765,6 +1776,18 @@ export interface Client {
   cnss_employer?: string | null
   capital_social?: number | string | null
   meta?: EntityMetaPayload | null
+  // Référents S2G
+  commercial_id?: number | null
+  responsable_technique_id?: number | null
+  responsable_facturation_id?: number | null
+  responsable_recouvrement_id?: number | null
+  commercial?: ClientReferent | null
+  responsable_technique?: ClientReferent | null
+  responsable_facturation?: ClientReferent | null
+  responsable_recouvrement?: ClientReferent | null
+  // GPS
+  lat?: number | null
+  lng?: number | null
   sites?: Site[]
   addresses?: ClientAddress[]
   contacts?: ClientContactRow[]

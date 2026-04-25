@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
@@ -45,15 +46,53 @@ class Client extends Model
         'cnss_employer',
         'capital_social',
         'meta',
+        // Référents S2G
+        'commercial_id',
+        'responsable_technique_id',
+        'responsable_facturation_id',
+        'responsable_recouvrement_id',
+        // GPS
+        'lat',
+        'lng',
     ];
 
     protected function casts(): array
     {
         return [
-            'meta' => 'array',
+            'meta'           => 'array',
             'capital_social' => 'decimal:2',
+            'lat'            => 'float',
+            'lng'            => 'float',
         ];
     }
+
+    // ----------------------------------------------------------------
+    // Référents S2G (collaborateurs internes)
+    // ----------------------------------------------------------------
+
+    public function commercial(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'commercial_id');
+    }
+
+    public function responsableTechnique(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'responsable_technique_id');
+    }
+
+    public function responsableFacturation(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'responsable_facturation_id');
+    }
+
+    public function responsableRecouvrement(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'responsable_recouvrement_id');
+    }
+
+    // ----------------------------------------------------------------
+    // Relations existantes
+    // ----------------------------------------------------------------
 
     public function addresses(): HasMany
     {

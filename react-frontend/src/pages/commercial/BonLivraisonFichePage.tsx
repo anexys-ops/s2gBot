@@ -5,6 +5,7 @@ import { bonsLivraisonApi } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
+import ClientContactPicker from '../../components/clients/ClientContactPicker'
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
 
@@ -15,6 +16,7 @@ export default function BonLivraisonFichePage() {
   const qc = useQueryClient()
   const lab = isLab(user?.role)
   const [notes, setNotes] = useState('')
+  const [contactId, setContactId] = useState<number | null>(null)
   const [ligneQty, setLigneQty] = useState<Record<number, string>>({})
 
   const { data: bl, isLoading, error } = useQuery({
@@ -26,6 +28,7 @@ export default function BonLivraisonFichePage() {
   useEffect(() => {
     if (!bl) return
     if (typeof bl.notes === 'string') setNotes(bl.notes)
+    setContactId(bl.contact_id ?? null)
     const next: Record<number, string> = {}
     for (const l of bl.lignes ?? []) {
       next[l.id] = String(l.quantite_livree)
@@ -124,9 +127,29 @@ export default function BonLivraisonFichePage() {
               <th>Date livraison</th>
               <td>{String(bl.date_livraison).slice(0, 10)}</td>
             </tr>
+            <tr>
+              <th>Contact client</th>
+              <td>
+                {bl.clientContact
+                  ? `${bl.clientContact.prenom} ${bl.clientContact.nom}${bl.clientContact.poste ? ` — ${bl.clientContact.poste}` : ''}`
+                  : '—'}
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
+
+      {lab && (
+        <div className="card" style={{ marginBottom: '1.25rem' }}>
+          <ClientContactPicker
+            clientId={bl.client_id}
+            value={contactId}
+            onChange={(id) => setContactId(id)}
+            label="Contact livraison"
+            contactType="livraison"
+          />
+        </div>
+      )}
 
       <h2 className="h2" style={{ fontSize: '1.05rem' }}>
         Lignes

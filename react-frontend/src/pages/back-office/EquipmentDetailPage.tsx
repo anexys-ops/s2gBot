@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { equipmentsApi } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import StatusBadge, { equipementStatutBadgeProps } from '../../components/ds/StatusBadge'
+import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 
 export default function EquipmentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -95,6 +96,8 @@ export default function EquipmentDetailPage() {
             <dd>{eq.test_types?.map((t) => t.name).join(', ') || '—'}</dd>
             </dl>
           </div>
+
+          <ExtrafieldsForm entityType="equipment" entityId={eq.id} canEdit={isAdmin} title="Champs personnalisés matériel" />
 
           <div className="card">
             <div className="card__header">

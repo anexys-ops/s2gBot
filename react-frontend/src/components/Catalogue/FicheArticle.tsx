@@ -3,17 +3,26 @@ import type { RefArticleRow } from '../../api/client'
 import { formatMoney } from '../../lib/appLocale'
 import { formatOptionalNumber, formatRefArticlePrice, formatTvaPercent } from '../../lib/catalogueFormat'
 
-type Props = { article: RefArticleRow }
+type ArticleFicheSection = 'all' | 'overview' | 'descriptions' | 'tables'
 
-export default function FicheArticle({ article }: Props) {
+type Props = { article: RefArticleRow; section?: ArticleFicheSection; showBackLink?: boolean }
+
+function truncateLabel(value: string, max = 60) {
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value
+}
+
+export default function FicheArticle({ article, section = 'all', showBackLink = true }: Props) {
   const fpkgs = article.famille_packages ?? []
   const params = article.parametres_essai ?? []
   const resultats = article.resultats ?? []
   const prixHt = formatRefArticlePrice(article)
+  const showOverview = section === 'all' || section === 'overview'
+  const showDescriptions = section === 'all' || section === 'descriptions'
+  const showTables = section === 'all' || section === 'tables'
 
   return (
     <div className="fiche-article">
-      <div className="fiche-article__summary card">
+      {showOverview && <div className="fiche-article__summary card">
         <h2 className="fiche-article__summary-title">Caractéristiques</h2>
         {article.tags && article.tags.length > 0 && (
           <div className="fiche-article__tags">
@@ -89,7 +98,9 @@ export default function FicheArticle({ article }: Props) {
               <dt>Regroupement (autre article)</dt>
               <dd>
                 <Link to={`/catalogue/articles/${article.article_lie.id}`} className="link-inline">
-                  {article.article_lie.code} — {article.article_lie.libelle}
+                  <span title={`${article.article_lie.code} — ${article.article_lie.libelle}`}>
+                    {article.article_lie.code} — {truncateLabel(article.article_lie.libelle, 60)}
+                  </span>
                 </Link>
               </dd>
             </div>
@@ -110,9 +121,9 @@ export default function FicheArticle({ article }: Props) {
             <p className="fiche-article__normes-text">{article.normes}</p>
           </div>
         )}
-      </div>
+      </div>}
 
-      {((article.description_commerciale && article.description_commerciale.trim()) ||
+      {showDescriptions && ((article.description_commerciale && article.description_commerciale.trim()) ||
         (article.description && String(article.description).trim())) && (
         <section className="fiche-article__section card">
           <h2 className="fiche-article__h2">Description commerciale</h2>
@@ -121,14 +132,14 @@ export default function FicheArticle({ article }: Props) {
           </p>
         </section>
       )}
-      {article.description_technique && String(article.description_technique).trim() !== '' && (
+      {showDescriptions && article.description_technique && String(article.description_technique).trim() !== '' && (
         <section className="fiche-article__section card">
           <h2 className="fiche-article__h2">Description technique</h2>
           <p className="fiche-article__body fiche-article__body--tech">{article.description_technique}</p>
         </section>
       )}
 
-      {fpkgs.length > 0 && (
+      {showTables && fpkgs.length > 0 && (
         <section className="fiche-article__section card">
           <h2 className="fiche-article__h2">Forfaits &amp; packages</h2>
           <ul className="fiche-article__forfait-list">
@@ -165,7 +176,7 @@ export default function FicheArticle({ article }: Props) {
         </section>
       )}
 
-      {params.length > 0 && (
+      {showTables && params.length > 0 && (
         <section className="fiche-article__section card">
           <h2 className="fiche-article__h2">Paramètres d’essai</h2>
           <div className="table-wrap">
@@ -199,7 +210,7 @@ export default function FicheArticle({ article }: Props) {
         </section>
       )}
 
-      {resultats.length > 0 && (
+      {showTables && resultats.length > 0 && (
         <section className="fiche-article__section card">
           <h2 className="fiche-article__h2">Résultats attendus</h2>
           <div className="table-wrap">
@@ -229,11 +240,11 @@ export default function FicheArticle({ article }: Props) {
         </section>
       )}
 
-      <p className="fiche-article__back">
+      {showBackLink && <p className="fiche-article__back">
         <Link to="/catalogue" className="btn btn-secondary btn-sm">
           ← Retour au catalogue
         </Link>
-      </p>
+      </p>}
     </div>
   )
 }

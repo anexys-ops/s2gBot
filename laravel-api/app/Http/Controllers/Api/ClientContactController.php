@@ -10,6 +10,8 @@ use Illuminate\Http\Request;
 
 class ClientContactController extends Controller
 {
+    private const CONTACT_TYPES = 'facturation,livraison,technique,chantier,commercial,autre';
+
     public function all(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -22,6 +24,7 @@ class ClientContactController extends Controller
         if ($search = trim((string) $request->query('search', ''))) {
             $query->where(function ($q) use ($search) {
                 $q->where('prenom', 'like', '%'.$search.'%')
+                    ->orWhere('contact_type', 'like', '%'.$search.'%')
                     ->orWhere('nom', 'like', '%'.$search.'%')
                     ->orWhere('poste', 'like', '%'.$search.'%')
                     ->orWhere('departement', 'like', '%'.$search.'%')
@@ -63,6 +66,7 @@ class ClientContactController extends Controller
         }
 
         $validated = $request->validate([
+            'contact_type' => 'nullable|in:'.self::CONTACT_TYPES,
             'prenom' => 'required|string|max:128',
             'nom' => 'required|string|max:128',
             'poste' => 'nullable|string|max:128',
@@ -73,6 +77,7 @@ class ClientContactController extends Controller
             'is_principal' => 'nullable|boolean',
             'notes' => 'nullable|string',
         ]);
+        $validated['contact_type'] = $validated['contact_type'] ?? 'commercial';
 
         if (! empty($validated['is_principal'])) {
             $client->contacts()->update(['is_principal' => false]);
@@ -90,6 +95,7 @@ class ClientContactController extends Controller
         }
 
         $validated = $request->validate([
+            'contact_type' => 'sometimes|nullable|in:'.self::CONTACT_TYPES,
             'prenom' => 'sometimes|string|max:128',
             'nom' => 'sometimes|string|max:128',
             'poste' => 'nullable|string|max:128',
@@ -100,6 +106,9 @@ class ClientContactController extends Controller
             'is_principal' => 'nullable|boolean',
             'notes' => 'nullable|string',
         ]);
+        if (array_key_exists('contact_type', $validated) && $validated['contact_type'] === null) {
+            $validated['contact_type'] = 'commercial';
+        }
 
         if (! empty($validated['is_principal'])) {
             ClientContact::query()

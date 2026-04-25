@@ -9,6 +9,18 @@ const cards = [
     desc: 'Liste du matériel, étalonnages, fiches détaillées et alertes de calibration.',
     icon: 'calculator' as const,
   },
+  {
+    to: '/materiel/planning',
+    title: 'Planning matériel',
+    desc: 'Calendrier des échéances de maintenance, étalonnages et dates de chantiers prévues.',
+    icon: 'trend' as const,
+  },
+  {
+    to: '/materiel/stocks',
+    title: 'Stocks',
+    desc: 'Tableau des produits, consommables et quantités suivies en stock.',
+    icon: 'catalog' as const,
+  },
 ] as const
 
 export default function MaterielHub() {
@@ -35,16 +47,6 @@ export default function MaterielHub() {
             <span className="hub-card-desc">{c.desc}</span>
           </Link>
         ))}
-        <div
-          className="hub-card hub-card--v2"
-          style={{ borderStyle: 'dashed', opacity: 0.92, cursor: 'default' }}
-        >
-          <span className="hub-card-v2__icon" aria-hidden>
-            <OutlineIcon id="trend" />
-          </span>
-          <span className="hub-card-title">Inventaire et localisation</span>
-          <span className="hub-card-desc">Vue stock / prêt de matériel par mission — à connecter (spec §8).</span>
-        </div>
       </div>
       {isLab && (
         <p className="hub-footnote text-muted" style={{ marginTop: '1.25rem' }}>

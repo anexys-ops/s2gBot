@@ -10,6 +10,7 @@ const TABS = [
   { to: 'bc-bl', label: 'BC / BL' },
   { to: 'essais', label: 'Essais' },
   { to: 'documents', label: 'Documents' },
+  { to: 'extrafields', label: 'Champs personnalisés' },
 ] as const
 
 export default function DossierFichePage() {

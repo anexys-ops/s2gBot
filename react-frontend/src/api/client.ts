@@ -254,6 +254,7 @@ export interface ClientContactRow {
   id: number
   client_id: number
   client?: Pick<Client, 'id' | 'name' | 'email' | 'phone' | 'city'>
+  contact_type?: 'facturation' | 'livraison' | 'technique' | 'chantier' | 'commercial' | 'autre' | null
   prenom: string
   nom: string
   poste?: string | null
@@ -349,7 +350,18 @@ export const documentPdfTemplatesApi = {
   ) => api<DocumentPdfTemplateRow>(`/document-pdf-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
 }
 
-export type ExtrafieldEntityType = 'client' | 'site' | 'order' | 'invoice' | 'quote'
+export type ExtrafieldEntityType =
+  | 'client'
+  | 'site'
+  | 'order'
+  | 'invoice'
+  | 'quote'
+  | 'article'
+  | 'dossier'
+  | 'bon_commande'
+  | 'bon_livraison'
+  | 'mission'
+  | 'equipment'
 
 export interface ExtrafieldSelectOption {
   value: string
@@ -711,8 +723,9 @@ export const bonsCommandeApi = {
     return api<BonCommande[]>(`/v1/bons-commande${s ? `?${s}` : ''}`)
   },
   get: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}`),
-  update: (id: number, body: { notes?: string; date_livraison_prevue?: string; montant_ht?: number; montant_ttc?: number }) =>
+  update: (id: number, body: { notes?: string; date_livraison_prevue?: string; montant_ht?: number; montant_ttc?: number; contact_id?: number | null }) =>
     api<BonCommande>(`/v1/bons-commande/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api<null>(`/v1/bons-commande/${id}`, { method: 'DELETE' }),
   confirmer: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}/confirmer`, { method: 'POST' }),
   transformerBl: (id: number) => api<BonLivraison>(`/v1/bons-commande/${id}/transformer-bl`, { method: 'POST' }),
   updateLigne: (
@@ -772,9 +785,10 @@ export const bonsLivraisonApi = {
   get: (id: number) => api<BonLivraison>(`/v1/bons-livraison/${id}`),
   update: (
     id: number,
-    body: { notes?: string; date_livraison?: string; lignes?: { id: number; quantite_livree: number }[] },
+    body: { notes?: string; date_livraison?: string; contact_id?: number | null; lignes?: { id: number; quantite_livree: number }[] },
   ) => api<BonLivraison>(`/v1/bons-livraison/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   valider: (id: number) => api<BonLivraison>(`/v1/bons-livraison/${id}/valider`, { method: 'POST' }),
+  delete: (id: number) => api<null>(`/v1/bons-livraison/${id}`, { method: 'DELETE' }),
 }
 
 export const devisV1Api = {
@@ -1779,6 +1793,8 @@ export interface Site {
 export interface Mission {
   id: number
   site_id: number
+  dossier_id?: number | null
+  bon_commande_id?: number | null
   reference?: string | null
   title?: string | null
   mission_status?: string | null
@@ -1787,6 +1803,9 @@ export interface Mission {
   maitre_ouvrage_phone?: string | null
   notes?: string | null
   meta?: EntityMetaPayload | null
+  site?: Site
+  dossier?: DossierRow
+  bon_commande?: BonCommande
   created_at?: string
   updated_at?: string
 }
@@ -1816,6 +1835,15 @@ export interface LithologyLayer {
 }
 
 export const missionsApi = {
+  listAll: (params?: { dossier_id?: number; bon_commande_id?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.dossier_id) q.set('dossier_id', String(params.dossier_id))
+    if (params?.bon_commande_id) q.set('bon_commande_id', String(params.bon_commande_id))
+    const s = q.toString()
+    return api<Mission[]>(`/missions${s ? `?${s}` : ''}`)
+  },
+  createGlobal: (body: Partial<Mission> & { source_type: 'dossier' | 'bon_commande'; source_id: number }) =>
+    api<Mission>('/missions', { method: 'POST', body: JSON.stringify(body) }),
   list: (siteId: number) => api<Mission[]>(`/sites/${siteId}/missions`),
   create: (siteId: number, body: Partial<Mission>) =>
     api<Mission>(`/sites/${siteId}/missions`, { method: 'POST', body: JSON.stringify(body) }),

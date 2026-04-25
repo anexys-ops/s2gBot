@@ -81,6 +81,7 @@ export default function ClientLayout() {
     { to: `${base}/fiche`, label: 'Fiche', end: true as const },
     ...(isLab ? [{ to: `${base}/commerce`, label: 'Commerce & adresses' as const }] : []),
     ...(isLab ? [{ to: `${base}/documents`, label: 'Documents' as const }] : []),
+    ...(isLab ? [{ to: `${base}/extrafields`, label: 'Champs personnalisés' as const }] : []),
   ]
 
   const onNew = () => navigate('/clients', { state: { openCreate: true } })

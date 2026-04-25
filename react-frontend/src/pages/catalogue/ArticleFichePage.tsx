@@ -5,10 +5,16 @@ import { catalogueApi, type RefArticleRow } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import FicheArticle from '../../components/Catalogue/FicheArticle'
 import { useAuth } from '../../contexts/AuthContext'
+import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 
 function safeNum(v: unknown, fallback: number): number {
   const n = Number(v)
   return Number.isFinite(n) ? n : fallback
+}
+
+function shortOptionLabel(code: string, label: string, max = 60) {
+  const text = `${code} — ${label}`
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text
 }
 
 function ArticleProlabEditor({ article, onUpdated }: { article: RefArticleRow; onUpdated: () => void }) {
@@ -146,7 +152,7 @@ function ArticleProlabEditor({ article, onUpdated }: { article: RefArticleRow; o
             <option value="">— Aucun —</option>
             {lieOptions.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.code} — {a.libelle}
+                {shortOptionLabel(a.code, a.libelle)}
               </option>
             ))}
           </select>
@@ -274,6 +280,7 @@ export default function ArticleFichePage() {
   const articleId = Number(id)
   const queryClient = useQueryClient()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
+  const [tab, setTab] = useState<'overview' | 'descriptions' | 'tables' | 'edit' | 'extrafields'>('overview')
 
   const { data: article, isLoading, error } = useQuery({
     queryKey: ['catalogue-article', articleId],
@@ -322,7 +329,7 @@ export default function ArticleFichePage() {
 
   return (
     <ModuleEntityShell
-      shellClassName="module-shell--crm"
+      shellClassName="module-shell--crm module-shell--article-wide"
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
         { label: 'Catalogue', to: '/catalogue' },
@@ -342,8 +349,29 @@ export default function ArticleFichePage() {
         </Link>
       }
     >
-      <FicheArticle article={article} />
-      {isLab && (
+      <div className="article-fiche-tabs" role="tablist" aria-label="Sections fiche article">
+        {[
+          { id: 'overview', label: 'Fiche' },
+          { id: 'descriptions', label: 'Descriptions' },
+          { id: 'tables', label: 'Tables' },
+          ...(isLab ? [{ id: 'edit', label: 'Modifier' }, { id: 'extrafields', label: 'Champs personnalisés' }] : []),
+        ].map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            className={`article-fiche-tabs__btn${tab === t.id ? ' article-fiche-tabs__btn--active' : ''}`}
+            onClick={() => setTab(t.id as typeof tab)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'overview' && <FicheArticle article={article} section="overview" showBackLink={false} />}
+      {tab === 'descriptions' && <FicheArticle article={article} section="descriptions" showBackLink={false} />}
+      {tab === 'tables' && <FicheArticle article={article} section="tables" showBackLink={false} />}
+      {tab === 'edit' && isLab && (
         <ArticleProlabEditor
           article={article}
           onUpdated={() => {
@@ -354,6 +382,9 @@ export default function ArticleFichePage() {
             void queryClient.invalidateQueries({ queryKey: ['catalogue-articles-flat'] })
           }}
         />
+      )}
+      {tab === 'extrafields' && isLab && (
+        <ExtrafieldsForm entityType="article" entityId={article.id} canEdit title="Champs personnalisés article" />
       )}
     </ModuleEntityShell>
   )

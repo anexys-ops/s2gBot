@@ -90,6 +90,23 @@ class BonCommandeController extends Controller
         ]));
     }
 
+    public function destroy(Request $request, BonCommande $bonCommande): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if (! AgencyAccess::userMayAccessBonCommande($request->user(), $bonCommande)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if ($bonCommande->bonsLivraison()->exists()) {
+            return response()->json(['message' => 'Impossible de supprimer un BC qui possède déjà un BL.'], 422);
+        }
+
+        $bonCommande->delete();
+
+        return response()->json(null, 204);
+    }
+
     public function updateLigne(
         Request $request,
         BonCommande $bonCommande,

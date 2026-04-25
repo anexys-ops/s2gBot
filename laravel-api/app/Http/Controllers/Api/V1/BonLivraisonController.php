@@ -89,6 +89,23 @@ class BonLivraisonController extends Controller
         return response()->json($bonLivraison->fresh()->load(['lignes', 'clientContact']));
     }
 
+    public function destroy(Request $request, BonLivraison $bonLivraison): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if (! AgencyAccess::userMayAccessBonLivraison($request->user(), $bonLivraison)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if ($bonLivraison->statut !== BonLivraison::STATUT_BROUILLON) {
+            return response()->json(['message' => 'Seul un BL en brouillon peut être supprimé.'], 422);
+        }
+
+        $bonLivraison->delete();
+
+        return response()->json(null, 204);
+    }
+
     public function valider(Request $request, BonLivraison $bonLivraison): JsonResponse
     {
         if (! $request->user()->isLab()) {

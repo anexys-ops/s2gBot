@@ -149,7 +149,7 @@ export default function AppNavigation() {
           { to: '/invoices', label: 'Factures' },
           { to: '/compta-fondation', label: 'Compta', labOnly: true },
           { to: '/back-office/offres', label: 'Offres', labOnly: true },
-          { to: '/sites', label: 'Ordres de mission' },
+          { to: '/ordres-mission', label: 'Ordres de mission' },
         ]),
       },
       {
@@ -158,7 +158,7 @@ export default function AppNavigation() {
         items: filterItems([
           { to: '/sites', label: 'Chantiers' },
           { to: '/terrain', label: 'Vue terrain' },
-          { to: '/sites', label: 'Ordres de mission' },
+          { to: '/ordres-mission', label: 'Ordres de mission' },
           { to: '/terrain/mesures', label: 'Mesures terrain' },
           { to: '/terrain/planning', label: 'Planning technicien' },
         ]),
@@ -169,8 +169,8 @@ export default function AppNavigation() {
         items: filterItems([
           { to: '/materiel', label: 'Vue d’ensemble' },
           { to: '/materiel/equipements', label: 'Parc équipements' },
-          { to: '/materiel', label: 'Planning matériel' },
-          { to: '/materiel', label: 'Stocks' },
+          { to: '/materiel/planning', label: 'Planning matériel' },
+          { to: '/materiel/stocks', label: 'Stocks' },
         ]),
       },
       {

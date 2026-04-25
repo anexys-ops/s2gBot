@@ -14,9 +14,15 @@ import Modal from '../../components/Modal'
 const ENTITY_TABS: { type: ExtrafieldEntityType; label: string }[] = [
   { type: 'client', label: 'Clients' },
   { type: 'site', label: 'Chantiers' },
-  { type: 'order', label: 'Dossiers / commandes' },
-  { type: 'invoice', label: 'Factures' },
+  { type: 'article', label: 'Articles' },
+  { type: 'dossier', label: 'Dossiers' },
   { type: 'quote', label: 'Devis' },
+  { type: 'bon_commande', label: 'Bons de commande' },
+  { type: 'bon_livraison', label: 'Bons de livraison' },
+  { type: 'invoice', label: 'Factures' },
+  { type: 'mission', label: 'Ordres de mission' },
+  { type: 'equipment', label: 'Matériel' },
+  { type: 'order', label: 'Commandes labo' },
 ]
 
 const FIELD_TYPES: { value: string; label: string }[] = [
@@ -49,7 +55,7 @@ export default function ModuleConfigurationPage() {
   const canConfigure = canManageAppConfig(user)
   const queryClient = useQueryClient()
   const [mainTab, setMainTab] = useState<MainTab>('extrafields')
-  const [entityTab, setEntityTab] = useState<ExtrafieldEntityType>('invoice')
+  const [entityTab, setEntityTab] = useState<ExtrafieldEntityType>('client')
   const [createOpen, setCreateOpen] = useState(false)
   const [editRow, setEditRow] = useState<ExtrafieldDefinitionRow | null>(null)
 
@@ -91,31 +97,32 @@ export default function ModuleConfigurationPage() {
 
       {mainTab === 'extrafields' && (
         <>
-          <p style={{ color: 'var(--color-muted)', maxWidth: '70ch', lineHeight: 1.5 }}>
-            Définissez des champs structurés par entité (clients, chantiers, dossiers, factures, devis). Les valeurs sont
-            stockées en base ; les écrans métier affichent des listes déroulantes ou champs adaptés au type.
+          <p style={{ color: 'var(--color-muted)', maxWidth: '78ch', lineHeight: 1.5 }}>
+            Choisissez un objet, puis ajoutez/modifiez/supprimez ses extrafields. Les champs créés ici sont lus par les
+            fiches métier et apparaissent dans l’onglet <strong>Champs personnalisés</strong> de l’objet concerné.
           </p>
-          <div className="module-configuration-page__entity-tabs">
-            {ENTITY_TABS.map((t) => (
-              <button
-                key={t.type}
-                type="button"
-                className={`btn btn-sm ${entityTab === t.type ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setEntityTab(t.type)}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-          <div className="crud-actions" style={{ marginBottom: '1rem' }}>
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => setCreateOpen(true)}>
-              + Nouveau champ
+          <div className="card module-configuration-page__object-picker">
+            <label>
+              Objet à configurer
+              <select value={entityTab} onChange={(e) => setEntityTab(e.target.value as ExtrafieldEntityType)}>
+                {ENTITY_TABS.map((t) => (
+                  <option key={t.type} value={t.type}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
+              Ajouter un extrafield
             </button>
           </div>
           {isLoading ? (
             <p>Chargement…</p>
           ) : (
             <div className="card" style={{ overflowX: 'auto' }}>
+              <h3 style={{ marginTop: 0 }}>
+                Extrafields — {ENTITY_TABS.find((t) => t.type === entityTab)?.label ?? entityTab}
+              </h3>
               <table className="module-configuration-page__table">
                 <thead>
                   <tr>
@@ -157,7 +164,7 @@ export default function ModuleConfigurationPage() {
                   ))}
                 </tbody>
               </table>
-              {definitions.length === 0 && <p style={{ padding: '1rem' }}>Aucun champ pour cette entité.</p>}
+              {definitions.length === 0 && <p style={{ padding: '1rem' }}>Aucun extrafield pour cet objet.</p>}
             </div>
           )}
         </>

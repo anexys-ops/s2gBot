@@ -9,6 +9,7 @@ class ClientContact extends Model
 {
     protected $fillable = [
         'client_id',
+        'contact_type',
         'prenom',
         'nom',
         'poste',

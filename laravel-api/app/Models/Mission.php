@@ -14,6 +14,7 @@ class Mission extends Model
     protected $fillable = [
         'site_id',
         'dossier_id',
+        'bon_commande_id',
         'reference',
         'title',
         'mission_status',
@@ -39,6 +40,11 @@ class Mission extends Model
     public function dossier(): BelongsTo
     {
         return $this->belongsTo(Dossier::class);
+    }
+
+    public function bonCommande(): BelongsTo
+    {
+        return $this->belongsTo(BonCommande::class, 'bon_commande_id');
     }
 
     public function boreholes(): HasMany

@@ -6,6 +6,7 @@ import DossierPlaceholderTab from './pages/dossiers/tabs/DossierPlaceholderTab'
 import DossierBcBlTab from './pages/dossiers/tabs/DossierBcBlTab'
 import DossierDevisTab from './pages/dossiers/tabs/DossierDevisTab'
 import DossierDocumentsTab from './pages/dossiers/tabs/DossierDocumentsTab'
+import DossierExtrafieldsTab from './pages/dossiers/tabs/DossierExtrafieldsTab'
 import CatalogueListePage from './pages/catalogue/CatalogueListePage'
 import ArticleFichePage from './pages/catalogue/ArticleFichePage'
 import DossierNewPage from './pages/dossiers/DossierNewPage'
@@ -47,6 +48,7 @@ import ClientFicheTab from './pages/clients/ClientFicheTab'
 import ClientCommerceTab from './pages/clients/ClientCommerceTab'
 import ClientDocumentsTab from './pages/clients/ClientDocumentsTab'
 import ClientContactsPage from './pages/clients/ClientContactsPage'
+import ClientExtrafieldsTab from './pages/clients/ClientExtrafieldsTab'
 import SiteLayout from './pages/sites/SiteLayout'
 import SiteFicheTab from './pages/sites/SiteFicheTab'
 import SiteMissionsTab from './pages/sites/SiteMissionsTab'
@@ -71,8 +73,11 @@ import BonCommandeFichePage from './pages/commercial/BonCommandeFichePage'
 import BonsLivraisonListPage from './pages/commercial/BonsLivraisonListPage'
 import BonLivraisonFichePage from './pages/commercial/BonLivraisonFichePage'
 import ComptaFondationPage from './pages/commercial/ComptaFondationPage'
+import OrdresMissionPage from './pages/commercial/OrdresMissionPage'
 import MaterielHub from './pages/hub/MaterielHub'
 import MaterielModuleLayout from './pages/materiel/MaterielModuleLayout'
+import MaterielPlanningPage from './pages/materiel/MaterielPlanningPage'
+import MaterielStocksPage from './pages/materiel/MaterielStocksPage'
 import {
   BackOfficeEquipementsListRedirect,
   BackOfficeEquipementDetailRedirect,
@@ -113,6 +118,7 @@ function AppRoutes() {
         <Route path="bons-commande/:id" element={<BonCommandeFichePage />} />
         <Route path="bons-livraison" element={<BonsLivraisonListPage />} />
         <Route path="bons-livraison/:id" element={<BonLivraisonFichePage />} />
+        <Route path="ordres-mission" element={<OrdresMissionPage />} />
         <Route path="compta-fondation" element={<ComptaFondationPage />} />
         <Route path="catalogue" element={<CatalogueListePage />} />
         <Route path="catalogue/services" element={<CommercialCatalogPage />} />
@@ -129,6 +135,7 @@ function AppRoutes() {
             element={<DossierPlaceholderTab label="Essais" description="Lien vers commandes d’essai et résultats." />}
           />
           <Route path="documents" element={<DossierDocumentsTab />} />
+          <Route path="extrafields" element={<DossierExtrafieldsTab />} />
         </Route>
         <Route path="terrain" element={<TerrainHub />} />
         <Route path="terrain/mesures" element={<TerrainMesuresPage />} />
@@ -138,6 +145,8 @@ function AppRoutes() {
           <Route index element={<MaterielHub />} />
           <Route path="equipements" element={<EquipmentsPage />} />
           <Route path="equipements/:id" element={<EquipmentDetailPage />} />
+          <Route path="planning" element={<MaterielPlanningPage />} />
+          <Route path="stocks" element={<MaterielStocksPage />} />
         </Route>
         <Route path="labo" element={<LaboHub />} />
         <Route path="labo/essais" element={<LaboEssaisPage />} />
@@ -180,6 +189,7 @@ function AppRoutes() {
           <Route path="fiche" element={<ClientFicheTab />} />
           <Route path="commerce" element={<ClientCommerceTab />} />
           <Route path="documents" element={<ClientDocumentsTab />} />
+          <Route path="extrafields" element={<ClientExtrafieldsTab />} />
         </Route>
         <Route path="clients/:clientId/commercial" element={<LegacyClientCommercialRedirect />} />
         <Route path="sites" element={<Sites />} />

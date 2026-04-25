@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { bonsLivraisonApi } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
+import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
 
@@ -203,6 +204,7 @@ export default function BonLivraisonFichePage() {
           </div>
         </section>
       )}
+      {lab && <ExtrafieldsForm entityType="bon_livraison" entityId={bl.id} canEdit title="Champs personnalisés BL" />}
     </ModuleEntityShell>
   )
 }

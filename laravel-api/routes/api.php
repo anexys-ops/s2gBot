@@ -104,6 +104,8 @@ Route::middleware('auth:sanctum')->group(function () {
             ->whereNumber('bonCommande');
         Route::put('bons-commande/{bonCommande}', [BonCommandeController::class, 'update'])
             ->whereNumber('bonCommande');
+        Route::delete('bons-commande/{bonCommande}', [BonCommandeController::class, 'destroy'])
+            ->whereNumber('bonCommande');
         Route::put('bons-commande/{bonCommande}/lignes/{ligne}', [BonCommandeController::class, 'updateLigne'])
             ->whereNumber('bonCommande')
             ->whereNumber('ligne');
@@ -122,6 +124,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('bons-livraison/{bonLivraison}', [BonLivraisonController::class, 'show'])
             ->whereNumber('bonLivraison');
         Route::put('bons-livraison/{bonLivraison}', [BonLivraisonController::class, 'update'])
+            ->whereNumber('bonLivraison');
+        Route::delete('bons-livraison/{bonLivraison}', [BonLivraisonController::class, 'destroy'])
             ->whereNumber('bonLivraison');
         Route::post('bons-livraison/{bonLivraison}/valider', [BonLivraisonController::class, 'valider'])
             ->whereNumber('bonLivraison');
@@ -180,6 +184,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('client-addresses/{client_address}', [ClientAddressController::class, 'update']);
     Route::delete('client-addresses/{client_address}', [ClientAddressController::class, 'destroy']);
     Route::apiResource('sites', SiteController::class);
+    Route::get('missions', [MissionController::class, 'all']);
+    Route::post('missions', [MissionController::class, 'storeGlobal']);
     Route::get('sites/{site}/missions', [MissionController::class, 'index']);
     Route::post('sites/{site}/missions', [MissionController::class, 'store']);
     Route::get('missions/{mission}', [MissionController::class, 'show']);

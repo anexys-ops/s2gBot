@@ -46,6 +46,7 @@ import ClientLayout, { LegacyClientCommercialRedirect } from './pages/clients/Cl
 import ClientFicheTab from './pages/clients/ClientFicheTab'
 import ClientCommerceTab from './pages/clients/ClientCommerceTab'
 import ClientDocumentsTab from './pages/clients/ClientDocumentsTab'
+import ClientContactsPage from './pages/clients/ClientContactsPage'
 import SiteLayout from './pages/sites/SiteLayout'
 import SiteFicheTab from './pages/sites/SiteFicheTab'
 import SiteMissionsTab from './pages/sites/SiteMissionsTab'
@@ -114,6 +115,7 @@ function AppRoutes() {
         <Route path="bons-livraison/:id" element={<BonLivraisonFichePage />} />
         <Route path="compta-fondation" element={<ComptaFondationPage />} />
         <Route path="catalogue" element={<CatalogueListePage />} />
+        <Route path="catalogue/services" element={<CommercialCatalogPage />} />
         <Route path="catalogue/articles/:id" element={<ArticleFichePage />} />
         <Route path="dossiers/new" element={<DossierNewPage />} />
         <Route path="dossiers" element={<DossiersListPage />} />
@@ -172,6 +174,7 @@ function AppRoutes() {
           </Route>
         </Route>
         <Route path="clients" element={<Clients />} />
+        <Route path="clients/contacts" element={<ClientContactsPage />} />
         <Route path="clients/:clientId" element={<ClientLayout />}>
           <Route index element={<Navigate to="fiche" replace />} />
           <Route path="fiche" element={<ClientFicheTab />} />

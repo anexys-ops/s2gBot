@@ -578,7 +578,6 @@ export default function QuoteEditorPage() {
       <form
         onSubmit={handleSubmit}
         className="card quote-editor-page__form"
-        style={{ paddingBottom: 'var(--layout-footer-dock-reserve, 3.5rem)' }}
       >
         <QuoteFormFields
           form={form}

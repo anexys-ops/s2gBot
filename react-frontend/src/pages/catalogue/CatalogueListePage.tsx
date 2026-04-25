@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { catalogueApi, type RefFamilleArticleRow } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
@@ -12,10 +13,15 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 export default function CatalogueListePage() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'lab_admin'
+  const [searchParams] = useSearchParams()
   const [familleId, setFamilleId] = useState<number | ''>('')
   const [search, setSearch] = useState('')
   const [withInactif, setWithInactif] = useState(false)
-  const [viewMode, setViewMode] = useState<'list' | 'tree'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'tree'>(searchParams.get('vue') === 'familles' ? 'tree' : 'list')
+
+  useEffect(() => {
+    setViewMode(searchParams.get('vue') === 'familles' ? 'tree' : 'list')
+  }, [searchParams])
 
   const { data: familles } = useQuery({
     queryKey: ['catalogue-familles', withInactif],

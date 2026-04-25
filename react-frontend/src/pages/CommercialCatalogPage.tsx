@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { commercialOfferingsApi, equipmentsApi, moduleSettingsApi, type CommercialOffering, type EquipmentRow } from '../api/client'
 import Modal from '../components/Modal'
@@ -24,16 +25,24 @@ const emptyRow = (): Partial<CommercialOffering> & { name: string; kind: 'produc
 
 export default function CommercialCatalogPage() {
   const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const debounced = useDebouncedValue(search, 300)
   const [page, setPage] = useState(1)
+  const [kindFilter, setKindFilter] = useState(searchParams.get('kind') ?? '')
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [editing, setEditing] = useState<CommercialOffering | null>(null)
   const [form, setForm] = useState(emptyRow())
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['commercial-offerings', debounced, page],
-    queryFn: () => commercialOfferingsApi.list({ search: debounced.trim() || undefined, per_page: 30, page }),
+    queryKey: ['commercial-offerings', debounced, kindFilter, page],
+    queryFn: () =>
+      commercialOfferingsApi.list({
+        search: debounced.trim() || undefined,
+        kind: kindFilter || undefined,
+        per_page: 30,
+        page,
+      }),
   })
 
   const { data: catalogMod } = useQuery({
@@ -134,6 +143,20 @@ export default function CommercialCatalogPage() {
               setPage(1)
             }}
           />
+          <select
+            value={kindFilter}
+            onChange={(e) => {
+              const next = e.target.value
+              setKindFilter(next)
+              setPage(1)
+              setSearchParams(next ? { kind: next } : {})
+            }}
+            aria-label="Filtrer par type"
+          >
+            <option value="">Tous les types</option>
+            <option value="service">Services</option>
+            <option value="product">Produits</option>
+          </select>
           <button type="button" className="btn btn-primary" onClick={openCreate}>
             Nouvelle référence
           </button>

@@ -171,6 +171,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('clients/{client}/commercial-overview', [ClientCommercialController::class, 'overview']);
     Route::get('clients/{client}/contacts', [ClientContactController::class, 'index']);
     Route::post('clients/{client}/contacts', [ClientContactController::class, 'store']);
+    Route::get('client-contacts', [ClientContactController::class, 'all']);
     Route::put('client-contacts/{client_contact}', [ClientContactController::class, 'update'])->whereNumber('client_contact');
     Route::delete('client-contacts/{client_contact}', [ClientContactController::class, 'destroy'])->whereNumber('client_contact');
     Route::get('document-status-histories', [DocumentStatusHistoryController::class, 'index']);

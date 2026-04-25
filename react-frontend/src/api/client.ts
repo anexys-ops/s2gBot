@@ -253,6 +253,7 @@ export const clientAddressesApi = {
 export interface ClientContactRow {
   id: number
   client_id: number
+  client?: Pick<Client, 'id' | 'name' | 'email' | 'phone' | 'city'>
   prenom: string
   nom: string
   poste?: string | null
@@ -265,6 +266,12 @@ export interface ClientContactRow {
 }
 
 export const clientContactsApi = {
+  listAll: (params?: { search?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    const s = q.toString()
+    return api<ClientContactRow[]>(`/client-contacts${s ? `?${s}` : ''}`)
+  },
   list: (clientId: number) => api<ClientContactRow[]>(`/clients/${clientId}/contacts`),
   create: (clientId: number, body: Partial<ClientContactRow> & { prenom: string; nom: string }) =>
     api<ClientContactRow>(`/clients/${clientId}/contacts`, { method: 'POST', body: JSON.stringify(body) }),

@@ -10,6 +10,40 @@ use Illuminate\Http\Request;
 
 class ClientContactController extends Controller
 {
+    public function all(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $query = ClientContact::query()->with('client:id,name,email,phone,city');
+
+        if ($user->isClient() || $user->isSiteContact()) {
+            $query->where('client_id', $user->client_id);
+        }
+
+        if ($search = trim((string) $request->query('search', ''))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('prenom', 'like', '%'.$search.'%')
+                    ->orWhere('nom', 'like', '%'.$search.'%')
+                    ->orWhere('poste', 'like', '%'.$search.'%')
+                    ->orWhere('departement', 'like', '%'.$search.'%')
+                    ->orWhere('email', 'like', '%'.$search.'%')
+                    ->orWhere('telephone_direct', 'like', '%'.$search.'%')
+                    ->orWhere('telephone_mobile', 'like', '%'.$search.'%')
+                    ->orWhereHas('client', function ($clientQuery) use ($search) {
+                        $clientQuery->where('name', 'like', '%'.$search.'%');
+                    });
+            });
+        }
+
+        return response()->json(
+            $query
+                ->orderBy('client_id')
+                ->orderByDesc('is_principal')
+                ->orderBy('nom')
+                ->orderBy('prenom')
+                ->get(),
+        );
+    }
+
     public function index(Request $request, Client $client): JsonResponse
     {
         $user = $request->user();

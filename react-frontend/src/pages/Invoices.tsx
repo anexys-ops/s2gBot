@@ -33,6 +33,13 @@ const STATUS_LABELS: Record<string, string> = {
 
 const DEFAULT_TVA_OPTIONS = [20, 10, 5.5, 0]
 
+function normalizePickerText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+
 function numList(v: unknown): number[] {
   if (!Array.isArray(v) || v.length === 0) return DEFAULT_TVA_OPTIONS
   const out = v.map((x) => Number(x)).filter((n) => !Number.isNaN(n))
@@ -60,6 +67,8 @@ export default function Invoices() {
   })
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
+  const [orderSearchInput, setOrderSearchInput] = useState('')
+  const debouncedOrderSearch = useDebouncedValue(orderSearchInput, 250)
   const [statusFilter, setStatusFilter] = useState('')
   const [clientFilter, setClientFilter] = useState('')
   const [page, setPage] = useState(1)
@@ -129,8 +138,13 @@ export default function Invoices() {
   })
 
   const { data: ordersData } = useQuery({
-    queryKey: ['orders', 'invoice-picker'],
-    queryFn: () => ordersApi.list({ page: 1, per_page: 100 }),
+    queryKey: ['orders', 'invoice-picker', debouncedOrderSearch],
+    queryFn: () =>
+      ordersApi.list({
+        page: 1,
+        per_page: 100,
+        search: debouncedOrderSearch.trim() || undefined,
+      }),
     enabled: isLab,
   })
 
@@ -164,10 +178,25 @@ export default function Invoices() {
   })
 
   const orders = ordersData?.data ?? []
-  const pickableOrders = orders.filter((o) => orderPickerStatuses.includes(o.status))
+  const pickableOrders = useMemo(
+    () => orders.filter((o) => orderPickerStatuses.includes(o.status)),
+    [orders, orderPickerStatuses],
+  )
+  const filteredPickableOrders = useMemo(() => {
+    const term = normalizePickerText(orderSearchInput.trim())
+    if (!term) return pickableOrders
+    return pickableOrders.filter((o) => {
+      const ref = normalizePickerText(o.reference)
+      const clientName = normalizePickerText(o.client?.name ?? '')
+      return ref.startsWith(term) || clientName.startsWith(term) || `${ref} ${clientName}`.includes(term)
+    })
+  }, [orderSearchInput, pickableOrders])
   const invoices = data?.data ?? []
   const lastPage = data?.last_page ?? 1
   const statusOptions = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
+  const toggleOrderSelection = (orderId: number) => {
+    setSelectedOrderIds((cur) => (cur.includes(orderId) ? cur.filter((id) => id !== orderId) : [...cur, orderId]))
+  }
 
   const openEdit = useCallback((inv: Invoice) => {
     setEditInvoice(inv)
@@ -271,25 +300,48 @@ export default function Invoices() {
             Sélectionnez une ou plusieurs commandes (même client). Les statuts proposés sont configurables dans le back
             office → Configuration → Listes par module → Factures.
           </p>
-          <label className="form-group" style={{ display: 'block', maxWidth: 520 }}>
-            <span style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem' }}>Commandes (liste déroulante multiple)</span>
-            <select
-              multiple
-              className="invoice-orders-multiselect"
-              size={Math.min(12, Math.max(6, pickableOrders.length))}
-              value={selectedOrderIds.map(String)}
-              onChange={(e) => {
-                const selected = Array.from(e.target.selectedOptions, (opt) => Number(opt.value))
-                setSelectedOrderIds(selected)
-              }}
-            >
-              {pickableOrders.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.reference} — {o.client?.name ?? 'Client'} ({o.status})
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="form-group invoice-orders-picker">
+            <label className="invoice-orders-picker__label" htmlFor="invoice-order-search">
+              Commandes
+            </label>
+            <input
+              id="invoice-order-search"
+              type="search"
+              value={orderSearchInput}
+              onChange={(e) => setOrderSearchInput(e.target.value)}
+              placeholder="Tapez les premières lettres d’une référence ou d’un client…"
+              autoComplete="off"
+            />
+            <div className="invoice-orders-picker__list" role="listbox" aria-multiselectable="true">
+              {filteredPickableOrders.map((o) => {
+                const selected = selectedOrderIds.includes(o.id)
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    className={`invoice-orders-picker__option${selected ? ' invoice-orders-picker__option--selected' : ''}`}
+                    role="option"
+                    aria-selected={selected}
+                    onClick={() => toggleOrderSelection(o.id)}
+                  >
+                    <span className="invoice-orders-picker__checkbox" aria-hidden="true">
+                      {selected ? '✓' : ''}
+                    </span>
+                    <span>
+                      <strong>{o.reference}</strong> — {o.client?.name ?? 'Client'}
+                      <span className="invoice-orders-picker__status">({o.status})</span>
+                    </span>
+                  </button>
+                )
+              })}
+              {filteredPickableOrders.length === 0 && (
+                <p className="invoice-orders-picker__empty">Aucune commande ne correspond à cette recherche.</p>
+              )}
+            </div>
+          </div>
+          {selectedOrderIds.length > 0 && (
+            <p className="invoice-orders-picker__summary">{selectedOrderIds.length} commande(s) sélectionnée(s)</p>
+          )}
           {pickableOrders.length === 0 && (
             <p style={{ color: 'var(--color-muted, #64748b)' }}>Aucune commande ne correspond aux statuts configurés.</p>
           )}

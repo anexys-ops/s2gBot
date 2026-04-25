@@ -122,13 +122,19 @@ export default function AppNavigation() {
       {
         id: 'catalogue',
         label: 'Catalogue',
-        items: filterItems([{ to: '/catalogue', label: 'Articles et familles (PROLAB)' }]),
+        items: filterItems([
+          { to: '/catalogue', label: 'Articles' },
+          { to: '/catalogue/services?kind=service', label: 'Services' },
+          { to: '/catalogue?vue=familles', label: 'Familles' },
+          { to: '/catalogue?vue=tags', label: 'Tags' },
+        ]),
       },
       {
         id: 'clients',
         label: 'Clients',
         items: filterItems([
-          { to: '/clients', label: 'Clients et contacts' },
+          { to: '/clients', label: 'Clients' },
+          { to: '/clients/contacts', label: 'Contacts' },
         ]),
       },
       {
@@ -136,14 +142,14 @@ export default function AppNavigation() {
         label: 'Commercial',
         items: filterItems([
           { to: '/crm', label: 'Vue d’ensemble' },
-          { to: '/crm/documents', label: 'Devis, factures (registre)' },
+          { to: '/dossiers', label: 'Dossiers' },
           { to: '/devis', label: 'Devis' },
-          { to: '/dossiers', label: 'Dossiers (pièces, suivi PROLAB)' },
-          { to: '/invoices', label: 'Factures' },
           { to: '/bons-commande', label: 'Bons de commande' },
           { to: '/bons-livraison', label: 'Bons de livraison' },
-          { to: '/compta-fondation', label: 'Compta (fondation)', labOnly: true },
-          { to: '/back-office/offres', label: 'Offres (lignes de devis)', labOnly: true },
+          { to: '/invoices', label: 'Factures' },
+          { to: '/compta-fondation', label: 'Compta', labOnly: true },
+          { to: '/back-office/offres', label: 'Offres', labOnly: true },
+          { to: '/sites', label: 'Ordres de mission' },
         ]),
       },
       {
@@ -152,9 +158,9 @@ export default function AppNavigation() {
         items: filterItems([
           { to: '/sites', label: 'Chantiers' },
           { to: '/terrain', label: 'Vue terrain' },
+          { to: '/sites', label: 'Ordres de mission' },
           { to: '/terrain/mesures', label: 'Mesures terrain' },
-          { to: '/terrain/chantiers', label: 'Carte chantiers' },
-          { to: '/terrain/planning', label: 'Planning techniciens' },
+          { to: '/terrain/planning', label: 'Planning technicien' },
         ]),
       },
       {
@@ -163,6 +169,8 @@ export default function AppNavigation() {
         items: filterItems([
           { to: '/materiel', label: 'Vue d’ensemble' },
           { to: '/materiel/equipements', label: 'Parc équipements' },
+          { to: '/materiel', label: 'Planning matériel' },
+          { to: '/materiel', label: 'Stocks' },
         ]),
       },
       {

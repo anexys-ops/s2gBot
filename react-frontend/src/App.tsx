@@ -75,6 +75,7 @@ import BonsLivraisonListPage from './pages/commercial/BonsLivraisonListPage'
 import BonLivraisonFichePage from './pages/commercial/BonLivraisonFichePage'
 import ComptaFondationPage from './pages/commercial/ComptaFondationPage'
 import OrdresMissionPage from './pages/commercial/OrdresMissionPage'
+import OrdresMissionDetailPage from './pages/commercial/OrdresMissionDetailPage'
 import MaterielHub from './pages/hub/MaterielHub'
 import MaterielModuleLayout from './pages/materiel/MaterielModuleLayout'
 import MaterielPlanningPage from './pages/materiel/MaterielPlanningPage'
@@ -120,6 +121,7 @@ function AppRoutes() {
         <Route path="bons-livraison" element={<BonsLivraisonListPage />} />
         <Route path="bons-livraison/:id" element={<BonLivraisonFichePage />} />
         <Route path="ordres-mission" element={<OrdresMissionPage />} />
+        <Route path="ordres-mission/:id" element={<OrdresMissionDetailPage />} />
         <Route path="compta-fondation" element={<ComptaFondationPage />} />
         <Route path="catalogue" element={<CatalogueListePage />} />
         <Route path="catalogue/services" element={<CommercialCatalogPage />} />

@@ -113,7 +113,6 @@ jobs:
           port: 167
           # Build Docker (NO_CACHE=1 par défaut) peut dépasser le délai implicite court
           command_timeout: 45m
-          script_stop: true
           # Ne pas s’appuyer sur `envs` (drone-ssh) : variables parfois absentes côté distant → `cd` silencieux + exit 1.
           # On injecte ici avec toJSON (échappement sûr des chemins / versions).
           script: |

@@ -20,9 +20,15 @@ export default function BonsCommandeListPage() {
     queryKey: ['quotes', 'bc-source', 'accepted'],
     queryFn: () => quotesApi.list({ status: 'accepted' }),
   })
-  const quoteOptions = [...(signedQuotes?.data ?? []), ...(acceptedQuotes?.data ?? [])].filter((q, index, arr) => (
-    q.dossier_id && arr.findIndex((x) => x.id === q.id) === index
-  ))
+  const { data: validatedQuotes } = useQuery({
+    queryKey: ['quotes', 'bc-source', 'validated'],
+    queryFn: () => quotesApi.list({ status: 'validated' }),
+  })
+  const quoteOptions = [
+    ...(signedQuotes?.data ?? []),
+    ...(acceptedQuotes?.data ?? []),
+    ...(validatedQuotes?.data ?? []),
+  ].filter((q, index, arr) => q.dossier_id && arr.findIndex((x) => x.id === q.id) === index)
   const createMut = useMutation({
     mutationFn: () => devisV1Api.transformerBc(Number(quoteId)),
     onSuccess: (bc) => {
@@ -92,6 +98,8 @@ export default function BonsCommandeListPage() {
                 <th>Dossier</th>
                 <th>Statut</th>
                 <th>Date</th>
+                <th>Statut client</th>
+                <th>Client</th>
                 <th>HT / TTC</th>
                 <th />
               </tr>
@@ -113,6 +121,8 @@ export default function BonsCommandeListPage() {
                   </td>
                   <td>{bc.statut}</td>
                   <td>{String(bc.date_commande).slice(0, 10)}</td>
+                  <td>{bc.statut}</td>
+                  <td>{bc.dossier?.client?.name ?? bc.client?.name ?? '-'}</td>
                   <td>
                     {bc.montant_ht} / {bc.montant_ttc}
                   </td>

@@ -5,6 +5,7 @@ import {
   bonsCommandeApi,
   planningTerrainApi,
   type BonCommande,
+  type BonCommandeLigne,
 } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
@@ -66,6 +67,11 @@ export default function PlanningTechniciensPage() {
   const [newDebut, setNewDebut] = useState(() => toYmd(new Date()))
   const [newFin, setNewFin] = useState(() => toYmd(new Date()))
   const [newNotes, setNewNotes] = useState('')
+  const [unposBcFilter, setUnposBcFilter] = useState<number | ''>('')
+  const [unposUserIdMap, setUnposUserIdMap] = useState<Record<number, number | ''>>({})
+  const [unposDebugMap, setUnposDebugMap] = useState<Record<number, string>>({})
+  const [unposFinMap, setUnposFinMap] = useState<Record<number, string>>({})
+  const [unposNotesMap, setUnposNotesMap] = useState<Record<number, string>>({})
 
   const { data: affectations, isLoading, error } = useQuery({
     queryKey: ['planning-terrain', from, to, userFilter],
@@ -94,6 +100,29 @@ export default function PlanningTechniciensPage() {
     [bcs, newBcId]
   )
 
+  const affectatedLigneIds = useMemo(
+    () => new Set((affectations ?? []).map((a) => a.bon_commande_ligne_id)),
+    [affectations]
+  )
+
+  const unpositionedLignes = useMemo(() => {
+    const all: (BonCommandeLigne & { bc_id: number; bc_numero: string; dossier_id: number })[] = []
+    for (const bc of bcs) {
+      if (unposBcFilter !== '' && bc.id !== unposBcFilter) continue
+      for (const ligne of bc.lignes ?? []) {
+        if (!affectatedLigneIds.has(ligne.id)) {
+          all.push({
+            ...ligne,
+            bc_id: bc.id,
+            bc_numero: bc.numero,
+            dossier_id: bc.dossier_id,
+          })
+        }
+      }
+    }
+    return all
+  }, [bcs, affectatedLigneIds, unposBcFilter])
+
   const createMut = useMutation({
     mutationFn: () =>
       planningTerrainApi.create({
@@ -106,6 +135,25 @@ export default function PlanningTechniciensPage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['planning-terrain'] })
       setNewNotes('')
+    },
+  })
+
+  const createUnposMut = useMutation({
+    mutationFn: (ligneId: number) =>
+      planningTerrainApi.create({
+        bon_commande_ligne_id: ligneId,
+        user_id: unposUserIdMap[ligneId] as number,
+        date_debut: unposDebugMap[ligneId] || toYmd(new Date()),
+        date_fin: unposFinMap[ligneId] || toYmd(new Date()),
+        notes: unposNotesMap[ligneId] || undefined,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['planning-terrain'] })
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+      setUnposUserIdMap({})
+      setUnposDebugMap({})
+      setUnposFinMap({})
+      setUnposNotesMap({})
     },
   })
 
@@ -128,6 +176,144 @@ export default function PlanningTechniciensPage() {
       title="Planning techniciens"
       subtitle="Affectations rattachées aux lignes des bons de commande — vue semaine (grille) + tableau, création depuis les BC."
     >
+      {lab && bonsListe && (
+        <section className="card" style={{ marginBottom: '1.5rem' }}>
+          <h2 className="h2" style={{ fontSize: '1.05rem', marginBottom: '0.75rem' }}>
+            Lignes non affectées
+          </h2>
+          <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>
+            Lignes de BC sans affectation terrain. Assignez un technicien et des dates pour créer l'affectation.
+          </p>
+          <div style={{ marginBottom: '0.75rem' }}>
+            <label>
+              Filtrer par BC
+              <select
+                value={unposBcFilter === '' ? '' : String(unposBcFilter)}
+                onChange={(e) => setUnposBcFilter(e.target.value === '' ? '' : Number(e.target.value))}
+                style={{ display: 'block', width: '100%', marginTop: 4 }}
+              >
+                <option value="">Tous</option>
+                {bcs.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.numero} (dossier #{b.dossier_id})
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {unpositionedLignes.length === 0 && (
+            <p className="text-muted">Aucune ligne non affectée.</p>
+          )}
+          {unpositionedLignes.length > 0 && (
+            <div className="table-wrap">
+              <table className="data-table data-table--compact" style={{ width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th>BC</th>
+                    <th>Ligne</th>
+                    <th>Technicien</th>
+                    <th>Début</th>
+                    <th>Fin</th>
+                    <th>Notes</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {unpositionedLignes.map((ligne) => (
+                    <tr key={ligne.id}>
+                      <td>
+                        <Link to={`/bons-commande/${ligne.bc_id}`} className="link-inline">
+                          {ligne.bc_numero}
+                        </Link>
+                      </td>
+                      <td>{ligne.libelle}</td>
+                      <td>
+                        <select
+                          value={unposUserIdMap[ligne.id] === undefined ? '' : String(unposUserIdMap[ligne.id])}
+                          onChange={(e) =>
+                            setUnposUserIdMap((m) => ({
+                              ...m,
+                              [ligne.id]: e.target.value === '' ? '' : Number(e.target.value),
+                            }))
+                          }
+                          style={{ width: '100%' }}
+                        >
+                          <option value="">—</option>
+                          {techniciens?.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          )) ?? null}
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          type="date"
+                          value={unposDebugMap[ligne.id] || toYmd(new Date())}
+                          onChange={(e) =>
+                            setUnposDebugMap((m) => ({
+                              ...m,
+                              [ligne.id]: e.target.value,
+                            }))
+                          }
+                          style={{ width: '100%' }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="date"
+                          value={unposFinMap[ligne.id] || toYmd(new Date())}
+                          onChange={(e) =>
+                            setUnposFinMap((m) => ({
+                              ...m,
+                              [ligne.id]: e.target.value,
+                            }))
+                          }
+                          style={{ width: '100%' }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          value={unposNotesMap[ligne.id] || ''}
+                          onChange={(e) =>
+                            setUnposNotesMap((m) => ({
+                              ...m,
+                              [ligne.id]: e.target.value,
+                            }))
+                          }
+                          style={{ width: '100%' }}
+                          placeholder="Notes"
+                        />
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="button button--secondary"
+                          disabled={
+                            createUnposMut.isPending ||
+                            unposUserIdMap[ligne.id] === '' ||
+                            unposUserIdMap[ligne.id] === undefined
+                          }
+                          onClick={() => createUnposMut.mutate(ligne.id)}
+                        >
+                          Créer
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {createUnposMut.isError && (
+            <p className="error" style={{ marginTop: '0.75rem' }}>
+              {(createUnposMut.error as Error).message}
+            </p>
+          )}
+        </section>
+      )}
+
       <div
         className="table-wrap"
         style={{ marginBottom: '1.25rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end' }}
@@ -235,76 +421,76 @@ export default function PlanningTechniciensPage() {
               })}
             </div>
           </section>
-        <div className="table-wrap" style={{ marginBottom: '2rem' }}>
-          <table className="data-table data-table--compact" style={{ width: '100%' }}>
-            <thead>
-              <tr>
-                <th>Période</th>
-                <th>Technicien</th>
-                <th>BC / ligne</th>
-                <th>Client / dossier</th>
-                {lab && <th>Actions</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {affectations.length === 0 && (
+          <div className="table-wrap" style={{ marginBottom: '2rem' }}>
+            <table className="data-table data-table--compact" style={{ width: '100%' }}>
+              <thead>
                 <tr>
-                  <td colSpan={lab ? 5 : 4} className="text-muted">
-                    Aucune affectation sur cette période.
-                  </td>
+                  <th>Période</th>
+                  <th>Technicien</th>
+                  <th>BC / ligne</th>
+                  <th>Client / dossier</th>
+                  {lab && <th>Actions</th>}
                 </tr>
-              )}
-              {affectations.map((a) => {
-                const ligne = a.bon_commande_ligne
-                const bc = ligne?.bon_commande
-                return (
-                  <tr key={a.id}>
-                    <td>
-                      {String(a.date_debut).slice(0, 10)} → {String(a.date_fin).slice(0, 10)}
+              </thead>
+              <tbody>
+                {affectations.length === 0 && (
+                  <tr>
+                    <td colSpan={lab ? 5 : 4} className="text-muted">
+                      Aucune affectation sur cette période.
                     </td>
-                    <td>{a.user?.name ?? `Utilisateur #${a.user_id}`}</td>
-                    <td>
-                      {bc && (
-                        <>
-                          <Link to={`/bons-commande/${bc.id}`} className="link-inline">
-                            {bc.numero}
-                          </Link>
-                          {ligne ? ` — ${ligne.libelle}` : ''}
-                        </>
-                      )}
-                      {!bc && '—'}
-                    </td>
-                    <td>
-                      {bc && (
-                        <>
-                          {bc.client?.name ?? '—'} /{' '}
-                          <Link to={`/dossiers/${bc.dossier_id}/bc-bl`} className="link-inline">
-                            Dossier #{bc.dossier_id}
-                          </Link>
-                        </>
-                      )}
-                    </td>
-                    {lab && (
-                      <td>
-                        <button
-                          type="button"
-                          className="button button--secondary"
-                          onClick={() => {
-                            if (window.confirm("Supprimer cette affectation du planning ?")) {
-                              deleteMut.mutate(a.id)
-                            }
-                          }}
-                        >
-                          Supprimer
-                        </button>
-                      </td>
-                    )}
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                )}
+                {affectations.map((a) => {
+                  const ligne = a.bon_commande_ligne
+                  const bc = ligne?.bon_commande
+                  return (
+                    <tr key={a.id}>
+                      <td>
+                        {String(a.date_debut).slice(0, 10)} → {String(a.date_fin).slice(0, 10)}
+                      </td>
+                      <td>{a.user?.name ?? `Utilisateur #${a.user_id}`}</td>
+                      <td>
+                        {bc && (
+                          <>
+                            <Link to={`/bons-commande/${bc.id}`} className="link-inline">
+                              {bc.numero}
+                            </Link>
+                            {ligne ? ` — ${ligne.libelle}` : ''}
+                          </>
+                        )}
+                        {!bc && '—'}
+                      </td>
+                      <td>
+                        {bc && (
+                          <>
+                            {bc.client?.name ?? '—'} /{' '}
+                            <Link to={`/dossiers/${bc.dossier_id}/bc-bl`} className="link-inline">
+                              Dossier #{bc.dossier_id}
+                            </Link>
+                          </>
+                        )}
+                      </td>
+                      {lab && (
+                        <td>
+                          <button
+                            type="button"
+                            className="button button--secondary"
+                            onClick={() => {
+                              if (window.confirm("Supprimer cette affectation du planning ?")) {
+                                deleteMut.mutate(a.id)
+                              }
+                            }}
+                          >
+                            Supprimer
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 
@@ -314,8 +500,8 @@ export default function PlanningTechniciensPage() {
             Nouvelle affectation
           </h2>
           <p className="text-muted" style={{ fontSize: '0.9rem' }}>
-            Choisissez un bon de commande, une ligne de produit, puis le technicien et les dates d’intervention. Les
-            dates d’affectation doivent rester dans la période prévue sur la ligne (défini sur la fiche BC).
+            Choisissez un bon de commande, une ligne de produit, puis le technicien et les dates d'intervention. Les
+            dates d'affectation doivent rester dans la période prévue sur la ligne (défini sur la fiche BC).
           </p>
           <div style={{ display: 'grid', gap: '0.75rem', marginTop: '0.75rem' }}>
             <label>
@@ -408,7 +594,7 @@ export default function PlanningTechniciensPage() {
                 }
                 onClick={() => createMut.mutate()}
               >
-                Créer l’affectation
+                Créer l'affectation
               </button>
             </div>
             {createMut.isError && <p className="error">{(createMut.error as Error).message}</p>}
@@ -417,7 +603,7 @@ export default function PlanningTechniciensPage() {
       )}
 
       <p className="text-muted" style={{ marginTop: '1.5rem' }}>
-        Navigation <Link to="/terrain">Chantier</Link> — les périodes par produit se saisissent sur la fiche d’un{' '}
+        Navigation <Link to="/terrain">Chantier</Link> — les périodes par produit se saisissent sur la fiche d'un{' '}
         <Link to="/bons-commande">bon de commande</Link> (lignes).
       </p>
     </ModuleEntityShell>

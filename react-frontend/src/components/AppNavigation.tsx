@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { brandingApi } from '../api/client'
+import GlobalSearch from './GlobalSearch'
 
 type SubItem = { to: string; label: string; labOnly?: boolean }
 
@@ -325,6 +326,7 @@ export default function AppNavigation() {
           </nav>
 
           <div className="nav-user">
+            <GlobalSearch />
             <NavLink
               to="/aide"
               className={({ isActive }) => `nav-aide-link${isActive ? ' nav-aide-link--active' : ''}`}

@@ -15,7 +15,14 @@ export default function BonsLivraisonListPage() {
   const { data: confirmedBc = [] } = useQuery({
     queryKey: ['bons-commande', 'bl-source', 'confirme'],
     queryFn: () => bonsCommandeApi.list({ statut: 'confirme' }),
+    staleTime: 60_000,
   })
+  const { data: enCoursBc = [] } = useQuery({
+    queryKey: ['bons-commande', 'bl-source', 'en_cours'],
+    queryFn: () => bonsCommandeApi.list({ statut: 'en_cours' }),
+    staleTime: 60_000,
+  })
+  const allBcForBl = [...confirmedBc, ...enCoursBc]
   const createMut = useMutation({
     mutationFn: () => bonsCommandeApi.transformerBl(Number(bcId)),
     onSuccess: (bl) => {
@@ -47,8 +54,8 @@ export default function BonsLivraisonListPage() {
         <h2 className="h2" style={{ fontSize: '1.05rem' }}>Créer depuis un bon de commande</h2>
         <div className="crud-actions">
           <select value={bcId} onChange={(e) => setBcId(e.target.value)} style={{ minWidth: 320 }}>
-            <option value="">Choisir un BC confirmé…</option>
-            {confirmedBc.map((bc) => (
+            <option value="">Choisir un BC confirmé / en cours…</option>
+            {allBcForBl.map((bc) => (
               <option key={bc.id} value={bc.id}>
                 {bc.numero} — {bc.client?.name ?? `Client #${bc.client_id}`} — dossier #{bc.dossier_id}
               </option>
@@ -66,6 +73,7 @@ export default function BonsLivraisonListPage() {
           <select value={statut} onChange={(e) => setStatut(e.target.value)} style={{ marginLeft: '0.35rem' }}>
             <option value="">Tous</option>
             <option value="brouillon">Brouillon</option>
+            <option value="en_cours">En cours</option>
             <option value="livre">Livré</option>
             <option value="signe">Signé</option>
           </select>

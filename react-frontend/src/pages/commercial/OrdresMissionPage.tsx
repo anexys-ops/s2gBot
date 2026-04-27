@@ -154,6 +154,9 @@ export default function OrdresMissionPage() {
                   <td>{mission.mission_status ?? '—'}</td>
                   <td>
                     <div className="crud-actions">
+                      <Link to={`/ordres-mission/${mission.id}`} className="link-inline">
+                        Voir / Imprimer
+                      </Link>
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEdit(mission)}>
                         Modifier
                       </button>

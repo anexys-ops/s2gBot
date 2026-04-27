@@ -18,6 +18,7 @@ export default function BonCommandeFichePage() {
   const [notes, setNotes] = useState('')
   const [contactId, setContactId] = useState<number | null>(null)
   const [ligneEdits, setLigneEdits] = useState<Record<number, { debut: string; fin: string }>>({})
+  const [ligneExtraEdits, setLigneExtraEdits] = useState<Record<number, { technicien_id: number | null; date_livraison: string; notes_ligne: string }>>({})
 
   const { data: bc, isLoading, error } = useQuery({
     queryKey: ['bon-commande', bcId],
@@ -34,17 +35,25 @@ export default function BonCommandeFichePage() {
   useEffect(() => {
     if (!bc?.lignes?.length) {
       setLigneEdits({})
+      setLigneExtraEdits({})
       return
     }
     const next: Record<number, { debut: string; fin: string }> = {}
+    const nextExtra: Record<number, { technicien_id: number | null; date_livraison: string; notes_ligne: string }> = {}
     for (const l of bc.lignes) {
       const dl = l as BonCommandeLigne
       next[l.id] = {
         debut: dl.date_debut_prevue ? String(dl.date_debut_prevue).slice(0, 10) : '',
         fin: dl.date_fin_prevue ? String(dl.date_fin_prevue).slice(0, 10) : '',
       }
+      nextExtra[l.id] = {
+        technicien_id: dl.technicien_id ?? null,
+        date_livraison: dl.date_livraison ? String(dl.date_livraison).slice(0, 10) : '',
+        notes_ligne: dl.notes_ligne ?? '',
+      }
     }
     setLigneEdits(next)
+    setLigneExtraEdits(nextExtra)
   }, [bc?.id, bc?.lignes])
 
   const mutUpdate = useMutation({
@@ -71,6 +80,23 @@ export default function BonCommandeFichePage() {
         await bonsCommandeApi.updateLigne(bcId, l.id, {
           date_debut_prevue: e.debut || null,
           date_fin_prevue: e.fin || null,
+        })
+      }
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
+    },
+  })
+  const mutLignesExtra = useMutation({
+    mutationFn: async () => {
+      if (!bc?.lignes?.length) return
+      for (const l of bc.lignes) {
+        const e = ligneExtraEdits[l.id]
+        if (!e) continue
+        await bonsCommandeApi.updateLigne(bcId, l.id, {
+          technicien_id: e.technicien_id,
+          date_livraison: e.date_livraison || null,
+          notes_ligne: e.notes_ligne || null,
         })
       }
     },
@@ -160,7 +186,7 @@ export default function BonCommandeFichePage() {
             </tr>
             {bc.quote_id && (
               <tr>
-                <th>Devis d’origine</th>
+                <th>Devis d'origine</th>
                 <td>
                   <Link to={`/devis/${bc.quote_id}/editer`} className="link-inline">
                     Devis #{bc.quote_id}
@@ -172,8 +198,8 @@ export default function BonCommandeFichePage() {
               <th>Contact client</th>
               <td>
                 {bc.clientContact
-                  ? `${bc.clientContact.prenom} ${bc.clientContact.nom}${bc.clientContact.poste ? ` — ${bc.clientContact.poste}` : ‘’}`
-                  : ‘—‘}
+                  ? `${bc.clientContact.prenom} ${bc.clientContact.nom}${bc.clientContact.poste ? ` — ${bc.clientContact.poste}` : ''}`
+                  : '—'}
               </td>
             </tr>
           </tbody>
@@ -181,7 +207,7 @@ export default function BonCommandeFichePage() {
       </div>
 
       {lab && (
-        <div className="card" style={{ marginBottom: ‘1.25rem’ }}>
+        <div className="card" style={{ marginBottom: '1.25rem' }}>
           <ClientContactPicker
             clientId={bc.client_id}
             value={contactId}
@@ -189,7 +215,7 @@ export default function BonCommandeFichePage() {
             label="Contact commercial (BC)"
             contactType="commercial"
           />
-          <div style={{ marginTop: ‘0.5rem’ }}>
+          <div style={{ marginTop: '0.5rem' }}>
             <button className="btn btn-secondary btn-sm" onClick={() => mutUpdate.mutate()} disabled={mutUpdate.isPending}>
               Enregistrer le contact
             </button>
@@ -214,6 +240,9 @@ export default function BonCommandeFichePage() {
                   <>
                     <th>Début terrain (prévu)</th>
                     <th>Fin terrain (prévu)</th>
+                    <th>Technicien</th>
+                    <th>Date livraison</th>
+                    <th>Notes ligne</th>
                   </>
                 )}
               </tr>
@@ -251,6 +280,42 @@ export default function BonCommandeFichePage() {
                           }
                         />
                       </td>
+                      <td>
+                        <input
+                          type="number"
+                          value={ligneExtraEdits[l.id]?.technicien_id ?? ''}
+                          onChange={(e) =>
+                            setLigneExtraEdits((s) => ({
+                              ...s,
+                              [l.id]: { ...s[l.id], technicien_id: e.target.value ? Number(e.target.value) : null },
+                            }))
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="date"
+                          value={ligneExtraEdits[l.id]?.date_livraison ?? ''}
+                          onChange={(e) =>
+                            setLigneExtraEdits((s) => ({
+                              ...s,
+                              [l.id]: { ...s[l.id], date_livraison: e.target.value },
+                            }))
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          value={ligneExtraEdits[l.id]?.notes_ligne ?? ''}
+                          onChange={(e) =>
+                            setLigneExtraEdits((s) => ({
+                              ...s,
+                              [l.id]: { ...s[l.id], notes_ligne: e.target.value },
+                            }))
+                          }
+                        />
+                      </td>
                     </>
                   )}
                 </tr>
@@ -273,6 +338,24 @@ export default function BonCommandeFichePage() {
           {mutLignesPeriodes.isError && (
             <p className="error" style={{ marginTop: '0.5rem' }}>
               {(mutLignesPeriodes.error as Error)?.message}
+            </p>
+          )}
+        </div>
+      )}
+
+      {lab && !!bc.lignes?.length && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={() => mutLignesExtra.mutate()}
+            disabled={mutLignesExtra.isPending}
+          >
+            Enregistrer (Technicien, Date livraison, Notes)
+          </button>
+          {mutLignesExtra.isError && (
+            <p className="error" style={{ marginTop: '0.5rem' }}>
+              {(mutLignesExtra.error as Error)?.message}
             </p>
           )}
         </div>

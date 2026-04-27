@@ -71,6 +71,8 @@ Route::get('/register/agencies', [AuthController::class, 'registerAgencyList']);
 Route::get('/version', [VersionController::class, 'show']);
 Route::get('/openapi.json', [OpenApiController::class, 'show']);
 
+use App\Http\Controllers\Api\GlobalSearchController;
+use App\Http\Controllers\Api\TagController;
 Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('v1')->group(function () {
         Route::get('catalogue/familles', [FamilleArticleController::class, 'index']);
@@ -298,6 +300,10 @@ Route::middleware('auth:sanctum')->group(function () {
             ->whereNumber('id');
     });
 });
+Route::get('global-search', [GlobalSearchController::class, 'search']);
+        Route::get('tags', [TagController::class, 'index']);
+        Route::post('tags/sync', [TagController::class, 'sync']);
+        Route::get('tags/entity', [TagController::class, 'forEntity']);
 
 Route::middleware('signed')->group(function () {
     Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'signedPdf'])

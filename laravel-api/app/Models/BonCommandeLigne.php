@@ -24,6 +24,9 @@ class BonCommandeLigne extends Model
         'montant_ht',
         'date_debut_prevue',
         'date_fin_prevue',
+        'technicien_id',
+        'date_livraison',
+        'notes_ligne',
     ];
 
     protected function casts(): array
@@ -31,6 +34,7 @@ class BonCommandeLigne extends Model
         return [
             'date_debut_prevue' => 'date',
             'date_fin_prevue' => 'date',
+            'date_livraison' => 'date',
         ];
     }
 
@@ -42,6 +46,11 @@ class BonCommandeLigne extends Model
     public function article(): BelongsTo
     {
         return $this->belongsTo(Article::class, 'ref_article_id');
+    }
+
+    public function technicien(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'technicien_id');
     }
 
     public function planningAffectations(): HasMany

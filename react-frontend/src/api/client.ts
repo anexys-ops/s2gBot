@@ -642,6 +642,10 @@ export type BonCommandeLigne = {
   ref_article_id?: number | null
   date_debut_prevue?: string | null
   date_fin_prevue?: string | null
+  technicien_id?: number | null
+  date_livraison?: string | null
+  notes_ligne?: string | null
+  technicien?: { id: number; name: string } | null
   planning_affectations?: BcLignePlanningAffectation[]
 }
 
@@ -736,7 +740,7 @@ export const bonsCommandeApi = {
   updateLigne: (
     bcId: number,
     ligneId: number,
-    body: { date_debut_prevue?: string | null; date_fin_prevue?: string | null }
+    body: { date_debut_prevue?: string | null; date_fin_prevue?: string | null; technicien_id?: number | null; date_livraison?: string | null; notes_ligne?: string | null }
   ) =>
     api<BonCommandeLigne>(`/v1/bons-commande/${bcId}/lignes/${ligneId}`, { method: 'PUT', body: JSON.stringify(body) }),
 }
@@ -794,6 +798,22 @@ export const bonsLivraisonApi = {
   ) => api<BonLivraison>(`/v1/bons-livraison/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   valider: (id: number) => api<BonLivraison>(`/v1/bons-livraison/${id}/valider`, { method: 'POST' }),
   delete: (id: number) => api<null>(`/v1/bons-livraison/${id}`, { method: 'DELETE' }),
+}
+
+export type GlobalSearchResult = { id: number; type: string; label: string; sub: string; url: string }
+
+export const globalSearchApi = {
+  search: (q: string): Promise<{ results: GlobalSearchResult[] }> =>
+    api<{ results: GlobalSearchResult[] }>(`/v1/global-search?q=${encodeURIComponent(q)}`),
+}
+
+export const tagsApi = {
+  list: () => api<Array<{ id: number; name: string; color?: string }>>('/v1/tags'),
+  create: (body: { name: string; color?: string }) =>
+    api<{ id: number; name: string; color?: string }>('/v1/tags', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: number, body: { name?: string; color?: string }) =>
+    api<{ id: number; name: string; color?: string }>(`/v1/tags/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api<null>(`/v1/tags/${id}`, { method: 'DELETE' }),
 }
 
 export const devisV1Api = {

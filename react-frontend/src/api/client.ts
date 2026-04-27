@@ -573,6 +573,7 @@ export type DossierCreateInput = {
   notes?: string | null
   reference?: string | null
   contacts?: DossierContactInput[]
+  contact_id?: number | null
 }
 
 export interface DossierContactInput {

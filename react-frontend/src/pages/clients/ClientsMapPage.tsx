@@ -17,7 +17,7 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import 'leaflet/dist/leaflet.css'
-import { clientsApi, adminUsersApi, type Client } from '../../api/client'
+import { clientsApi, type Client } from '../../api/client'
 
 const OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
 

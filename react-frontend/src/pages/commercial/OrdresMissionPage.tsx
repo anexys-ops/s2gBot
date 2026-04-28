@@ -1,258 +1,196 @@
+/**
+ * OrdresMissionPage
+ *
+ * Tableau de bord des ordres de mission (labo / technicien / ingénieur).
+ * Génération depuis un bon de commande.
+ */
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { bonsCommandeApi, dossiersApi, missionsApi, type Mission } from '../../api/client'
-import Modal from '../../components/Modal'
+import { bonsCommandeApi, ordresMissionApi } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 
-type MissionForm = {
-  source_type: 'dossier' | 'bon_commande'
-  source_id: number | ''
-  reference: string
-  title: string
-  mission_status: string
-  notes: string
+const TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
+  labo:       { label: 'Laboratoire', color: '#10b981', bg: '#d1fae5' },
+  technicien: { label: 'Techniciens', color: '#f59e0b', bg: '#fef3c7' },
+  ingenieur:  { label: 'Ingénieurs',  color: '#3b82f6', bg: '#dbeafe' },
 }
 
-const emptyForm: MissionForm = {
-  source_type: 'dossier',
-  source_id: '',
-  reference: '',
-  title: '',
-  mission_status: 'g1',
-  notes: '',
+const STATUT_META: Record<string, string> = {
+  brouillon: 'Brouillon',
+  planifie:  'Planifié',
+  en_cours:  'En cours',
+  termine:   'Terminé',
+  annule:    'Annulé',
+}
+
+function TypeBadge({ type }: { type: string }) {
+  const meta = TYPE_META[type] ?? { label: type, color: '#6b7280', bg: '#f3f4f6' }
+  return (
+    <span style={{ padding: '0.15rem 0.5rem', borderRadius: 12, fontSize: '0.78rem', fontWeight: 600, color: meta.color, background: meta.bg }}>
+      {meta.label}
+    </span>
+  )
 }
 
 export default function OrdresMissionPage() {
   const qc = useQueryClient()
-  const [modal, setModal] = useState<'create' | 'edit' | null>(null)
-  const [editing, setEditing] = useState<Mission | null>(null)
-  const [form, setForm] = useState<MissionForm>(emptyForm)
+  const [typeFilter, setTypeFilter] = useState('')
+  const [statutFilter, setStatutFilter] = useState('')
+  const [generateBcId, setGenerateBcId] = useState<number | ''>('')
+  const [showGeneratePanel, setShowGeneratePanel] = useState(false)
 
-  const { data: missions = [], isLoading, error } = useQuery({
-    queryKey: ['missions', 'all'],
-    queryFn: () => missionsApi.listAll(),
+  const { data: ordres = [], isLoading } = useQuery({
+    queryKey: ['ordres-mission', typeFilter, statutFilter],
+    queryFn: () => ordresMissionApi.list({ type: typeFilter || undefined, statut: statutFilter || undefined }),
+    staleTime: 30_000,
   })
-  const { data: dossiers = [] } = useQuery({
-    queryKey: ['dossiers', 'mission-source'],
-    queryFn: () => dossiersApi.list(),
-  })
+
   const { data: bonsCommande = [] } = useQuery({
-    queryKey: ['bons-commande', 'mission-source'],
-    queryFn: () => bonsCommandeApi.list(),
+    queryKey: ['bons-commande', 'for-om'],
+    queryFn: () => bonsCommandeApi.list({ statut: 'confirme' }),
+    enabled: showGeneratePanel,
+    staleTime: 60_000,
   })
 
-  const createMut = useMutation({
+  const generateMut = useMutation({
     mutationFn: () => {
-      if (!form.source_id) throw new Error('Sélectionnez une source.')
-      return missionsApi.createGlobal({
-        source_type: form.source_type,
-        source_id: form.source_id,
-        reference: form.reference || undefined,
-        title: form.title || undefined,
-        mission_status: form.mission_status,
-        notes: form.notes || undefined,
-      })
+      if (!generateBcId) throw new Error('Sélectionnez un bon de commande.')
+      return ordresMissionApi.generateFromBC(generateBcId as number)
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['missions'] })
-      setModal(null)
-      setForm(emptyForm)
+    onSuccess: (created) => {
+      void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
+      setShowGeneratePanel(false)
+      setGenerateBcId('')
+      alert(`${created.length} ordre(s) de mission générés.`)
     },
   })
-  const updateMut = useMutation({
-    mutationFn: () => {
-      if (!editing) throw new Error('Ordre de mission introuvable.')
-      return missionsApi.update(editing.id, {
-        reference: form.reference || undefined,
-        title: form.title || undefined,
-        mission_status: form.mission_status,
-        notes: form.notes || undefined,
-      })
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['missions'] })
-      setModal(null)
-      setEditing(null)
-      setForm(emptyForm)
-    },
-  })
+
   const deleteMut = useMutation({
-    mutationFn: (id: number) => missionsApi.delete(id),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['missions'] }),
+    mutationFn: (id: number) => ordresMissionApi.delete(id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['ordres-mission'] }),
   })
 
-  const openCreate = () => {
-    setEditing(null)
-    setForm(emptyForm)
-    setModal('create')
-  }
-
-  const openEdit = (mission: Mission) => {
-    setEditing(mission)
-    setForm({
-      source_type: mission.bon_commande_id ? 'bon_commande' : 'dossier',
-      source_id: mission.bon_commande_id ?? mission.dossier_id ?? '',
-      reference: mission.reference ?? '',
-      title: mission.title ?? '',
-      mission_status: mission.mission_status ?? 'g1',
-      notes: mission.notes ?? '',
-    })
-    setModal('edit')
-  }
+  const stats = Object.keys(TYPE_META).map((type) => ({
+    type,
+    total: ordres.filter((o) => o.type === type).length,
+    en_cours: ordres.filter((o) => o.type === type && o.statut === 'en_cours').length,
+  }))
 
   return (
     <ModuleEntityShell
-      shellClassName="module-shell--crm"
-      breadcrumbs={[
-        { label: 'Accueil', to: '/' },
-        { label: 'Commercial', to: '/crm' },
-        { label: 'Ordres de mission' },
-      ]}
-      moduleBarLabel="Commercial"
+      breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Ordres de mission' }]}
+      moduleBarLabel="Commercial — Ordres de mission"
       title="Ordres de mission"
-      subtitle="Création depuis un dossier ou un bon de commande."
+      subtitle={`${ordres.length} ordre(s) affiché(s)`}
       actions={
-        <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
-          Nouvel ordre de mission
+        <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowGeneratePanel((v) => !v)}>
+          ⚡ Générer depuis BC
         </button>
       }
     >
-      {isLoading && <p className="text-muted">Chargement…</p>}
-      {error && <p className="error">{(error as Error).message}</p>}
-      {!isLoading && !missions.length && <p className="text-muted">Aucun ordre de mission.</p>}
-      {!!missions.length && (
-        <div className="table-wrap">
-          <table className="data-table data-table--compact" style={{ width: '100%' }}>
-            <thead>
-              <tr>
-                <th>Référence</th>
-                <th>Titre</th>
-                <th>Source</th>
-                <th>Chantier</th>
-                <th>Statut</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {missions.map((mission) => (
-                <tr key={mission.id}>
-                  <td><code>{mission.reference}</code></td>
-                  <td>{mission.title || '—'}</td>
-                  <td>
-                    {mission.bon_commande_id ? (
-                      <Link to={`/bons-commande/${mission.bon_commande_id}`} className="link-inline">
-                        BC #{mission.bon_commande_id}
-                      </Link>
-                    ) : mission.dossier_id ? (
-                      <Link to={`/dossiers/${mission.dossier_id}`} className="link-inline">
-                        Dossier #{mission.dossier_id}
-                      </Link>
-                    ) : '—'}
-                  </td>
-                  <td>{mission.site?.name ?? (mission.site_id ? `Chantier #${mission.site_id}` : '—')}</td>
-                  <td>{mission.mission_status ?? '—'}</td>
-                  <td>
-                    <div className="crud-actions">
-                      <Link to={`/ordres-mission/${mission.id}`} className="link-inline">
-                        Voir / Imprimer
-                      </Link>
-                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEdit(mission)}>
-                        Modifier
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm btn-danger-outline"
-                        onClick={() => {
-                          if (window.confirm(`Supprimer l’ordre de mission ${mission.reference} ?`)) deleteMut.mutate(mission.id)
-                        }}
-                      >
-                        Supprimer
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Stats */}
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        {stats.map(({ type, total, en_cours }) => {
+          const meta = TYPE_META[type]
+          return (
+            <div
+              key={type}
+              style={{ flex: '1 1 150px', padding: '0.75rem 1rem', borderRadius: 8, background: meta.bg, cursor: 'pointer', border: typeFilter === type ? `2px solid ${meta.color}` : '2px solid transparent' }}
+              onClick={() => setTypeFilter(typeFilter === type ? '' : type)}
+            >
+              <div style={{ fontWeight: 700, color: meta.color, fontSize: '1.4rem' }}>{total}</div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{meta.label}</div>
+              {en_cours > 0 && <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{en_cours} en cours</div>}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Génération depuis BC */}
+      {showGeneratePanel && (
+        <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
+          <h4 style={{ margin: '0 0 0.5rem' }}>Générer depuis un bon de commande</h4>
+          <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+            Les OMs labo / technicien / ingénieur seront créés selon les actions définies sur chaque article du BC.
+          </p>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <label style={{ flex: '1 1 280px' }}>
+              Bon de commande (confirmé)
+              <select value={generateBcId} onChange={(e) => setGenerateBcId(e.target.value ? Number(e.target.value) : '')}>
+                <option value="">Choisir…</option>
+                {bonsCommande.map((bc) => (
+                  <option key={bc.id} value={bc.id}>{bc.numero} — {bc.client?.name ?? `#${bc.client_id}`}</option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className="btn btn-primary" disabled={!generateBcId || generateMut.isPending} onClick={() => generateMut.mutate()}>
+              {generateMut.isPending ? 'Génération…' : 'Générer les OMs'}
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowGeneratePanel(false)}>Annuler</button>
+          </div>
+          {generateMut.isError && <p className="error" style={{ marginTop: '0.5rem' }}>{(generateMut.error as Error).message}</p>}
         </div>
       )}
 
-      {modal && (
-        <Modal title={modal === 'create' ? 'Nouvel ordre de mission' : 'Modifier l’ordre de mission'} onClose={() => setModal(null)}>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (modal === 'create') createMut.mutate()
-              else updateMut.mutate()
-            }}
-          >
-            <div className="quote-form-grid">
-              <label>
-                Source
-                <select
-                  value={form.source_type}
-                  onChange={(e) => setForm((f) => ({ ...f, source_type: e.target.value as MissionForm['source_type'], source_id: '' }))}
-                  disabled={modal === 'edit'}
-                >
-                  <option value="dossier">Dossier</option>
-                  <option value="bon_commande">Bon de commande</option>
-                </select>
-              </label>
-              <label>
-                {form.source_type === 'dossier' ? 'Dossier' : 'Bon de commande'}
-                <select
-                  value={form.source_id === '' ? '' : String(form.source_id)}
-                  onChange={(e) => setForm((f) => ({ ...f, source_id: e.target.value ? Number(e.target.value) : '' }))}
-                  disabled={modal === 'edit'}
-                  required
-                >
-                  <option value="">Choisir…</option>
-                  {form.source_type === 'dossier'
-                    ? dossiers.map((dossier) => (
-                        <option key={dossier.id} value={dossier.id}>
-                          {dossier.reference} — {dossier.titre}
-                        </option>
-                      ))
-                    : bonsCommande.map((bc) => (
-                        <option key={bc.id} value={bc.id}>
-                          {bc.numero} — dossier #{bc.dossier_id}
-                        </option>
-                      ))}
-                </select>
-              </label>
-              <label>
-                Référence
-                <input value={form.reference} onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))} placeholder="Auto si vide" />
-              </label>
-              <label>
-                Titre
-                <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
-              </label>
-              <label>
-                Statut
-                <select value={form.mission_status} onChange={(e) => setForm((f) => ({ ...f, mission_status: e.target.value }))}>
-                  {['g1', 'g2', 'g3', 'g4', 'g5'].map((status) => <option key={status} value={status}>{status.toUpperCase()}</option>)}
-                </select>
-              </label>
-            </div>
-            <label>
-              Notes
-              <textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={3} />
-            </label>
-            {(createMut.isError || updateMut.isError) && (
-              <p className="error">{((createMut.error ?? updateMut.error) as Error).message}</p>
-            )}
-            <div className="crud-actions" style={{ marginTop: '1rem' }}>
-              <button type="submit" className="btn btn-primary" disabled={createMut.isPending || updateMut.isPending}>
-                Enregistrer
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>
-                Annuler
-              </button>
-            </div>
-          </form>
-        </Modal>
+      {/* Filtres */}
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={{ flex: '1 1 160px', maxWidth: 200 }}>
+          <option value="">— Tous types —</option>
+          {Object.entries(TYPE_META).map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
+        </select>
+        <select value={statutFilter} onChange={(e) => setStatutFilter(e.target.value)} style={{ flex: '1 1 160px', maxWidth: 200 }}>
+          <option value="">— Tous statuts —</option>
+          {Object.entries(STATUT_META).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        <Link to="/ordres-mission/planning" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }}>
+          📅 Planning
+        </Link>
+      </div>
+
+      {isLoading && <p>Chargement…</p>}
+      {!isLoading && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="table-wrap">
+            <table className="data-table data-table--compact">
+              <thead>
+                <tr>
+                  <th>Numéro</th>
+                  <th>Type</th>
+                  <th>Client</th>
+                  <th>BC</th>
+                  <th>Statut</th>
+                  <th>Date prévue</th>
+                  <th>Responsable</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ordres.map((om) => (
+                  <tr key={om.id}>
+                    <td><Link to={`/ordres-mission/${om.id}`} className="link-inline" style={{ fontWeight: 600 }}>{om.numero}</Link></td>
+                    <td><TypeBadge type={om.type} /></td>
+                    <td>{om.client?.name ?? `#${om.client_id}`}</td>
+                    <td>{om.bonCommande && <Link to={`/bons-commande/${om.bon_commande_id}`} className="link-inline">{om.bonCommande.numero}</Link>}</td>
+                    <td><span className="badge">{STATUT_META[om.statut] ?? om.statut}</span></td>
+                    <td>{om.date_prevue ? new Date(om.date_prevue).toLocaleDateString('fr-FR') : '—'}</td>
+                    <td>{om.responsable?.name ?? '—'}</td>
+                    <td>
+                      <div className="crud-actions">
+                        <Link to={`/ordres-mission/${om.id}`} className="btn btn-secondary btn-sm">Ouvrir</Link>
+                        <button type="button" className="btn btn-secondary btn-sm btn-danger-outline"
+                          onClick={() => { if (window.confirm(`Supprimer ${om.numero} ?`)) deleteMut.mutate(om.id) }}>
+                          Supprimer
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {ordres.length === 0 && <p style={{ padding: '1rem' }} className="text-muted">Aucun ordre de mission.</p>}
+        </div>
       )}
     </ModuleEntityShell>
   )

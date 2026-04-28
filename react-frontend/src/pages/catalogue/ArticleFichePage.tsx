@@ -6,6 +6,7 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import FicheArticle from '../../components/Catalogue/FicheArticle'
 import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
+import ArticleActionsPanel from '../../components/Catalogue/ArticleActionsPanel'
 
 function safeNum(v: unknown, fallback: number): number {
   const n = Number(v)
@@ -280,7 +281,7 @@ export default function ArticleFichePage() {
   const articleId = Number(id)
   const queryClient = useQueryClient()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
-  const [tab, setTab] = useState<'overview' | 'descriptions' | 'tables' | 'edit' | 'extrafields'>('overview')
+  const [tab, setTab] = useState<'overview' | 'descriptions' | 'tables' | 'edit' | 'actions' | 'extrafields'>('overview')
 
   const { data: article, isLoading, error } = useQuery({
     queryKey: ['catalogue-article', articleId],
@@ -354,7 +355,7 @@ export default function ArticleFichePage() {
           { id: 'overview', label: 'Fiche' },
           { id: 'descriptions', label: 'Descriptions' },
           { id: 'tables', label: 'Tables' },
-          ...(isLab ? [{ id: 'edit', label: 'Modifier' }, { id: 'extrafields', label: 'Champs personnalisés' }] : []),
+          ...(isLab ? [{ id: 'actions', label: 'Actions & matériel' }, { id: 'edit', label: 'Modifier' }, { id: 'extrafields', label: 'Champs personnalisés' }] : []),
         ].map((t) => (
           <button
             key={t.id}
@@ -371,6 +372,9 @@ export default function ArticleFichePage() {
       {tab === 'overview' && <FicheArticle article={article} section="overview" showBackLink={false} />}
       {tab === 'descriptions' && <FicheArticle article={article} section="descriptions" showBackLink={false} />}
       {tab === 'tables' && <FicheArticle article={article} section="tables" showBackLink={false} />}
+      {tab === 'actions' && isLab && (
+        <ArticleActionsPanel articleId={articleId} />
+      )}
       {tab === 'edit' && isLab && (
         <ArticleProlabEditor
           article={article}

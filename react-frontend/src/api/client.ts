@@ -2072,3 +2072,130 @@ export interface ClientCommercialOverview {
   }
   document_links: CommercialDocumentLink[]
 }
+
+// ── Ordres de mission ─────────────────────────────────────────────────────────
+
+export interface ArticleAction {
+  id: number
+  ref_article_id: number
+  type: 'technicien' | 'ingenieur' | 'labo'
+  libelle: string
+  description?: string | null
+  duree_heures: number
+  ordre: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ArticleEquipmentRequirement {
+  id: number
+  ref_article_id: number
+  equipment_id: number
+  quantite: number
+  notes?: string | null
+  equipment?: { id: number; name: string; code?: string; type?: string }
+}
+
+export interface OrdreMissionLigne {
+  id: number
+  ordre_mission_id: number
+  bon_commande_ligne_id?: number | null
+  ref_article_id?: number | null
+  article_action_id?: number | null
+  libelle: string
+  quantite: number
+  statut: 'a_faire' | 'en_cours' | 'realise' | 'annule'
+  assigned_user_id?: number | null
+  equipment_id?: number | null
+  date_prevue?: string | null
+  date_realisation?: string | null
+  duree_reelle_heures?: number | null
+  notes?: string | null
+  ordre: number
+  assignedUser?: { id: number; name: string } | null
+  equipment?: { id: number; name: string; code?: string } | null
+  articleAction?: ArticleAction | null
+  article?: { id: number; code: string; libelle: string } | null
+}
+
+export interface OrdreMission {
+  id: number
+  numero: string
+  bon_commande_id: number
+  dossier_id?: number | null
+  client_id: number
+  site_id?: number | null
+  type: 'labo' | 'technicien' | 'ingenieur'
+  statut: 'brouillon' | 'planifie' | 'en_cours' | 'termine' | 'annule'
+  date_prevue?: string | null
+  date_debut?: string | null
+  date_fin?: string | null
+  responsable_id?: number | null
+  notes?: string | null
+  created_at?: string
+  client?: { id: number; name: string } | null
+  site?: { id: number; name: string } | null
+  responsable?: { id: number; name: string } | null
+  bonCommande?: { id: number; numero: string } | null
+  lignes?: OrdreMissionLigne[]
+}
+
+export interface FraisDeplacement {
+  id: number
+  ordre_mission_id: number
+  user_id: number
+  date: string
+  lieu_depart?: string | null
+  lieu_arrivee?: string | null
+  distance_km: number
+  taux_km: number
+  montant: number
+  type_transport: string
+  notes?: string | null
+  statut: 'draft' | 'valide' | 'rembourse'
+  user?: { id: number; name: string } | null
+}
+
+export const articleActionsApi = {
+  list: (articleId: number) =>
+    api<ArticleAction[]>(`/articles/${articleId}/actions`),
+  create: (articleId: number, body: Partial<ArticleAction>) =>
+    api<ArticleAction>(`/articles/${articleId}/actions`, { method: 'POST', body: JSON.stringify(body) }),
+  update: (articleId: number, id: number, body: Partial<ArticleAction>) =>
+    api<ArticleAction>(`/articles/${articleId}/actions/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (articleId: number, id: number) =>
+    api<void>(`/articles/${articleId}/actions/${id}`, { method: 'DELETE' }),
+  equipmentList: (articleId: number) =>
+    api<ArticleEquipmentRequirement[]>(`/articles/${articleId}/equipment-requirements`),
+  equipmentAdd: (articleId: number, body: { equipment_id: number; quantite?: number; notes?: string }) =>
+    api<ArticleEquipmentRequirement>(`/articles/${articleId}/equipment-requirements`, { method: 'POST', body: JSON.stringify(body) }),
+  equipmentRemove: (articleId: number, reqId: number) =>
+    api<void>(`/articles/${articleId}/equipment-requirements/${reqId}`, { method: 'DELETE' }),
+}
+
+export const ordresMissionApi = {
+  list: (params?: { type?: string; statut?: string; bon_commande_id?: number; date_from?: string; date_to?: string }) => {
+    const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
+    return api<OrdreMission[]>(`/ordres-mission${s ? `?${s}` : ''}`)
+  },
+  get: (id: number) => api<OrdreMission>(`/ordres-mission/${id}`),
+  update: (id: number, body: Partial<OrdreMission>) =>
+    api<OrdreMission>(`/ordres-mission/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) =>
+    api<void>(`/ordres-mission/${id}`, { method: 'DELETE' }),
+  generateFromBC: (bcId: number) =>
+    api<OrdreMission[]>(`/bons-commande/${bcId}/generate-ordres-mission`, { method: 'POST' }),
+  updateLigne: (omId: number, ligneId: number, body: Partial<OrdreMissionLigne>) =>
+    api<OrdreMissionLigne>(`/ordres-mission/${omId}/lignes/${ligneId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  planning: (params?: { type?: string; from?: string; to?: string }) => {
+    const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
+    return api<OrdreMission[]>(`/ordres-mission/planning${s ? `?${s}` : ''}`)
+  },
+  fraisList: (omId: number) => api<FraisDeplacement[]>(`/ordres-mission/${omId}/frais`),
+  fraisCreate: (omId: number, body: Partial<FraisDeplacement>) =>
+    api<FraisDeplacement>(`/ordres-mission/${omId}/frais`, { method: 'POST', body: JSON.stringify(body) }),
+  fraisUpdate: (omId: number, fraisId: number, body: Partial<FraisDeplacement>) =>
+    api<FraisDeplacement>(`/ordres-mission/${omId}/frais/${fraisId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  fraisDelete: (omId: number, fraisId: number) =>
+    api<void>(`/ordres-mission/${omId}/frais/${fraisId}`, { method: 'DELETE' }),
+}

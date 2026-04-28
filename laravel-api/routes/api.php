@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\AccessGroupController;
+use App\Http\Controllers\Api\ArticleActionController;
+use App\Http\Controllers\Api\OrdreMissionController;
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AccountingExportController;
 use App\Http\Controllers\Api\ActivityLogController;
@@ -283,6 +285,28 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('module-settings/{module_key}', [ModuleSettingController::class, 'show']);
     Route::put('module-settings/{module_key}', [ModuleSettingController::class, 'update']);
+
+    // ── Actions par article & matériel requis ────────────────────────────────
+    Route::get('articles/{article}/actions', [ArticleActionController::class, 'index']);
+    Route::post('articles/{article}/actions', [ArticleActionController::class, 'store']);
+    Route::put('articles/{article}/actions/{action}', [ArticleActionController::class, 'update']);
+    Route::delete('articles/{article}/actions/{action}', [ArticleActionController::class, 'destroy']);
+    Route::get('articles/{article}/equipment-requirements', [ArticleActionController::class, 'equipmentIndex']);
+    Route::post('articles/{article}/equipment-requirements', [ArticleActionController::class, 'equipmentStore']);
+    Route::delete('articles/{article}/equipment-requirements/{requirement}', [ArticleActionController::class, 'equipmentDestroy']);
+
+    // ── Ordres de mission ────────────────────────────────────────────────────
+    Route::get('ordres-mission', [OrdreMissionController::class, 'index']);
+    Route::get('ordres-mission/planning', [OrdreMissionController::class, 'planning']);
+    Route::get('ordres-mission/{ordre_mission}', [OrdreMissionController::class, 'show']);
+    Route::put('ordres-mission/{ordre_mission}', [OrdreMissionController::class, 'update']);
+    Route::delete('ordres-mission/{ordre_mission}', [OrdreMissionController::class, 'destroy']);
+    Route::put('ordres-mission/{ordre_mission}/lignes/{ligne}', [OrdreMissionController::class, 'updateLigne']);
+    Route::get('ordres-mission/{ordre_mission}/frais', [OrdreMissionController::class, 'fraisIndex']);
+    Route::post('ordres-mission/{ordre_mission}/frais', [OrdreMissionController::class, 'fraisStore']);
+    Route::put('ordres-mission/{ordre_mission}/frais/{frais}', [OrdreMissionController::class, 'fraisUpdate']);
+    Route::delete('ordres-mission/{ordre_mission}/frais/{frais}', [OrdreMissionController::class, 'fraisDestroy']);
+    Route::post('bons-commande/{bon_commande}/generate-ordres-mission', [OrdreMissionController::class, 'generateFromBC']);
 
     // App mobile laboratoire / terrain — dossiers (mesures + photos)
     Route::prefix('mobile/dossiers')->group(function () {

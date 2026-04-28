@@ -17,6 +17,8 @@ class FamilleArticle extends Model
         'code',
         'libelle',
         'description',
+        'color',
+        'type_ressource',
         'ordre',
         'actif',
     ];

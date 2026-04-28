@@ -2,6 +2,8 @@
 
 namespace App\Models\Catalogue;
 
+use App\Models\ArticleAction;
+use App\Models\ArticleEquipmentRequirement;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -94,6 +96,16 @@ class Article extends Model
     public function scopeActif(Builder $query): Builder
     {
         return $query->where('actif', true);
+    }
+
+    public function actions(): HasMany
+    {
+        return $this->hasMany(ArticleAction::class, 'ref_article_id')->orderBy('ordre');
+    }
+
+    public function equipmentRequirements(): HasMany
+    {
+        return $this->hasMany(ArticleEquipmentRequirement::class, 'ref_article_id');
     }
 
     public function scopeOrdonne(Builder $query): Builder

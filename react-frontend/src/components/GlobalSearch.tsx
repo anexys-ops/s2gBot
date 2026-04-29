@@ -5,10 +5,14 @@ import { globalSearchApi, type GlobalSearchResult } from '../api/client'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 
 const TYPE_ICONS: Record<string, string> = {
-  client: '🏢', contact: '👤', devis: '📋', facture: '🧾', article: '📦',
+  client: '🏢', contact: '👤', site: '📍', dossier: '📁',
+  devis: '📋', facture: '🧾', article: '📦', materiel: '🛠️',
+  ordre_mission: '📝', task: '✅', ndf: '💳',
 }
 const TYPE_LABELS: Record<string, string> = {
-  client: 'Client', contact: 'Contact', devis: 'Devis', facture: 'Facture', article: 'Article',
+  client: 'Client', contact: 'Contact', site: 'Chantier', dossier: 'Dossier',
+  devis: 'Devis', facture: 'Facture', article: 'Article', materiel: 'Matériel',
+  ordre_mission: 'Ordre de mission', task: 'Tâche', ndf: 'Note de frais',
 }
 
 export default function GlobalSearch() {
@@ -96,7 +100,7 @@ export default function GlobalSearch() {
             <input
               ref={inputRef}
               type="search"
-              placeholder="Clients, devis, factures, articles…"
+              placeholder="Clients, sites, dossiers, devis, OdM, tâches, articles, matériel…"
               value={input}
               onChange={(e) => { setInput(e.target.value); setSelectedIdx(-1) }}
               onKeyDown={onKeyDown}

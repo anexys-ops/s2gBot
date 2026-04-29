@@ -138,5 +138,8 @@ class DatabaseSeeder extends Seeder
 
         /** Groupes d'accès PROLAB + rattachement agence (utilisateurs @labo.ma) — voir BDC-147. */
         $this->call(ProlabGroupsAgenciesSeeder::class);
+
+        /** v1.2.0 — LIMS géotechnique (40 essais, 20 matériels, 10 prélèvements, 4 templates). */
+        $this->call(GeotechniqueV12Seeder::class);
     }
 }

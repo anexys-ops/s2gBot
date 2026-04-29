@@ -1,5 +1,31 @@
 # Changelog — s2gBot
 
+## [1.2.0] — 2026-04-29
+
+### LIMS géotechnique — catalogue & seeders
+- **4 familles métier** géotechnique : Béton, Sol, In Situ, Chimique (couleurs + `type_ressource`)
+- **40 essais normés** seedés (10 béton, 15 sol, 10 in situ, 5 chimiques) avec normes NF/EN, prix, durée, unité
+- **20 matériels** géotechnique (presse 3000 kN, CBR/Marshall, triaxial, œdomètre, cisaillement, Proctor, tamis, étuve, balance, Casagrande, VBS, carotteuse, pressiomètre Ménard, PANDA, DPSH, CPT, gammadensimètre, plaque Westergaard…)
+- **Liens article ↔ matériel requis** automatiques (`article_equipment_requirements`)
+- **Actions standardisées par famille** (technicien / labo / ingénieur)
+- **Prélèvements démo** (10) rattachés aux commandes existantes
+
+### Formulaires dynamiques (FormTemplate ↔ DynamicForm)
+- Composant React `DynamicForm` (`src/components/forms/DynamicForm.tsx`) générant le formulaire à partir d'une définition JSON
+- Types de champs : `number`, `text` (multiline), `photo`, `file`, `coordinates` (avec capture GPS), `table`, `graph` (recharts, courbe alimentée par une table source)
+- 4 templates seedés : Compression béton 28j, Proctor (avec courbe γd/w), Densité en place (terrain), Pressiomètre Ménard (avec courbe pression/volume)
+
+### RBAC — rôles métier
+- Nouveaux rôles : `commercial`, `ingenieur`, `laborantin`, `responsable`
+- Helpers `User::isCommercial()`, `isIngenieur()`, `isLaborantin()`, `isResponsable()`, `canValidateStatus()`, `isInternal()`
+- Constante `User::ROLES_INTERNAL` listant les rôles internes laboratoire
+
+### Recherche globale — fix
+- Bug : `RefArticle` (classe inexistante) et colonne `designation` (n'existe pas) → utilise désormais `App\Models\Catalogue\Article` avec `libelle`, `code`, `code_interne`, `sku`, `normes`
+- Ajout types : sites/chantiers, matériel/équipements
+- Recherche client groupée correctement (parenthèses sur `orWhere`)
+- Devis route corrigée (`/devis/:id/editer`)
+
 ## [1.0.27] — 2026-04-28
 
 ### Familles articles & Catalogue enrichi

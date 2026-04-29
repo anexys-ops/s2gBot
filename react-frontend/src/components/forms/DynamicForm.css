@@ -1,0 +1,65 @@
+/* v1.2.0 — DynamicForm styles. Voir DynamicForm.tsx. */
+.dynform { display: flex; flex-direction: column; gap: 1rem; }
+
+.dynform-field {
+  display: flex; flex-direction: column; gap: 0.35rem;
+}
+
+.dynform-label {
+  font-weight: 600; font-size: 0.85rem;
+  color: var(--color-foreground, #111827);
+  display: flex; align-items: center; gap: 0.4rem;
+}
+
+.dynform-req { color: #dc2626; font-weight: 700; }
+
+.dynform-tag {
+  font-size: 0.65rem; font-weight: 500;
+  background: var(--color-muted-bg, #f3f4f6);
+  color: var(--color-muted, #6b7280);
+  padding: 0.05rem 0.4rem; border-radius: 999px;
+}
+
+.dynform-input {
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 0.4rem;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.9rem;
+  background: var(--color-surface, #fff);
+}
+.dynform-input:disabled { background: var(--color-muted-bg, #f9fafb); color: var(--color-muted, #6b7280); }
+.dynform-input-sm { padding: 0.3rem 0.4rem; font-size: 0.82rem; }
+
+.dynform-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+.dynform-row .dynform-input { flex: 1 1 140px; min-width: 0; }
+
+.dynform-btn {
+  border: 1px solid var(--color-border, #d1d5db);
+  background: var(--color-surface, #fff);
+  border-radius: 0.4rem; padding: 0.35rem 0.7rem;
+  font-size: 0.82rem; cursor: pointer;
+}
+.dynform-btn:hover { background: var(--color-muted-bg, #f3f4f6); }
+.dynform-btn-danger {
+  border-color: #fca5a5; color: #b91c1c; padding: 0.15rem 0.5rem;
+}
+
+.dynform-table-wrap { overflow-x: auto; }
+.dynform-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.dynform-table th, .dynform-table td {
+  border: 1px solid var(--color-border, #e5e7eb);
+  padding: 0.3rem 0.4rem; text-align: left;
+}
+.dynform-table th {
+  background: var(--color-muted-bg, #f9fafb);
+  font-weight: 600; color: var(--color-muted, #4b5563);
+}
+.dynform-empty {
+  text-align: center; color: var(--color-muted, #6b7280);
+  font-style: italic; padding: 0.6rem;
+}
+
+.dynform-preview { max-width: 220px; max-height: 220px; border-radius: 0.4rem; border: 1px solid var(--color-border, #e5e7eb); }
+.dynform-link { font-size: 0.85rem; color: #2563eb; }
+.dynform-hint { font-size: 0.78rem; color: var(--color-muted, #6b7280); }
+.dynform-error { font-size: 0.78rem; color: #b91c1c; }

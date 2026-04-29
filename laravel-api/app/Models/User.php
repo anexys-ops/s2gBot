@@ -19,6 +19,21 @@ class User extends Authenticatable
     public const ROLE_CLIENT = 'client';
     public const ROLE_SITE_CONTACT = 'site_contact';
 
+    /** v1.2.0 — rôles métier détaillés (RBAC LIMS géotechnique). */
+    public const ROLE_COMMERCIAL = 'commercial';
+    public const ROLE_INGENIEUR = 'ingenieur';
+    public const ROLE_LABORANTIN = 'laborantin';
+    public const ROLE_RESPONSABLE = 'responsable';
+
+    public const ROLES_INTERNAL = [
+        self::ROLE_LAB_ADMIN,
+        self::ROLE_LAB_TECHNICIAN,
+        self::ROLE_COMMERCIAL,
+        self::ROLE_INGENIEUR,
+        self::ROLE_LABORANTIN,
+        self::ROLE_RESPONSABLE,
+    ];
+
     protected $fillable = [
         'name',
         'email',
@@ -150,5 +165,37 @@ class User extends Authenticatable
     public function isSiteContact(): bool
     {
         return $this->role === self::ROLE_SITE_CONTACT;
+    }
+
+    public function isCommercial(): bool
+    {
+        return $this->role === self::ROLE_COMMERCIAL;
+    }
+
+    public function isIngenieur(): bool
+    {
+        return $this->role === self::ROLE_INGENIEUR;
+    }
+
+    public function isLaborantin(): bool
+    {
+        return $this->role === self::ROLE_LABORANTIN;
+    }
+
+    public function isResponsable(): bool
+    {
+        return $this->role === self::ROLE_RESPONSABLE;
+    }
+
+    /** Peut valider un changement de statut (workflow). */
+    public function canValidateStatus(): bool
+    {
+        return in_array($this->role, [self::ROLE_LAB_ADMIN, self::ROLE_RESPONSABLE], true);
+    }
+
+    /** Membre interne du laboratoire (terrain, labo, ingé, commercial, admin, responsable). */
+    public function isInternal(): bool
+    {
+        return in_array($this->role, self::ROLES_INTERNAL, true);
     }
 }

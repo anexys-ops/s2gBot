@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Catalogue\Article;
 use App\Models\Client;
 use App\Models\Dossier;
+use App\Models\Equipment;
 use App\Models\ExpenseReport;
 use App\Models\Invoice;
 use App\Models\MissionTask;
 use App\Models\OrdreMission;
 use App\Models\Quote;
+use App\Models\Site;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -26,13 +29,28 @@ class GlobalSearchController extends Controller
         $like = '%' . $q . '%';
 
         // ── Clients ────────────────────────────────────────────────────────
-        $clients = Client::where('name', 'like', $like)
-            ->orWhere('ice', 'like', $like)
-            ->orWhere('email', 'like', $like)
-            ->limit(5)->get(['id', 'name', 'city', 'email']);
-        foreach ($clients as $c) {
-            $results[] = ['type' => 'client', 'id' => $c->id, 'label' => $c->name, 'sub' => $c->city ?? $c->email ?? '', 'url' => "/clients/{$c->id}/fiche"];
-        }
+        try {
+            $clients = Client::where(function ($cq) use ($like) {
+                $cq->where('name', 'like', $like)
+                    ->orWhere('ice', 'like', $like)
+                    ->orWhere('email', 'like', $like);
+            })->limit(5)->get(['id', 'name', 'city', 'email']);
+            foreach ($clients as $c) {
+                $results[] = ['type' => 'client', 'id' => $c->id, 'label' => $c->name, 'sub' => $c->city ?? $c->email ?? '', 'url' => "/clients/{$c->id}/fiche"];
+            }
+        } catch (\Exception $e) {}
+
+        // ── Sites / Chantiers ──────────────────────────────────────────────
+        try {
+            $sites = Site::where(function ($sq) use ($like) {
+                $sq->where('name', 'like', $like)
+                    ->orWhere('city', 'like', $like)
+                    ->orWhere('address', 'like', $like);
+            })->with('client:id,name')->limit(5)->get(['id', 'name', 'city', 'client_id']);
+            foreach ($sites as $s) {
+                $results[] = ['type' => 'site', 'id' => $s->id, 'label' => $s->name, 'sub' => $s->client?->name ?? $s->city ?? '', 'url' => "/sites/{$s->id}/fiche"];
+            }
+        } catch (\Exception $e) {}
 
         // ── Contacts ───────────────────────────────────────────────────────
         try {
@@ -96,33 +114,58 @@ class GlobalSearchController extends Controller
 
         // ── Devis ──────────────────────────────────────────────────────────
         try {
-            $quotes = Quote::where('number', 'like', $like)
-                ->orWhereHas('client', fn ($cq) => $cq->where('name', 'like', $like))
-                ->with('client:id,name')
+            $quotes = Quote::where(function ($qq) use ($like) {
+                $qq->where('number', 'like', $like)
+                    ->orWhereHas('client', fn ($cq) => $cq->where('name', 'like', $like));
+            })->with('client:id,name')
                 ->limit(5)->get(['id', 'number', 'client_id', 'status']);
             foreach ($quotes as $qt) {
-                $results[] = ['type' => 'devis', 'id' => $qt->id, 'label' => $qt->number, 'sub' => $qt->client?->name ?? '', 'url' => "/devis/{$qt->id}"];
+                $results[] = ['type' => 'devis', 'id' => $qt->id, 'label' => $qt->number, 'sub' => $qt->client?->name ?? '', 'url' => "/devis/{$qt->id}/editer"];
             }
         } catch (\Exception $e) {}
 
         // ── Factures ───────────────────────────────────────────────────────
         try {
-            $invoices = Invoice::where('number', 'like', $like)
-                ->orWhereHas('client', fn ($iq) => $iq->where('name', 'like', $like))
-                ->with('client:id,name')
+            $invoices = Invoice::where(function ($iq) use ($like) {
+                $iq->where('number', 'like', $like)
+                    ->orWhereHas('client', fn ($q2) => $q2->where('name', 'like', $like));
+            })->with('client:id,name')
                 ->limit(5)->get(['id', 'number', 'client_id']);
             foreach ($invoices as $inv) {
                 $results[] = ['type' => 'facture', 'id' => $inv->id, 'label' => $inv->number, 'sub' => $inv->client?->name ?? '', 'url' => "/invoices/{$inv->id}"];
             }
         } catch (\Exception $e) {}
 
-        // ── Articles catalogue ─────────────────────────────────────────────
+        // ── Articles catalogue (essais, prestations) ───────────────────────
         try {
-            $articles = \App\Models\RefArticle::where('designation', 'like', $like)
-                ->orWhere('code', 'like', $like)
-                ->limit(5)->get(['id', 'designation', 'code']);
+            $articles = Article::where(function ($aq) use ($like) {
+                $aq->where('libelle', 'like', $like)
+                    ->orWhere('code', 'like', $like)
+                    ->orWhere('code_interne', 'like', $like)
+                    ->orWhere('sku', 'like', $like)
+                    ->orWhere('normes', 'like', $like);
+            })->with('famille:id,libelle,code')
+                ->limit(8)->get(['id', 'libelle', 'code', 'ref_famille_article_id']);
             foreach ($articles as $art) {
-                $results[] = ['type' => 'article', 'id' => $art->id, 'label' => $art->designation, 'sub' => $art->code ?? '', 'url' => "/catalogue/articles/{$art->id}"];
+                $sub = $art->code ?? '';
+                if ($art->famille) {
+                    $sub = trim($sub . ($sub ? ' · ' : '') . $art->famille->libelle);
+                }
+                $results[] = ['type' => 'article', 'id' => $art->id, 'label' => $art->libelle, 'sub' => $sub, 'url' => "/catalogue/articles/{$art->id}"];
+            }
+        } catch (\Exception $e) {}
+
+        // ── Matériel / Équipements ─────────────────────────────────────────
+        try {
+            if (class_exists(Equipment::class)) {
+                $equipments = Equipment::where(function ($eq) use ($like) {
+                    $eq->where('name', 'like', $like)
+                        ->orWhere('reference', 'like', $like)
+                        ->orWhere('serial_number', 'like', $like);
+                })->limit(5)->get(['id', 'name', 'reference', 'serial_number']);
+                foreach ($equipments as $eq) {
+                    $results[] = ['type' => 'materiel', 'id' => $eq->id, 'label' => $eq->name, 'sub' => $eq->reference ?? $eq->serial_number ?? '', 'url' => "/materiel/equipements/{$eq->id}"];
+                }
             }
         } catch (\Exception $e) {}
 

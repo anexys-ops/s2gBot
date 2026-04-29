@@ -53,6 +53,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReportFormDefinitionController;
 use App\Http\Controllers\Api\ReportPdfTemplateController;
 use App\Http\Controllers\Api\SampleController;
+use App\Http\Controllers\Api\SampleReceptionController;
 use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\TestResultController;
@@ -373,6 +374,25 @@ Route::middleware('auth:sanctum')->group(function () {
             ->where('kind', 'order|site')
             ->whereNumber('id');
     });
+    // ── v1.2.0 — Menu RÉCEPTION (échantillons FOLD) ──────────────────────────
+    Route::prefix('v1')->group(function () {
+        Route::get('samples',                 [SampleReceptionController::class, 'index']);
+        Route::get('samples/stats',           [SampleReceptionController::class, 'stats']);
+        Route::get('samples/search',          [SampleReceptionController::class, 'searchByFold']);
+        Route::get('samples/{sample}',        [SampleReceptionController::class, 'show'])->whereNumber('sample');
+        Route::post('samples',                [SampleReceptionController::class, 'store'])
+            ->middleware('role:lab_technician,receptionnaire,laborantin,ingenieur');
+        Route::put('samples/{sample}',        [SampleReceptionController::class, 'update'])->whereNumber('sample');
+        Route::patch('samples/{sample}/receive',     [SampleReceptionController::class, 'receive'])
+            ->middleware('role:receptionnaire,responsable,laborantin')->whereNumber('sample');
+        Route::patch('samples/{sample}/start-test',  [SampleReceptionController::class, 'startTest'])
+            ->middleware('role:laborantin,responsable')->whereNumber('sample');
+        Route::patch('samples/{sample}/complete',    [SampleReceptionController::class, 'complete'])
+            ->middleware('role:laborantin,responsable')->whereNumber('sample');
+        Route::patch('samples/{sample}/reject',      [SampleReceptionController::class, 'reject'])
+            ->middleware('role:responsable')->whereNumber('sample');
+    });
+
     // ── Recherche globale & tags ──────────────────────────────────────────────
     Route::get('global-search', [GlobalSearchController::class, 'search']);
     Route::get('tags', [TagController::class, 'index']);

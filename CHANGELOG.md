@@ -26,6 +26,46 @@
 - Recherche client groupée correctement (parenthèses sur `orWhere`)
 - Devis route corrigée (`/devis/:id/editer`)
 
+### Catalogue UI
+- Chips de familles colorées au-dessus du sélecteur de famille (couleur DB + tooltip type_ressource)
+
+### Page Fiches techniques `/labo/fiches`
+- Nouvelle route qui liste les `ReportFormDefinition` actives et permet de saisir une fiche en sandbox via `DynamicForm`
+- Cartes ajoutées dans le hub Labo : « Fiches techniques » et « Tâches labo »
+
+### RBAC — middleware route
+- Nouveau middleware `App\Http\Middleware\EnsureRole` enregistré sous l'alias `role:`
+- Garde appliquée sur les transitions de statut critiques :
+  - `POST /v1/bons-commande/{id}/confirmer` → `role:responsable`
+  - `POST /v1/bons-commande/{id}/transformer-bl` → `role:responsable`
+  - `POST /v1/bons-livraison/{id}/valider` → `role:responsable`
+- `lab_admin` conserve le bypass implicite
+
+### Menu RÉCEPTION (échantillons FOLD)
+- Migration `extend_samples_for_reception` étendant la table `samples` avec :
+  `fold_number` (unique, FOLD-XXXXXXXX 8 chiffres), `dossier_id`, `mission_order_id`,
+  `task_id`, `product_id`, `description`, `sample_type`, `origin_location`, `depth_m`,
+  `collected_by` / `collected_at`, `received_by`, `condition_state`, `storage_location`,
+  `photo_path`, `weight_g`, `quantity`, `rejection_reason`. `order_item_id` rendu nullable.
+- Modèle `Sample` étendu : génération automatique du `fold_number` via `Sequence::next('FOLD')` ;
+  nouveaux statuts `en_transit / receptionne / en_essai / termine / rejete` ; relations
+  `dossier`, `missionOrder`, `task`, `product`, `collectedBy`, `receivedBy`.
+- Rôle RBAC `receptionnaire` ajouté.
+- `SampleReceptionController` (distinct du `SampleController` historique) avec endpoints :
+  - `GET    /api/v1/samples` — liste paginée + filtres (status, dossier, mission, fold, dates)
+  - `GET    /api/v1/samples/stats` — compteurs dashboard
+  - `GET    /api/v1/samples/search?fold=…` — recherche rapide par numéro FOLD
+  - `GET    /api/v1/samples/{id}` — détail
+  - `POST   /api/v1/samples` — création terrain (rôles `lab_technician/receptionnaire/laborantin/ingenieur`)
+  - `PUT    /api/v1/samples/{id}` — modification
+  - `PATCH  /api/v1/samples/{id}/receive` — validation réception (`receptionnaire/responsable/laborantin`)
+  - `PATCH  /api/v1/samples/{id}/start-test` — démarrage essais (`laborantin/responsable`)
+  - `PATCH  /api/v1/samples/{id}/complete` — fin essais (`laborantin/responsable`)
+  - `PATCH  /api/v1/samples/{id}/reject` — rejet avec motif (`responsable`)
+
+### Backend — fallback de version
+- `App\Support\AppVersion::detect()` fallback `1.1.0` → `1.2.0` (la source de vérité reste `react-frontend/package.json`).
+
 ## [1.0.27] — 2026-04-28
 
 ### Familles articles & Catalogue enrichi

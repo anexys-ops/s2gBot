@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -92,14 +93,21 @@ return new class extends Migration
         });
 
         // Le flux Réception crée des Sample sans OrderItem amont
-        // (prélèvement terrain → réception). On rend la FK historique nullable.
+        // (prélèvement terrain → réception). On rend la FK historique nullable
+        // via du SQL natif pour éviter la dépendance doctrine/dbal (absente en
+        // prod quand `composer install --no-dev` est utilisé).
         if (Schema::hasColumn('samples', 'order_item_id')) {
             try {
-                Schema::table('samples', function (Blueprint $table) {
-                    $table->unsignedBigInteger('order_item_id')->nullable()->change();
-                });
+                $driver = Schema::getConnection()->getDriverName();
+                if ($driver === 'mysql' || $driver === 'mariadb') {
+                    DB::statement('ALTER TABLE samples MODIFY order_item_id BIGINT UNSIGNED NULL');
+                } elseif ($driver === 'pgsql') {
+                    DB::statement('ALTER TABLE samples ALTER COLUMN order_item_id DROP NOT NULL');
+                }
+                // SQLite : pas d’ALTER COLUMN simple — on tolère.
             } catch (\Throwable $e) {
-                // SQLite < 3.35 ou contrainte FK posant souci en ALTER : on tolère.
+                // Driver inattendu / contrainte : on ignore, le contrôleur
+                // pourra toujours créer un OrderItem placeholder si besoin.
             }
         }
 

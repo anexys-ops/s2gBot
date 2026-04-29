@@ -24,6 +24,7 @@ class User extends Authenticatable
     public const ROLE_INGENIEUR = 'ingenieur';
     public const ROLE_LABORANTIN = 'laborantin';
     public const ROLE_RESPONSABLE = 'responsable';
+    public const ROLE_RECEPTIONNAIRE = 'receptionnaire';
 
     public const ROLES_INTERNAL = [
         self::ROLE_LAB_ADMIN,
@@ -32,6 +33,7 @@ class User extends Authenticatable
         self::ROLE_INGENIEUR,
         self::ROLE_LABORANTIN,
         self::ROLE_RESPONSABLE,
+        self::ROLE_RECEPTIONNAIRE,
     ];
 
     protected $fillable = [
@@ -185,6 +187,11 @@ class User extends Authenticatable
     public function isResponsable(): bool
     {
         return $this->role === self::ROLE_RESPONSABLE;
+    }
+
+    public function isReceptionnaire(): bool
+    {
+        return $this->role === self::ROLE_RECEPTIONNAIRE;
     }
 
     /** Peut valider un changement de statut (workflow). */

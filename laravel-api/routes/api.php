@@ -117,9 +117,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('bons-commande/{bonCommande}/lignes/{ligne}', [BonCommandeController::class, 'updateLigne'])
             ->whereNumber('bonCommande')
             ->whereNumber('ligne');
+        // v1.2.0 — validation de statut réservée à responsable / lab_admin (RBAC)
         Route::post('bons-commande/{bonCommande}/confirmer', [BonCommandeController::class, 'confirmer'])
+            ->middleware('role:responsable')
             ->whereNumber('bonCommande');
         Route::post('bons-commande/{bonCommande}/transformer-bl', [BonCommandeController::class, 'transformerBl'])
+            ->middleware('role:responsable')
             ->whereNumber('bonCommande');
         Route::get('planning-terrain/techniciens', [PlanningTerrainController::class, 'techniciens']);
         Route::get('planning-terrain', [PlanningTerrainController::class, 'index']);
@@ -135,7 +138,9 @@ Route::middleware('auth:sanctum')->group(function () {
             ->whereNumber('bonLivraison');
         Route::delete('bons-livraison/{bonLivraison}', [BonLivraisonController::class, 'destroy'])
             ->whereNumber('bonLivraison');
+        // v1.2.0 — validation BL réservée à responsable / lab_admin (RBAC)
         Route::post('bons-livraison/{bonLivraison}/valider', [BonLivraisonController::class, 'valider'])
+            ->middleware('role:responsable')
             ->whereNumber('bonLivraison');
         Route::get('reglements', [ReglementController::class, 'index']);
         Route::post('reglements', [ReglementController::class, 'store']);

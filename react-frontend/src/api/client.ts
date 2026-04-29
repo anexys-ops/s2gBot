@@ -510,6 +510,10 @@ export interface RefFamilleArticleRow {
   code: string
   libelle: string
   description?: string | null
+  /** v1.2.0 — couleur hex (ex. #3B82F6) pour pastille / chip de famille. */
+  color?: string | null
+  /** v1.2.0 — `technicien | ingenieur | labo | mixte`. */
+  type_ressource?: string | null
   ordre: number
   actif: boolean
   articles?: RefArticleRow[]

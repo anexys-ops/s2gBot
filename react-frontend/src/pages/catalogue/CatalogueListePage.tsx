@@ -93,6 +93,53 @@ export default function CatalogueListePage() {
             ))}
           </select>
         </label>
+        {familleOptions.length > 0 && (
+          <div className="catalogue-liste__chips" aria-label="Familles" style={{
+            display: 'flex', flexWrap: 'wrap', gap: '0.4rem',
+            flexBasis: '100%', marginTop: '0.5rem',
+          }}>
+            <button
+              type="button"
+              className="btn btn-sm"
+              aria-pressed={familleId === ''}
+              onClick={() => setFamilleId('')}
+              style={{
+                background: familleId === '' ? '#111827' : '#f3f4f6',
+                color: familleId === '' ? '#fff' : '#374151',
+                border: '1px solid #e5e7eb', borderRadius: 999, padding: '0.2rem 0.7rem', fontSize: '0.78rem',
+              }}
+            >
+              Toutes
+            </button>
+            {familleOptions.map((f) => {
+              const active = familleId === f.id
+              const dot = f.color ?? '#9ca3af'
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setFamilleId(f.id)}
+                  title={f.type_ressource ? `Ressource : ${f.type_ressource}` : undefined}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                    background: active ? dot : '#fff',
+                    color: active ? '#fff' : '#374151',
+                    border: `1px solid ${active ? dot : '#e5e7eb'}`,
+                    borderRadius: 999, padding: '0.2rem 0.7rem', fontSize: '0.78rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span aria-hidden style={{
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: active ? '#fff' : dot, display: 'inline-block',
+                  }} />
+                  {f.libelle}
+                </button>
+              )
+            })}
+          </div>
+        )}
         <label className="catalogue-liste__field catalogue-liste__field--search">
           <span className="catalogue-liste__label">Recherche (code / libellé)</span>
           <input

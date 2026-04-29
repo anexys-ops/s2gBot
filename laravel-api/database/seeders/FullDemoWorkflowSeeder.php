@@ -53,6 +53,12 @@ class FullDemoWorkflowSeeder extends Seeder
             return;
         }
 
+        // ── 0. Enrichir TOUS les articles (description / tags) ─────────────
+        // Beaucoup d'articles sortent du HFSQL/PROLAB sans description ni
+        // description technique : on remplit ces champs vides pour que la
+        // fiche article ne soit plus vide en UI.
+        $this->enrichArticles();
+
         $sites = Site::query()->orderBy('id')->limit(5)->get();
 
         $users = User::query()
@@ -265,14 +271,136 @@ class FullDemoWorkflowSeeder extends Seeder
             }
         }
 
+        // ── 6. Échantillons FOLD liés aux dossiers ─────────────────────────
+        $this->ensureSamples($dossiers, $oms, $articles, $techniciens);
+
         $this->command?->info(sprintf(
-            'FullDemoWorkflowSeeder OK : %d dossiers, %d BC, %d OdM, %d tasks, %d plannings, %d NDF.',
+            'FullDemoWorkflowSeeder OK : %d dossiers, %d BC, %d OdM, %d tasks, %d plannings, %d NDF, %d samples.',
             count($dossiers),
             count($bcs),
             count($oms),
             MissionTask::query()->count(),
             PlanningHuman::query()->count(),
             ExpenseReport::query()->count(),
+            Sample::query()->count(),
         ));
+    }
+
+    /**
+     * Remplit description / description_commerciale / description_technique
+     * et tags pour les articles dont ces champs sont vides — sans toucher
+     * aux articles déjà documentés.
+     */
+    private function enrichArticles(): void
+    {
+        $hasCom    = Schema::hasColumn('ref_articles', 'description_commerciale');
+        $hasTech   = Schema::hasColumn('ref_articles', 'description_technique');
+        $hasTags   = Schema::hasColumn('ref_articles', 'tags');
+
+        $tagsByFamilleCode = [
+            'GEO_BETON'   => ['béton', 'résistance', 'éprouvette'],
+            'GEO_SOL'     => ['sol', 'géotechnique', 'laboratoire'],
+            'GEO_IN_SITU' => ['terrain', 'in situ', 'sondage'],
+            'GEO_CHIMIE'  => ['chimie', 'analyse', 'dosage'],
+            'BETON'       => ['béton', 'NF EN 12390'],
+            'PROCTOR'     => ['proctor', 'compactage'],
+            'COMPACTAGE'  => ['compactage', 'CBR'],
+            'IDR'         => ['indice', 'dr'],
+            'IP'          => ['indice', 'plasticité'],
+            'AG'          => ['agrégats', 'graves'],
+        ];
+
+        Article::query()->with('famille:id,code,libelle')->chunk(100, function ($chunk) use ($hasCom, $hasTech, $hasTags, $tagsByFamilleCode) {
+            foreach ($chunk as $art) {
+                $patch = [];
+                $famLib = $art->famille?->libelle ?? 'essai géotechnique';
+                $famCode = $art->famille?->code;
+
+                if (empty($art->description)) {
+                    $patch['description'] = sprintf(
+                        "%s — %s. Réalisé selon %s. Article catalogue PROLAB destiné aux laboratoires de géotechnique BTP.",
+                        $art->libelle,
+                        $famLib,
+                        $art->normes ?: 'normes en vigueur'
+                    );
+                }
+                if ($hasCom && empty($art->description_commerciale)) {
+                    $patch['description_commerciale'] = sprintf(
+                        "Prestation %s — durée estimée %d min, prix unitaire %.2f €. Famille : %s.",
+                        $art->libelle,
+                        (int) ($art->duree_estimee ?? 0),
+                        (float) ($art->prix_unitaire_ht ?? 0),
+                        $famLib,
+                    );
+                }
+                if ($hasTech && empty($art->description_technique)) {
+                    $patch['description_technique'] = sprintf(
+                        "Mode opératoire selon %s. Code interne : %s. Unité : %s. Famille : %s.",
+                        $art->normes ?: 'norme à préciser',
+                        $art->code,
+                        $art->unite ?: 'U',
+                        $famLib,
+                    );
+                }
+                if ($hasTags && (empty($art->tags) || $art->tags === [])) {
+                    $tags = $tagsByFamilleCode[$famCode] ?? ['catalogue', 'essai'];
+                    $patch['tags'] = $tags;
+                }
+
+                if ($patch) {
+                    $art->fill($patch)->save();
+                }
+            }
+        });
+    }
+
+    /**
+     * @param list<Dossier>             $dossiers
+     * @param list<OrdreMission>        $oms
+     * @param \Illuminate\Support\Collection<int, Article> $articles
+     * @param \Illuminate\Support\Collection<int, User>    $techniciens
+     */
+    private function ensureSamples(array $dossiers, array $oms, $articles, $techniciens): void
+    {
+        $types   = Sample::TYPES;
+        $statuts = Sample::STATUSES_RECEPTION;
+
+        // En prod MySQL, samples.order_item_id est nullable depuis la migration
+        // 2026_04_29_120000_extend_samples_for_reception (driver-aware ALTER).
+        // Sur SQLite (CI), rester compatible NOT NULL : passer un order_item_id
+        // existant si dispo, sinon skip.
+        $fallbackOrderItemId = null;
+        if (Schema::getConnection()->getDriverName() === 'sqlite' && Schema::hasColumn('samples', 'order_item_id')) {
+            $fallbackOrderItemId = \App\Models\OrderItem::query()->value('id');
+            if ($fallbackOrderItemId === null) {
+                return;
+            }
+        }
+
+        for ($i = 0; $i < 10; $i++) {
+            $reference = sprintf('DEMOWF-SMP-%03d', $i + 1);
+            $dossier = $dossiers[$i % count($dossiers)] ?? null;
+            $om      = $oms[$i % max(count($oms), 1)] ?? null;
+            $payload = array_filter([
+                'order_item_id' => $fallbackOrderItemId,
+            ], fn ($v) => $v !== null) + [
+                'dossier_id'       => $dossier?->id,
+                'mission_order_id' => $om?->id,
+                'product_id'       => $articles[$i % $articles->count()]->id,
+                'description'      => 'Échantillon workflow #' . ($i + 1),
+                'sample_type'      => $types[$i % count($types)],
+                'origin_location'  => 'Site démo — point #' . ($i + 1),
+                'depth_m'          => 0.5 * ($i + 1),
+                'collected_by'     => $techniciens[$i % max($techniciens->count(), 1)]->id ?? null,
+                'collected_at'     => now()->subDays(7 - ($i % 7)),
+                'status'           => $statuts[$i % count($statuts)],
+                'condition_state'  => 'bon',
+                'storage_location' => 'Étagère ' . chr(65 + ($i % 5)) . '-' . ($i + 1),
+                'weight_g'         => 1500 + $i * 200,
+                'quantity'         => 1,
+                'notes'            => 'Échantillon de démo workflow.',
+            ];
+            Sample::firstOrCreate(['reference' => $reference], $payload);
+        }
     }
 }

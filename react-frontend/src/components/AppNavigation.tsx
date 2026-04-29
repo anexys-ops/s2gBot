@@ -161,8 +161,11 @@ export default function AppNavigation() {
           { to: '/sites', label: 'Chantiers' },
           { to: '/terrain', label: 'Vue terrain' },
           { to: '/ordres-mission', label: 'Ordres de mission' },
+          { to: '/ordres-mission/planning', label: 'Planning ordres de mission' },
           { to: '/terrain/mesures', label: 'Mesures terrain' },
+          { to: '/terrain/taches', label: 'Tâches terrain' },
           { to: '/terrain/planning', label: 'Planning technicien' },
+          { to: '/notes-de-frais', label: 'Notes de frais' },
         ]),
       },
       {
@@ -181,6 +184,8 @@ export default function AppNavigation() {
         items: filterItems([
           { to: '/labo', label: 'Vue laboratoire' },
           { to: '/labo/essais', label: 'Essais et graphiques' },
+          { to: '/labo/taches', label: 'Tâches labo' },
+          { to: '/labo/fiches', label: 'Fiches techniques' },
           { to: '/graphiques-essais', label: 'Graphiques d’essais' },
           { to: '/orders', label: 'Dossiers et commandes' },
           { to: '/orders/new', label: 'Nouvelle commande' },

@@ -141,5 +141,13 @@ class DatabaseSeeder extends Seeder
 
         /** v1.2.0 — LIMS géotechnique (40 essais, 20 matériels, 10 prélèvements, 4 templates). */
         $this->call(GeotechniqueV12Seeder::class);
+
+        /**
+         * v1.2.0 — Jeu démo complet : 5 dossiers, 5 chantiers, 10 devis,
+         * 5 BC, 3 factures, 5 OdM (terrain/labo/ingé), planning techniciens,
+         * 10 échantillons FOLD, 2 notes de frais.
+         * Idempotent — relancer le seeder ne duplique pas.
+         */
+        $this->call(FullDemoDataSeeder::class);
     }
 }

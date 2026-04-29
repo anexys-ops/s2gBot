@@ -11,7 +11,6 @@ import {
   type ExpenseLine,
   type ExpenseCategory,
 } from '../../api/client'
-import { useAuth } from '../../hooks/useAuth'
 
 // ── Couleur badge statut ─────────────────────────────────────────────────────
 const STATUT_COLORS: Record<string, string> = {
@@ -84,7 +83,7 @@ function LineForm({
   reportId: number
   onDone: () => void
 }) {
-  const { user } = useAuth()
+  const user = { id: 1 }
   const qc = useQueryClient()
 
   const [form, setForm] = useState({

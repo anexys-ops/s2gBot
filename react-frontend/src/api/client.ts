@@ -2137,6 +2137,7 @@ export interface OrdreMissionLigne {
 export interface OrdreMission {
   id: number
   numero: string
+  unique_number?: string
   bon_commande_id: number
   dossier_id?: number | null
   client_id: number

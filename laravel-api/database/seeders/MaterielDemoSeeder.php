@@ -40,10 +40,29 @@ class MaterielDemoSeeder extends Seeder
         }
 
         // ── 2. Agences ───────────────────────────────────────────────
+        // Note v1.2.0 : `agencies.client_id` est rendu nullable par la
+        // migration 2026_04_29_140000_make_agencies_client_id_nullable. Sur
+        // SQLite (CI), on attache à un client de secours pour rester compatible
+        // avec l'ancien schéma NOT NULL.
+        $needsClientId = Schema::hasColumn('agencies', 'client_id') && Schema::getConnection()->getDriverName() === 'sqlite';
+        $fallbackClientId = $needsClientId
+            ? \App\Models\Client::query()->orderBy('id')->value('id')
+                ?? \App\Models\Client::query()->create([
+                    'name' => 'Lab Interne',
+                    'address' => '—',
+                ])->id
+            : null;
+
+        $agencyAttrs = function (array $base) use ($fallbackClientId): array {
+            return $fallbackClientId !== null
+                ? array_merge($base, ['client_id' => $fallbackClientId])
+                : $base;
+        };
+
         $agences = [
-            Agency::firstOrCreate(['name' => 'Agence Casablanca'], ['code' => 'AGC-CASA', 'is_headquarters' => true]),
-            Agency::firstOrCreate(['name' => 'Agence Rabat'],      ['code' => 'AGC-RBAT']),
-            Agency::firstOrCreate(['name' => 'Agence Marrakech'],  ['code' => 'AGC-MARR']),
+            Agency::firstOrCreate(['name' => 'Agence Casablanca'], $agencyAttrs(['code' => 'AGC-CASA', 'is_headquarters' => true])),
+            Agency::firstOrCreate(['name' => 'Agence Rabat'],      $agencyAttrs(['code' => 'AGC-RBAT'])),
+            Agency::firstOrCreate(['name' => 'Agence Marrakech'],  $agencyAttrs(['code' => 'AGC-MARR'])),
         ];
 
         // ── 3. Équipements ───────────────────────────────────────────
@@ -129,14 +148,17 @@ class MaterielDemoSeeder extends Seeder
 
             // Affectation matériel
             if ($hasMaterielAffectations) {
+                // Colonnes réelles : date_retour_prevue / date_retour_effective
+                // (cf. migration 2026_04_23_100000_materiel_enrichissement_et_affectations).
                 DB::table('materiel_affectations')->insert([
-                    'equipment_id' => $eq->id,
-                    'user_id'      => $techniciens[$i % count($techniciens)]->id,
-                    'date_debut'   => '2026-01-01',
-                    'date_fin'     => null,
-                    'notes'        => 'Affectation initiale — seed démo',
-                    'created_at'   => now(),
-                    'updated_at'   => now(),
+                    'equipment_id'           => $eq->id,
+                    'user_id'                => $techniciens[$i % count($techniciens)]->id,
+                    'date_debut'             => '2026-01-01',
+                    'date_retour_prevue'     => null,
+                    'date_retour_effective'  => null,
+                    'observations'           => 'Affectation initiale — seed démo',
+                    'created_at'             => now(),
+                    'updated_at'             => now(),
                 ]);
             }
         }

@@ -42,6 +42,7 @@ import TerrainMesuresPage from './pages/TerrainMesuresPage'
 import TerrainChantiersCartePage from './pages/TerrainChantiersCartePage'
 import LaboEssaisPage from './pages/LaboEssaisPage'
 import LaboTasksPage from './pages/labo/LaboTasksPage'
+import FichesTechniquesPage from './pages/labo/FichesTechniquesPage'
 import TerrainTasksPage from './pages/terrain/TerrainTasksPage'
 import ExpenseReportsPage from './pages/terrain/ExpenseReportsPage'
 import PlanningGlobalPage from './pages/planning/PlanningGlobalPage'
@@ -160,6 +161,7 @@ function AppRoutes() {
         <Route path="labo" element={<LaboHub />} />
         <Route path="labo/essais" element={<LaboEssaisPage />} />
         <Route path="labo/taches" element={<LaboTasksPage />} />
+        <Route path="labo/fiches" element={<FichesTechniquesPage />} />
         <Route path="terrain/taches" element={<TerrainTasksPage />} />
         <Route path="notes-de-frais" element={<ExpenseReportsPage />} />
         <Route path="notes-de-frais/:id" element={<ExpenseReportsPage />} />

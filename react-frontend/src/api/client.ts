@@ -969,6 +969,18 @@ export interface ReportFormFieldDef {
   key: string
   label: string
   type: string
+  /** v1.2.0 — métadonnées optionnelles consommées par DynamicForm. */
+  unit?: string
+  required?: boolean
+  multiline?: boolean
+  computed?: boolean
+  columns?: { key: string; label: string }[]
+  source?: string
+  x?: string
+  y?: string | string[]
+  accept?: string
+  defaultLat?: number
+  defaultLng?: number
 }
 
 export interface ReportFormDefinitionRow {

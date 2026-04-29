@@ -149,5 +149,13 @@ class DatabaseSeeder extends Seeder
          * Idempotent — relancer le seeder ne duplique pas.
          */
         $this->call(FullDemoDataSeeder::class);
+
+        /**
+         * v1.2.0 — Workflow démo branché sur les données EXISTANTES
+         * (clients/users/articles déjà en base) : 5 dossiers, 5 BC, 5 OdM,
+         * tasks, planning, NDF. Utile en prod où les autres seeders n'ont
+         * pas généré le workflow complet historiquement.
+         */
+        $this->call(FullDemoWorkflowSeeder::class);
     }
 }

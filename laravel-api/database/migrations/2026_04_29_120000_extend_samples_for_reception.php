@@ -111,19 +111,24 @@ return new class extends Migration
             }
         }
 
-        // Index utiles pour la recherche réception
-        Schema::table('samples', function (Blueprint $table) {
-            try {
+        // Index utiles pour la recherche réception. On wrap chaque appel
+        // Schema::table dans un try/catch CAR les ordres SQL sont exécutés
+        // APRÈS le retour de la closure (pas pendant) — un try/catch interne
+        // serait inopérant si l'index existe déjà.
+        try {
+            Schema::table('samples', function (Blueprint $table) {
                 $table->index('status');
-            } catch (\Throwable $e) {
-                // index déjà existant — on ignore.
-            }
-            try {
+            });
+        } catch (\Throwable $e) {
+            // index déjà existant — on ignore.
+        }
+        try {
+            Schema::table('samples', function (Blueprint $table) {
                 $table->index('sample_type');
-            } catch (\Throwable $e) {
-                // index déjà existant — on ignore.
-            }
-        });
+            });
+        } catch (\Throwable $e) {
+            // index déjà existant — on ignore.
+        }
     }
 
     public function down(): void

@@ -1,5 +1,40 @@
 # Changelog — s2gBot
 
+## [1.0.27] — 2026-04-28
+
+### Familles articles & Catalogue enrichi
+- Familles d'articles avec couleur et type de ressource (labo/terrain/ingénierie)
+- Actions par article (`article_actions`) : durée, ressource, matériel requis
+- Configuration des champs de mesure par action (`action_measure_configs`) : type (number/text/select/date/file/boolean), unité, bornes min/max, options select, champ requis, ordre
+
+### Ordres de Mission (OdM)
+- Modèle `OrdreMission` avec 3 types : labo / technicien / ingénieur
+- Génération automatique depuis un Bon de Commande (`generate-ordres-mission`)
+- Lignes d'OM liées aux lignes BC + articles catalogue
+- Numéros séquentiels 8 chiffres : `OM-10000001` (via table `sequences` avec verrou pessimiste)
+
+### Essais & Tâches de mission
+- `MissionTask` (TSK-XXXXXXXX) : tâche concrète issue d'une ligne OM, avec statut todo/in_progress/done/validated/rejected
+- `TaskMeasure` : saisie des mesures avec auto-conformité (calcul automatique depuis bornes min/max)
+- `TaskResult` : résultat final validé par tâche
+- Vue labo (`/labo/taches`) et vue terrain (`/terrain/taches`) pour saisie des mesures
+
+### Planning & Indisponibilités
+- `PlanningHuman` / `PlanningEquipment` : affectation des personnes et machines aux tâches
+- `StockPersonnel` / `StockEquipment` : périodes d'indisponibilité
+- Page planning global (`/planning`) : grille mensuelle par personne ou matériel, onglets Personnel / Matériel / Indisponibilités
+
+### Notes de frais (NDF)
+- `ExpenseReport` (NDF-XXXXXXXX) : rapport lié à un OM terrain/ingénieur
+- `ExpenseLine` : lignes de dépenses (Essence, Hotel, Voyage, Repas, Péage, Parking, Divers)
+- Workflow statut : brouillon → soumis → validé → remboursé
+- Page `/notes-de-frais` : liste et gestion complète
+
+### Recherche globale améliorée
+- Couvre : clients, contacts, dossiers, ordres de mission, tâches, NDF, devis, factures, articles
+- Recherche sur `unique_number` en plus du nom/référence
+- Route `/api/global-search` déplacée sous le middleware `auth:sanctum`
+
 ## [1.0.37] — 2026-04-23
 
 ### Interface

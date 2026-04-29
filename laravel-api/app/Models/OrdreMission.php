@@ -25,6 +25,7 @@ class OrdreMission extends Model
 
     protected $fillable = [
         'numero',
+        'unique_number',
         'bon_commande_id',
         'dossier_id',
         'client_id',
@@ -46,6 +47,15 @@ class OrdreMission extends Model
             'date_debut'  => 'date',
             'date_fin'    => 'date',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $model) {
+            if (!$model->unique_number) {
+                $model->unique_number = Sequence::next('OM');
+            }
+        });
     }
 
     public function bonCommande(): BelongsTo

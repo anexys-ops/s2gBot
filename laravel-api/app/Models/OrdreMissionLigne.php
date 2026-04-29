@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Catalogue\Article;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class OrdreMissionLigne extends Model
 {
@@ -66,5 +67,26 @@ class OrdreMissionLigne extends Model
     public function equipment(): BelongsTo
     {
         return $this->belongsTo(Equipment::class);
+    }
+
+    public function missionTasks(): HasMany
+    {
+        return $this->hasMany(MissionTask::class, 'ordre_mission_ligne_id');
+    }
+
+    /**
+     * Génère une MissionTask pour cette ligne si elle n'en a pas encore.
+     * Appelé lors de la création ou de l'assignation d'un utilisateur.
+     */
+    public function ensureTaskExists(): MissionTask
+    {
+        return $this->missionTasks()->firstOrCreate(
+            ['ordre_mission_ligne_id' => $this->id],
+            [
+                'assigned_user_id' => $this->assigned_user_id,
+                'planned_date'     => $this->date_prevue,
+                'statut'           => MissionTask::STATUT_TODO,
+            ]
+        );
     }
 }

@@ -1,8 +1,12 @@
 <?php
 
 use App\Http\Controllers\Api\AccessGroupController;
+use App\Http\Controllers\Api\ActionMeasureConfigController;
+use App\Http\Controllers\Api\ExpenseReportController;
 use App\Http\Controllers\Api\ArticleActionController;
+use App\Http\Controllers\Api\MissionTaskController;
 use App\Http\Controllers\Api\OrdreMissionController;
+use App\Http\Controllers\Api\PlanningController;
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AccountingExportController;
 use App\Http\Controllers\Api\ActivityLogController;
@@ -295,6 +299,36 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('articles/{article}/equipment-requirements', [ArticleActionController::class, 'equipmentStore']);
     Route::delete('articles/{article}/equipment-requirements/{requirement}', [ArticleActionController::class, 'equipmentDestroy']);
 
+    // ── Configuration des mesures par action ─────────────────────────────────
+    Route::get('articles/{article}/actions/{action}/measures', [ActionMeasureConfigController::class, 'index']);
+    Route::post('articles/{article}/actions/{action}/measures', [ActionMeasureConfigController::class, 'store']);
+    Route::put('articles/{article}/actions/{action}/measures/{measure}', [ActionMeasureConfigController::class, 'update']);
+    Route::delete('articles/{article}/actions/{action}/measures/{measure}', [ActionMeasureConfigController::class, 'destroy']);
+
+    // ── Tâches de mission ────────────────────────────────────────────────────
+    Route::get('mission-tasks/labo', [MissionTaskController::class, 'laboBoard']);
+    Route::get('mission-tasks/terrain', [MissionTaskController::class, 'terrainBoard']);
+    Route::get('mission-tasks', [MissionTaskController::class, 'index']);
+    Route::get('mission-tasks/{task}', [MissionTaskController::class, 'show']);
+    Route::put('mission-tasks/{task}', [MissionTaskController::class, 'update']);
+    Route::post('mission-tasks/{task}/measures', [MissionTaskController::class, 'storeMeasures']);
+    Route::post('mission-tasks/{task}/validate', [MissionTaskController::class, 'validate']);
+
+    // ── Planning & stock ─────────────────────────────────────────────────────
+    Route::get('planning/overview', [PlanningController::class, 'overview']);
+    Route::get('planning/humans', [PlanningController::class, 'humansIndex']);
+    Route::post('planning/humans', [PlanningController::class, 'humansStore']);
+    Route::delete('planning/humans/{id}', [PlanningController::class, 'humansDestroy']);
+    Route::get('planning/equipments', [PlanningController::class, 'equipmentsIndex']);
+    Route::post('planning/equipments', [PlanningController::class, 'equipmentsStore']);
+    Route::delete('planning/equipments/{id}', [PlanningController::class, 'equipmentsDestroy']);
+    Route::get('planning/stock/personnel', [PlanningController::class, 'stockPersonnelIndex']);
+    Route::post('planning/stock/personnel', [PlanningController::class, 'stockPersonnelStore']);
+    Route::delete('planning/stock/personnel/{id}', [PlanningController::class, 'stockPersonnelDestroy']);
+    Route::get('planning/stock/equipment', [PlanningController::class, 'stockEquipmentIndex']);
+    Route::post('planning/stock/equipment', [PlanningController::class, 'stockEquipmentStore']);
+    Route::delete('planning/stock/equipment/{id}', [PlanningController::class, 'stockEquipmentDestroy']);
+
     // ── Ordres de mission ────────────────────────────────────────────────────
     Route::get('ordres-mission', [OrdreMissionController::class, 'index']);
     Route::get('ordres-mission/planning', [OrdreMissionController::class, 'planning']);
@@ -307,6 +341,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('ordres-mission/{ordre_mission}/frais/{frais}', [OrdreMissionController::class, 'fraisUpdate']);
     Route::delete('ordres-mission/{ordre_mission}/frais/{frais}', [OrdreMissionController::class, 'fraisDestroy']);
     Route::post('bons-commande/{bon_commande}/generate-ordres-mission', [OrdreMissionController::class, 'generateFromBC']);
+
+    // ── Notes de frais ───────────────────────────────────────────────────────
+    Route::get('expense-reports/eligible-oms', [ExpenseReportController::class, 'eligibleOrdresMission']);
+    Route::get('expense-reports', [ExpenseReportController::class, 'index']);
+    Route::post('expense-reports', [ExpenseReportController::class, 'store']);
+    Route::get('expense-reports/{expenseReport}', [ExpenseReportController::class, 'show']);
+    Route::put('expense-reports/{expenseReport}', [ExpenseReportController::class, 'update']);
+    Route::delete('expense-reports/{expenseReport}', [ExpenseReportController::class, 'destroy']);
+    Route::post('expense-reports/{expenseReport}/lines', [ExpenseReportController::class, 'storeLine']);
+    Route::put('expense-reports/{expenseReport}/lines/{line}', [ExpenseReportController::class, 'updateLine']);
+    Route::delete('expense-reports/{expenseReport}/lines/{line}', [ExpenseReportController::class, 'destroyLine']);
 
     // App mobile laboratoire / terrain — dossiers (mesures + photos)
     Route::prefix('mobile/dossiers')->group(function () {
@@ -323,11 +368,12 @@ Route::middleware('auth:sanctum')->group(function () {
             ->where('kind', 'order|site')
             ->whereNumber('id');
     });
+    // ── Recherche globale & tags ──────────────────────────────────────────────
+    Route::get('global-search', [GlobalSearchController::class, 'search']);
+    Route::get('tags', [TagController::class, 'index']);
+    Route::post('tags/sync', [TagController::class, 'sync']);
+    Route::get('tags/entity', [TagController::class, 'forEntity']);
 });
-Route::get('global-search', [GlobalSearchController::class, 'search']);
-        Route::get('tags', [TagController::class, 'index']);
-        Route::post('tags/sync', [TagController::class, 'sync']);
-        Route::get('tags/entity', [TagController::class, 'forEntity']);
 
 Route::middleware('signed')->group(function () {
     Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'signedPdf'])

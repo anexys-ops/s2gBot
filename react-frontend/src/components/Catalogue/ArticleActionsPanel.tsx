@@ -9,6 +9,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { articleActionsApi, type ArticleAction } from '../../api/client'
+import ActionMeasureConfigPanel from './ActionMeasureConfigPanel'
 
 const TYPE_META: Record<string, { label: string; color: string }> = {
   technicien: { label: 'Terrain / Technicien', color: '#f59e0b' },
@@ -311,6 +312,16 @@ export default function ArticleActionsPanel({ articleId }: { articleId: number }
                 Aucune action définie pour ce type.
               </p>
             )}
+
+            {/* Panneau config des mesures par action */}
+            {typeActions.slice().sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0)).map((action) => (
+              <ActionMeasureConfigPanel
+                key={action.id}
+                articleId={articleId}
+                actionId={action.id}
+                actionLabel={action.libelle}
+              />
+            ))}
 
             <NewActionForm articleId={articleId} type={type} onCreated={() => {}} />
           </section>

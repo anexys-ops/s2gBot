@@ -2075,6 +2075,21 @@ export interface ClientCommercialOverview {
 
 // ── Ordres de mission ─────────────────────────────────────────────────────────
 
+export interface ActionMeasureConfig {
+  id: number
+  article_action_id: number
+  field_name: string
+  field_type: 'number' | 'text' | 'select' | 'date' | 'file' | 'boolean'
+  unit?: string | null
+  min_value?: number | null
+  max_value?: number | null
+  select_options?: string[] | null
+  is_required: boolean
+  placeholder?: string | null
+  help_text?: string | null
+  ordre: number
+}
+
 export interface ArticleAction {
   id: number
   ref_article_id: number
@@ -2083,6 +2098,7 @@ export interface ArticleAction {
   description?: string | null
   duree_heures: number
   ordre: number
+  measure_configs?: ActionMeasureConfig[]
   created_at?: string
   updated_at?: string
 }
@@ -2198,4 +2214,268 @@ export const ordresMissionApi = {
     api<FraisDeplacement>(`/ordres-mission/${omId}/frais/${fraisId}`, { method: 'PUT', body: JSON.stringify(body) }),
   fraisDelete: (omId: number, fraisId: number) =>
     api<void>(`/ordres-mission/${omId}/frais/${fraisId}`, { method: 'DELETE' }),
+}
+
+// ── Measure configs ────────────────────────────────────────────────────────
+export const measureConfigsApi = {
+  list: (articleId: number, actionId: number) =>
+    api<ActionMeasureConfig[]>(`/articles/${articleId}/actions/${actionId}/measures`),
+  create: (articleId: number, actionId: number, body: Partial<ActionMeasureConfig>) =>
+    api<ActionMeasureConfig>(`/articles/${articleId}/actions/${actionId}/measures`, { method: 'POST', body: JSON.stringify(body) }),
+  update: (articleId: number, actionId: number, id: number, body: Partial<ActionMeasureConfig>) =>
+    api<ActionMeasureConfig>(`/articles/${articleId}/actions/${actionId}/measures/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (articleId: number, actionId: number, id: number) =>
+    api<void>(`/articles/${articleId}/actions/${actionId}/measures/${id}`, { method: 'DELETE' }),
+}
+
+// ── Mission Tasks ──────────────────────────────────────────────────────────
+export interface TaskMeasure {
+  id: number
+  mission_task_id: number
+  measure_config_id: number
+  value?: string | null
+  value_numeric?: number | null
+  is_conform?: boolean | null
+  attachment_path?: string | null
+  measure_config?: ActionMeasureConfig
+  created_by?: number | null
+}
+
+export interface TaskResult {
+  id: number
+  mission_task_id: number
+  is_conform: boolean
+  value_final?: number | null
+  conclusion?: string | null
+  observations?: string | null
+  validated_by?: number | null
+  validated_at?: string | null
+  rapport_path?: string | null
+  validatedBy?: { id: number; name: string }
+}
+
+export interface MissionTask {
+  id: number
+  ordre_mission_ligne_id: number
+  assigned_user_id?: number | null
+  statut: 'todo' | 'in_progress' | 'done' | 'validated' | 'rejected'
+  planned_date?: string | null
+  due_date?: string | null
+  started_at?: string | null
+  completed_at?: string | null
+  validated_at?: string | null
+  validated_by?: number | null
+  notes?: string | null
+  is_conform?: boolean | null
+  assignedUser?: { id: number; name: string; email?: string }
+  ordreMissionLigne?: OrdreMissionLigne & {
+    ordreMission?: OrdreMission
+    article?: { id: number; code: string; libelle: string }
+    articleAction?: ArticleAction & { measure_configs?: ActionMeasureConfig[] }
+  }
+  measures?: TaskMeasure[]
+  result?: TaskResult | null
+}
+
+export const missionTasksApi = {
+  list: (params?: { assigned_user_id?: number; statut?: string; type?: string; ordre_mission_id?: number; dossier_id?: number; date_from?: string; date_to?: string }) => {
+    const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
+    return api<MissionTask[]>(`/mission-tasks${s ? `?${s}` : ''}`)
+  },
+  laboBoard: (params?: { user_id?: number; statut?: string }) => {
+    const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
+    return api<MissionTask[]>(`/mission-tasks/labo${s ? `?${s}` : ''}`)
+  },
+  terrainBoard: (params?: { user_id?: number; type?: string; statut?: string }) => {
+    const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
+    return api<MissionTask[]>(`/mission-tasks/terrain${s ? `?${s}` : ''}`)
+  },
+  get: (id: number) => api<MissionTask>(`/mission-tasks/${id}`),
+  update: (id: number, body: Partial<MissionTask>) =>
+    api<MissionTask>(`/mission-tasks/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  submitMeasures: (id: number, measures: Array<{ measure_config_id: number; value?: string; value_numeric?: number; attachment_path?: string }>) =>
+    api<MissionTask>(`/mission-tasks/${id}/measures`, { method: 'POST', body: JSON.stringify({ measures }) }),
+  validate: (id: number, body: { is_conform: boolean; value_final?: number; conclusion?: string; observations?: string; rapport_path?: string }) =>
+    api<MissionTask>(`/mission-tasks/${id}/validate`, { method: 'POST', body: JSON.stringify(body) }),
+}
+
+// ── Planning & Stock ───────────────────────────────────────────────────────
+export interface PlanningHuman {
+  id: number
+  user_id: number
+  mission_task_id?: number | null
+  date_debut: string
+  date_fin: string
+  heure_debut?: string | null
+  heure_fin?: string | null
+  type_evenement: 'tache' | 'conge' | 'formation' | 'absent' | 'autre'
+  notes?: string | null
+  user?: { id: number; name: string; email?: string }
+  missionTask?: { id: number; statut: string }
+}
+
+export interface PlanningEquipmentSlot {
+  id: number
+  equipment_id: number
+  mission_task_id?: number | null
+  date_debut: string
+  date_fin: string
+  type_evenement: 'utilisation' | 'maintenance' | 'indispo' | 'autre'
+  notes?: string | null
+  equipment?: { id: number; name: string; code?: string }
+  missionTask?: { id: number; statut: string }
+}
+
+export interface StockPersonnel {
+  id: number
+  user_id: number
+  date_debut: string
+  date_fin: string
+  motif: 'conge' | 'maladie' | 'formation' | 'autre'
+  is_validated: boolean
+  notes?: string | null
+  user?: { id: number; name: string }
+}
+
+export interface StockEquipmentEntry {
+  id: number
+  equipment_id: number
+  date_debut: string
+  date_fin: string
+  motif: 'maintenance' | 'panne' | 'calibration' | 'autre'
+  is_validated: boolean
+  notes?: string | null
+  equipment?: { id: number; name: string; code?: string }
+}
+
+export interface PlanningOverview {
+  humans: PlanningHuman[]
+  equipments: PlanningEquipmentSlot[]
+  stock_personnels: StockPersonnel[]
+  stock_equipments: StockEquipmentEntry[]
+}
+
+export const planningApi = {
+  overview: (from?: string, to?: string) => {
+    const s = new URLSearchParams()
+    if (from) s.set('from', from)
+    if (to) s.set('to', to)
+    return api<PlanningOverview>(`/planning/overview${s.toString() ? `?${s}` : ''}`)
+  },
+  humans: {
+    list: (params?: { from?: string; to?: string; user_id?: number }) => {
+      const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
+      return api<PlanningHuman[]>(`/planning/humans${s ? `?${s}` : ''}`)
+    },
+    create: (body: Partial<PlanningHuman>) =>
+      api<PlanningHuman>('/planning/humans', { method: 'POST', body: JSON.stringify(body) }),
+    delete: (id: number) =>
+      api<void>(`/planning/humans/${id}`, { method: 'DELETE' }),
+  },
+  equipments: {
+    list: (params?: { from?: string; to?: string; equipment_id?: number }) => {
+      const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
+      return api<PlanningEquipmentSlot[]>(`/planning/equipments${s ? `?${s}` : ''}`)
+    },
+    create: (body: Partial<PlanningEquipmentSlot>) =>
+      api<PlanningEquipmentSlot>('/planning/equipments', { method: 'POST', body: JSON.stringify(body) }),
+    delete: (id: number) =>
+      api<void>(`/planning/equipments/${id}`, { method: 'DELETE' }),
+  },
+  stockPersonnel: {
+    list: (params?: { from?: string; to?: string; user_id?: number }) => {
+      const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
+      return api<StockPersonnel[]>(`/planning/stock/personnel${s ? `?${s}` : ''}`)
+    },
+    create: (body: Partial<StockPersonnel>) =>
+      api<StockPersonnel>('/planning/stock/personnel', { method: 'POST', body: JSON.stringify(body) }),
+    delete: (id: number) =>
+      api<void>(`/planning/stock/personnel/${id}`, { method: 'DELETE' }),
+  },
+  stockEquipment: {
+    list: (params?: { from?: string; to?: string; equipment_id?: number }) => {
+      const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
+      return api<StockEquipmentEntry[]>(`/planning/stock/equipment${s ? `?${s}` : ''}`)
+    },
+    create: (body: Partial<StockEquipmentEntry>) =>
+      api<StockEquipmentEntry>('/planning/stock/equipment', { method: 'POST', body: JSON.stringify(body) }),
+    delete: (id: number) =>
+      api<void>(`/planning/stock/equipment/${id}`, { method: 'DELETE' }),
+  },
+}
+
+// ── Notes de frais ────────────────────────────────────────────────────────────
+
+export const EXPENSE_CATEGORIES = ['Essence', 'Hotel', 'Voyage', 'Repas', 'Peage', 'Parking', 'Divers'] as const
+export type ExpenseCategory = typeof EXPENSE_CATEGORIES[number]
+
+export interface ExpenseLine {
+  id: number
+  expense_report_id: number
+  user_id: number
+  user?: { id: number; name: string }
+  category: ExpenseCategory
+  amount: number
+  date: string
+  description?: string
+  receipt_path?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ExpenseReport {
+  id: number
+  unique_number: string
+  ordre_mission_id: number
+  ordre_mission?: {
+    id: number
+    unique_number?: string
+    numero: string
+    type: string
+    statut: string
+    dossier?: { id: number; reference?: string; titre?: string }
+    client?: { id: number; name: string }
+    site?: { id: number; nom?: string; name?: string }
+  }
+  statut: 'brouillon' | 'soumis' | 'valide' | 'rembourse' | 'rejete'
+  notes?: string
+  created_by?: number
+  created_by_user?: { id: number; name: string }
+  validated_by?: number
+  validated_by_user?: { id: number; name: string }
+  validated_at?: string
+  total?: number
+  lines?: ExpenseLine[]
+  created_at: string
+  updated_at: string
+}
+
+export const expenseReportsApi = {
+  eligibleOMs: () => api<OrdreMission[]>('/expense-reports/eligible-oms'),
+
+  list: (params?: { statut?: string; ordre_mission_id?: number }) => {
+    const s = params
+      ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
+      : ''
+    return api<{ data: ExpenseReport[]; total: number }>(`/expense-reports${s ? `?${s}` : ''}`)
+  },
+
+  get: (id: number) => api<ExpenseReport>(`/expense-reports/${id}`),
+
+  create: (body: { ordre_mission_id: number; notes?: string }) =>
+    api<ExpenseReport>('/expense-reports', { method: 'POST', body: JSON.stringify(body) }),
+
+  update: (id: number, body: Partial<Pick<ExpenseReport, 'statut' | 'notes'>>) =>
+    api<ExpenseReport>(`/expense-reports/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  delete: (id: number) => api<void>(`/expense-reports/${id}`, { method: 'DELETE' }),
+
+  addLine: (reportId: number, body: Omit<ExpenseLine, 'id' | 'expense_report_id' | 'created_at' | 'updated_at'>) =>
+    api<ExpenseLine>(`/expense-reports/${reportId}/lines`, { method: 'POST', body: JSON.stringify(body) }),
+
+  updateLine: (reportId: number, lineId: number, body: Partial<ExpenseLine>) =>
+    api<ExpenseLine>(`/expense-reports/${reportId}/lines/${lineId}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  deleteLine: (reportId: number, lineId: number) =>
+    api<void>(`/expense-reports/${reportId}/lines/${lineId}`, { method: 'DELETE' }),
 }

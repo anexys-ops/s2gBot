@@ -23,9 +23,13 @@ return new class extends Migration
     {
         // ── Enrichir familles articles ───────────────────────────────────────
         Schema::table('ref_famille_articles', function (Blueprint $table) {
-            $table->string('color', 7)->nullable()->after('description')->comment('Couleur hex ex. #3B82F6');
-            $table->string('type_ressource', 32)->nullable()->after('color')
-                ->comment('technicien|ingenieur|labo|mixte');
+            if (!Schema::hasColumn('ref_famille_articles', 'color')) {
+                $table->string('color', 7)->nullable()->after('description')->comment('Couleur hex ex. #3B82F6');
+            }
+            if (!Schema::hasColumn('ref_famille_articles', 'type_ressource')) {
+                $table->string('type_ressource', 32)->nullable()->after('color')
+                    ->comment('technicien|ingenieur|labo|mixte');
+            }
         });
 
         // ── Actions par article ──────────────────────────────────────────────
@@ -51,7 +55,7 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->unique(['ref_article_id', 'equipment_id']);
+            $table->unique(['ref_article_id', 'equipment_id'], 'art_equip_req_unique');
         });
 
         // ── Ordres de mission ────────────────────────────────────────────────

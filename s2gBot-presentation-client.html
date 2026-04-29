@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>s2gBot — Schéma BDD, structure projet & planning — Présentation client</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<style>
+  :root{
+    --bg:#0b1220;
+    --bg-card:#111a2c;
+    --bg-soft:#162238;
+    --border:#22304d;
+    --text:#e6edf7;
+    --muted:#97a3bf;
+    --primary:#14b8a6;
+    --primary-2:#0ea5e9;
+    --accent:#f59e0b;
+    --ok:#22c55e;
+    --warn:#f97316;
+    --risk:#ef4444;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.55}
+  .wrap{max-width:1200px;margin:0 auto;padding:32px 24px 80px}
+  header.hero{display:flex;flex-direction:column;gap:8px;padding:28px 0 24px;border-bottom:1px solid var(--border);margin-bottom:28px}
+  header.hero .tag{display:inline-flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--primary);font-weight:700}
+  header.hero h1{font-size:34px;margin:4px 0;letter-spacing:-.02em}
+  header.hero p.sub{color:var(--muted);font-size:16px;margin:0;max-width:900px}
+  header.hero .meta{display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;font-size:13px;color:var(--muted)}
+  header.hero .meta span b{color:var(--text);font-weight:600}
+  nav.toc{position:sticky;top:0;z-index:10;background:rgba(11,18,32,.92);backdrop-filter:blur(8px);margin:0 -24px 24px;padding:10px 24px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px}
+  nav.toc a{font-size:13px;color:var(--muted);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:999px;transition:.15s}
+  nav.toc a:hover{color:var(--text);border-color:var(--primary)}
+  section{margin:0 0 40px}
+  h2{font-size:22px;margin:28px 0 10px;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+  h2::before{content:"";width:8px;height:22px;background:linear-gradient(180deg,var(--primary),var(--primary-2));border-radius:3px;display:inline-block}
+  h3{font-size:16px;margin:20px 0 8px;color:var(--text)}
+  p{color:var(--text)}
+  .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;margin:14px 0}
+  .grid{display:grid;gap:16px}
+  .grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .grid.cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  @media (max-width:900px){.grid.cols-2,.grid.cols-3,.grid.cols-4{grid-template-columns:1fr}}
+  .kpi{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
+  .kpi .v{font-size:26px;font-weight:700;letter-spacing:-.01em}
+  .kpi .l{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:4px}
+  .kpi .accent-teal{color:var(--primary)}
+  .kpi .accent-blue{color:var(--primary-2)}
+  .kpi .accent-amber{color:var(--accent)}
+  .kpi .accent-green{color:var(--ok)}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:10px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em;background:var(--bg-soft)}
+  tbody tr:hover{background:rgba(20,184,166,.04)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.02em;border:1px solid}
+  .b-ok{color:var(--ok);border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.08)}
+  .b-warn{color:var(--warn);border-color:rgba(249,115,22,.4);background:rgba(249,115,22,.08)}
+  .b-risk{color:var(--risk);border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.08)}
+  .b-info{color:var(--primary-2);border-color:rgba(14,165,233,.4);background:rgba(14,165,233,.08)}
+  .b-accent{color:var(--accent);border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.08)}
+  .mermaid{background:var(--bg-soft);border:1px solid var(--border);border-radius:var(--radius);padding:18px;overflow:auto}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin-top:10px}
+  .legend .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+  code,pre{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+  code{background:var(--bg-soft);padding:1px 6px;border-radius:4px;border:1px solid var(--border);color:var(--primary)}
+  pre{background:var(--bg-soft);border:1px solid var(--border);border-radius:var(--radius);padding:14px;overflow:auto}
+  ul.clean{margin:8px 0 0 18px;padding:0}
+  ul.clean li{margin:4px 0}
+  .gantt-wrap{overflow:auto}
+  footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(20,184,166,.12);color:var(--primary);border:1px solid rgba(20,184,166,.3);margin-right:6px}
+  .phase-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;border-left:4px solid var(--primary)}
+  .phase-card.v1{border-left-color:var(--primary-2)}
+  .phase-card.v2{border-left-color:var(--accent)}
+  .phase-card h4{margin:0 0 6px;font-size:15px;display:flex;align-items:center;gap:8px}
+  .phase-card .delay{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  .print-only{display:none}
+  @media print{
+    body{background:#fff;color:#111}
+    .card,.kpi,.mermaid,.phase-card{background:#fff;border-color:#d0d7e2;color:#111}
+    nav.toc{position:static;background:#fff}
+    header.hero{border-color:#d0d7e2}
+    h2::before{background:#0ea5e9}
+    .print-only{display:block}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">● Plateforme LIMS BTP · s2gBot · présentation client</span>
+  <h1>Schéma base de données, structure projet & planning d'évolution</h1>
+  <p class="sub">Vue d'ensemble technique et fonctionnelle de la plateforme laboratoire BTP (géotechnique, essais, rapports, facturation) — architecture actuelle, modèle de données, feuille de route d'améliorations MVP → V1 → V2.</p>
+  <div class="meta">
+    <span>Date · <b>20 avril 2026</b></span>
+    <span>Stack · <b>Laravel 11 + React 18 + Expo</b></span>
+    <span>Marché · <b>France &amp; Maroc</b></span>
+    <span>Préparé par · <b>BDC / anexys</b></span>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#synthese">1. Synthèse</a>
+  <a href="#structure">2. Structure projet</a>
+  <a href="#archi">3. Architecture</a>
+  <a href="#schema">4. Schéma BDD</a>
+  <a href="#workflow">5. Workflow métier</a>
+  <a href="#planning">6. Planning</a>
+  <a href="#amelio">7. Améliorations</a>
+  <a href="#risques">8. Risques</a>
+</nav>
+
+<section id="synthese">
+  <h2>1. Synthèse exécutive</h2>
+  <div class="grid cols-4">
+    <div class="kpi"><div class="v accent-teal">32</div><div class="l Tables métier</div></div>
+    <div class="kpi"><div class="v accent-blue">7</div><div class="l Modules fonctionnels</div></div>
+    <div class="kpi"><div class="v accent-amber">3</div><div class="l Phases (MVP→V1→V2)</div></div>
+    <div class="kpi"><div class="v accent-green">4</div><div class="l Rôles utilisateurs</div></div>
+  </div>
+  <div class="card">
+    <p><b>Objectif.</b> Plateforme unique couvrant le flux bout-en-bout d'un laboratoire BTP : <i>demande → prélèvement → essai → résultats → rapport → facturation</i>, avec volet géotechnique (missions, forages, lithologie) et saisie terrain mobile.</p>
+    <p><b>État actuel.</b> MVP fonctionnel en production (Laravel 11 API + React 18 SPA + mobile Expo). Couvre CRM, chantiers/sites, devis, commandes, échantillons, résultats, rapports PDF, facturation FR/MA (TVA 20 %, MAD, ICE/RC/Patente).</p>
+    <p><b>Cap produit.</b> Industrialiser la traçabilité (ISO 17025 / SNIMA), outiller les équipements (étalonnages), ouvrir un portail client et connecter les instruments (V2).</p>
+  </div>
+</section>
+
+<section id="structure">
+  <h2>2. Structure projet</h2>
+  <div class="card">
+    <pre>s2gBot/
+├── laravel-api/              Backend Laravel 11 — API REST (Sanctum)
+│   ├── app/Models/           34 modèles Eloquent (Client, Mission, Order, Sample…)
+│   ├── app/Http/Controllers/ REST controllers (Auth, Client, Order, Invoice, Mobile…)
+│   ├── database/migrations/  Schéma SQL versionné
+│   └── routes/api.php        ~60 endpoints /api/*
+│
+├── react-frontend/           SPA React 18 (Vite, React Router, React Query)
+│   ├── src/pages/            Écrans CRM (/crm) et Terrain (/terrain)
+│   ├── src/components/       UI partagée, tableaux, formulaires, cartes GPS
+│   └── src/api/              Client HTTP typé
+│
+├── apps/lab-btp-mobile/      App mobile Expo (iOS + Android)
+│                             Saisie terrain : mesures, photos, GPS
+│
+├── docker/                   Stack Docker (MySQL + PHP-FPM + Nginx)
+├── scripts/                  Installation, seed, déploiement (port SSH 167)
+├── docs/                     Cadrage LIMS Maroc, comparaison Dolibarr, API mobile
+└── .github/workflows/        CI/CD GitHub Actions → SSH prod</pre>
+  </div>
+
+  <h3>Modules fonctionnels</h3>
+  <div class="grid cols-3">
+    <div class="card"><b>CRM</b><ul class="clean"><li>Clients (FR + MA : ICE, RC, Patente, IF, CNSS)</li><li>Agences &amp; adresses billing/delivery</li><li>Dossier commercial : devis, factures, impayés TTC</li></ul></div>
+    <div class="card"><b>Terrain &amp; géotech</b><ul class="clean"><li>Sites (GPS lat/long, frais déplacement)</li><li>Missions G1…G5 + forages + lithologie</li><li>Carte GPS compacte fiche chantier</li></ul></div>
+    <div class="card"><b>Catalogue essais</b><ul class="clean"><li>Types d'essais + paramètres (fck, MF, SE, CBR…)</li><li>Normes NF / EN / ASTM / NM</li><li>Offres commerciales (produit / service / stock)</li></ul></div>
+    <div class="card"><b>Commande → Résultat</b><ul class="clean"><li>Commandes + lignes (réf. test_type)</li><li>Échantillons rattachés aux forages (profondeur)</li><li>Résultats paramétrés</li></ul></div>
+    <div class="card"><b>Rapports PDF</b><ul class="clean"><li>Templates Blade + layout_config JSON</li><li>Form definitions (terrain, prélèvement)</li><li>Signature, revue, versioning</li></ul></div>
+    <div class="card"><b>Facturation</b><ul class="clean"><li>Devis / factures multi-lignes, remises, TVA</li><li>Frais déplacement + shipping</li><li>Statuts : draft → validated → signed → sent → paid</li></ul></div>
+    <div class="card"><b>Mobile terrain</b><ul class="clean"><li>Gabarits mesures JSON (module_settings)</li><li>Soumissions idempotentes (client_submission_id)</li><li>Photos géotaggées</li></ul></div>
+    <div class="card"><b>Administration</b><ul class="clean"><li>Rôles : lab_admin, lab_technician, client, site_contact</li><li>Access groups + permissions JSON</li><li>Extrafields, module_settings, branding PDF</li></ul></div>
+    <div class="card"><b>Traçabilité</b><ul class="clean"><li>Audit trail (activity_logs)</li><li>Cadrage ISO 17025 (lab_cadrage)</li><li>Attachments polymorphes</li></ul></div>
+  </div>
+</section>
+
+<section id="archi">
+  <h2>3. Architecture technique</h2>
+  <div class="mermaid">
+flowchart LR
+  subgraph clients[Clients]
+    U1[Collaborateurs labo]
+    U2[Techniciens terrain]
+    U3[Clients finaux]
+  end
+
+  subgraph front[Frontaux]
+    WEB[React 18 SPA<br/>Vite / React Query]
+    MOB[App mobile Expo<br/>iOS / Android]
+  end
+
+  subgraph api[Backend]
+    LAR[Laravel 11 API<br/>Sanctum Bearer]
+    PDF[Générateur PDF Blade]
+    MAIL[Mail Service]
+  end
+
+  subgraph data[Données]
+    DB[(MySQL / PostgreSQL)]
+    FS[Stockage fichiers<br/>attachments + rapports]
+  end
+
+  subgraph infra[Infra]
+    NGX[Nginx + PHP-FPM]
+    GHA[GitHub Actions<br/>Deploy SSH :167]
+  end
+
+  U1 --> WEB
+  U2 --> MOB
+  U3 --> WEB
+  WEB -->|HTTPS REST JSON| LAR
+  MOB -->|HTTPS REST JSON| LAR
+  LAR --> DB
+  LAR --> PDF
+  LAR --> MAIL
+  LAR --> FS
+  LAR --- NGX
+  GHA --> NGX
+
+  classDef soft fill:#162238,stroke:#22304d,color:#e6edf7
+  class clients,front,api,data,infra soft
+  </div>
+  <div class="legend">
+    <span><span class="dot" style="background:#14b8a6"></span>API & services</span>
+    <span><span class="dot" style="background:#0ea5e9"></span>Frontaux</span>
+    <span><span class="dot" style="background:#f59e0b"></span>Infra CI/CD</span>
+  </div>
+</section>
+
+<section id="schema">
+  <h2>4. Schéma de base de données</h2>
+  <p>Vue d'ensemble des entités principales et leurs relations. Couleurs par domaine fonctionnel.</p>
+
+  <h3>4.1 Diagramme relationnel (ER)</h3>
+  <div class="mermaid">
+erDiagram
+  CLIENT ||--o{ AGENCY : "a"
+  CLIENT ||--o{ CLIENT_ADDRESS : "adresses"
+  CLIENT ||--o{ SITE : "chantiers"
+  CLIENT ||--o{ USER : "utilisateurs (portail)"
+  AGENCY ||--o{ SITE : "rattachées"
+  AGENCY }o--o{ USER : "agency_user"
+
+  SITE ||--o{ MISSION : "missions G1..G5"
+  MISSION ||--o{ BOREHOLE : "forages"
+  BOREHOLE ||--o{ LITHOLOGY_LAYER : "couches"
+  BOREHOLE ||--o{ SAMPLE : "échantillons"
+
+  CLIENT ||--o{ ORDER : "commandes"
+  SITE ||--o{ ORDER : ""
+  AGENCY ||--o{ ORDER : ""
+  ORDER ||--o{ ORDER_ITEM : "lignes"
+  ORDER_ITEM }o--|| TEST_TYPE : "essai"
+  TEST_TYPE ||--o{ TEST_TYPE_PARAM : "paramètres"
+  ORDER_ITEM ||--o{ SAMPLE : "échantillons"
+  SAMPLE ||--o{ TEST_RESULT : "résultats"
+  TEST_RESULT }o--|| TEST_TYPE_PARAM : ""
+
+  ORDER ||--o{ REPORT : "rapports PDF"
+  REPORT }o--|| REPORT_PDF_TEMPLATE : "template"
+  REPORT }o--o| REPORT_FORM_DEFINITION : "formulaire"
+
+  CLIENT ||--o{ QUOTE : "devis"
+  CLIENT ||--o{ INVOICE : "factures"
+  QUOTE ||--o{ QUOTE_LINE : "lignes"
+  INVOICE ||--o{ INVOICE_LINE : "lignes"
+  INVOICE }o--o{ ORDER : "invoice_orders"
+  QUOTE_LINE }o--o| COMMERCIAL_OFFERING : "produit/service"
+  QUOTE }o--o| DOCUMENT_PDF_TEMPLATE : ""
+  INVOICE }o--o| DOCUMENT_PDF_TEMPLATE : ""
+
+  USER ||--o{ ACCESS_GROUP_USER : ""
+  ACCESS_GROUP ||--o{ ACCESS_GROUP_USER : ""
+
+  ORDER ||--o{ MOBILE_MEASURE_SUBMISSION : "terrain"
+  SITE ||--o{ MOBILE_MEASURE_SUBMISSION : ""
+  ORDER ||--o{ MOBILE_DOSSIER_PHOTO : ""
+  SITE ||--o{ MOBILE_DOSSIER_PHOTO : ""
+
+  CLIENT {
+    bigint id PK
+    string name
+    string city
+    string postal_code
+    string siret
+    string ice "MA"
+    string rc
+    string patente
+    string if_number
+    string cnss_employer
+    decimal capital_social
+    json meta
+  }
+  SITE {
+    bigint id PK
+    bigint client_id FK
+    bigint agency_id FK
+    string name
+    string reference
+    decimal latitude
+    decimal longitude
+    decimal travel_fee_quote_ht
+    decimal travel_fee_invoice_ht
+  }
+  MISSION {
+    bigint id PK
+    bigint site_id FK
+    string reference
+    string mission_status "g1..g5"
+    string maitre_ouvrage_name
+  }
+  BOREHOLE {
+    bigint id PK
+    bigint mission_id FK
+    string code
+    decimal latitude
+    decimal longitude
+    decimal ground_level_m
+  }
+  ORDER {
+    bigint id PK
+    string reference
+    bigint client_id FK
+    bigint site_id FK
+    bigint agency_id FK
+    string status
+    date order_date
+    date delivery_date
+  }
+  SAMPLE {
+    bigint id PK
+    bigint order_item_id FK
+    bigint borehole_id FK
+    string reference
+    decimal depth_top_m
+    decimal depth_bottom_m
+    string status
+  }
+  TEST_RESULT {
+    bigint id PK
+    bigint sample_id FK
+    bigint test_type_param_id FK
+    string value
+    bigint created_by FK
+  }
+  REPORT {
+    bigint id PK
+    bigint order_id FK
+    bigint pdf_template_id FK
+    string filename
+    json form_data
+    timestamp signed_at
+    string review_status
+  }
+  INVOICE {
+    bigint id PK
+    string number
+    bigint client_id FK
+    date invoice_date
+    date due_date
+    decimal amount_ht
+    decimal amount_ttc
+    decimal tva_rate
+    string status
+  }
+  QUOTE {
+    bigint id PK
+    string number
+    bigint client_id FK
+    bigint site_id FK
+    date valid_until
+    decimal amount_ttc
+    string status
+  }
+  </div>
+
+  <h3>4.2 Répartition par domaine fonctionnel</h3>
+  <div class="grid cols-2">
+    <div class="card">
+      <b><span class="pill">Référentiel</span></b>
+      <table>
+        <tr><th>Table</th><th>Rôle</th></tr>
+        <tr><td><code>clients</code></td><td>Fiche client + spécificités Maroc (ICE, RC, Patente, IF, CNSS)</td></tr>
+        <tr><td><code>client_addresses</code></td><td>Adresses facturation / livraison</td></tr>
+        <tr><td><code>agencies</code> / <code>agency_user</code></td><td>Agences du client (multi-tenant interne)</td></tr>
+        <tr><td><code>sites</code></td><td>Chantiers (GPS, frais déplacement)</td></tr>
+        <tr><td><code>users</code> / <code>access_groups</code></td><td>Utilisateurs, rôles, permissions JSON</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <b><span class="pill">Géotechnique</span></b>
+      <table>
+        <tr><th>Table</th><th>Rôle</th></tr>
+        <tr><td><code>missions</code></td><td>Missions G1 à G5, maître d'ouvrage</td></tr>
+        <tr><td><code>boreholes</code></td><td>Forages avec GPS et cote sol</td></tr>
+        <tr><td><code>lithology_layers</code></td><td>Couches géologiques (profondeur, RQD)</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <b><span class="pill">Essais &amp; résultats</span></b>
+      <table>
+        <tr><th>Table</th><th>Rôle</th></tr>
+        <tr><td><code>test_types</code> / <code>test_type_params</code></td><td>Catalogue essais + paramètres (normes, seuils)</td></tr>
+        <tr><td><code>orders</code> / <code>order_items</code></td><td>Commandes et lignes d'essais</td></tr>
+        <tr><td><code>samples</code></td><td>Échantillons (lien forage + profondeur)</td></tr>
+        <tr><td><code>test_results</code></td><td>Valeurs des paramètres mesurés</td></tr>
+        <tr><td><code>reports</code> / <code>report_pdf_templates</code></td><td>Rapports PDF + signature + revue</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <b><span class="pill">Commercial</span></b>
+      <table>
+        <tr><th>Table</th><th>Rôle</th></tr>
+        <tr><td><code>quotes</code> / <code>quote_lines</code></td><td>Devis multi-lignes, remises, TVA par ligne</td></tr>
+        <tr><td><code>invoices</code> / <code>invoice_lines</code></td><td>Factures + pivot <code>invoice_orders</code></td></tr>
+        <tr><td><code>commercial_offerings</code></td><td>Catalogue produits/services + stock</td></tr>
+        <tr><td><code>document_pdf_templates</code></td><td>Templates PDF (classique / détaillé TVA)</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <b><span class="pill">Mobile terrain</span></b>
+      <table>
+        <tr><th>Table</th><th>Rôle</th></tr>
+        <tr><td><code>mobile_measure_submissions</code></td><td>Mesures terrain, idempotence par <code>client_submission_id</code></td></tr>
+        <tr><td><code>mobile_dossier_photos</code></td><td>Métadonnées photos, lien vers attachment</td></tr>
+        <tr><td><code>report_form_definitions</code></td><td>Gabarits formulaires dynamiques</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <b><span class="pill">Transverse / config</span></b>
+      <table>
+        <tr><th>Table</th><th>Rôle</th></tr>
+        <tr><td><code>attachments</code></td><td>Pièces jointes polymorphes</td></tr>
+        <tr><td><code>mail_templates</code> / <code>mail_logs</code></td><td>Templates et historique emails</td></tr>
+        <tr><td><code>activity_logs</code></td><td>Audit trail (qui a fait quoi)</td></tr>
+        <tr><td><code>extrafield_definitions</code> / <code>extrafield_values</code></td><td>Champs custom par entité</td></tr>
+        <tr><td><code>module_settings</code></td><td>Config dynamique (TVA, branding, mobile templates)</td></tr>
+        <tr><td><code>lab_cadrage</code></td><td>Données cadrage ISO 17025 / SNIMA</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="workflow">
+  <h2>5. Workflow métier (bout-en-bout)</h2>
+  <div class="mermaid">
+flowchart TD
+  A[Demande / Devis] --> B{Accepté ?}
+  B -- Non --> X[Devis rejeté]
+  B -- Oui --> C[Création commande<br/>+ mission + forages]
+  C --> D[Prélèvement terrain<br/>mobile : mesures + photos + GPS]
+  D --> E[Enregistrement échantillons<br/>lien forage + profondeur]
+  E --> F[Essais labo<br/>saisie résultats par paramètre]
+  F --> G[Calculs BTP<br/>fck, MF, SE, CBR, IP…]
+  G --> H[Génération rapport PDF<br/>template + form_data]
+  H --> I{Revue interne}
+  I -- Corrections --> F
+  I -- Approuvé --> J[Signature électronique]
+  J --> K[Envoi client<br/>mail + pièce jointe]
+  K --> L[Facturation<br/>from-orders → invoice]
+  L --> M[Paiement<br/>statut paid]
+
+  style A fill:#14b8a6,stroke:#0e8a81,color:#fff
+  style L fill:#0ea5e9,stroke:#0369a1,color:#fff
+  style M fill:#22c55e,stroke:#166534,color:#fff
+  </div>
+</section>
+
+<section id="planning">
+  <h2>6. Planning &amp; feuille de route</h2>
+
+  <h3>6.1 Phasage global</h3>
+  <div class="grid cols-3">
+    <div class="phase-card">
+      <div class="delay">MVP · 6–10 semaines</div>
+      <h4>Lot 1 — Référentiel &amp; essais <span class="badge b-ok">livré</span></h4>
+      <ul class="clean">
+        <li>Clients, agences, sites, missions, forages</li>
+        <li>Catalogue essais + normes</li>
+        <li>Commandes → échantillons → résultats</li>
+        <li>Rapports PDF + signature</li>
+        <li>Devis / factures FR + MA</li>
+      </ul>
+    </div>
+    <div class="phase-card v1">
+      <div class="delay">V1 · 10–16 semaines</div>
+      <h4>Lot 2 — Industrialisation <span class="badge b-info">en cours</span></h4>
+      <ul class="clean">
+        <li>Planning techniciens + équipements</li>
+        <li>Gestion étalonnages (certificats, échéances)</li>
+        <li>Non-conformités + actions correctives</li>
+        <li>Audit trail renforcé (diff valeurs)</li>
+        <li>Bilingue FR/AR (interface + PDF)</li>
+      </ul>
+    </div>
+    <div class="phase-card v2">
+      <div class="delay">V2 · 16+ semaines</div>
+      <h4>Lot 3 — Ouverture &amp; BI <span class="badge b-warn">planifié</span></h4>
+      <ul class="clean">
+        <li>Connecteurs instruments (presse, balance, CSV/RS232)</li>
+        <li>Portail client PDF + paiement en ligne</li>
+        <li>BI / KPI (Metabase, Superset)</li>
+        <li>Multi-labos / multi-sociétés</li>
+        <li>IA : détection anomalies résultats</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>6.2 Gantt prévisionnel</h3>
+  <div class="gantt-wrap">
+  <div class="mermaid">
+gantt
+  title Roadmap s2gBot — Avril 2026 → T1 2027
+  dateFormat  YYYY-MM-DD
+  axisFormat  %b %Y
+  section MVP (livré)
+  Référentiel + flux essais     :done, mvp1, 2025-11-01, 2026-02-15
+  Rapports PDF + signature      :done, mvp2, 2026-01-15, 2026-03-15
+  Facturation FR + MA (ICE/RC)  :done, mvp3, 2026-02-01, 2026-04-15
+
+  section V1 Industrialisation
+  Planning &amp; équipements         :active, v11, 2026-04-21, 35d
+  Étalonnages &amp; certificats      :v12, after v11, 21d
+  Non-conformités / CAPA        :v13, after v11, 28d
+  Audit trail renforcé (diff)   :v14, 2026-05-15, 21d
+  Bilingue FR / AR              :v15, 2026-06-01, 28d
+  Tests recette V1              :milestone, 2026-07-31, 0d
+
+  section V2 Ouverture
+  Connecteurs instruments       :v21, 2026-08-01, 42d
+  Portail client + paiement     :v22, 2026-08-15, 35d
+  BI / KPI (Metabase)           :v23, 2026-09-15, 28d
+  Multi-labos                   :v24, 2026-10-01, 35d
+  IA anomalies résultats        :v25, 2026-11-01, 28d
+  Mise en production V2         :milestone, 2027-01-15, 0d
+  </div>
+  </div>
+</section>
+
+<section id="amelio">
+  <h2>7. Améliorations recommandées</h2>
+
+  <h3>7.1 Court terme (0–3 mois) — quick wins</h3>
+  <table>
+    <thead><tr><th>#</th><th>Amélioration</th><th>Gain</th><th>Effort</th><th>Priorité</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Index composite <code>(client_id, status)</code> sur <code>invoices</code> et <code>orders</code></td><td>Dashboards × 3–5 en vitesse</td><td>S</td><td><span class="badge b-risk">Haute</span></td></tr>
+      <tr><td>2</td><td>Endpoint <code>/invoices/unpaid</code> dédié + filtre multi-statuts</td><td>Simplifie app mobile impayés</td><td>S</td><td><span class="badge b-risk">Haute</span></td></tr>
+      <tr><td>3</td><td>PDF accessible au client (URL signée temporaire)</td><td>Self-service portail</td><td>M</td><td><span class="badge b-risk">Haute</span></td></tr>
+      <tr><td>4</td><td>Relances automatiques factures (<code>sent → relanced</code>) via scheduler</td><td>−30 % délai moyen paiement</td><td>M</td><td><span class="badge b-warn">Moyenne</span></td></tr>
+      <tr><td>5</td><td>Exports comptables (Sage, CEGID, écriture CSV)</td><td>Intégration ERP client</td><td>M</td><td><span class="badge b-warn">Moyenne</span></td></tr>
+      <tr><td>6</td><td>Versioning rapports (soft-delete + historique <code>form_data</code>)</td><td>Conformité ISO 17025</td><td>M</td><td><span class="badge b-warn">Moyenne</span></td></tr>
+      <tr><td>7</td><td>Tests automatisés (PHPUnit + Playwright)</td><td>Fiabilité déploiements</td><td>L</td><td><span class="badge b-warn">Moyenne</span></td></tr>
+      <tr><td>8</td><td>Séparation DB logs / DB métier (<code>activity_logs</code> archivé)</td><td>Perf + rétention</td><td>M</td><td><span class="badge b-info">Basse</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>7.2 Moyen terme (3–9 mois) — industrialisation</h3>
+  <table>
+    <thead><tr><th>#</th><th>Amélioration</th><th>Impact</th></tr></thead>
+    <tbody>
+      <tr><td>9</td><td><b>Module équipements</b> (balances, presses) + étalonnages + alertes échéance</td><td>Accréditation SNIMA / ISO 17025 rendue possible</td></tr>
+      <tr><td>10</td><td><b>Module non-conformités</b> + actions correctives (workflow 8D)</td><td>Qualité et traçabilité</td></tr>
+      <tr><td>11</td><td><b>Planning techniciens</b> (drag &amp; drop, affectation essais)</td><td>+20 % productivité labo</td></tr>
+      <tr><td>12</td><td><b>Bilingue FR / AR</b> (i18next + PDF RTL)</td><td>Obligatoire pour clients publics Maroc</td></tr>
+      <tr><td>13</td><td><b>Notifications temps réel</b> (Laravel Reverb + WebSocket)</td><td>Retour terrain immédiat</td></tr>
+      <tr><td>14</td><td><b>Offline-first mobile</b> (SQLite local, sync delta)</td><td>Saisie chantier sans réseau</td></tr>
+      <tr><td>15</td><td><b>Rôles fins via <code>access_groups.permissions</code></b> (CASL/Laravel Gates)</td><td>Sécurité granulaire</td></tr>
+    </tbody>
+  </table>
+
+  <h3>7.3 Long terme (9–18 mois) — différenciation</h3>
+  <table>
+    <thead><tr><th>#</th><th>Amélioration</th><th>Impact</th></tr></thead>
+    <tbody>
+      <tr><td>16</td><td><b>Connecteurs instruments</b> (CSV watcher, RS232, API Bluetooth)</td><td>Zéro double-saisie</td></tr>
+      <tr><td>17</td><td><b>Portail client</b> avec paiement en ligne (CMI Maroc, Stripe FR)</td><td>Réduction DSO</td></tr>
+      <tr><td>18</td><td><b>BI embarqué</b> (Metabase + vues matérialisées)</td><td>Pilotage multi-labo</td></tr>
+      <tr><td>19</td><td><b>IA détection anomalies résultats</b> (scikit-learn, alertes hors seuils)</td><td>Qualité proactive</td></tr>
+      <tr><td>20</td><td><b>OCR rapports anciens</b> (Tesseract / Claude Vision) pour migration Excel</td><td>Onboarding clients historiques</td></tr>
+      <tr><td>21</td><td><b>Multi-tenant strict</b> (database per tenant ou <code>tenant_id</code> partout)</td><td>SaaS multi-clients</td></tr>
+      <tr><td>22</td><td><b>API publique documentée</b> (Swagger / OpenAPI + webhooks)</td><td>Intégrations tierces (n8n, Make)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>7.4 Dette technique à adresser</h3>
+  <div class="card">
+    <ul class="clean">
+      <li>Supprimer ou archiver le dossier <code>services/</code> (anciens microservices Node non utilisés).</li>
+      <li>Harmoniser le JSON <code>meta</code> sur toutes les entités (schema JSON par entité + validation).</li>
+      <li>Mutualiser les templates PDF (3 templates redondants actuellement, <code>layout_config</code> à étendre).</li>
+      <li>Migration SQLite → PostgreSQL en prod (index JSON, performance, concurrency).</li>
+      <li>Normaliser les statuts (enum PHP partagé entre Laravel et React au lieu de strings libres).</li>
+    </ul>
+  </div>
+</section>
+
+<section id="risques">
+  <h2>8. Risques &amp; mitigation</h2>
+  <table>
+    <thead><tr><th>Risque</th><th>Probabilité</th><th>Impact</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td>Non-conformité SNIMA / ISO 17025 sur audit trail</td><td><span class="badge b-warn">Moyenne</span></td><td><span class="badge b-risk">Fort</span></td><td>Prioriser V1 audit trail + signatures + étalonnages (lot 2)</td></tr>
+      <tr><td>Saisie terrain sans réseau (zones chantier Maroc)</td><td><span class="badge b-risk">Haute</span></td><td><span class="badge b-warn">Moyen</span></td><td>Mode offline-first mobile + sync delta (lot 3)</td></tr>
+      <tr><td>Perte de données / mauvaise restauration</td><td><span class="badge b-info">Basse</span></td><td><span class="badge b-risk">Fort</span></td><td>Sauvegardes quotidiennes + restore drill mensuel</td></tr>
+      <tr><td>Dépendance Dolibarr implicite (si décision change)</td><td><span class="badge b-info">Basse</span></td><td><span class="badge b-warn">Moyen</span></td><td>API ouverte + exports CSV pour portabilité</td></tr>
+      <tr><td>Performance dashboards avec volume (&gt;50k résultats)</td><td><span class="badge b-warn">Moyenne</span></td><td><span class="badge b-warn">Moyen</span></td><td>Index composite + vues matérialisées BI (V2)</td></tr>
+      <tr><td>Sécurité tokens mobile (Sanctum, vol device)</td><td><span class="badge b-info">Basse</span></td><td><span class="badge b-risk">Fort</span></td><td>TTL courts + révocation par device_name + biométrie app</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>
+  <div><b>s2gBot</b> — Plateforme LIMS BTP — document de présentation client · 20 avril 2026</div>
+  <div>BDC / anexys · <a href="mailto:support@anexys.fr" style="color:var(--primary);text-decoration:none">support@anexys.fr</a></div>
+</footer>
+
+</div>
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:"dark",
+    themeVariables:{
+      background:"#162238",
+      primaryColor:"#14b8a6",
+      primaryTextColor:"#e6edf7",
+      primaryBorderColor:"#0ea5e9",
+      lineColor:"#97a3bf",
+      secondaryColor:"#0ea5e9",
+      tertiaryColor:"#162238",
+      clusterBkg:"#0b1220",
+      clusterBorder:"#22304d",
+      edgeLabelBackground:"#111a2c"
+    },
+    er:{layoutDirection:"LR",useMaxWidth:true},
+    gantt:{useMaxWidth:true,barHeight:18,fontSize:12}
+  });
+</script>
+</body>
+</html>

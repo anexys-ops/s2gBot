@@ -37,6 +37,18 @@ export default function LaboHub() {
       desc: 'Créer un dossier de commande laboratoire.',
       icon: 'plus',
     },
+    {
+      to: '/labo/fiches',
+      title: 'Fiches techniques',
+      desc: 'Modèles de saisie dynamiques (Proctor, compression, densité, pressiomètre).',
+      icon: 'lab',
+    },
+    {
+      to: '/labo/taches',
+      title: 'Tâches labo',
+      desc: 'Mesures et conformités par tâche d’essai.',
+      icon: 'orders',
+    },
   ]
 
   if (isLab) {

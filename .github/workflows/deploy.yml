@@ -79,29 +79,36 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          rsync -avz --delete \
-            --exclude='.git' \
-            --exclude='node_modules' \
-            --exclude='vendor' \
-            --exclude='.env' \
-            --exclude='.env.docker' \
-            --exclude='laravel-api/storage/logs/*' \
-            --exclude='laravel-api/storage/framework/cache/*' \
-            --exclude='laravel-api/storage/framework/sessions/*' \
-            --exclude='laravel-api/storage/framework/views/*' \
-            --exclude='react-frontend/dist' \
-            --exclude='.run' \
-            --exclude='PROLAB/' \
-            --exclude='BD_S2G_PROLAB/' \
-            --exclude='*.zip' \
-            --exclude='*.fic' \
-            --exclude='*.FIC' \
-            --exclude='*.ndx' \
-            --exclude='*.pptx' \
-            --exclude='*.html' \
-            --exclude='cursor-tasks/' \
-            -e "ssh -i ~/.ssh/deploy_key -p 167 -o StrictHostKeyChecking=accept-new" \
-            ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+          # Retry rsync jusqu'à 3 fois (fail2ban / reset réseau transitoire)
+          for attempt in 1 2 3; do
+            rsync -avz --delete \
+              --exclude='.git' \
+              --exclude='.claude' \
+              --exclude='node_modules' \
+              --exclude='vendor' \
+              --exclude='.env' \
+              --exclude='.env.docker' \
+              --exclude='laravel-api/storage/logs/*' \
+              --exclude='laravel-api/storage/framework/cache/*' \
+              --exclude='laravel-api/storage/framework/sessions/*' \
+              --exclude='laravel-api/storage/framework/views/*' \
+              --exclude='react-frontend/dist' \
+              --exclude='.run' \
+              --exclude='PROLAB/' \
+              --exclude='BD_S2G_PROLAB/' \
+              --exclude='apps/' \
+              --exclude='*.zip' \
+              --exclude='*.fic' \
+              --exclude='*.FIC' \
+              --exclude='*.ndx' \
+              --exclude='*.pptx' \
+              --exclude='*.html' \
+              --exclude='cursor-tasks/' \
+              -e "ssh -i ~/.ssh/deploy_key -p 167 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30" \
+              ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/" && break
+            echo "⚠ rsync tentative $attempt échouée (exit $?), nouvelle tentative dans 10s..."
+            sleep 10
+          done
           echo "✓ Code synchronisé"
 
       - name: Déployer sur serveur (SSH)

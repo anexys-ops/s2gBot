@@ -112,65 +112,70 @@ jobs:
           echo "✓ Code synchronisé"
 
       - name: Déployer sur serveur (SSH)
-        uses: appleboy/ssh-action@v1.2.5
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 167
-          # Build Docker (NO_CACHE=1 par défaut) peut dépasser le délai implicite court
-          command_timeout: 45m
-          # Ne pas s’appuyer sur `envs` (drone-ssh) : variables parfois absentes côté distant → `cd` silencieux + exit 1.
-          # On injecte ici avec toJSON (échappement sûr des chemins / versions).
-          script: |
-            set -eu
-            DEPLOY_PATH=${{ toJSON(secrets.DEPLOY_PATH) }}
-            PKG_VER=${{ toJSON(steps.ver.outputs.pkg_ver) }}
-            GIT_SHA_FULL=${{ toJSON(github.sha) }}
-            # POSIX (dash sur /bin/sh) : pas de ${var:0:7} ; ssh n’exécute pas le shebang si script inline
-            GIT_COMMIT_SHORT=$(printf '%.7s' "$GIT_SHA_FULL")
+        # SSH direct (une seule connexion) — appleboy/drone-ssh v1.8.2 faisait des tentatives
+        # multiples qui déclenchaient fail2ban après le rsync → handshake reset by peer.
+        # ServerAliveInterval maintient la connexion vivante pendant le build Docker (~10-20 min).
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          PKG_VER: ${{ steps.ver.outputs.pkg_ver }}
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          GIT_COMMIT_SHORT=$(printf ‘%.7s’ "$GIT_SHA")
 
-            echo "=========================================="
-            echo "▶ Deploy s2gBot"
-            echo "▶ Commit : $GIT_SHA_FULL ($GIT_COMMIT_SHORT)"
-            echo "▶ Version package : $PKG_VER"
-            echo "▶ Cible : $DEPLOY_PATH"
-            echo "=========================================="
+          echo "=========================================="
+          echo "▶ Deploy s2gBot"
+          echo "▶ Commit : $GIT_SHA ($GIT_COMMIT_SHORT)"
+          echo "▶ Version package : $PKG_VER"
+          echo "▶ Cible : $DEPLOY_PATH"
+          echo "=========================================="
 
-            if [ -z "$DEPLOY_PATH" ]; then
-              echo "❌ DEPLOY_PATH vide (secret GitHub Actions manquant ?)"
-              exit 1
-            fi
-            if [ ! -d "$DEPLOY_PATH" ]; then
-              echo "❌ Répertoire inexistant : $DEPLOY_PATH"
-              exit 1
-            fi
+          ssh -i ~/.ssh/deploy_key \
+              -p 167 \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=30 \
+              -o ServerAliveInterval=60 \
+              -o ServerAliveCountMax=45 \
+              "$DEPLOY_USER@$DEPLOY_HOST" \
+              "export DEPLOY_PATH=’${DEPLOY_PATH}’ PKG_VER=’${PKG_VER}’ GIT_COMMIT_SHORT=’${GIT_COMMIT_SHORT}’; bash -s" << ‘ENDSSH’
+          set -eu
 
-            if ! cd "$DEPLOY_PATH"; then
-              echo "❌ Impossible d’accéder au répertoire (permissions ?) : $DEPLOY_PATH"
-              exit 1
-            fi
-            if [ ! -f .env.docker ]; then
-              echo "❌ Fichier .env.docker absent (obligatoire pour docker compose / docker-prod-refresh.sh)."
-              echo "   Le rsync n’envoie pas ce fichier. Sur le serveur, une fois :"
-              echo "   cp $DEPLOY_PATH/docker/env.docker.example $DEPLOY_PATH/.env.docker"
-              echo "   Puis éditer DB, APP_KEY, HTTP_PORT, etc., puis relancer le workflow (ou push)."
-              exit 1
-            fi
-            chmod +x scripts/*.sh 2>/dev/null || true
+          if [ -z "$DEPLOY_PATH" ]; then
+            echo "❌ DEPLOY_PATH vide (secret GitHub Actions manquant ?)"
+            exit 1
+          fi
+          if [ ! -d "$DEPLOY_PATH" ]; then
+            echo "❌ Répertoire inexistant : $DEPLOY_PATH"
+            exit 1
+          fi
 
-            if grep -q '^APP_VERSION=' .env.docker; then
-              sed -i "s|^APP_VERSION=.*|APP_VERSION=$PKG_VER|" .env.docker
-            else
-              printf '\nAPP_VERSION=%s\n' "$PKG_VER" >> .env.docker
-            fi
-            if grep -q '^GIT_COMMIT_SHORT=' .env.docker; then
-              sed -i "s|^GIT_COMMIT_SHORT=.*|GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT|" .env.docker
-            else
-              printf 'GIT_COMMIT_SHORT=%s\n' "$GIT_COMMIT_SHORT" >> .env.docker
-            fi
-            echo "✓ .env.docker mis à jour (APP_VERSION=$PKG_VER, GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT)"
+          if ! cd "$DEPLOY_PATH"; then
+            echo "❌ Impossible d’accéder au répertoire (permissions ?) : $DEPLOY_PATH"
+            exit 1
+          fi
+          if [ ! -f .env.docker ]; then
+            echo "❌ Fichier .env.docker absent (obligatoire pour docker compose / docker-prod-refresh.sh)."
+            echo "   Le rsync n’envoie pas ce fichier. Sur le serveur, une fois :"
+            echo "   cp $DEPLOY_PATH/docker/env.docker.example $DEPLOY_PATH/.env.docker"
+            echo "   Puis éditer DB, APP_KEY, HTTP_PORT, etc., puis relancer le workflow (ou push)."
+            exit 1
+          fi
+          chmod +x scripts/*.sh 2>/dev/null || true
 
-            echo "▶ Exécution docker-prod-refresh.sh"
-            ./scripts/docker-prod-refresh.sh
-            echo "✓ Déploiement terminé"
+          if grep -q ‘^APP_VERSION=’ .env.docker; then
+            sed -i "s|^APP_VERSION=.*|APP_VERSION=$PKG_VER|" .env.docker
+          else
+            printf ‘\nAPP_VERSION=%s\n’ "$PKG_VER" >> .env.docker
+          fi
+          if grep -q ‘^GIT_COMMIT_SHORT=’ .env.docker; then
+            sed -i "s|^GIT_COMMIT_SHORT=.*|GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT|" .env.docker
+          else
+            printf ‘GIT_COMMIT_SHORT=%s\n’ "$GIT_COMMIT_SHORT" >> .env.docker
+          fi
+          echo "✓ .env.docker mis à jour (APP_VERSION=$PKG_VER, GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT)"
+
+          echo "▶ Exécution docker-prod-refresh.sh"
+          ./scripts/docker-prod-refresh.sh
+          echo "✓ Déploiement terminé"
+          ENDSSH

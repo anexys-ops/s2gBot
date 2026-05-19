@@ -176,16 +176,11 @@ jobs:
           fi
           chmod +x scripts/*.sh 2>/dev/null || true
 
-          if grep -q ‘^APP_VERSION=’ .env.docker; then
-            sed -i "s|^APP_VERSION=.*|APP_VERSION=$PKG_VER|" .env.docker
-          else
-            printf ‘\nAPP_VERSION=%s\n’ "$PKG_VER" >> .env.docker
-          fi
-          if grep -q ‘^GIT_COMMIT_SHORT=’ .env.docker; then
-            sed -i "s|^GIT_COMMIT_SHORT=.*|GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT|" .env.docker
-          else
-            printf ‘GIT_COMMIT_SHORT=%s\n’ "$GIT_COMMIT_SHORT" >> .env.docker
-          fi
+          # Mise à jour idempotente : supprime les anciennes lignes puis réinsère proprement.
+          # (évite la corruption de type printf-\n lors d’un premier déploiement)
+          sed -i ‘/^APP_VERSION=/d; /^GIT_COMMIT_SHORT=/d’ .env.docker
+          echo "APP_VERSION=$PKG_VER" >> .env.docker
+          echo "GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT" >> .env.docker
           echo "✓ .env.docker mis à jour (APP_VERSION=$PKG_VER, GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT)"
 
           echo "▶ Exécution docker-prod-refresh.sh"

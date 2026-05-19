@@ -43,8 +43,6 @@ import TerrainChantiersCartePage from './pages/TerrainChantiersCartePage'
 import LaboEssaisPage from './pages/LaboEssaisPage'
 import LaboTasksPage from './pages/labo/LaboTasksPage'
 import FichesTechniquesPage from './pages/labo/FichesTechniquesPage'
-import LabReportsListPage from './pages/labo/LabReportsListPage'
-import LabReportViewPage from './pages/labo/LabReportViewPage'
 import TerrainTasksPage from './pages/terrain/TerrainTasksPage'
 import ExpenseReportsPage from './pages/terrain/ExpenseReportsPage'
 import PlanningGlobalPage from './pages/planning/PlanningGlobalPage'
@@ -176,6 +174,13 @@ function AppRoutes() {
         <Route path="labo/fiches" element={<FichesTechniquesPage />} />
         <Route path="labo/rapports" element={<LabReportsListPage />} />
         <Route path="labo/rapports/:reportId" element={<LabReportViewPage />} />
+        <Route path="labo/reception" element={<LaboReceptionPage />} />
+        <Route path="labo/odm" element={<LaboOdmPage />} />
+        <Route path="labo/planning" element={<PlanningLaboPage />} />
+        <Route path="labo/transco" element={<TranscoFoldPage />} />
+        <Route path="ingenierie/odm" element={<OdmIngenieurPage />} />
+        <Route path="ingenierie/taches" element={<TachesIngenieurPage />} />
+        <Route path="ingenierie/planning" element={<PlanningIngenieurPage />} />
         <Route path="terrain/taches" element={<TerrainTasksPage />} />
         <Route path="notes-de-frais" element={<ExpenseReportsPage />} />
         <Route path="notes-de-frais/:id" element={<ExpenseReportsPage />} />
@@ -238,6 +243,7 @@ function AppRoutes() {
           <Route path="groupes" element={<SettingsGroupsPage />} />
           <Route path="charte" element={<SettingsBrandingPage />} />
         </Route>
+        <Route path="config/agences" element={<AgencesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

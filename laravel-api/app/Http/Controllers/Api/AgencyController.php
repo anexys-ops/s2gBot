@@ -101,6 +101,145 @@ class AgencyController extends Controller
         return response()->json(null, 204);
     }
 
+    // ── Standalone agences (v1.2.0 — système multi-agences labo) ────────────
+
+    /**
+     * Liste paginée des agences labo (indépendant du client).
+     */
+    public function indexStandalone(Request $request): JsonResponse
+    {
+        $query = Agency::withCount('users');
+
+        if ($request->boolean('active')) {
+            $query->where('active', true);
+        }
+
+        return response()->json(
+            $query->orderByDesc('is_siege')->orderBy('name')
+                ->paginate((int) $request->query('per_page', 50))
+        );
+    }
+
+    /**
+     * Crée une agence labo standalone.
+     */
+    public function storeStandalone(Request $request): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $validated = $request->validate([
+            'name'     => 'required|string|max:255',
+            'code'     => 'required|string|max:64|unique:agencies,code',
+            'address'  => 'nullable|string',
+            'city'     => 'nullable|string|max:128',
+            'phone'    => 'nullable|string|max:50',
+            'email'    => 'nullable|email|max:255',
+            'is_siege' => 'sometimes|boolean',
+            'active'   => 'sometimes|boolean',
+        ]);
+
+        $agency = Agency::create($validated);
+
+        return response()->json($agency->loadCount('users'), 201);
+    }
+
+    /**
+     * Affiche une agence labo avec le nombre d'utilisateurs.
+     */
+    public function showStandalone(int $id): JsonResponse
+    {
+        $agency = Agency::withCount('users')->findOrFail($id);
+
+        return response()->json($agency);
+    }
+
+    /**
+     * Met à jour une agence labo standalone.
+     */
+    public function updateStandalone(Request $request, int $id): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $agency = Agency::findOrFail($id);
+
+        $validated = $request->validate([
+            'name'     => 'sometimes|string|max:255',
+            'code'     => 'sometimes|string|max:64|unique:agencies,code,'.$agency->id,
+            'address'  => 'nullable|string',
+            'city'     => 'nullable|string|max:128',
+            'phone'    => 'nullable|string|max:50',
+            'email'    => 'nullable|email|max:255',
+            'is_siege' => 'sometimes|boolean',
+            'active'   => 'sometimes|boolean',
+        ]);
+
+        $agency->update($validated);
+
+        return response()->json($agency->fresh()->loadCount('users'));
+    }
+
+    /**
+     * Supprime une agence labo (interdit si is_siege).
+     */
+    public function destroyStandalone(Request $request, int $id): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $agency = Agency::findOrFail($id);
+
+        if ($agency->is_siege) {
+            return response()->json(['message' => 'Impossible de supprimer l\'agence siège.'], 422);
+        }
+
+        $agency->delete();
+
+        return response()->json(null, 204);
+    }
+
+    /**
+     * Assigne un utilisateur à cette agence (met à jour users.agency_id).
+     */
+    public function assignUser(Request $request, int $id): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $agency = Agency::findOrFail($id);
+
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+        ]);
+
+        $user = User::findOrFail($validated['user_id']);
+        $user->update(['agency_id' => $agency->id]);
+
+        return response()->json(['message' => 'Utilisateur assigné.', 'user' => $user->fresh()]);
+    }
+
+    /**
+     * Liste les utilisateurs d'une agence.
+     */
+    public function agencyUsers(int $id): JsonResponse
+    {
+        $agency = Agency::findOrFail($id);
+
+        $users = User::where('agency_id', $agency->id)
+            ->select(['id', 'name', 'email', 'role', 'phone', 'agency_id'])
+            ->orderBy('name')
+            ->get();
+
+        return response()->json($users);
+    }
+
+    // ── Private helpers ──────────────────────────────────────────────────────
+
     private function userMayViewClient(Request $request, Client $client): bool
     {
         $u = $request->user();

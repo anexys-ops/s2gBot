@@ -157,5 +157,17 @@ class DatabaseSeeder extends Seeder
          * pas généré le workflow complet historiquement.
          */
         $this->call(FullDemoWorkflowSeeder::class);
+
+        /** v1.2.0 — Agences de base (siège MHD + agence DEMO). */
+        $this->call(AgenciesSeeder::class);
+
+        /**
+         * v1.2.0 — 60 essais géotechniques dans le catalogue
+         * (familles Béton/Sol/In Situ/Chimique).
+         */
+        $this->call(LabEssaisSeeder::class);
+
+        // LabReportDemoSeeder est appelé séparément (rapport de démo).
+        // $this->call(LabReportDemoSeeder::class);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\QuoteEmailMailable;
 use App\Models\Agency;
 use App\Models\Catalogue\Article;
 use App\Models\Catalogue\Package;
@@ -20,6 +21,7 @@ use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 
 class QuoteController extends Controller

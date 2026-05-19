@@ -78,7 +78,9 @@ Route::get('/register/agencies', [AuthController::class, 'registerAgencyList']);
 Route::get('/version', [VersionController::class, 'show']);
 Route::get('/openapi.json', [OpenApiController::class, 'show']);
 
+use App\Http\Controllers\Api\ArticleCompositionController;
 use App\Http\Controllers\Api\GlobalSearchController;
+use App\Http\Controllers\Api\LabReportController;
 use App\Http\Controllers\Api\TagController;
 Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('v1')->group(function () {
@@ -254,6 +256,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('invoices/{invoice}/pdf-link', [InvoiceController::class, 'pdfLink']);
     Route::apiResource('invoices', InvoiceController::class);
     Route::apiResource('quotes', QuoteController::class);
+    Route::post('quotes/{id}/send-email', [QuoteController::class, 'sendEmail'])->whereNumber('id');
     Route::apiResource('commercial-offerings', CommercialOfferingController::class);
     Route::get('pdf/templates', [PdfController::class, 'templates']);
     Route::post('pdf/generate', [PdfController::class, 'generate']);
@@ -398,6 +401,40 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('tags', [TagController::class, 'index']);
     Route::post('tags/sync', [TagController::class, 'sync']);
     Route::get('tags/entity', [TagController::class, 'forEntity']);
+
+    // ── v1.2.0 — Multi-agences labo (standalone) ─────────────────────────────
+    Route::get('agences', [AgencyController::class, 'indexStandalone']);
+    Route::post('agences', [AgencyController::class, 'storeStandalone']);
+    Route::get('agences/{id}', [AgencyController::class, 'showStandalone'])->whereNumber('id');
+    Route::put('agences/{id}', [AgencyController::class, 'updateStandalone'])->whereNumber('id');
+    Route::delete('agences/{id}', [AgencyController::class, 'destroyStandalone'])->whereNumber('id');
+    Route::post('agences/{id}/assign-user', [AgencyController::class, 'assignUser'])->whereNumber('id');
+    Route::get('agences/{id}/users', [AgencyController::class, 'agencyUsers'])->whereNumber('id');
+
+    // ── v1.2.0 — Rapports labo ───────────────────────────────────────────────
+    Route::get('lab-reports', [LabReportController::class, 'index']);
+    Route::post('lab-reports', [LabReportController::class, 'store']);
+    Route::get('lab-reports/{id}', [LabReportController::class, 'show'])->whereNumber('id');
+    Route::put('lab-reports/{id}', [LabReportController::class, 'update'])->whereNumber('id');
+    Route::delete('lab-reports/{id}', [LabReportController::class, 'destroy'])->whereNumber('id');
+    Route::post('lab-reports/{id}/transition', [LabReportController::class, 'transition'])->whereNumber('id');
+    Route::post('lab-reports/{id}/sections', [LabReportController::class, 'addSection'])->whereNumber('id');
+    Route::put('lab-reports/{id}/sections/{sid}', [LabReportController::class, 'updateSection'])
+        ->whereNumber('id')->whereNumber('sid');
+    Route::delete('lab-reports/{id}/sections/{sid}', [LabReportController::class, 'removeSection'])
+        ->whereNumber('id')->whereNumber('sid');
+
+    // ── v1.2.0 — Compositions d'articles ────────────────────────────────────
+    Route::get('articles/{articleId}/compositions', [ArticleCompositionController::class, 'index'])
+        ->whereNumber('articleId');
+    Route::post('articles/{articleId}/compositions', [ArticleCompositionController::class, 'store'])
+        ->whereNumber('articleId');
+    Route::post('articles/{articleId}/compositions/reorder', [ArticleCompositionController::class, 'reorder'])
+        ->whereNumber('articleId');
+    Route::put('articles/{articleId}/compositions/{id}', [ArticleCompositionController::class, 'update'])
+        ->whereNumber('articleId')->whereNumber('id');
+    Route::delete('articles/{articleId}/compositions/{id}', [ArticleCompositionController::class, 'destroy'])
+        ->whereNumber('articleId')->whereNumber('id');
 });
 
 Route::middleware('signed')->group(function () {

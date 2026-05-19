@@ -1,0 +1,40 @@
+<?php
+
+namespace App\Mail;
+
+use App\Models\Quote;
+use Illuminate\Bus\Queueable;
+use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Queue\SerializesModels;
+
+class QuoteEmailMailable extends Mailable
+{
+    use Queueable, SerializesModels;
+
+    public function __construct(
+        public readonly Quote $quote,
+        public readonly string $recipientName,
+        public readonly ?string $customMessage = null,
+    ) {}
+
+    public function envelope(): Envelope
+    {
+        return new Envelope(
+            subject: "Devis {$this->quote->number} — " . config('app.name', 'Lab BTP'),
+        );
+    }
+
+    public function content(): Content
+    {
+        return new Content(
+            view: 'emails.quote',
+            with: [
+                'quote'         => $this->quote,
+                'recipientName' => $this->recipientName,
+                'customMessage' => $this->customMessage,
+            ],
+        );
+    }
+}

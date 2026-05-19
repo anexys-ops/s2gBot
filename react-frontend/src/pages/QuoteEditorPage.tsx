@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import PageBackNav from '../components/PageBackNav'
 import Modal from '../components/Modal'
-import QuoteFormFields, { type QuoteFormState, type QuoteLineDraft, type ContextMode } from '../components/quotes/QuoteFormFields'
+import { type QuoteFormState, type QuoteLineDraft, type ContextMode } from '../components/quotes/QuoteFormFields'
 import QuoteWizard from '../components/quotes/wizard/QuoteWizard'
 import {
   quotesApi,
@@ -320,10 +320,6 @@ export default function QuoteEditorPage() {
 
   const clients = Array.isArray(clientsData) ? clientsData : []
   const allSites = Array.isArray(allSitesData) ? allSitesData : []
-  const sitesForClient = useMemo(
-    () => (form.client_id > 0 ? allSites.filter((s) => s.client_id === form.client_id) : []),
-    [allSites, form.client_id],
-  )
   const clientContacts = Array.isArray(clientContactsData) ? clientContactsData : []
   const addressesForm = addrForm ?? []
   const quoteTemplates = tplQuote?.data ?? []
@@ -362,24 +358,6 @@ export default function QuoteEditorPage() {
       travelForTotals.tva,
     ],
   )
-
-  const clientLabel = useMemo(
-    () =>
-      form.client_id > 0
-        ? clients.find((c) => c.id === form.client_id)?.name?.trim() || `Client #${form.client_id}`
-        : '—',
-    [clients, form.client_id],
-  )
-  const siteLabel = useMemo(() => {
-    if (!form.site_id) return '—'
-    const s = allSites.find((x) => x.id === form.site_id) ?? sitesForClient.find((x) => x.id === form.site_id)
-    return s?.name?.trim() || `Chantier #${form.site_id}`
-  }, [allSites, sitesForClient, form.site_id])
-  const dossierLabel = useMemo(() => {
-    if (!form.dossier_id) return '—'
-    const d = dossiers.find((x) => x.id === form.dossier_id)
-    return d ? `${d.reference} — ${d.titre}`.trim() : `Dossier #${form.dossier_id}`
-  }, [dossiers, form.dossier_id])
 
   const metaFraisTtc = useMemo(
     () => sumFraisSupplementairesTtc(form.meta.frais_supplementaires),
@@ -582,13 +560,12 @@ export default function QuoteEditorPage() {
         onSubmit={handleSubmit}
         className="card quote-editor-page__form"
       >
-        <QuoteFormFields
+        <QuoteWizard
           form={form}
           setForm={setForm}
           clients={clients}
           clientContacts={clientContacts}
           allSites={allSites}
-          sitesForClient={sitesForClient}
           dossiers={dossiers}
           addresses={addressesForm}
           quoteTemplates={quoteTemplates}
@@ -596,9 +573,12 @@ export default function QuoteEditorPage() {
           updateLine={updateLine}
           removeLine={removeLine}
           totals={documentTotals}
-          clientLabel={clientLabel}
-          siteLabel={siteLabel}
-          dossierLabel={dossierLabel}
+          metaFraisTtc={metaFraisTtc}
+          isCreate={isCreate}
+          isSubmitting={createMutation.isPending || updateMutation.isPending}
+          submitLabel={isCreate ? 'Créer le devis' : 'Enregistrer'}
+          onCancel={() => navigate('/devis')}
+          createdQuote={createdQuote}
           onOpenCommercialCatalog={(i) => {
             setCatalogPick({ target: 'line', index: i })
             setCatalogSearch('')
@@ -607,27 +587,13 @@ export default function QuoteEditorPage() {
             setProlabPick({ target: 'line', index: i })
             setProlabFamilleId('')
           }}
-          onOpenCommercialCatalogForJalon={(ji) => {
-            setCatalogPick({ target: 'jalon', jalonIndex: ji })
-            setCatalogSearch('')
-          }}
-          onOpenProlabCatalogForJalon={(ji) => {
-            setProlabPick({ target: 'jalon', jalonIndex: ji })
-            setProlabFamilleId('')
-          }}
+          wizardStep={wizardStep}
+          onWizardStepChange={setWizardStep}
         />
 
         {(createMutation.isError || updateMutation.isError) && (
           <p className="error" style={{ marginTop: '1rem' }}>{((createMutation.error ?? updateMutation.error) as Error).message}</p>
         )}
-
-        <QuoteFooterSticky
-          totals={documentTotals}
-          metaFraisTtc={metaFraisTtc}
-          isSubmitting={createMutation.isPending || updateMutation.isPending}
-          submitLabel={isCreate ? 'Créer le devis' : 'Enregistrer'}
-          onCancel={() => navigate('/devis')}
-        />
       </form>
 
       {catalogPick !== null && (

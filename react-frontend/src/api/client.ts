@@ -1483,8 +1483,10 @@ export type EntityMetaPayload = {
     montant_ht: number
     tva_rate: number
   }>
-  /** Mode de tarification du devis : ‘forfait’ = montant global, undefined = détaillé */
-  mode_devis?: ‘forfait’ | string
+  /** Mode de tarification du devis : forfait = montant global, undefined = detaille */
+  mode_devis?: string
+  /** Mode remise sur step5 wizard : percent | amount */
+  discount_mode?: string
   /** Mode de paiement */
   mode_paiement?: string
   /** Délai de paiement */
@@ -2568,4 +2570,29 @@ export const labReportsApi = {
     api<LabReportSection>(`/lab-reports/${id}/sections/${sid}`, { method: 'PUT', body: JSON.stringify(body) }),
   removeSection: (id: number, sid: number) =>
     api<void>(`/lab-reports/${id}/sections/${sid}`, { method: 'DELETE' }),
+}
+
+// ─── Agences (internes BDC) ──────────────────────────────────────────────────
+
+export type Agency = {
+  id: number
+  name: string
+  code: string
+  address: string | null
+  city: string | null
+  phone: string | null
+  email: string | null
+  is_siege: boolean
+  active: boolean
+  users_count?: number
+}
+
+export const agencesApi = {
+  list: () => api<Agency[]>('/agences'),
+  get: (id: number) => api<Agency>(`/agences/${id}`),
+  create: (body: Partial<Agency>) => api<Agency>('/agences', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: number, body: Partial<Agency>) => api<Agency>(`/agences/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api<void>(`/agences/${id}`, { method: 'DELETE' }),
+  assignUser: (agencyId: number, userId: number) => api<void>(`/agences/${agencyId}/assign-user`, { method: 'POST', body: JSON.stringify({ user_id: userId }) }),
+  users: (agencyId: number) => api<{ id: number; name: string; email: string; role: string }[]>(`/agences/${agencyId}/users`),
 }

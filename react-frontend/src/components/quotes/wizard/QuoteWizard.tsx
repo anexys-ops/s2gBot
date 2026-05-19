@@ -39,6 +39,9 @@ type Props = {
   onCancel: () => void
   /** Called after successful creation (step 6). Provides the created quote id + number. */
   createdQuote?: { id: number; number: string } | null
+  /** Externally controlled step override (e.g. jump to 6 after creation) */
+  wizardStep?: number | null
+  onWizardStepChange?: (step: number) => void
 }
 
 function isStepValid(step: number, form: QuoteFormState): boolean {
@@ -84,8 +87,18 @@ export default function QuoteWizard({
   submitLabel,
   onCancel,
   createdQuote,
+  wizardStep,
+  onWizardStepChange,
 }: Props) {
-  const [step, setStep] = useState(isCreate ? 1 : 4)
+  const [internalStep, setInternalStep] = useState(isCreate ? 1 : 4)
+
+  // Use external step when provided (e.g. parent forces step 6 after creation)
+  const step = wizardStep != null ? wizardStep : internalStep
+  const setStep = (s: number | ((prev: number) => number)) => {
+    const next = typeof s === 'function' ? s(step) : s
+    setInternalStep(next)
+    onWizardStepChange?.(next)
+  }
 
   const canGoNext = isStepValid(step, form)
 

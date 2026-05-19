@@ -36,6 +36,14 @@ class Article extends Model
         'duree_estimee',
         'normes',
         'actif',
+        // v1.2.0 — déclencheurs workflow & ressources
+        'triggers_odm_terrain',
+        'triggers_odm_labo',
+        'triggers_odm_ingenieur',
+        'triggers_ndf',
+        'triggers_materiel_booking',
+        'nb_par_sondage',
+        'type_ressource',
     ];
 
     protected $appends = [
@@ -45,12 +53,19 @@ class Article extends Model
     protected function casts(): array
     {
         return [
-            'prix_unitaire_ht' => 'decimal:2',
-            'prix_revient_ht' => 'decimal:2',
-            'tva_rate' => 'decimal:2',
-            'duree_estimee' => 'integer',
-            'actif' => 'boolean',
-            'tags' => 'array',
+            'prix_unitaire_ht'         => 'decimal:2',
+            'prix_revient_ht'          => 'decimal:2',
+            'tva_rate'                 => 'decimal:2',
+            'duree_estimee'            => 'integer',
+            'actif'                    => 'boolean',
+            'tags'                     => 'array',
+            // v1.2.0 — déclencheurs & ressources
+            'triggers_odm_terrain'     => 'boolean',
+            'triggers_odm_labo'        => 'boolean',
+            'triggers_odm_ingenieur'   => 'boolean',
+            'triggers_ndf'             => 'boolean',
+            'triggers_materiel_booking' => 'boolean',
+            'nb_par_sondage'           => 'integer',
         ];
     }
 
@@ -111,5 +126,17 @@ class Article extends Model
     public function scopeOrdonne(Builder $query): Builder
     {
         return $query->orderBy('code');
+    }
+
+    // ── Compositions (v1.2.0) ────────────────────────────────────────────────
+
+    public function compositions(): HasMany
+    {
+        return $this->hasMany(ArticleComposition::class, 'parent_article_id')->orderBy('ordre');
+    }
+
+    public function composedIn(): HasMany
+    {
+        return $this->hasMany(ArticleComposition::class, 'child_article_id');
     }
 }

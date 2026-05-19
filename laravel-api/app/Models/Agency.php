@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Agence (tenant opérationnel) rattachée au siège {@see Client}.
+ *
+ * v1.2.0 — ajout is_siege, active, email, phone + helpers siège.
  */
 class Agency extends Model
 {
@@ -17,15 +19,21 @@ class Agency extends Model
         'name',
         'code',
         'is_headquarters',
+        'is_siege',
+        'active',
         'address',
         'city',
         'postal_code',
+        'phone',
+        'email',
     ];
 
     protected function casts(): array
     {
         return [
             'is_headquarters' => 'boolean',
+            'is_siege'        => 'boolean',
+            'active'          => 'boolean',
         ];
     }
 
@@ -57,5 +65,17 @@ class Agency extends Model
     public function quotes(): HasMany
     {
         return $this->hasMany(Quote::class);
+    }
+
+    // ── Helpers siège ────────────────────────────────────────────────────────
+
+    public static function siege(): ?self
+    {
+        return static::where('is_siege', true)->first();
+    }
+
+    public static function siegeId(): ?int
+    {
+        return static::siege()?->id;
     }
 }

@@ -1483,6 +1483,14 @@ export type EntityMetaPayload = {
     montant_ht: number
     tva_rate: number
   }>
+  /** Mode de tarification du devis : ‘forfait’ = montant global, undefined = détaillé */
+  mode_devis?: ‘forfait’ | string
+  /** Mode de paiement */
+  mode_paiement?: string
+  /** Délai de paiement */
+  delai_paiement?: string
+  /** Conditions commerciales */
+  conditions_commerciales?: string
 }
 
 export interface DashboardStatsPayload {
@@ -2495,4 +2503,69 @@ export const expenseReportsApi = {
 
   deleteLine: (reportId: number, lineId: number) =>
     api<void>(`/expense-reports/${reportId}/lines/${lineId}`, { method: 'DELETE' }),
+}
+
+// ─── Lab Reports ────────────────────────────────────────────────────────────
+
+export type LabReportSection = {
+  id: number
+  report_id: number
+  sample_id: number | null
+  essai_article_id: number | null
+  technician_id: number | null
+  equipment_id: number | null
+  ordre: number
+  performed_at: string | null
+  temperature_c: number | null
+  humidity_pct: number | null
+  data: Record<string, unknown> | null
+  conformity: 'conforme' | 'non_conforme' | 'en_attente'
+  conclusion: string | null
+  essai_article?: { id: number; code: string; libelle: string; normes?: string[] }
+  sample?: { id: number; fold_number: string }
+  technician?: { id: number; name: string }
+}
+
+export type LabReport = {
+  id: number
+  number: string
+  bc_id: number | null
+  dossier_id: number | null
+  client_id: number | null
+  site_id: number | null
+  agency_id: number | null
+  technician_id: number | null
+  validator_id: number | null
+  status: 'brouillon' | 'en_validation' | 'valide' | 'signe' | 'emis'
+  title: string
+  conclusion: string | null
+  notes_internes: string | null
+  signed_at: string | null
+  emitted_at: string | null
+  sections?: LabReportSection[]
+  technician?: { id: number; name: string }
+  validator?: { id: number; name: string }
+  created_at: string
+}
+
+export const labReportsApi = {
+  list: (params?: { status?: string; bc_id?: number }) => {
+    const q = params
+      ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
+      : ''
+    return api<LaravelPaginator<LabReport>>(`/lab-reports${q ? `?${q}` : ''}`)
+  },
+  get: (id: number) => api<LabReport>(`/lab-reports/${id}`),
+  create: (body: Partial<LabReport> & { title: string }) =>
+    api<LabReport>('/lab-reports', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: number, body: Partial<LabReport>) =>
+    api<LabReport>(`/lab-reports/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  transition: (id: number, status: string) =>
+    api<LabReport>(`/lab-reports/${id}/transition`, { method: 'POST', body: JSON.stringify({ status }) }),
+  addSection: (id: number, body: Partial<LabReportSection>) =>
+    api<LabReportSection>(`/lab-reports/${id}/sections`, { method: 'POST', body: JSON.stringify(body) }),
+  updateSection: (id: number, sid: number, body: Partial<LabReportSection>) =>
+    api<LabReportSection>(`/lab-reports/${id}/sections/${sid}`, { method: 'PUT', body: JSON.stringify(body) }),
+  removeSection: (id: number, sid: number) =>
+    api<void>(`/lab-reports/${id}/sections/${sid}`, { method: 'DELETE' }),
 }

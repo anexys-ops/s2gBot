@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import PageBackNav from '../components/PageBackNav'
 import Modal from '../components/Modal'
 import QuoteFormFields, { type QuoteFormState, type QuoteLineDraft, type ContextMode } from '../components/quotes/QuoteFormFields'
-import QuoteFooterSticky from '../components/quotes/QuoteFooterSticky'
+import QuoteWizard from '../components/quotes/wizard/QuoteWizard'
 import {
   quotesApi,
   clientsApi,
@@ -147,6 +147,8 @@ export default function QuoteEditorPage() {
   const isCreate = editingNumericId === null || Number.isNaN(editingNumericId)
 
   const [form, setForm] = useState<QuoteFormState>(emptyForm)
+  const [createdQuote, setCreatedQuote] = useState<{ id: number; number: string } | null>(null)
+  const [wizardStep, setWizardStep] = useState<number | null>(null)
   type LineOrJalon = { target: 'line'; index: number } | { target: 'jalon'; jalonIndex: number }
   const [catalogPick, setCatalogPick] = useState<LineOrJalon | null>(null)
   const [prolabPick, setProlabPick] = useState<LineOrJalon | null>(null)
@@ -300,9 +302,10 @@ export default function QuoteEditorPage() {
 
   const createMutation = useMutation({
     mutationFn: (body: QuoteCreateBody) => quotesApi.create(body),
-    onSuccess: () => {
+    onSuccess: (quote) => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
-      navigate('/devis')
+      setCreatedQuote({ id: quote.id, number: quote.number })
+      setWizardStep(6)
     },
   })
 

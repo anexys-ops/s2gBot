@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Support\PermissionCatalog;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -44,6 +45,7 @@ class User extends Authenticatable
         'role',
         'client_id',
         'site_id',
+        'agency_id',
     ];
 
     protected $hidden = [
@@ -59,14 +61,19 @@ class User extends Authenticatable
         ];
     }
 
-    public function client()
+    public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
     }
 
-    public function site()
+    public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function agency(): BelongsTo
+    {
+        return $this->belongsTo(Agency::class);
     }
 
     public function dossiersCreees(): HasMany
@@ -204,5 +211,19 @@ class User extends Authenticatable
     public function isInternal(): bool
     {
         return in_array($this->role, self::ROLES_INTERNAL, true);
+    }
+
+    // ── Multi-agences (v1.2.0) ───────────────────────────────────────────────
+
+    /** Vrai si l'utilisateur appartient au siège (aucune agence assignée ou rôle lab_admin). */
+    public function isSiege(): bool
+    {
+        return $this->agency_id === null || $this->role === self::ROLE_LAB_ADMIN;
+    }
+
+    /** Code court de l'agence de l'utilisateur (fallback 'MHD' si siège). */
+    public function agencyCode(): string
+    {
+        return $this->agency?->code ?? 'MHD';
     }
 }

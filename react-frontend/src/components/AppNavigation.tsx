@@ -8,12 +8,11 @@ import GlobalSearch from './GlobalSearch'
 type SubItem = { to: string; label: string; labOnly?: boolean }
 
 type MenuGroupId =
-  | 'catalogue'
-  | 'clients'
   | 'commercial'
-  | 'chantier'
-  | 'materiel'
+  | 'terrain'
   | 'laboratoire'
+  | 'ingenierie'
+  | 'catalogue'
   | 'configuration'
   | 'rapports'
 
@@ -23,53 +22,46 @@ type MenuGroup = {
   items: SubItem[]
 }
 
-function isCatalogueActive(pathname: string): boolean {
-  return pathname === '/catalogue' || pathname.startsWith('/catalogue/')
-}
-
-function isClientsActive(pathname: string): boolean {
-  return pathname === '/clients' || pathname.startsWith('/clients/')
-}
-
 function isCommercialActive(pathname: string): boolean {
-  if (pathname.startsWith('/crm')) return true
+  if (pathname === '/clients' || pathname.startsWith('/clients/')) return true
+  if (pathname === '/sites' || pathname.startsWith('/sites/')) return true
   if (pathname.startsWith('/dossiers')) return true
   if (pathname.startsWith('/devis')) return true
-  if (pathname.startsWith('/invoices')) return true
   if (pathname.startsWith('/bons-commande')) return true
   if (pathname.startsWith('/bons-livraison')) return true
-  if (pathname.startsWith('/compta-fondation')) return true
-  if (pathname.startsWith('/back-office/offres')) return true
+  if (pathname.startsWith('/factures')) return true
+  if (pathname.startsWith('/invoices')) return true
   return false
 }
 
-function isChantierActive(pathname: string): boolean {
-  return pathname === '/sites' || pathname.startsWith('/sites/') || pathname.startsWith('/terrain')
-}
-
-function isMaterielActive(pathname: string): boolean {
-  return pathname.startsWith('/materiel')
+function isTerrainActive(pathname: string): boolean {
+  if (pathname.startsWith('/terrain')) return true
+  if (pathname.startsWith('/ordres-mission')) return true
+  if (pathname.startsWith('/notes-de-frais')) return true
+  return false
 }
 
 function isLaboratoireActive(pathname: string): boolean {
-  if (pathname.startsWith('/graphiques-essais')) return true
   if (pathname.startsWith('/labo')) return true
-  if (pathname.startsWith('/orders')) return true
-  if (pathname.startsWith('/back-office/granulometrie')) return true
-  if (pathname.startsWith('/back-office/cadrage')) return true
-  if (pathname.startsWith('/back-office/exemples-calculs')) return true
+  return false
+}
+
+function isIngenerieActive(pathname: string): boolean {
+  if (pathname.startsWith('/ingenierie')) return true
+  return false
+}
+
+function isCatalogueActive(pathname: string): boolean {
+  if (pathname === '/catalogue' || pathname.startsWith('/catalogue/')) return true
+  if (pathname.startsWith('/materiel')) return true
   return false
 }
 
 function isConfigurationActive(pathname: string): boolean {
-  if (pathname.startsWith('/settings')) return true
-  if (pathname === '/aide' || pathname.startsWith('/aide/')) return true
-  if (pathname.startsWith('/back-office/pdf')) return true
-  if (pathname.startsWith('/back-office/mails')) return true
-  if (pathname.startsWith('/back-office/modeles-')) return true
+  if (pathname.startsWith('/config/agences')) return true
+  if (pathname.startsWith('/back-office/utilisateurs')) return true
+  if (pathname.startsWith('/back-office/modeles-rapports-pdf')) return true
   if (pathname.startsWith('/back-office/configuration')) return true
-  if (pathname.startsWith('/back-office/journal-audit')) return true
-  if (pathname.startsWith('/back-office/non-conformites')) return true
   return false
 }
 
@@ -79,18 +71,16 @@ function isReportsActive(pathname: string): boolean {
 
 function isGroupActive(id: MenuGroupId, pathname: string): boolean {
   switch (id) {
-    case 'catalogue':
-      return isCatalogueActive(pathname)
-    case 'clients':
-      return isClientsActive(pathname)
     case 'commercial':
       return isCommercialActive(pathname)
-    case 'chantier':
-      return isChantierActive(pathname)
-    case 'materiel':
-      return isMaterielActive(pathname)
+    case 'terrain':
+      return isTerrainActive(pathname)
     case 'laboratoire':
       return isLaboratoireActive(pathname)
+    case 'ingenierie':
+      return isIngenerieActive(pathname)
+    case 'catalogue':
+      return isCatalogueActive(pathname)
     case 'configuration':
       return isConfigurationActive(pathname)
     case 'rapports':
@@ -121,101 +111,78 @@ export default function AppNavigation() {
 
     return [
       {
-        id: 'catalogue',
-        label: 'Catalogue',
-        items: filterItems([
-          { to: '/catalogue', label: 'Articles' },
-          { to: '/catalogue/services?kind=service', label: 'Services' },
-          { to: '/catalogue?vue=familles', label: 'Familles' },
-          { to: '/catalogue?vue=tags', label: 'Tags' },
-        ]),
-      },
-      {
-        id: 'clients',
-        label: 'Clients',
-        items: filterItems([
-          { to: '/clients', label: 'Clients' },
-          { to: '/clients/contacts', label: 'Contacts' },
-          { to: '/clients/carte', label: 'Carte' },
-        ]),
-      },
-      {
-        id: 'commercial',
+        id: 'commercial' as MenuGroupId,
         label: 'Commercial',
         items: filterItems([
-          { to: '/crm', label: 'Vue d’ensemble' },
+          { to: '/clients', label: 'Clients' },
+          { to: '/sites', label: 'Chantiers' },
           { to: '/dossiers', label: 'Dossiers' },
           { to: '/devis', label: 'Devis' },
           { to: '/bons-commande', label: 'Bons de commande' },
           { to: '/bons-livraison', label: 'Bons de livraison' },
-          { to: '/invoices', label: 'Factures' },
-          { to: '/compta-fondation', label: 'Compta', labOnly: true },
-          { to: '/back-office/offres', label: 'Offres', labOnly: true },
-          { to: '/ordres-mission', label: 'Ordres de mission' },
+          { to: '/factures', label: 'Factures' },
         ]),
       },
       {
-        id: 'chantier',
-        label: 'Chantier',
+        id: 'terrain' as MenuGroupId,
+        label: 'Terrain',
         items: filterItems([
-          { to: '/sites', label: 'Chantiers' },
-          { to: '/terrain', label: 'Vue terrain' },
-          { to: '/ordres-mission', label: 'Ordres de mission' },
-          { to: '/ordres-mission/planning', label: 'Planning ordres de mission' },
-          { to: '/terrain/mesures', label: 'Mesures terrain' },
+          { to: '/terrain/carte', label: 'Carte chantiers' },
+          { to: '/ordres-mission', label: 'OdM Terrain' },
           { to: '/terrain/taches', label: 'Tâches terrain' },
-          { to: '/terrain/planning', label: 'Planning technicien' },
+          { to: '/terrain/planning', label: 'Planning terrain' },
           { to: '/notes-de-frais', label: 'Notes de frais' },
         ]),
       },
       {
-        id: 'materiel',
-        label: 'Matériel',
-        items: filterItems([
-          { to: '/materiel', label: 'Vue d’ensemble' },
-          { to: '/materiel/equipements', label: 'Parc équipements' },
-          { to: '/materiel/planning', label: 'Planning matériel' },
-          { to: '/materiel/stocks', label: 'Stocks' },
-        ]),
-      },
-      {
-        id: 'laboratoire',
+        id: 'laboratoire' as MenuGroupId,
         label: 'Laboratoire',
         items: filterItems([
-          { to: '/labo', label: 'Vue laboratoire' },
-          { to: '/labo/essais', label: 'Essais et graphiques' },
-          { to: '/labo/taches', label: 'Tâches labo' },
+          { to: '/labo/reception', label: 'Réception (FOLD)' },
+          { to: '/labo/odm', label: 'OdM Laboratoire' },
+          { to: '/labo/taches', label: 'Tâches en cours' },
+          { to: '/labo/planning', label: 'Planning labo' },
+          { to: '/labo/rapports', label: "Rapports d'essais" },
           { to: '/labo/fiches', label: 'Fiches techniques' },
-          { to: '/graphiques-essais', label: 'Graphiques d’essais' },
-          { to: '/orders', label: 'Dossiers et commandes' },
-          { to: '/orders/new', label: 'Nouvelle commande' },
-          { to: '/back-office/granulometrie', label: 'Granulométrie', labOnly: true },
-          { to: '/back-office/cadrage', label: 'Cadrage' },
-          { to: '/back-office/exemples-calculs', label: 'Exemples de calculs' },
+          { to: '/labo/transco', label: 'Transco FOLD', labOnly: true },
         ]),
       },
       {
-        id: 'configuration',
-        label: 'Config',
+        id: 'ingenierie' as MenuGroupId,
+        label: 'Ingénierie',
         items: filterItems([
-          { to: '/settings', label: 'Compte, sécurité, marque' },
-          { to: '/settings/utilisateurs', label: 'Utilisateurs', labOnly: true },
-          { to: '/settings/groupes', label: 'Groupes et accès', labOnly: true },
-          { to: '/settings/charte', label: 'Charte (logo, couleurs)', labOnly: true },
-          { to: '/back-office/modeles-documents-pdf', label: 'Modèles de documents PDF', labOnly: true },
-          { to: '/back-office/modeles-rapports-pdf', label: 'Modèles de rapports PDF', labOnly: true },
-          { to: '/back-office/pdf', label: 'Création de PDF' },
-          { to: '/back-office/mails', label: 'Mails', labOnly: true },
-          { to: '/back-office/configuration', label: 'Modules (activation)', labOnly: true },
-          { to: '/back-office/journal-audit', label: 'Journal d’audit', labOnly: true },
-          { to: '/back-office/non-conformites', label: 'Non-conformités' },
-          { to: '/aide', label: 'API (OpenAPI)' },
+          { to: '/ingenierie/odm', label: 'OdM Ingénieur' },
+          { to: '/ingenierie/taches', label: 'Tâches ingénieur' },
+          { to: '/ingenierie/planning', label: 'Planning ingénieur' },
         ]),
       },
       {
-        id: 'rapports',
+        id: 'catalogue' as MenuGroupId,
+        label: 'Catalogue',
+        items: filterItems([
+          { to: '/catalogue', label: 'Articles & essais' },
+          { to: '/materiel', label: 'Matériel / Équipements' },
+          { to: '/labo/fiches', label: 'Fiches techniques dynamiques' },
+        ]),
+      },
+      {
+        id: 'configuration' as MenuGroupId,
+        label: 'Configuration',
+        items: filterItems([
+          { to: '/config/agences', label: 'Agences', labOnly: true },
+          { to: '/back-office/utilisateurs', label: 'Utilisateurs', labOnly: true },
+          { to: '/back-office/modeles-rapports-pdf', label: 'Modèles PDF', labOnly: true },
+          { to: '/back-office/configuration', label: 'Modules', labOnly: true },
+        ]),
+      },
+      {
+        id: 'rapports' as MenuGroupId,
         label: 'Rapports',
-        items: filterItems([{ to: '/rapports', label: 'Rapports (compta, ventes, délais)' }]),
+        items: filterItems([
+          { to: '/rapports/ventes', label: 'Ventes' },
+          { to: '/rapports/compta', label: 'Comptabilité' },
+          { to: '/rapports/delais', label: 'Délais chantier' },
+        ]),
       },
     ]
   }, [isLab])

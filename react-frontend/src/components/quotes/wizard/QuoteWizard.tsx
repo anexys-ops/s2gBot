@@ -1,0 +1,197 @@
+import { useState } from 'react'
+import type { QuoteFormState, QuoteLineDraft } from '../QuoteFormFields'
+import type {
+  Site,
+  DossierRow,
+  ClientAddress,
+  ClientContactRow,
+  DocumentPdfTemplateRow,
+} from '../../../api/client'
+import type { DocumentTotalsResult } from '../../../lib/quoteTotals'
+import WizardStepperBar from './WizardStepperBar'
+import WizardStep1Context from './WizardStep1Context'
+import WizardStep2Dates from './WizardStep2Dates'
+import WizardStep3Infos from './WizardStep3Infos'
+import WizardStep4Lines from './WizardStep4Lines'
+import WizardStep5Pricing from './WizardStep5Pricing'
+import WizardStep6Send from './WizardStep6Send'
+import './wizard.css'
+
+type Props = {
+  form: QuoteFormState
+  setForm: React.Dispatch<React.SetStateAction<QuoteFormState>>
+  clients: { id: number; name: string }[]
+  clientContacts: ClientContactRow[]
+  allSites: Site[]
+  dossiers: DossierRow[]
+  addresses: ClientAddress[]
+  quoteTemplates: DocumentPdfTemplateRow[]
+  addLine: () => void
+  updateLine: (index: number, field: keyof QuoteLineDraft, value: string | number | null | boolean) => void
+  removeLine: (index: number) => void
+  onOpenCommercialCatalog: (lineIndex: number) => void
+  onOpenProlabCatalog: (lineIndex: number) => void
+  totals: DocumentTotalsResult
+  metaFraisTtc: number
+  isCreate: boolean
+  isSubmitting: boolean
+  submitLabel: string
+  onCancel: () => void
+  /** Called after successful creation (step 6). Provides the created quote id + number. */
+  createdQuote?: { id: number; number: string } | null
+}
+
+function isStepValid(step: number, form: QuoteFormState): boolean {
+  switch (step) {
+    case 1:
+      return form.client_id > 0
+    case 2:
+      return !!form.quote_date
+    case 3:
+      return true
+    case 4: {
+      const hasForfait =
+        form.meta?.mode_devis === 'forfait' &&
+        (form.meta?.tarif_global_hors_lignes_ht ?? 0) > 0
+      const hasLines = form.lines.length > 0
+      return hasForfait || hasLines
+    }
+    case 5:
+      return true
+    default:
+      return true
+  }
+}
+
+export default function QuoteWizard({
+  form,
+  setForm,
+  clients,
+  clientContacts,
+  allSites,
+  dossiers,
+  addresses,
+  quoteTemplates,
+  addLine,
+  updateLine,
+  removeLine,
+  onOpenCommercialCatalog,
+  onOpenProlabCatalog,
+  totals,
+  metaFraisTtc,
+  isCreate,
+  isSubmitting,
+  submitLabel,
+  onCancel,
+  createdQuote,
+}: Props) {
+  const [step, setStep] = useState(isCreate ? 1 : 4)
+
+  const canGoNext = isStepValid(step, form)
+
+  const goNext = () => {
+    if (step < 5 && canGoNext) setStep((s) => s + 1)
+  }
+
+  const goBack = () => {
+    if (step > 1) setStep((s) => s - 1)
+  }
+
+  // Step 6 — shown after successful creation
+  if (step === 6 && createdQuote) {
+    const contactEmail =
+      form.contact_id != null
+        ? clientContacts.find((c) => c.id === form.contact_id)?.email ?? undefined
+        : undefined
+    return (
+      <WizardStep6Send
+        quoteId={createdQuote.id}
+        quoteNumber={createdQuote.number}
+        contactEmail={contactEmail}
+        onDone={onCancel}
+      />
+    )
+  }
+
+  return (
+    <>
+      <WizardStepperBar current={step} />
+
+      {step === 1 && (
+        <WizardStep1Context
+          form={form}
+          setForm={setForm}
+          clients={clients}
+          allSites={allSites}
+          dossiers={dossiers}
+        />
+      )}
+
+      {step === 2 && <WizardStep2Dates form={form} setForm={setForm} />}
+
+      {step === 3 && (
+        <WizardStep3Infos
+          form={form}
+          setForm={setForm}
+          clientContacts={clientContacts}
+          addresses={addresses}
+          quoteTemplates={quoteTemplates}
+        />
+      )}
+
+      {step === 4 && (
+        <WizardStep4Lines
+          form={form}
+          setForm={setForm}
+          addLine={addLine}
+          updateLine={updateLine}
+          removeLine={removeLine}
+          onOpenCommercialCatalog={onOpenCommercialCatalog}
+          onOpenProlabCatalog={onOpenProlabCatalog}
+        />
+      )}
+
+      {step === 5 && (
+        <WizardStep5Pricing
+          form={form}
+          setForm={setForm}
+          totals={totals}
+          metaFraisTtc={metaFraisTtc}
+          isSubmitting={isSubmitting}
+          submitLabel={submitLabel}
+          onCancel={onCancel}
+        />
+      )}
+
+      {/* Navigation — not shown on step 5 (has its own submit buttons) */}
+      {step !== 5 && (
+        <div className="qw-nav" style={{ padding: '0 2rem 2rem' }}>
+          <button
+            type="button"
+            className="qw-nav__back"
+            onClick={step === 1 ? onCancel : goBack}
+          >
+            {step === 1 ? 'Annuler' : '← Retour'}
+          </button>
+          <button
+            type="button"
+            className="qw-nav__next"
+            onClick={goNext}
+            disabled={!canGoNext}
+          >
+            Suivant →
+          </button>
+        </div>
+      )}
+
+      {/* Back button on step 5 */}
+      {step === 5 && (
+        <div style={{ padding: '0 2rem 1rem' }}>
+          <button type="button" className="qw-nav__back" onClick={goBack}>
+            ← Retour
+          </button>
+        </div>
+      )}
+    </>
+  )
+}

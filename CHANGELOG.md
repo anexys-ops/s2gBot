@@ -1,5 +1,47 @@
 # Changelog — s2gBot
 
+## [1.2.2] — 2026-05-19
+
+### Multi-agences + Rapports labo + Wizard QuoteEditor
+
+#### Architecture multi-agences
+- Nouvelle table `agencies` enrichie (is_siege, phone, email, active)
+- `agency_id` ajouté sur : users, clients, dossiers, bons_commande, bons_livraison, expense_reports
+- Trait `HasAgencyScope` : filtre automatique par agence sur les modèles commerciaux
+- Modèle `Agency` avec helpers `siege()`, `siegeId()`
+- Numérotation par agence : sequences composite `(type, agency_code)` → ex : `MHD-DEV-0001`
+- BC : champ `origine` (devis | interne) + `notes_internes_odm`
+
+#### Catalogue — Déclencheurs OdM
+- 7 nouveaux champs sur `ref_articles` : `triggers_odm_terrain/labo/ingenieur`, `triggers_ndf`, `triggers_materiel_booking`, `nb_par_sondage`, `type_ressource`
+- Table `article_compositions` : composition parent→enfants (ex: "Analyse béton" → 9 essais)
+- Modèle `ArticleComposition` avec relations parent/child
+
+#### 60 essais géotechniques seedés
+- Béton (15) : compression 7/28/90j, slump, Vébé, air occlus, masse vol., traction, module, absorption, carbonatation, chlorures, retrait, granulos, équiv. sable
+- Sol (20) : granulo tamisage+sédi, Atterberg, teneur eau, masse vol., pycnomètre, Proctor N/M, CBR immédiat/immersion, IPI, VBS, MO, sulfates, chlorures, cisaillement, oedomètre, triaxial UU/CU
+- In Situ (15) : PANDA, DPSH, CPT, pressiomètre Ménard, SPT, Lefranc, densité membrane/gamma, sonde neutronique, plaque Westergaard, PDL, scissomètre, inclinomètre, piézomètre, perméamètre
+- Chimique (10) : pH, conductivité, ICP-MS métaux, HAP, HCT, PCB, BTEX, amiante sol, eaux interstitielles, potentiel gonflement
+
+#### Rapports labo
+- Tables `lab_reports` + `lab_report_sections` avec softDeletes
+- `LabReportController` : CRUD + transitions de statut + sections
+- 10 renderers React (Recharts) : Granulométrie, Atterberg, Teneur eau, Proctor, CBR, Béton compression, Slump, Pressiomètre, PANDA, fallback table
+- `LabReportView` : rendu print-ready avec CSS `@media print`
+- Seeder rapport démo : MHD-RPT-DEMO-001 avec 10 sections et données réalistes
+
+#### Navigation restructurée
+- 7 sections : Commercial | Terrain | Laboratoire | Ingénierie (nouveau) | Catalogue | Configuration | Rapports
+- Laboratoire : Réception FOLD, OdM Labo, Tâches, Planning, Rapports d'essais, Fiches, Transco FOLD
+- Ingénierie : OdM Ingénieur, Tâches, Planning
+
+#### Wizard QuoteEditor
+- 5 étapes : Client & Chantier (tuiles) → Dates → Infos → Lignes → Tarif & Validation
+- Step 6 post-création : envoi email au contact (réel via Mailable Laravel)
+- Mode forfait / détaillé avec toggle
+- Jalons simplifiés (libellé + montant)
+- Suppression du sticky footer masquant
+
 ## [1.2.1] — 2026-05-05
 
 ### Démarrage cycle post-démo client

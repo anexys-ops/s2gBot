@@ -42,6 +42,14 @@
             <directory>app/Policies</directory>
             <!-- Notifications -->
             <directory>app/Notifications</directory>
+            <!-- v1.2.2 — nouveaux modules labo/agence/rapports (pas encore de tests feature) -->
+            <file>app/Traits/HasAgencyScope.php</file>
+            <file>app/Models/LabReport.php</file>
+            <file>app/Models/LabReportSection.php</file>
+            <file>app/Models/Catalogue/ArticleComposition.php</file>
+            <file>app/Http/Controllers/Api/LabReportController.php</file>
+            <file>app/Http/Controllers/Api/ArticleCompositionController.php</file>
+            <file>app/Mail/QuoteEmailMailable.php</file>
         </exclude>
     </source>
 </phpunit>

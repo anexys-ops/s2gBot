@@ -58,13 +58,25 @@ jobs:
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p 167 -T 10 "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-          echo "✓ SSH configuré (port 167)"
+          # Établit UNE connexion TCP maître (ControlMaster) réutilisée par rsync ET deploy.
+          # → fail2ban ne voit qu'une seule connexion par run, jamais déclenché.
+          ssh -i ~/.ssh/deploy_key \
+              -p 167 \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=30 \
+              -o ControlMaster=auto \
+              -o ControlPath=/tmp/ssh-s2g-master \
+              -o ControlPersist=3600 \
+              -fN \
+              "$DEPLOY_USER@$DEPLOY_HOST"
+          echo "✓ SSH configuré — connexion maître établie (port 167)"
 
       - name: Extraire APP_VERSION depuis package.json
         id: ver
@@ -104,7 +116,7 @@ jobs:
               --exclude='*.pptx' \
               --exclude='*.html' \
               --exclude='cursor-tasks/' \
-              -e "ssh -i ~/.ssh/deploy_key -p 167 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30" \
+              -e "ssh -i ~/.ssh/deploy_key -p 167 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 -o ControlMaster=auto -o ControlPath=/tmp/ssh-s2g-master" \
               ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/" && break
             echo "⚠ rsync tentative $attempt échouée (exit $?), nouvelle tentative dans 10s..."
             sleep 10
@@ -135,10 +147,11 @@ jobs:
               -p 167 \
               -o StrictHostKeyChecking=accept-new \
               -o ConnectTimeout=30 \
+              -o ControlMaster=auto \
+              -o ControlPath=/tmp/ssh-s2g-master \
               -o ServerAliveInterval=60 \
               -o ServerAliveCountMax=45 \
-              "$DEPLOY_USER@$DEPLOY_HOST" \
-              "export DEPLOY_PATH=’${DEPLOY_PATH}’ PKG_VER=’${PKG_VER}’ GIT_COMMIT_SHORT=’${GIT_COMMIT_SHORT}’; bash -s" << ‘ENDSSH’
+              "$DEPLOY_USER@$DEPLOY_HOST" bash -s << ENDSSH
           set -eu
 
           if [ -z "$DEPLOY_PATH" ]; then

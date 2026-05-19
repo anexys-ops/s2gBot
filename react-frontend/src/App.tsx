@@ -43,6 +43,8 @@ import TerrainChantiersCartePage from './pages/TerrainChantiersCartePage'
 import LaboEssaisPage from './pages/LaboEssaisPage'
 import LaboTasksPage from './pages/labo/LaboTasksPage'
 import FichesTechniquesPage from './pages/labo/FichesTechniquesPage'
+import LabReportsListPage from './pages/labo/LabReportsListPage'
+import LabReportViewPage from './pages/labo/LabReportViewPage'
 import TerrainTasksPage from './pages/terrain/TerrainTasksPage'
 import ExpenseReportsPage from './pages/terrain/ExpenseReportsPage'
 import PlanningGlobalPage from './pages/planning/PlanningGlobalPage'
@@ -91,6 +93,16 @@ import {
   BackOfficeEquipementDetailRedirect,
 } from './pages/back-office/BackOfficeMaterielRedirects'
 import PlanningTechniciensPage from './pages/terrain/PlanningTechniciensPage'
+import AgencesPage from './pages/config/AgencesPage'
+import OdmIngenieurPage from './pages/ingenierie/OdmIngenieurPage'
+import TachesIngenieurPage from './pages/ingenierie/TachesIngenieurPage'
+import PlanningIngenieurPage from './pages/ingenierie/PlanningIngenieurPage'
+import LaboOdmPage from './pages/labo/LaboOdmPage'
+import LaboReceptionPage from './pages/labo/LaboReceptionPage'
+import PlanningLaboPage from './pages/labo/PlanningLaboPage'
+import TranscoFoldPage from './pages/labo/TranscoFoldPage'
+import LabReportsListPage from './pages/labo/LabReportsListPage'
+import LabReportViewPage from './pages/labo/LabReportViewPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -162,6 +174,8 @@ function AppRoutes() {
         <Route path="labo/essais" element={<LaboEssaisPage />} />
         <Route path="labo/taches" element={<LaboTasksPage />} />
         <Route path="labo/fiches" element={<FichesTechniquesPage />} />
+        <Route path="labo/rapports" element={<LabReportsListPage />} />
+        <Route path="labo/rapports/:reportId" element={<LabReportViewPage />} />
         <Route path="terrain/taches" element={<TerrainTasksPage />} />
         <Route path="notes-de-frais" element={<ExpenseReportsPage />} />
         <Route path="notes-de-frais/:id" element={<ExpenseReportsPage />} />

@@ -324,6 +324,43 @@ class QuoteController extends Controller
         return response()->json(null, 204);
     }
 
+    public function sendEmail(Request $request, int $id): JsonResponse
+    {
+        $quote = Quote::with(['client', 'clientContact'])->findOrFail($id);
+
+        $user = $request->user();
+        if (! AgencyAccess::userMayAccessQuote($user, $quote)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $validated = $request->validate([
+            'recipient_email' => 'required|email',
+            'recipient_name'  => 'required|string|max:100',
+            'message'         => 'nullable|string|max:2000',
+        ]);
+
+        try {
+            Mail::to($validated['recipient_email'])
+                ->send(new QuoteEmailMailable(
+                    $quote,
+                    $validated['recipient_name'],
+                    $validated['message'] ?? null,
+                ));
+
+            // Marquer comme envoyé si le devis est encore au statut brouillon
+            if ($quote->status === Quote::STATUS_DRAFT) {
+                $quote->update(['status' => Quote::STATUS_SENT]);
+            }
+
+            return response()->json([
+                'message' => 'Devis envoyé avec succès à ' . $validated['recipient_email'],
+                'quote'   => $this->loadQuoteForResponse($quote->fresh()),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Erreur d\'envoi : ' . $e->getMessage()], 500);
+        }
+    }
+
     private function loadQuoteForResponse(Quote $quote): Quote
     {
         return $quote->load([

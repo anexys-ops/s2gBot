@@ -134,7 +134,7 @@ jobs:
           PKG_VER: ${{ steps.ver.outputs.pkg_ver }}
           GIT_SHA: ${{ github.sha }}
         run: |
-          GIT_COMMIT_SHORT=$(printf ‘%.7s’ "$GIT_SHA")
+          GIT_COMMIT_SHORT=$(printf '%.7s' "$GIT_SHA")
 
           echo "=========================================="
           echo "▶ Deploy s2gBot"
@@ -164,12 +164,12 @@ jobs:
           fi
 
           if ! cd "$DEPLOY_PATH"; then
-            echo "❌ Impossible d’accéder au répertoire (permissions ?) : $DEPLOY_PATH"
+            echo "❌ Impossible d'accéder au répertoire (permissions ?) : $DEPLOY_PATH"
             exit 1
           fi
           if [ ! -f .env.docker ]; then
             echo "❌ Fichier .env.docker absent (obligatoire pour docker compose / docker-prod-refresh.sh)."
-            echo "   Le rsync n’envoie pas ce fichier. Sur le serveur, une fois :"
+            echo "   Le rsync n'envoie pas ce fichier. Sur le serveur, une fois :"
             echo "   cp $DEPLOY_PATH/docker/env.docker.example $DEPLOY_PATH/.env.docker"
             echo "   Puis éditer DB, APP_KEY, HTTP_PORT, etc., puis relancer le workflow (ou push)."
             exit 1
@@ -177,8 +177,8 @@ jobs:
           chmod +x scripts/*.sh 2>/dev/null || true
 
           # Mise à jour idempotente : supprime les anciennes lignes puis réinsère proprement.
-          # (évite la corruption de type printf-\n lors d’un premier déploiement)
-          sed -i ‘/^APP_VERSION=/d; /^GIT_COMMIT_SHORT=/d’ .env.docker
+          # (évite la corruption de type printf-\n lors d'un premier déploiement)
+          sed -i '/^APP_VERSION=/d; /^GIT_COMMIT_SHORT=/d' .env.docker
           echo "APP_VERSION=$PKG_VER" >> .env.docker
           echo "GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT" >> .env.docker
           echo "✓ .env.docker mis à jour (APP_VERSION=$PKG_VER, GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT)"

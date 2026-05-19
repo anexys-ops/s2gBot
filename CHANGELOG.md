@@ -1,5 +1,12 @@
 # Changelog — s2gBot
 
+## [1.2.1] — 2026-05-05
+
+### Démarrage cycle post-démo client
+- Bump de version `1.2.0 → 1.2.1` avant intégration des retours de la démo client (modifications à venir).
+- Source de vérité : `react-frontend/package.json` (lue par `AppVersion::detect`).
+- Fallback backend : `App\Support\AppVersion::detect()` aligné `1.2.1`.
+
 ## [1.2.0] — 2026-04-29
 
 ### LIMS géotechnique — catalogue & seeders

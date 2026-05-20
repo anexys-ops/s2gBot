@@ -127,4 +127,12 @@ class Invoice extends Model
     {
         return $this->morphMany(Attachment::class, 'attachable');
     }
+
+    /**
+     * Scope: factures non réglées (sent, overdue, partial).
+     */
+    public function scopeUnpaid($query)
+    {
+        return $query->whereIn('status', ['sent', 'overdue', 'partial']);
+    }
 }

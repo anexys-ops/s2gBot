@@ -55,6 +55,15 @@ class InvoiceController extends Controller
 
         $this->applyInvoiceStatusFilter($query, $request);
 
+        // Multi-status filter: ?statuses[]=sent&statuses[]=overdue
+        if ($request->has('statuses') && is_array($request->statuses) && count($request->statuses) > 0) {
+            $allowed = Invoice::statuses();
+            $filtered = array_values(array_intersect($request->statuses, $allowed));
+            if (count($filtered) > 0) {
+                $query->whereIn('status', $filtered);
+            }
+        }
+
         if ($request->filled('client_id')) {
             $query->where('client_id', (int) $request->query('client_id'));
         }
@@ -67,48 +76,45 @@ class InvoiceController extends Controller
     public function unpaid(Request $request): JsonResponse
     {
         $user = $request->user();
-        $query = Invoice::query()->with([
-            'client',
-            'clientContact',
-            'agency',
-            'orders',
-            'invoiceLines',
-            'billingAddress',
-            'deliveryAddress',
-            'pdfTemplate',
-        ]);
+        $query = Invoice::unpaid()->with(['client:id,name']);
 
         if (! $user->isLab()) {
             AgencyAccess::applyInvoiceScope($query, $user);
         }
 
-        $override = $this->requestedInvoiceStatuses($request);
-        if ($override !== null && count($override) > 0) {
-            $narrow = array_values(array_intersect($override, self::unpaidOverrideAllowedStatuses()));
-            $statuses = count($narrow) > 0 ? $narrow : self::defaultUnpaidStatuses();
-        } else {
-            $statuses = self::defaultUnpaidStatuses();
-        }
-
-        $query->whereIn('status', $statuses);
-
-        if ($search = trim((string) $request->query('search', ''))) {
-            $query->where(function ($q) use ($search) {
-                $q->where('number', 'like', '%'.$search.'%')
-                    ->orWhereHas('client', function ($cq) use ($search) {
-                        $cq->where('name', 'like', '%'.$search.'%');
-                    });
-            });
-        }
-
-        if ($request->filled('client_id') && $user->isLab()) {
+        if ($request->filled('client_id')) {
             $query->where('client_id', (int) $request->query('client_id'));
         }
 
-        $totalDue = number_format((float) (clone $query)->sum('amount_ttc'), 2, '.', '');
-        $invoices = $query->orderByDesc('invoice_date')->paginate(15);
+        if ($request->boolean('overdue_only')) {
+            $query->where('due_date', '<', now()->toDateString());
+        }
+
+        $sortBy = $request->query('sort') === 'due_date' ? 'due_date' : 'invoice_date';
+        $query->orderBy($sortBy);
+
+        $invoices = $query->paginate(50);
+
+        $items = $invoices->getCollection()->map(function (Invoice $invoice) {
+            $daysOverdue = 0;
+            if ($invoice->status === 'overdue' && $invoice->due_date !== null) {
+                $diff = now()->diffInDays($invoice->due_date, false);
+                $daysOverdue = max(0, (int) ($diff * -1));
+            }
+
+            return [
+                'id'           => $invoice->id,
+                'ref'          => $invoice->number,
+                'client'       => $invoice->client ? ['id' => $invoice->client->id, 'name' => $invoice->client->name] : null,
+                'amount_ttc'   => $invoice->amount_ttc,
+                'due_date'     => $invoice->due_date?->toDateString(),
+                'status'       => $invoice->status,
+                'days_overdue' => $daysOverdue,
+            ];
+        });
+
         $payload = $invoices->toArray();
-        $payload['total_amount_due_ttc'] = $totalDue;
+        $payload['data'] = $items->values()->all();
 
         return response()->json($payload);
     }
@@ -376,30 +382,6 @@ class InvoiceController extends Controller
         $invoice->delete();
 
         return response()->json(null, 204);
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function defaultUnpaidStatuses(): array
-    {
-        return [
-            Invoice::STATUS_VALIDATED,
-            Invoice::STATUS_SIGNED,
-            Invoice::STATUS_SENT,
-            Invoice::STATUS_RELANCED,
-        ];
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function unpaidOverrideAllowedStatuses(): array
-    {
-        return array_values(array_diff(Invoice::statuses(), [
-            Invoice::STATUS_DRAFT,
-            Invoice::STATUS_PAID,
-        ]));
     }
 
     private function applyInvoiceStatusFilter(Builder $query, Request $request): void

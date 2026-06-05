@@ -6,7 +6,6 @@
  */
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
 import { articleCompositionApi, type ArticleComposition } from '../../api/articleCompositionApi'
 import { catalogueApi } from '../../api/client'
 
@@ -129,7 +128,7 @@ function CompositionRow({
           title="Monter"
           style={{ padding: '0.15rem 0.35rem' }}
         >
-          <ChevronUp size={14} />
+          ▲
         </button>
         <button
           type="button"
@@ -139,7 +138,7 @@ function CompositionRow({
           title="Descendre"
           style={{ padding: '0.15rem 0.35rem', marginLeft: '0.2rem' }}
         >
-          <ChevronDown size={14} />
+          ▼
         </button>
       </td>
       <td>
@@ -154,7 +153,7 @@ function CompositionRow({
             }
           }}
         >
-          {deleteMut.isPending ? '…' : <Trash2 size={14} />}
+          {deleteMut.isPending ? '…' : '✕'}
         </button>
       </td>
     </tr>

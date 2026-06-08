@@ -41,12 +41,14 @@ export default function ListTableToolbar({
           <span className="filter-label">Recherche</span>
           <div className="list-table-toolbar__search-input-wrap">
             <input
-              type="search"
+              type="text"
+              role="searchbox"
               className="list-table-toolbar__search-input"
               value={searchValue}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={searchPlaceholder}
               aria-label="Recherche"
+              autoComplete="off"
             />
             {searchValue.trim() !== '' && (
               <button

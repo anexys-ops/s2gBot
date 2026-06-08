@@ -10,6 +10,7 @@ import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibil
 import ClientMoroccoFormFields from '../components/clients/ClientMoroccoFormFields'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import Toast, { toastErrorMessage, type ToastVariant } from '../components/Toast'
+import TableRowActions from '../components/TableRowActions'
 
 function parseCapital(v: Client['capital_social']): number | undefined {
   if (v === undefined || v === null || v === '') return undefined
@@ -394,28 +395,14 @@ export default function Clients() {
                 )}
                 {isAdmin && visible.actions !== false && (
                   <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
-                    <div className="data-table__actions-inner">
-                      <button
-                        type="button"
-                        className="ds-icon-btn"
-                        title="Modifier"
-                        aria-label="Modifier le client"
-                        onClick={() => openEdit(c)}
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        type="button"
-                        className="ds-icon-btn ds-icon-btn--danger"
-                        title="Supprimer définitivement"
-                        aria-label="Supprimer définitivement le client"
-                        onClick={() => {
-                          if (window.confirm(`Supprimer le client « ${c.name} » ?`)) deleteMut.mutate(c.id)
-                        }}
-                      >
-                        🗑️
-                      </button>
-                    </div>
+                    <TableRowActions
+                      editLabel="Modifier le client"
+                      deleteLabel="Supprimer définitivement le client"
+                      onEdit={() => openEdit(c)}
+                      onDelete={() => {
+                        if (window.confirm(`Supprimer le client « ${c.name} » ?`)) deleteMut.mutate(c.id)
+                      }}
+                    />
                   </td>
                 )}
               </tr>

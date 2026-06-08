@@ -8,6 +8,7 @@ import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
+import TableRowActions from '../components/TableRowActions'
 import { MONEY_UNIT_LABEL } from '../lib/appLocale'
 import SiteStatusPill from '../components/SiteStatusPill'
 import { SITE_STATUS_KEYS, SITE_STATUS_LABELS } from '../lib/siteStatusPresentation'
@@ -236,8 +237,9 @@ export default function Sites() {
         }
       />
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table>
-          <thead>
+        <div className="table-wrap">
+          <table className="data-table data-table--compact">
+            <thead>
             <tr>
               {visible.name !== false && <th>Nom</th>}
               {visible.client !== false && <th>Client</th>}
@@ -247,9 +249,9 @@ export default function Sites() {
               {visible.address !== false && <th>Adresse</th>}
               {visible.travelQuote !== false && <th>Dépl. devis (HT)</th>}
               {visible.travelInvoice !== false && <th>Dépl. facture (HT)</th>}
-              {isAdmin && visible.actions !== false && <th>Actions</th>}
+              {isAdmin && visible.actions !== false && <th className="data-table__actions">Actions</th>}
             </tr>
-          </thead>
+            </thead>
           <tbody>
             {list.map((s) => (
               <tr
@@ -282,27 +284,22 @@ export default function Sites() {
                 {visible.travelQuote !== false && <td>{Number(s.travel_fee_quote_ht ?? 0).toFixed(2)}</td>}
                 {visible.travelInvoice !== false && <td>{Number(s.travel_fee_invoice_ht ?? 0).toFixed(2)}</td>}
                 {isAdmin && visible.actions !== false && (
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <div className="crud-actions">
-                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEdit(s)}>
-                        Modifier
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm btn-danger-outline"
-                        onClick={() => {
-                          if (window.confirm(`Supprimer le chantier « ${s.name} » ?`)) deleteMut.mutate(s.id)
-                        }}
-                      >
-                        Supprimer
-                      </button>
-                    </div>
+                  <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
+                    <TableRowActions
+                      editLabel="Modifier le chantier"
+                      deleteLabel="Supprimer le chantier"
+                      onEdit={() => openEdit(s)}
+                      onDelete={() => {
+                        if (window.confirm(`Supprimer le chantier « ${s.name} » ?`)) deleteMut.mutate(s.id)
+                      }}
+                    />
                   </td>
                 )}
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
         {!list.length && <p style={{ padding: '1rem' }}>Aucun chantier pour cette vue.</p>}
         <PaginationBar page={currentPage} lastPage={lastPage} onPage={setPage} />
       </div>

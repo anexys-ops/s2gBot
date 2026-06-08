@@ -188,6 +188,14 @@ export default function Clients() {
   const lastPage = data?.last_page ?? 1
   const currentPage = data?.current_page ?? page
 
+  const hasActiveFilters = debouncedSearch.trim() !== '' || viewFilter !== 'all'
+
+  const clearAllFilters = () => {
+    setSearchInput('')
+    setViewFilter('all')
+    setPage(1)
+  }
+
   if (isLoading) {
     return (
       <ModuleEntityShell
@@ -247,7 +255,10 @@ export default function Clients() {
     >
       <ListTableToolbar
         searchValue={searchInput}
-        onSearchChange={setSearchInput}
+        onSearchChange={(v) => {
+          setSearchInput(v)
+          setPage(1)
+        }}
         searchPlaceholder="Nom, email, ICE, RC, ville…"
         columns={[
           { id: 'name', label: 'Nom' },
@@ -263,7 +274,7 @@ export default function Clients() {
         visibleColumns={visible}
         onToggleColumn={toggle}
         extra={
-          <label style={{ minWidth: 200, margin: 0 }}>
+          <label>
             <span className="filter-label">Vue (filtre liste)</span>
             <select
               value={viewFilter}
@@ -279,6 +290,48 @@ export default function Clients() {
               ))}
             </select>
           </label>
+        }
+        footer={
+          hasActiveFilters ? (
+            <>
+              <span className="list-table-toolbar__footer-label">Filtres actifs</span>
+              {debouncedSearch.trim() !== '' && (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">Recherche : « {debouncedSearch.trim()} »</span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => {
+                      setSearchInput('')
+                      setPage(1)
+                    }}
+                    aria-label="Retirer la recherche"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {viewFilter !== 'all' && (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">{VIEW_LABELS[viewFilter]}</span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => {
+                      setViewFilter('all')
+                      setPage(1)
+                    }}
+                    aria-label="Retirer le filtre vue"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              <button type="button" className="btn btn-secondary btn-sm" onClick={clearAllFilters}>
+                Tout effacer
+              </button>
+            </>
+          ) : undefined
         }
       />
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>

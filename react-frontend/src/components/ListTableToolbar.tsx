@@ -13,6 +13,7 @@ type Props = {
   visibleColumns?: Record<string, boolean>
   onToggleColumn?: (id: string) => void
   extra?: ReactNode
+  footer?: ReactNode
 }
 
 export default function ListTableToolbar({
@@ -26,54 +27,82 @@ export default function ListTableToolbar({
   visibleColumns,
   onToggleColumn,
   extra,
+  footer,
 }: Props) {
+  const visibleColumnCount =
+    columns && visibleColumns
+      ? columns.filter((c) => visibleColumns[c.id] !== false).length
+      : null
+
   return (
-    <div className="card list-table-toolbar" style={{ marginBottom: '1rem', padding: '0.75rem 1rem' }}>
-      <label className="list-table-toolbar__search">
-        <span style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem', color: 'var(--muted, #64748b)' }}>
-          Recherche
-        </span>
-        <input
-          type="search"
-          value={searchValue}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={searchPlaceholder}
-          style={{ width: '100%' }}
-        />
-      </label>
-      {statusOptions && onStatusChange && (
-        <label className="list-table-toolbar__status">
-          <span style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem', color: 'var(--muted, #64748b)' }}>
-            Filtre statut
-          </span>
-          <select value={statusValue} onChange={(e) => onStatusChange(e.target.value)} style={{ width: '100%' }}>
-            <option value="">Tous</option>
-            {statusOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {columns && visibleColumns && onToggleColumn && (
-        <details className="list-table-toolbar__columns">
-          <summary style={{ cursor: 'pointer', fontSize: '0.9rem' }}>Colonnes affichées</summary>
-          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-            {columns.map((c) => (
-              <label key={c.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.85rem' }}>
-                <input
-                  type="checkbox"
-                  checked={visibleColumns[c.id] !== false}
-                  onChange={() => onToggleColumn(c.id)}
-                />
-                {c.label}
-              </label>
-            ))}
+    <div className="card list-table-toolbar">
+      <div className="list-table-toolbar__row">
+        <label className="list-table-toolbar__field list-table-toolbar__search">
+          <span className="filter-label">Recherche</span>
+          <div className="list-table-toolbar__search-input-wrap">
+            <input
+              type="search"
+              className="list-table-toolbar__search-input"
+              value={searchValue}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder={searchPlaceholder}
+              aria-label="Recherche"
+            />
+            {searchValue.trim() !== '' && (
+              <button
+                type="button"
+                className="list-table-toolbar__search-clear"
+                onClick={() => onSearchChange('')}
+                aria-label="Effacer la recherche"
+                title="Effacer"
+              >
+                ×
+              </button>
+            )}
           </div>
-        </details>
-      )}
-      {extra ? <div className="list-table-toolbar__extra">{extra}</div> : null}
+        </label>
+
+        {statusOptions && onStatusChange && (
+          <label className="list-table-toolbar__field list-table-toolbar__status">
+            <span className="filter-label">Filtre statut</span>
+            <select value={statusValue} onChange={(e) => onStatusChange(e.target.value)}>
+              <option value="">Tous</option>
+              {statusOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {extra ? <div className="list-table-toolbar__extra">{extra}</div> : null}
+
+        {columns && visibleColumns && onToggleColumn && (
+          <details className="list-table-toolbar__columns">
+            <summary>
+              Colonnes affichées
+              {visibleColumnCount != null && (
+                <span className="list-table-toolbar__columns-count">{visibleColumnCount}</span>
+              )}
+            </summary>
+            <div className="list-table-toolbar__columns-panel">
+              {columns.map((c) => (
+                <label key={c.id} className="list-table-toolbar__column-option">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns[c.id] !== false}
+                    onChange={() => onToggleColumn(c.id)}
+                  />
+                  <span>{c.label}</span>
+                </label>
+              ))}
+            </div>
+          </details>
+        )}
+      </div>
+
+      {footer ? <div className="list-table-toolbar__footer">{footer}</div> : null}
     </div>
   )
 }

@@ -29,9 +29,20 @@ class SiteController extends Controller
             });
         }
 
-        $sites = $query->orderBy('name')->get();
+        if ($clientId = $request->query('client_id')) {
+            $query->where('client_id', (int) $clientId);
+        }
 
-        return response()->json($sites);
+        $query->orderBy('name');
+
+        if ($request->has('page') || $request->has('per_page')) {
+            $perPage = (int) $request->query('per_page', 20);
+            $perPage = min(100, max(1, $perPage));
+
+            return response()->json($query->paginate($perPage));
+        }
+
+        return response()->json($query->get());
     }
 
     public function store(Request $request): JsonResponse

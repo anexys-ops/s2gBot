@@ -1021,6 +1021,19 @@ export const sitesApi = {
     const s = q.toString()
     return api<Site[]>(`/sites${s ? `?${s}` : ''}`)
   },
+  listPaginated: (params?: {
+    search?: string
+    client_id?: number
+    page?: number
+    per_page?: number
+  }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    if (params?.client_id) q.set('client_id', String(params.client_id))
+    q.set('page', String(params?.page ?? 1))
+    q.set('per_page', String(params?.per_page ?? 20))
+    return api<LaravelPaginator<Site>>(`/sites?${q.toString()}`)
+  },
   get: (id: number) => api<Site>(`/sites/${id}`),
   create: (body: Partial<Site>) => api<Site>('/sites', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: Partial<Site>) => api<Site>(`/sites/${id}`, { method: 'PUT', body: JSON.stringify(body) }),

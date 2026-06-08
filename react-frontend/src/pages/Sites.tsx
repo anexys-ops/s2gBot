@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sitesApi, clientsApi, type Site } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
-import ListTableToolbar from '../components/ListTableToolbar'
+import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
@@ -35,6 +35,8 @@ export default function Sites() {
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [clientFilter, setClientFilter] = useState<string>('')
+  const [page, setPage] = useState(1)
+  const perPage = 20
   const { visible, toggle } = usePersistedColumnVisibility('sites', {
     name: true,
     client: true,
@@ -47,10 +49,22 @@ export default function Sites() {
     actions: true,
   })
 
-  const { data: sites, isLoading, error } = useQuery({
-    queryKey: ['sites', debouncedSearch],
-    queryFn: () => sitesApi.list({ search: debouncedSearch.trim() || undefined }),
+  const clientFilterId = clientFilter ? Number(clientFilter) : undefined
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['sites', 'paginated', debouncedSearch, clientFilter, page, perPage],
+    queryFn: () =>
+      sitesApi.listPaginated({
+        search: debouncedSearch.trim() || undefined,
+        client_id: clientFilterId && Number.isFinite(clientFilterId) ? clientFilterId : undefined,
+        page,
+        per_page: perPage,
+      }),
   })
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, clientFilter])
 
   const { data: clientsData } = useQuery({
     queryKey: ['clients'],
@@ -125,13 +139,10 @@ export default function Sites() {
     }
   }
 
-  const rawList = Array.isArray(sites) ? sites : []
-  const list = useMemo(() => {
-    if (!clientFilter) return rawList
-    const cid = Number(clientFilter)
-    if (!cid) return rawList
-    return rawList.filter((s) => s.client_id === cid)
-  }, [rawList, clientFilter])
+  const list = data?.data ?? []
+  const total = data?.total ?? 0
+  const lastPage = data?.last_page ?? 1
+  const currentPage = data?.current_page ?? page
 
   if (isLoading) {
     return (
@@ -174,7 +185,11 @@ export default function Sites() {
       ]}
       moduleBarLabel="Projets — Chantiers"
       title="Chantiers / Sites"
-      subtitle={`${list.length} ligne(s) affichée(s)`}
+      subtitle={
+        total > 0
+          ? `${total} chantier(s) — page ${currentPage} / ${lastPage}`
+          : 'Aucun chantier pour cette vue'
+      }
       actions={
         isAdmin ? (
           <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
@@ -203,7 +218,13 @@ export default function Sites() {
         extra={
           <label style={{ minWidth: 220, margin: 0 }}>
             <span className="filter-label">Filtrer par client</span>
-            <select value={clientFilter} onChange={(e) => setClientFilter(e.target.value)}>
+            <select
+              value={clientFilter}
+              onChange={(e) => {
+                setClientFilter(e.target.value)
+                setPage(1)
+              }}
+            >
               <option value="">Tous les clients</option>
               {clients.map((c) => (
                 <option key={c.id} value={String(c.id)}>
@@ -283,6 +304,7 @@ export default function Sites() {
           </tbody>
         </table>
         {!list.length && <p style={{ padding: '1rem' }}>Aucun chantier pour cette vue.</p>}
+        <PaginationBar page={currentPage} lastPage={lastPage} onPage={setPage} />
       </div>
 
       {modal && isAdmin && (

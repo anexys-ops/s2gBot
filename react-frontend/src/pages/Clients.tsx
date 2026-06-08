@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { clientsApi, type Client } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
-import ListTableToolbar from '../components/ListTableToolbar'
+import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import ClientMoroccoFormFields from '../components/clients/ClientMoroccoFormFields'
@@ -58,6 +58,8 @@ export default function Clients() {
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all')
+  const [page, setPage] = useState(1)
+  const perPage = 20
   const { visible, toggle } = usePersistedColumnVisibility('clients', {
     name: true,
     email: true,
@@ -69,10 +71,20 @@ export default function Clients() {
     actions: true,
   })
 
-  const { data: clients, isLoading, error } = useQuery({
-    queryKey: ['clients', debouncedSearch],
-    queryFn: () => clientsApi.list({ search: debouncedSearch.trim() || undefined }),
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['clients', 'paginated', debouncedSearch, viewFilter, page, perPage],
+    queryFn: () =>
+      clientsApi.listPaginated({
+        search: debouncedSearch.trim() || undefined,
+        view: viewFilter,
+        page,
+        per_page: perPage,
+      }),
   })
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, viewFilter])
 
   useEffect(() => {
     const st = location.state as { openCreate?: boolean } | null
@@ -156,18 +168,10 @@ export default function Clients() {
     }
   }
 
-  const rawList = Array.isArray(clients) ? clients : []
-
-  const list = useMemo(() => {
-    return rawList.filter((c) => {
-      if (viewFilter === 'with_siret') return !!(c.siret && String(c.siret).trim())
-      if (viewFilter === 'with_ice') return !!(c.ice && String(c.ice).trim())
-      if (viewFilter === 'missing_email') return !c.email?.trim()
-      if (viewFilter === 'missing_phone') return !c.phone?.trim()
-      if (viewFilter === 'missing_ice') return !(c.ice && String(c.ice).trim())
-      return true
-    })
-  }, [rawList, viewFilter])
+  const list = data?.data ?? []
+  const total = data?.total ?? 0
+  const lastPage = data?.last_page ?? 1
+  const currentPage = data?.current_page ?? page
 
   if (isLoading) {
     return (
@@ -211,7 +215,11 @@ export default function Clients() {
       ]}
       moduleBarLabel="Tiers — Clients"
       title="Clients"
-      subtitle={`${list.length} fiche(s) affichée(s) sur ${rawList.length} chargée(s)`}
+      subtitle={
+        total > 0
+          ? `${total} client(s) — page ${currentPage} / ${lastPage}`
+          : 'Aucun client pour cette vue'
+      }
       actions={
         <>
           {isAdmin && (
@@ -241,7 +249,13 @@ export default function Clients() {
         extra={
           <label style={{ minWidth: 200, margin: 0 }}>
             <span className="filter-label">Vue (filtre liste)</span>
-            <select value={viewFilter} onChange={(e) => setViewFilter(e.target.value as ViewFilter)}>
+            <select
+              value={viewFilter}
+              onChange={(e) => {
+                setViewFilter(e.target.value as ViewFilter)
+                setPage(1)
+              }}
+            >
               {(Object.keys(VIEW_LABELS) as ViewFilter[]).map((k) => (
                 <option key={k} value={k}>
                   {VIEW_LABELS[k]}
@@ -337,6 +351,7 @@ export default function Clients() {
           </table>
         </div>
         {!list.length && <p style={{ padding: '1rem' }}>Aucun client pour cette vue.</p>}
+        <PaginationBar page={currentPage} lastPage={lastPage} onPage={setPage} />
       </div>
 
       {modal && (

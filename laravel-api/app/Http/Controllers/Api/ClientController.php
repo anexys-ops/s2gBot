@@ -51,9 +51,18 @@ class ClientController extends Controller
             $query->whereNotNull('lat')->whereNotNull('lng');
         }
 
-        $clients = $query->orderBy('name')->get();
+        $this->applyViewFilter($query, $request->query('view'));
 
-        return response()->json($clients);
+        $query->orderBy('name');
+
+        if ($request->has('page') || $request->has('per_page')) {
+            $perPage = (int) $request->query('per_page', 20);
+            $perPage = min(100, max(1, $perPage));
+
+            return response()->json($query->paginate($perPage));
+        }
+
+        return response()->json($query->get());
     }
 
     public function store(Request $request): JsonResponse
@@ -110,6 +119,29 @@ class ClientController extends Controller
     // ----------------------------------------------------------------
     // Helpers
     // ----------------------------------------------------------------
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<Client>  $query
+     */
+    private function applyViewFilter($query, mixed $view): void
+    {
+        $view = is_string($view) ? trim($view) : '';
+
+        match ($view) {
+            'with_siret' => $query->whereNotNull('siret')->where('siret', '!=', ''),
+            'with_ice' => $query->whereNotNull('ice')->where('ice', '!=', ''),
+            'missing_email' => $query->where(function ($q) {
+                $q->whereNull('email')->orWhere('email', '=', '');
+            }),
+            'missing_phone' => $query->where(function ($q) {
+                $q->whereNull('phone')->orWhere('phone', '=', '');
+            }),
+            'missing_ice' => $query->where(function ($q) {
+                $q->whereNull('ice')->orWhere('ice', '=', '');
+            }),
+            default => null,
+        };
+    }
 
     private function rules(bool $sometimes = false): array
     {

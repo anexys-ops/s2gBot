@@ -192,6 +192,21 @@ export const clientsApi = {
     const s = q.toString()
     return api<Client[]>(`/clients${s ? `?${s}` : ''}`)
   },
+  listPaginated: (params?: {
+    search?: string
+    commercial_id?: number
+    view?: string
+    page?: number
+    per_page?: number
+  }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    if (params?.commercial_id) q.set('commercial_id', String(params.commercial_id))
+    if (params?.view && params.view !== 'all') q.set('view', params.view)
+    q.set('page', String(params?.page ?? 1))
+    q.set('per_page', String(params?.per_page ?? 20))
+    return api<LaravelPaginator<Client>>(`/clients?${q.toString()}`)
+  },
   get: (id: number) => api<Client>(`/clients/${id}`),
   create: (body: Partial<Client>) => api<Client>('/clients', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: Partial<Client>) => api<Client>(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(body) }),

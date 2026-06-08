@@ -129,10 +129,15 @@ class Invoice extends Model
     }
 
     /**
-     * Scope: factures non réglées (sent, overdue, partial).
+     * Scope: factures non réglées (validated, signed, sent, relanced).
      */
     public function scopeUnpaid($query)
     {
-        return $query->whereIn('status', ['sent', 'overdue', 'partial']);
+        return $query->whereIn('status', [
+            self::STATUS_VALIDATED,
+            self::STATUS_SIGNED,
+            self::STATUS_SENT,
+            self::STATUS_RELANCED,
+        ]);
     }
 }

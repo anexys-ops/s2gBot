@@ -76,7 +76,32 @@ class InvoiceController extends Controller
     public function unpaid(Request $request): JsonResponse
     {
         $user = $request->user();
-        $query = Invoice::unpaid()->with(['client:id,name']);
+
+        // Optionnel : ?status=sent,relanced  ou  ?status[]=sent&status[]=relanced
+        // Override the default scope with the specified statuses (validated against known statuses).
+        $overrideStatuses = null;
+        if ($request->has('status')) {
+            $raw = $request->query('status');
+            if (is_string($raw) && str_contains($raw, ',')) {
+                $parsed = array_values(array_filter(array_map('trim', explode(',', $raw))));
+            } elseif (is_array($raw)) {
+                $parsed = array_values(array_filter(array_map('trim', $raw)));
+            } elseif (is_string($raw) && $raw !== '') {
+                $parsed = [trim($raw)];
+            } else {
+                $parsed = [];
+            }
+            $allowed = Invoice::statuses();
+            $overrideStatuses = array_values(array_intersect($parsed, $allowed));
+        }
+
+        if ($overrideStatuses !== null && count($overrideStatuses) > 0) {
+            $query = Invoice::query()->whereIn('status', $overrideStatuses);
+        } else {
+            $query = Invoice::unpaid();
+        }
+
+        $query->with(['client:id,name']);
 
         if (! $user->isLab()) {
             AgencyAccess::applyInvoiceScope($query, $user);
@@ -90,18 +115,15 @@ class InvoiceController extends Controller
             $query->where('due_date', '<', now()->toDateString());
         }
 
+        // Total avant pagination
+        $totalAmountDueTtc = number_format((float) (clone $query)->sum('amount_ttc'), 2, '.', '');
+
         $sortBy = $request->query('sort') === 'due_date' ? 'due_date' : 'invoice_date';
         $query->orderBy($sortBy);
 
         $invoices = $query->paginate(50);
 
         $items = $invoices->getCollection()->map(function (Invoice $invoice) {
-            $daysOverdue = 0;
-            if ($invoice->status === 'overdue' && $invoice->due_date !== null) {
-                $diff = now()->diffInDays($invoice->due_date, false);
-                $daysOverdue = max(0, (int) ($diff * -1));
-            }
-
             return [
                 'id'           => $invoice->id,
                 'ref'          => $invoice->number,
@@ -109,12 +131,13 @@ class InvoiceController extends Controller
                 'amount_ttc'   => $invoice->amount_ttc,
                 'due_date'     => $invoice->due_date?->toDateString(),
                 'status'       => $invoice->status,
-                'days_overdue' => $daysOverdue,
+                'days_overdue' => 0,
             ];
         });
 
         $payload = $invoices->toArray();
         $payload['data'] = $items->values()->all();
+        $payload['total_amount_due_ttc'] = $totalAmountDueTtc;
 
         return response()->json($payload);
     }

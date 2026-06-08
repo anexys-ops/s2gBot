@@ -5,6 +5,7 @@ import { clientsApi, adminUsersApi, type Client, type EntityMetaPayload } from '
 import ClientMoroccoFormFields from '../../components/clients/ClientMoroccoFormFields'
 import EntityMetaCard from '../../components/module/EntityMetaCard'
 import Modal from '../../components/Modal'
+import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
 import { legalFormLabel } from '../../constants/moroccoClient'
 import type { ClientOutletContext } from './ClientLayout'
 
@@ -46,6 +47,7 @@ export default function ClientFicheTab() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState<Partial<Client>>(() => emptyForm(client))
+  const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
 
   // Liste des utilisateurs internes pour les selects référents
   const { data: usersData } = useQuery({
@@ -76,6 +78,13 @@ export default function ClientFicheTab() {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       queryClient.invalidateQueries({ queryKey: ['client-commercial', clientId] })
       setModalOpen(false)
+      setToast({ message: 'Client mis à jour avec succès.', variant: 'success' })
+    },
+    onError: (err) => {
+      setToast({
+        message: toastErrorMessage(err, 'Échec de la mise à jour du client.'),
+        variant: 'error',
+      })
     },
   })
 
@@ -250,7 +259,6 @@ export default function ClientFicheTab() {
               ))}
             </fieldset>
 
-            {updateMut.isError && <p className="error">{(updateMut.error as Error).message}</p>}
             <div className="crud-actions" style={{ marginTop: '1rem' }}>
               <button type="submit" className="btn btn-primary" disabled={updateMut.isPending}>
                 Enregistrer
@@ -261,6 +269,9 @@ export default function ClientFicheTab() {
             </div>
           </form>
         </Modal>
+      )}
+      {toast && (
+        <Toast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} />
       )}
     </>
   )

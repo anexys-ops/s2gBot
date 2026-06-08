@@ -9,6 +9,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import ClientMoroccoFormFields from '../components/clients/ClientMoroccoFormFields'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
+import Toast, { toastErrorMessage, type ToastVariant } from '../components/Toast'
 
 function parseCapital(v: Client['capital_social']): number | undefined {
   if (v === undefined || v === null || v === '') return undefined
@@ -60,6 +61,7 @@ export default function Clients() {
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all')
   const [page, setPage] = useState(1)
   const perPage = 20
+  const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
   const { visible, toggle } = usePersistedColumnVisibility('clients', {
     name: true,
     email: true,
@@ -96,12 +98,20 @@ export default function Clients() {
     }
   }, [location.state, navigate, isAdmin])
 
+  const showToast = (message: string, variant: ToastVariant) => {
+    setToast({ message, variant })
+  }
+
   const createMut = useMutation({
     mutationFn: (body: Partial<Client>) => clientsApi.create(body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       setModal(null)
       setForm(emptyForm)
+      showToast('Client créé avec succès.', 'success')
+    },
+    onError: (err) => {
+      showToast(toastErrorMessage(err, 'Échec de la création du client.'), 'error')
     },
   })
 
@@ -112,6 +122,10 @@ export default function Clients() {
       setModal(null)
       setEditingId(null)
       setForm(emptyForm)
+      showToast('Client mis à jour avec succès.', 'success')
+    },
+    onError: (err) => {
+      showToast(toastErrorMessage(err, 'Échec de la mise à jour du client.'), 'error')
     },
   })
 
@@ -370,9 +384,6 @@ export default function Clients() {
               <input type="email" value={form.email ?? ''} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
             </div>
             <ClientMoroccoFormFields form={form} setForm={setForm} />
-            {(createMut.isError || updateMut.isError) && (
-              <p className="error">{(createMut.error || updateMut.error)?.message}</p>
-            )}
             <div className="crud-actions" style={{ marginTop: '1rem' }}>
               <button type="submit" className="btn btn-primary" disabled={createMut.isPending || updateMut.isPending}>
                 Enregistrer
@@ -383,6 +394,9 @@ export default function Clients() {
             </div>
           </form>
         </Modal>
+      )}
+      {toast && (
+        <Toast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} />
       )}
     </ModuleEntityShell>
   )

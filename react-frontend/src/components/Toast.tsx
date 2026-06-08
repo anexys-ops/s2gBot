@@ -17,6 +17,9 @@ export default function Toast({ message, variant, durationMs = 5000, onClose }: 
 
   return (
     <div className={`app-toast app-toast--${variant}`} role="alert" aria-live="polite">
+      <span className="app-toast__icon" aria-hidden>
+        {variant === 'success' ? '✓' : '!'}
+      </span>
       <span className="app-toast__message">{message}</span>
       <button type="button" className="app-toast__close" onClick={onClose} aria-label="Fermer">
         ×

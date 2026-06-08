@@ -43,8 +43,8 @@ else
 fi
 
 echo "=== 1/6 Caches Laravel (optimize:clear) si l’ancien conteneur app répond ==="
-if "${DC[@]}" exec -T app true 2>/dev/null; then
-  "${DC[@]}" exec -T app php artisan optimize:clear || true
+if timeout 20 "${DC[@]}" exec -T app true 2>/dev/null; then
+  timeout 60 "${DC[@]}" exec -T app php artisan optimize:clear || true
 else
   echo "app absent ou non joignable — étape ignorée."
 fi

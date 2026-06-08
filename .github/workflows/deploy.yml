@@ -183,7 +183,7 @@ jobs:
           echo "GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT" >> .env.docker
           echo "✓ .env.docker mis à jour (APP_VERSION=$PKG_VER, GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT)"
 
-          echo "▶ Exécution docker-prod-refresh.sh"
-          ./scripts/docker-prod-refresh.sh
+          echo "▶ Exécution docker-prod-refresh.sh (NO_CACHE=0 — cache Docker actif)"
+          NO_CACHE=0 ./scripts/docker-prod-refresh.sh
           echo "✓ Déploiement terminé"
           ENDSSH

@@ -1863,6 +1863,7 @@ export interface Client {
   // GPS
   lat?: number | null
   lng?: number | null
+  created_at?: string
   sites?: Site[]
   addresses?: ClientAddress[]
   contacts?: ClientContactRow[]

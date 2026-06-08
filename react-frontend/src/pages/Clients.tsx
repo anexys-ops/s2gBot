@@ -69,6 +69,7 @@ export default function Clients() {
     city: true,
     ice: true,
     siret: false,
+    created: false,
     commercial: true,
     actions: true,
   })
@@ -255,6 +256,7 @@ export default function Clients() {
           { id: 'city', label: 'Ville' },
           { id: 'ice', label: 'ICE' },
           { id: 'siret', label: 'SIRET / autre' },
+          { id: 'created', label: 'Date de création' },
           ...(isLab ? [{ id: 'commercial', label: 'Commerce (fiche)' }] : []),
           ...(isAdmin ? [{ id: 'actions', label: 'Actions' }] : []),
         ]}
@@ -290,6 +292,7 @@ export default function Clients() {
               {visible.city !== false && <th>Ville</th>}
               {visible.ice !== false && <th>ICE</th>}
               {visible.siret !== false && <th>SIRET / autre</th>}
+              {visible.created !== false && <th>Création</th>}
               {isLab && visible.commercial !== false && <th>Commerce</th>}
               {isAdmin && visible.actions !== false && <th className="data-table__actions">Actions</th>}
             </tr>
@@ -326,6 +329,9 @@ export default function Clients() {
                 {visible.city !== false && <td>{c.city?.trim() ? c.city : '—'}</td>}
                 {visible.ice !== false && <td>{c.ice?.trim() ? c.ice : '—'}</td>}
                 {visible.siret !== false && <td>{c.siret?.trim() ? c.siret : '—'}</td>}
+                {visible.created !== false && (
+                  <td>{c.created_at ? new Date(c.created_at).toLocaleDateString('fr-FR') : '—'}</td>
+                )}
                 {isLab && visible.commercial !== false && (
                   <td>
                     <Link className="btn btn-secondary btn-sm" to={`/clients/${c.id}/commerce`} onClick={(e) => e.stopPropagation()}>

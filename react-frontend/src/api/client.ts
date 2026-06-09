@@ -520,6 +520,14 @@ export interface RefArticleRow {
   resultats?: RefResultatRow[]
 }
 
+/** Laravel ArticleResource renvoie parfois { data: article }. */
+function unwrapCatalogueArticle(payload: RefArticleRow | { data: RefArticleRow }): RefArticleRow {
+  if (payload && typeof payload === 'object' && 'data' in payload && payload.data && typeof payload.data === 'object') {
+    return payload.data
+  }
+  return payload as RefArticleRow
+}
+
 export interface RefFamilleArticleRow {
   id: number
   code: string
@@ -569,11 +577,18 @@ export const catalogueApi = {
     const s = q.toString()
     return api<RefPackageRow[]>(`/v1/catalogue/packages${s ? `?${s}` : ''}`)
   },
-  article: (id: number) => api<RefArticleRow>(`/v1/catalogue/articles/${id}`),
+  article: (id: number) =>
+    api<RefArticleRow | { data: RefArticleRow }>(`/v1/catalogue/articles/${id}`).then(unwrapCatalogueArticle),
   createArticle: (body: Partial<RefArticleRow> & { ref_famille_article_id: number; code: string; libelle: string }) =>
-    api<RefArticleRow>('/v1/catalogue/articles', { method: 'POST', body: JSON.stringify(body) }),
+    api<RefArticleRow | { data: RefArticleRow }>('/v1/catalogue/articles', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }).then(unwrapCatalogueArticle),
   updateArticle: (id: number, body: Partial<RefArticleRow>) =>
-    api<RefArticleRow>(`/v1/catalogue/articles/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    api<RefArticleRow | { data: RefArticleRow }>(`/v1/catalogue/articles/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }).then(unwrapCatalogueArticle),
   deleteArticle: (id: number) => api<null>(`/v1/catalogue/articles/${id}`, { method: 'DELETE' }),
 }
 

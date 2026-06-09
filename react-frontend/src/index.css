@@ -6554,9 +6554,41 @@ a.catalogue-tree__link-article:hover {
 .materiel-equipments-toolbar {
   margin-bottom: 1rem;
 }
-.materiel-equipments-toolbar__due {
-  flex: 0 1 10rem;
-  min-width: min(100%, 9rem);
+.materiel-equipments-toolbar.list-table-toolbar .list-table-toolbar__row {
+  display: grid;
+  grid-template-columns: minmax(14rem, 2fr) minmax(11rem, 1fr);
+  align-items: end;
+  gap: 0.75rem 1rem;
+}
+.materiel-equipments-toolbar .list-table-toolbar__search {
+  grid-column: 1;
+  flex: none;
+  min-width: 0;
+  max-width: none;
+  width: 100%;
+}
+.materiel-equipments-toolbar .list-table-toolbar__status {
+  grid-column: 2;
+  flex: none;
+  min-width: 0;
+  max-width: none;
+  width: 100%;
+}
+.materiel-equipments-table__actions {
+  white-space: nowrap;
+  text-align: right;
+}
+.materiel-equipments-table__actions .btn + .btn {
+  margin-left: 0.35rem;
+}
+@media (max-width: 640px) {
+  .materiel-equipments-toolbar.list-table-toolbar .list-table-toolbar__row {
+    grid-template-columns: 1fr;
+  }
+  .materiel-equipments-toolbar .list-table-toolbar__search,
+  .materiel-equipments-toolbar .list-table-toolbar__status {
+    grid-column: 1 / -1;
+  }
 }
 
 .equipment-create-form__intro {

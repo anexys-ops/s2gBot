@@ -1,18 +1,24 @@
 import { useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { equipmentsApi, type EquipmentRow } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
+import ConfirmDialog from '../../components/ConfirmDialog'
+import StatusBadge, { equipementStatutBadgeProps } from '../../components/ds/StatusBadge'
+import ListTableToolbar from '../../components/ListTableToolbar'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import EquipmentCreateModal from '../../components/materiel/EquipmentCreateModal'
 import { MATERIEL_MODULE_TABS } from '../materiel/materielModuleTabs'
 
-const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: '', label: 'Tous statuts' },
+const STATUS_OPTIONS = [
   { value: 'active', label: 'Actif' },
   { value: 'maintenance', label: 'Maintenance' },
   { value: 'retired', label: 'Retiré' },
-]
+] as const
+
+function statusLabel(value: string): string {
+  return STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value
+}
 
 function nextDueLabel(eq: EquipmentRow): string {
   const cals = eq.calibrations ?? []
@@ -22,26 +28,55 @@ function nextDueLabel(eq: EquipmentRow): string {
   return sorted[0] ? new Date(sorted[0]).toLocaleDateString('fr-FR') : '—'
 }
 
+function matchesSearch(eq: EquipmentRow, term: string): boolean {
+  if (!term) return true
+  const haystack = [
+    eq.code,
+    eq.name,
+    eq.status,
+    eq.type,
+    eq.brand,
+    eq.model,
+    eq.serial_number,
+    eq.location,
+    eq.agency?.name,
+    ...(eq.test_types?.map((t) => t.name) ?? []),
+  ]
+    .filter(Boolean)
+    .map((v) => String(v).toLowerCase())
+  return haystack.some((v) => v.includes(term))
+}
+
 export default function EquipmentsPage() {
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const isAdmin = user?.role === 'lab_admin'
+  const queryClient = useQueryClient()
+  const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
-  const [dueWithin, setDueWithin] = useState<number | ''>('')
   const [createOpen, setCreateOpen] = useState(false)
-
-  const listParams = useMemo(() => {
-    const p: { status?: string; due_within?: number } = {}
-    if (status) p.status = status
-    if (dueWithin !== '' && dueWithin > 0) p.due_within = dueWithin
-    return p
-  }, [status, dueWithin])
+  const [deleteTarget, setDeleteTarget] = useState<EquipmentRow | null>(null)
 
   const { data: rows = [], isLoading, error } = useQuery({
-    queryKey: ['equipments', listParams],
-    queryFn: () => equipmentsApi.list(listParams),
+    queryKey: ['equipments', status],
+    queryFn: () => equipmentsApi.list(status ? { status } : undefined),
     enabled: isLab,
   })
+
+  const filteredRows = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    return rows.filter((eq) => matchesSearch(eq, term))
+  }, [rows, search])
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => equipmentsApi.delete(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['equipments'] })
+      setDeleteTarget(null)
+    },
+  })
+
+  const hasActiveFilters = search.trim() !== '' || status !== ''
 
   if (!isLab) {
     return <Navigate to="/" replace />
@@ -56,7 +91,14 @@ export default function EquipmentsPage() {
       ]}
       moduleBarLabel="Matériel"
       title="Parc équipements"
-      subtitle="Liste du matériel, étalonnages et fiches détaillées."
+      subtitle={
+        <>
+          {filteredRows.length} équipement{filteredRows.length !== 1 ? 's' : ''}
+          {hasActiveFilters && rows.length !== filteredRows.length ? (
+            <span className="text-muted"> (sur {rows.length} chargé{rows.length !== 1 ? 's' : ''})</span>
+          ) : null}
+        </>
+      }
       tabs={MATERIEL_MODULE_TABS}
       actions={
         isAdmin ? (
@@ -66,41 +108,54 @@ export default function EquipmentsPage() {
         ) : undefined
       }
     >
-      <div className="card list-table-toolbar materiel-equipments-toolbar">
-        <div className="list-table-toolbar__row">
-          <label className="list-table-toolbar__field list-table-toolbar__status">
-            <span className="filter-label">Statut</span>
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value || 'all'} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="list-table-toolbar__field materiel-equipments-toolbar__due">
-            <span className="filter-label">Échéance dans (j.)</span>
-            <input
-              type="number"
-              className="article-actions-form__input article-actions-form__input--number"
-              min={1}
-              max={365}
-              value={dueWithin}
-              onChange={(e) => {
-                const v = e.target.value
-                setDueWithin(v === '' ? '' : Math.min(365, Math.max(1, Number(v))))
-              }}
-              placeholder="ex. 30"
-            />
-          </label>
-        </div>
-      </div>
+      <ListTableToolbar
+        className="materiel-equipments-toolbar"
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Code, nom, agence, type, n° série…"
+        statusValue={status}
+        onStatusChange={setStatus}
+        statusOptions={STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        footer={
+          hasActiveFilters ? (
+            <>
+              <span className="list-table-toolbar__footer-label">Filtres actifs</span>
+              {search.trim() !== '' ? (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">Recherche : « {search.trim()} »</span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => setSearch('')}
+                    aria-label="Effacer la recherche"
+                  >
+                    ×
+                  </button>
+                </span>
+              ) : null}
+              {status ? (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">{statusLabel(status)}</span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => setStatus('')}
+                    aria-label="Effacer le filtre statut"
+                  >
+                    ×
+                  </button>
+                </span>
+              ) : null}
+            </>
+          ) : null
+        }
+      />
 
       {isLoading && <p className="text-muted">Chargement…</p>}
       {error && <p className="error">{(error as Error).message}</p>}
       {!isLoading && !error && (
         <div className="card dossier-tab-panel dossier-tab-panel--table">
-          {rows.length > 0 ? (
+          {filteredRows.length > 0 ? (
             <div className="table-wrap">
               <table className="data-table data-table--compact">
                 <thead>
@@ -110,32 +165,81 @@ export default function EquipmentsPage() {
                     <th>Statut</th>
                     <th>Agence</th>
                     <th>Prochain étalonnage</th>
+                    <th className="materiel-equipments-table__actions">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((eq) => (
-                    <tr key={eq.id}>
-                      <td>
-                        <Link to={`/materiel/equipements/${eq.id}`} className="link-inline">
-                          <code className="code-badge">{eq.code}</code>
-                        </Link>
-                      </td>
-                      <td>{eq.name}</td>
-                      <td>{eq.status}</td>
-                      <td>{eq.agency?.name ?? '—'}</td>
-                      <td>{nextDueLabel(eq)}</td>
-                    </tr>
-                  ))}
+                  {filteredRows.map((eq) => {
+                    const st = equipementStatutBadgeProps(eq.status)
+                    return (
+                      <tr key={eq.id}>
+                        <td>
+                          <Link to={`/materiel/equipements/${eq.id}`} className="link-inline">
+                            <code className="code-badge">{eq.code}</code>
+                          </Link>
+                        </td>
+                        <td>{eq.name}</td>
+                        <td>
+                          <StatusBadge variant={st.variant} size="sm">
+                            {statusLabel(eq.status)}
+                          </StatusBadge>
+                        </td>
+                        <td>{eq.agency?.name ?? '—'}</td>
+                        <td>{nextDueLabel(eq)}</td>
+                        <td className="materiel-equipments-table__actions">
+                          <Link
+                            to={`/materiel/equipements/${eq.id}`}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            Fiche
+                          </Link>
+                          {isAdmin ? (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm btn-danger-outline"
+                              title="Supprimer"
+                              onClick={() => setDeleteTarget(eq)}
+                            >
+                              Supprimer
+                            </button>
+                          ) : null}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
           ) : (
-            <p className="dossier-tab-empty">Aucun équipement pour ces filtres.</p>
+            <p className="dossier-tab-empty">
+              {rows.length === 0
+                ? 'Aucun équipement enregistré.'
+                : 'Aucun équipement ne correspond à la recherche ou aux filtres.'}
+            </p>
           )}
         </div>
       )}
 
       {createOpen ? <EquipmentCreateModal onClose={() => setCreateOpen(false)} /> : null}
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Supprimer l'équipement"
+          message={
+            <>
+              Supprimer définitivement <strong>{deleteTarget.code}</strong> — {deleteTarget.name} ?
+            </>
+          }
+          confirmLabel="Supprimer"
+          variant="danger"
+          loading={deleteMut.isPending}
+          error={deleteMut.isError ? (deleteMut.error as Error).message : null}
+          onConfirm={() => deleteMut.mutate(deleteTarget.id)}
+          onCancel={() => {
+            if (!deleteMut.isPending) setDeleteTarget(null)
+          }}
+        />
+      ) : null}
     </ModuleEntityShell>
   )
 }

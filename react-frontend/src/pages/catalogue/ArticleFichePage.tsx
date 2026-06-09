@@ -375,7 +375,7 @@ export default function ArticleFichePage() {
       {tab === 'descriptions' && <FicheArticle article={article} section="descriptions" showBackLink={false} />}
       {tab === 'tables' && <FicheArticle article={article} section="tables" showBackLink={false} />}
       {tab === 'composition' && (
-        <ArticleCompositionEditor articleId={articleId} />
+        <ArticleCompositionEditor articleId={articleId} canEdit={isLab} />
       )}
       {tab === 'actions' && isLab && (
         <ArticleActionsPanel articleId={articleId} />

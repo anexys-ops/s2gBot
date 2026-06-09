@@ -210,6 +210,17 @@ export default function FicheArticle({ article, section = 'all', showBackLink = 
         </section>
       )}
 
+      {showTables && fpkgs.length === 0 && params.length === 0 && resultats.length === 0 && (
+        <section className="fiche-article__section card">
+          <h2 className="fiche-article__h2">Tables</h2>
+          <p className="fiche-article__tables-empty text-muted">
+            Aucune donnée tabulaire pour cet article : pas de forfaits &amp; packages, de paramètres d&apos;essai ni de
+            résultats attendus. D&apos;autres articles du catalogue peuvent en comporter selon leur famille et leur
+            configuration laboratoire.
+          </p>
+        </section>
+      )}
+
       {showTables && resultats.length > 0 && (
         <section className="fiche-article__section card">
           <h2 className="fiche-article__h2">Résultats attendus</h2>

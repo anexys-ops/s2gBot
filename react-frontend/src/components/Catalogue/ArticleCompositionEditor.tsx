@@ -1,30 +1,53 @@
 /**
  * ArticleCompositionEditor
  *
- * Éditeur de composition d'un article : liste des composants (articles enfants),
- * ajout, modification inline (qté / optionnel), réordonnancement et suppression.
+ * Composition d'un article : articles enfants, quantités, optionnel, ordre.
  */
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { articleCompositionApi, type ArticleComposition } from '../../api/articleCompositionApi'
 import { catalogueApi } from '../../api/client'
+import ConfirmDialog from '../ConfirmDialog'
+import { formatMoney } from '../../lib/appLocale'
 
-// ─── Row inline editing ──────────────────────────────────────────────────────
+type Props = {
+  articleId: number
+  canEdit?: boolean
+}
+
+function childLabel(comp: ArticleComposition): string {
+  const child = comp.child
+  if (child?.libelle) return child.libelle
+  if (child?.code) return child.code
+  return `#${comp.child_article_id}`
+}
+
+function childPrice(comp: ArticleComposition): string {
+  const raw = comp.child?.prix_unitaire_ht
+  if (raw == null || String(raw).trim() === '') return '—'
+  const n = Number(raw)
+  return Number.isFinite(n) ? formatMoney(n) : '—'
+}
 
 function CompositionRow({
   comp,
   articleId,
+  canEdit,
   isFirst,
   isLast,
   onMoveUp,
   onMoveDown,
+  onDelete,
 }: {
   comp: ArticleComposition
   articleId: number
+  canEdit: boolean
   isFirst: boolean
   isLast: boolean
   onMoveUp: () => void
   onMoveDown: () => void
+  onDelete: () => void
 }) {
   const qc = useQueryClient()
   const [qty, setQty] = useState(comp.qty_per_unit)
@@ -40,127 +63,112 @@ function CompositionRow({
     },
   })
 
-  const deleteMut = useMutation({
-    mutationFn: () => articleCompositionApi.remove(articleId, comp.id),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['article-compositions', articleId] })
-    },
-  })
-
   const child = comp.child
-  const designation = child?.designation ?? `#${comp.child_article_id}`
+  const label = childLabel(comp)
   const code = child?.code ?? '—'
-  const unite = child?.unite ?? '—'
-  const prix = child?.prix_unitaire
-
-  function handleSave() {
-    updateMut.mutate({ qty_per_unit: qty, is_optional: optional })
-  }
+  const unite = child?.unite?.trim() || null
+  const childId = child?.id ?? comp.child_article_id
 
   return (
     <tr>
-      <td style={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{code}</td>
       <td>
-        {designation}
-        {unite && unite !== '—' && (
-          <span className="text-muted" style={{ marginLeft: '0.4rem', fontSize: '0.8rem' }}>
-            / {unite}
-          </span>
+        <code className="code-badge">{code}</code>
+      </td>
+      <td>
+        <Link to={`/catalogue/articles/${childId}`} className="link-inline">
+          {label}
+        </Link>
+        {unite ? <span className="text-muted article-composition__unite"> / {unite}</span> : null}
+      </td>
+      <td className="article-composition__col-amount">{childPrice(comp)}</td>
+      <td className="article-composition__col-qty">
+        {canEdit ? (
+          <input
+            type="number"
+            min={1}
+            step={1}
+            className="article-composition__qty-input"
+            value={qty}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10)
+              setQty(Number.isFinite(v) && v > 0 ? v : 1)
+              setDirty(true)
+            }}
+          />
+        ) : (
+          comp.qty_per_unit
         )}
       </td>
-      <td style={{ textAlign: 'right' }}>
-        {prix != null ? (
-          <span style={{ fontSize: '0.85rem' }}>
-            {Number(prix).toLocaleString('fr-MA', { minimumFractionDigits: 2 })} DH
-          </span>
+      <td className="article-composition__col-center">
+        {canEdit ? (
+          <input
+            type="checkbox"
+            checked={optional}
+            onChange={(e) => {
+              setOptional(e.target.checked)
+              setDirty(true)
+            }}
+          />
+        ) : optional ? (
+          <span className="status-pill status-pill--muted">Oui</span>
         ) : (
           '—'
         )}
       </td>
-      <td>
-        <input
-          type="number"
-          min={1}
-          step={1}
-          value={qty}
-          onChange={(e) => {
-            const v = parseInt(e.target.value, 10)
-            setQty(Number.isFinite(v) && v > 0 ? v : 1)
-            setDirty(true)
-          }}
-          style={{ width: 64, textAlign: 'right' }}
-        />
-      </td>
-      <td style={{ textAlign: 'center' }}>
-        <input
-          type="checkbox"
-          checked={optional}
-          onChange={(e) => {
-            setOptional(e.target.checked)
-            setDirty(true)
-          }}
-        />
-      </td>
-      <td>
-        {dirty && (
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={updateMut.isPending}
-            onClick={handleSave}
-            style={{ marginRight: '0.25rem' }}
-          >
-            {updateMut.isPending ? '…' : 'Sauver'}
-          </button>
-        )}
-        {updateMut.isError && (
-          <span className="error" style={{ fontSize: '0.75rem' }}>
-            {(updateMut.error as Error).message}
-          </span>
-        )}
-      </td>
-      <td style={{ whiteSpace: 'nowrap' }}>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
-          onClick={onMoveUp}
-          disabled={isFirst}
-          title="Monter"
-          style={{ padding: '0.15rem 0.35rem' }}
-        >
-          ▲
-        </button>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
-          onClick={onMoveDown}
-          disabled={isLast}
-          title="Descendre"
-          style={{ padding: '0.15rem 0.35rem', marginLeft: '0.2rem' }}
-        >
-          ▼
-        </button>
-      </td>
-      <td>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm btn-danger-outline"
-          disabled={deleteMut.isPending}
-          title="Supprimer"
-          onClick={() => {
-            if (window.confirm(`Supprimer "${designation}" de la composition ?`)) {
-              deleteMut.mutate()
-            }
-          }}
-        >
-          {deleteMut.isPending ? '…' : '✕'}
-        </button>
-      </td>
+      {canEdit ? (
+        <>
+          <td className="article-composition__col-actions">
+            {dirty ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={updateMut.isPending}
+                onClick={() => updateMut.mutate({ qty_per_unit: qty, is_optional: optional })}
+              >
+                {updateMut.isPending ? '…' : 'Sauver'}
+              </button>
+            ) : null}
+            {updateMut.isError ? (
+              <span className="error article-composition__row-error">{(updateMut.error as Error).message}</span>
+            ) : null}
+          </td>
+          <td className="article-composition__col-order">
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={onMoveUp}
+              disabled={isFirst}
+              title="Monter"
+              aria-label="Monter"
+            >
+              ▲
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={onMoveDown}
+              disabled={isLast}
+              title="Descendre"
+              aria-label="Descendre"
+            >
+              ▼
+            </button>
+          </td>
+          <td>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm btn-danger-outline"
+              title="Supprimer"
+              onClick={onDelete}
+            >
+              ✕
+            </button>
+          </td>
+        </>
+      ) : null}
     </tr>
   )
 }
-
-// ─── Add form ────────────────────────────────────────────────────────────────
 
 function AddCompositionForm({ articleId }: { articleId: number }) {
   const qc = useQueryClient()
@@ -177,16 +185,17 @@ function AddCompositionForm({ articleId }: { articleId: number }) {
     staleTime: 120_000,
   })
 
-  const filtered = search.trim().length >= 1
-    ? articles
-        .filter(
-          (a) =>
-            a.id !== articleId &&
-            (a.code.toLowerCase().includes(search.toLowerCase()) ||
-              a.libelle.toLowerCase().includes(search.toLowerCase())),
-        )
-        .slice(0, 20)
-    : []
+  const filtered =
+    search.trim().length >= 1
+      ? articles
+          .filter(
+            (a) =>
+              a.id !== articleId &&
+              (a.code.toLowerCase().includes(search.toLowerCase()) ||
+                a.libelle.toLowerCase().includes(search.toLowerCase())),
+          )
+          .slice(0, 20)
+      : []
 
   const createMut = useMutation({
     mutationFn: () => {
@@ -209,133 +218,91 @@ function AddCompositionForm({ articleId }: { articleId: number }) {
   })
 
   return (
-    <tfoot>
-      <tr>
-        <td colSpan={8} style={{ paddingTop: '0.75rem' }}>
-          <form
-            style={{
-              display: 'flex',
-              gap: '0.5rem',
-              alignItems: 'flex-end',
-              flexWrap: 'wrap',
-              padding: '0.75rem',
-              background: 'var(--color-surface)',
-              borderRadius: 6,
-              border: '1px solid var(--color-border)',
+    <section className="card article-composition-add">
+      <h3 className="ds-form-section__title">Ajouter un composant</h3>
+      <p className="article-composition-add__intro text-muted">
+        Recherchez un article du catalogue à inclure dans la composition (prestation regroupée, kit, etc.).
+      </p>
+      <form
+        className="article-composition-add__form"
+        onSubmit={(e) => {
+          e.preventDefault()
+          createMut.mutate()
+        }}
+      >
+        <label className="article-composition-add__field article-composition-add__field--picker">
+          Article *
+          <input
+            value={selectedId ? selectedLabel : search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setSelectedId(null)
+              setSelectedLabel('')
+              setShowPicker(true)
             }}
-            onSubmit={(e) => {
-              e.preventDefault()
-              createMut.mutate()
+            onFocus={() => setShowPicker(true)}
+            onBlur={() => {
+              window.setTimeout(() => setShowPicker(false), 150)
             }}
-          >
-            {/* Article picker */}
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.82rem', position: 'relative' }}>
-              Article *
-              <input
-                value={selectedId ? selectedLabel : search}
-                onChange={(e) => {
-                  setSearch(e.target.value)
-                  setSelectedId(null)
-                  setSelectedLabel('')
-                  setShowPicker(true)
-                }}
-                onFocus={() => setShowPicker(true)}
-                placeholder="Rechercher un article…"
-                style={{ minWidth: 220 }}
-                autoComplete="off"
-              />
-              {showPicker && filtered.length > 0 && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    zIndex: 100,
-                    background: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 6,
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-                    minWidth: 280,
-                    maxHeight: 240,
-                    overflowY: 'auto',
-                  }}
-                >
-                  {filtered.map((a) => (
-                    <div
-                      key={a.id}
-                      style={{
-                        padding: '0.4rem 0.75rem',
-                        cursor: 'pointer',
-                        fontSize: '0.85rem',
-                        borderBottom: '1px solid var(--color-border)',
-                      }}
-                      onMouseDown={() => {
-                        setSelectedId(a.id)
-                        setSelectedLabel(`${a.code} — ${a.libelle}`)
-                        setSearch('')
-                        setShowPicker(false)
-                      }}
-                    >
-                      <span style={{ fontFamily: 'monospace', marginRight: '0.5rem', color: 'var(--color-text-muted)' }}>
-                        {a.code}
-                      </span>
-                      {a.libelle}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </label>
+            placeholder="Rechercher par code ou libellé…"
+            autoComplete="off"
+          />
+          {showPicker && filtered.length > 0 ? (
+            <ul className="article-composition-picker" role="listbox">
+              {filtered.map((a) => (
+                <li key={a.id}>
+                  <button
+                    type="button"
+                    role="option"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setSelectedId(a.id)
+                      setSelectedLabel(`${a.code} — ${a.libelle}`)
+                      setSearch('')
+                      setShowPicker(false)
+                    }}
+                  >
+                    <code>{a.code}</code>
+                    <span>{a.libelle}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </label>
 
-            {/* Qty */}
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.82rem' }}>
-              Qté / unité
-              <input
-                type="number"
-                min={1}
-                step={1}
-                value={qty}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10)
-                  setQty(Number.isFinite(v) && v > 0 ? v : 1)
-                }}
-                style={{ width: 72 }}
-              />
-            </label>
+        <label className="article-composition-add__field">
+          Qté / unité
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={qty}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10)
+              setQty(Number.isFinite(v) && v > 0 ? v : 1)
+            }}
+          />
+        </label>
 
-            {/* Optional */}
-            <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', fontSize: '0.82rem' }}>
-              <input
-                type="checkbox"
-                checked={isOptional}
-                onChange={(e) => setIsOptional(e.target.checked)}
-              />
-              Optionnel
-            </label>
+        <label className="article-composition-add__field article-composition-add__field--checkbox">
+          <input type="checkbox" checked={isOptional} onChange={(e) => setIsOptional(e.target.checked)} />
+          Optionnel
+        </label>
 
-            <button
-              type="submit"
-              className="btn btn-primary btn-sm"
-              disabled={createMut.isPending || !selectedId}
-            >
-              {createMut.isPending ? 'Ajout…' : '+ Ajouter'}
-            </button>
+        <button type="submit" className="btn btn-primary btn-sm" disabled={createMut.isPending || !selectedId}>
+          {createMut.isPending ? 'Ajout…' : '+ Ajouter'}
+        </button>
 
-            {createMut.isError && (
-              <span className="error" style={{ fontSize: '0.82rem' }}>
-                {(createMut.error as Error).message}
-              </span>
-            )}
-          </form>
-        </td>
-      </tr>
-    </tfoot>
+        {createMut.isError ? <p className="error article-composition-add__error">{(createMut.error as Error).message}</p> : null}
+      </form>
+    </section>
   )
 }
 
-// ─── Main component ──────────────────────────────────────────────────────────
-
-export default function ArticleCompositionEditor({ articleId }: { articleId: number }) {
+export default function ArticleCompositionEditor({ articleId, canEdit = true }: Props) {
   const qc = useQueryClient()
+  const [deleteTarget, setDeleteTarget] = useState<ArticleComposition | null>(null)
 
   const { data: compositions = [], isLoading, error } = useQuery({
     queryKey: ['article-compositions', articleId],
@@ -352,6 +319,14 @@ export default function ArticleCompositionEditor({ articleId }: { articleId: num
     },
   })
 
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => articleCompositionApi.remove(articleId, id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['article-compositions', articleId] })
+      setDeleteTarget(null)
+    },
+  })
+
   function handleMove(index: number, direction: 'up' | 'down') {
     const newSorted = [...sorted]
     const swapIndex = direction === 'up' ? index - 1 : index + 1
@@ -360,67 +335,104 @@ export default function ArticleCompositionEditor({ articleId }: { articleId: num
   }
 
   if (isLoading) {
-    return <p className="text-muted">Chargement de la composition…</p>
+    return (
+      <div className="article-composition">
+        <p className="text-muted">Chargement de la composition…</p>
+      </div>
+    )
   }
 
   if (error) {
-    return <p className="error">{(error as Error).message}</p>
+    return (
+      <div className="article-composition">
+        <p className="error">{(error as Error).message}</p>
+      </div>
+    )
   }
 
   return (
-    <section className="card" style={{ padding: '1rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Composition</h3>
+    <div className="article-composition">
+      <section className="card dossier-tab-panel">
+        <h2 className="ds-form-section__title">Composition</h2>
+        <p className="dossier-tab-panel__intro">
+          Articles composant cette prestation (kits, regroupements, sous-essais). La quantité indique le nombre
+          d&apos;unités de l&apos;article enfant par unité de l&apos;article parent.
+        </p>
         <span className="badge">
           {sorted.length} composant{sorted.length !== 1 ? 's' : ''}
         </span>
-        {reorderMut.isPending && (
-          <span className="text-muted" style={{ fontSize: '0.8rem' }}>
-            Réordonnancement…
-          </span>
+        {reorderMut.isPending ? <span className="text-muted article-composition__reorder-hint">Réordonnancement…</span> : null}
+      </section>
+
+      <section className="card dossier-tab-panel dossier-tab-panel--table">
+        <div className="dossier-tab-panel__header">
+          <h2 className="ds-form-section__title">Composants</h2>
+        </div>
+        {sorted.length === 0 ? (
+          <p className="dossier-tab-empty">
+            {canEdit
+              ? 'Aucun composant — cet article est une prestation simple. Ajoutez des articles ci-dessous.'
+              : 'Aucun composant — cet article est une prestation simple.'}
+          </p>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table data-table--compact article-composition-table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Désignation</th>
+                  <th className="article-composition__col-amount">Prix unit. HT</th>
+                  <th className="article-composition__col-qty">Qté / unité</th>
+                  <th className="article-composition__col-center">Optionnel</th>
+                  {canEdit ? (
+                    <>
+                      <th />
+                      <th>Ordre</th>
+                      <th />
+                    </>
+                  ) : null}
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((comp, idx) => (
+                  <CompositionRow
+                    key={comp.id}
+                    comp={comp}
+                    articleId={articleId}
+                    canEdit={canEdit}
+                    isFirst={idx === 0}
+                    isLast={idx === sorted.length - 1}
+                    onMoveUp={() => handleMove(idx, 'up')}
+                    onMoveDown={() => handleMove(idx, 'down')}
+                    onDelete={() => setDeleteTarget(comp)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
+      </section>
 
-      {sorted.length === 0 && (
-        <p className="text-muted" style={{ fontSize: '0.88rem', marginBottom: '1rem', fontStyle: 'italic' }}>
-          Aucun composant — cet article est une prestation simple.
-        </p>
-      )}
+      {canEdit ? <AddCompositionForm articleId={articleId} /> : null}
 
-      <div className="table-wrap">
-        <table className="data-table data-table--compact">
-          {sorted.length > 0 && (
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Désignation</th>
-                <th style={{ textAlign: 'right' }}>Prix unit.</th>
-                <th style={{ textAlign: 'right' }}>Qté / unité</th>
-                <th style={{ textAlign: 'center' }}>Optionnel</th>
-                <th></th>
-                <th style={{ whiteSpace: 'nowrap' }}>Ordre</th>
-                <th></th>
-              </tr>
-            </thead>
-          )}
-          {sorted.length > 0 && (
-            <tbody>
-              {sorted.map((comp, idx) => (
-                <CompositionRow
-                  key={comp.id}
-                  comp={comp}
-                  articleId={articleId}
-                  isFirst={idx === 0}
-                  isLast={idx === sorted.length - 1}
-                  onMoveUp={() => handleMove(idx, 'up')}
-                  onMoveDown={() => handleMove(idx, 'down')}
-                />
-              ))}
-            </tbody>
-          )}
-          <AddCompositionForm articleId={articleId} />
-        </table>
-      </div>
-    </section>
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Supprimer le composant"
+          message={
+            <>
+              Retirer <strong>{childLabel(deleteTarget)}</strong> de la composition ?
+            </>
+          }
+          confirmLabel="Supprimer"
+          variant="danger"
+          loading={deleteMut.isPending}
+          error={deleteMut.isError ? (deleteMut.error as Error).message : null}
+          onConfirm={() => deleteMut.mutate(deleteTarget.id)}
+          onCancel={() => {
+            if (!deleteMut.isPending) setDeleteTarget(null)
+          }}
+        />
+      ) : null}
+    </div>
   )
 }

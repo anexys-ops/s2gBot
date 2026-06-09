@@ -1,0 +1,70 @@
+<?php
+
+return [
+
+    // Géotechnique — missions / forages / lithologie
+    'depth_from_m' => 'profondeur de début (m)',
+    'depth_to_m' => 'profondeur de fin (m)',
+    'depth_top_m' => 'profondeur haute (m)',
+    'depth_bottom_m' => 'profondeur basse (m)',
+    'description' => 'description',
+    'rqd' => 'RQD (%)',
+    'sort_order' => 'ordre',
+    'code' => 'code forage',
+    'ground_level_m' => 'niveau du sol (m)',
+    'latitude' => 'latitude',
+    'longitude' => 'longitude',
+    'notes' => 'notes',
+    'reference' => 'référence',
+    'title' => 'titre',
+    'mission_status' => 'statut mission',
+    'maitre_ouvrage_name' => 'nom maître d\'ouvrage',
+    'maitre_ouvrage_email' => 'e-mail maître d\'ouvrage',
+    'maitre_ouvrage_phone' => 'téléphone maître d\'ouvrage',
+    'dossier_id' => 'dossier',
+    'bon_commande_id' => 'bon de commande',
+    'source_type' => 'type de source',
+    'source_id' => 'source',
+    'borehole_id' => 'forage',
+
+    // Chantiers / clients
+    'client_id' => 'client',
+    'site_id' => 'chantier',
+    'agency_id' => 'agence',
+    'name' => 'nom',
+    'address' => 'adresse',
+    'status' => 'statut',
+    'travel_fee_quote_ht' => 'forfait déplacement devis (HT)',
+    'travel_fee_invoice_ht' => 'forfait déplacement facture (HT)',
+    'travel_fee_label' => 'libellé frais de déplacement',
+    'meta' => 'métadonnées',
+
+    // Client
+    'email' => 'e-mail',
+    'phone' => 'téléphone',
+    'city' => 'ville',
+    'postal_code' => 'code postal',
+    'country' => 'pays',
+    'siret' => 'SIRET',
+    'ice' => 'ICE',
+    'rc' => 'RC',
+    'patente' => 'patente',
+    'if_number' => 'IF',
+    'legal_form' => 'forme juridique',
+    'capital_social' => 'capital social',
+    'lat' => 'latitude',
+    'lng' => 'longitude',
+
+    // Commercial
+    'amount_ht' => 'montant HT',
+    'amount_ttc' => 'montant TTC',
+    'tva_rate' => 'taux de TVA',
+    'invoice_date' => 'date de facture',
+    'due_date' => 'date d\'échéance',
+    'quote_date' => 'date de devis',
+    'contact_id' => 'contact',
+    'order_ids' => 'commandes',
+    'lines' => 'lignes',
+    'number' => 'numéro',
+
+];

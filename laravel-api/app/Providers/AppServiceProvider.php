@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Report;
 use App\Observers\ReportObserver;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -17,6 +18,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        App::setLocale(config('app.locale', 'fr'));
+
         Report::observe(ReportObserver::class);
 
         View::share('currencyLabel', config('app.currency_display', 'DH'));

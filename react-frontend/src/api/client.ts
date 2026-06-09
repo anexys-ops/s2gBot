@@ -33,7 +33,7 @@ export async function api<T>(
   if (res.status === 401) {
     localStorage.removeItem('token')
     window.location.href = '/login'
-    throw new Error('Unauthorized')
+    throw new Error('Non autorisé')
   }
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
@@ -315,7 +315,7 @@ export const attachmentsApi = {
     if (res.status === 401) {
       localStorage.removeItem('token')
       window.location.href = '/login'
-      throw new Error('Unauthorized')
+      throw new Error('Non autorisé')
     }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data.message || `Erreur ${res.status}`)
@@ -330,7 +330,7 @@ export const attachmentsApi = {
     if (res.status === 401) {
       localStorage.removeItem('token')
       window.location.href = '/login'
-      throw new Error('Unauthorized')
+      throw new Error('Non autorisé')
     }
     if (!res.ok) throw new Error('Téléchargement impossible')
     const blob = await res.blob()
@@ -942,7 +942,7 @@ export const brandingApi = {
     if (res.status === 401) {
       localStorage.removeItem('token')
       window.location.href = '/login'
-      throw new Error('Unauthorized')
+      throw new Error('Non autorisé')
     }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -1715,7 +1715,7 @@ export const pdfApi = {
     if (res.status === 401) {
       localStorage.removeItem('token')
       window.location.href = '/login'
-      throw new Error('Unauthorized')
+      throw new Error('Non autorisé')
     }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))

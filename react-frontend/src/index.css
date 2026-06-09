@@ -3771,6 +3771,65 @@ th {
   border-top: 1px solid var(--color-border);
 }
 
+/* ——— Missions / forages / couches (fiche chantier) ——— */
+.site-missions-subsection__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.site-missions-subsection__title {
+  margin: 0;
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.site-missions-subsection__empty {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #64748b);
+}
+.site-missions-layers {
+  margin-top: 0.35rem;
+}
+.site-missions-layers__count {
+  margin: 0 0 0.45rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #64748b);
+}
+.site-missions-layers__table-wrap {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-surface, #fff);
+}
+.site-missions-layers__table th.site-missions-layers__num,
+.site-missions-layers__table td.site-missions-layers__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.site-missions-layers__table td.site-missions-layers__desc {
+  max-width: 16rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text);
+  line-height: 1.35;
+}
+.site-missions-layers__thickness {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--color-surface-2, #f1f5f9);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #475569);
+}
+.site-missions-layers__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 @media (max-width: 640px) {
   .entity-meta-row {
     grid-template-columns: 1fr;

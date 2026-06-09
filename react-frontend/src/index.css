@@ -261,14 +261,113 @@ input, select, textarea, button { font: inherit; }
 }
 
 .materiel-planning-toolbar {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.materiel-planning-toolbar__block {
+  padding: 1rem 1.15rem;
+}
+.materiel-planning-toolbar__block + .materiel-planning-toolbar__block {
+  border-top: 1px solid var(--color-border, #e2e8f0);
+}
+.materiel-planning-toolbar__block-head {
+  margin-bottom: 0.85rem;
+}
+.materiel-planning-toolbar__block-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.materiel-planning-toolbar__block-hint {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+.materiel-planning-toolbar__row {
+  align-items: flex-end;
+}
+.materiel-planning-toolbar__month {
+  flex: 1 1 320px;
+  min-width: min(100%, 280px);
+}
+.materiel-planning-toolbar__month-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: end;
-  margin-bottom: 1rem;
+  align-items: center;
+  gap: 0.45rem;
 }
-.materiel-planning-toolbar label {
-  min-width: min(100%, 12rem);
+.materiel-planning-toolbar__month-btn {
+  min-width: 2.35rem;
+  padding-inline: 0.55rem;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.materiel-planning-toolbar__month-input {
+  min-height: 2.35rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-surface, #fff);
+  font: inherit;
+  color: inherit;
+  box-sizing: border-box;
+}
+.materiel-planning-toolbar__month-input:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 1px;
+  border-color: #93c5fd;
+}
+.materiel-planning-toolbar__kind {
+  flex: 0 1 220px;
+  min-width: min(100%, 200px);
+}
+.materiel-planning-toolbar__equipment-filter,
+.materiel-planning-toolbar__equipment-edit {
+  flex: 1 1 260px;
+  min-width: min(100%, 220px);
+}
+.materiel-planning-toolbar__location {
+  flex: 1 1 220px;
+  min-width: min(100%, 180px);
+}
+.materiel-planning-toolbar__text-input {
+  width: 100%;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-surface, #fff);
+  font: inherit;
+  box-sizing: border-box;
+}
+.materiel-planning-toolbar__text-input:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 1px;
+  border-color: #93c5fd;
+}
+.materiel-planning-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  padding-bottom: 0.05rem;
+}
+.materiel-planning-toolbar__edit-placeholder {
+  margin: 0;
+  flex: 1 1 240px;
+  font-size: 0.88rem;
+  align-self: center;
+}
+.materiel-planning-toolbar__edit-meta {
+  margin: 0.65rem 0 0;
+  font-size: 0.82rem;
+}
+.materiel-planning-toolbar__saved {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
 }
 .materiel-calendar {
   padding: 1rem;
@@ -357,6 +456,9 @@ input, select, textarea, button { font: inherit; }
 .materiel-calendar__event--chantier {
   background: #eff6ff;
   border-left: 3px solid #2563eb;
+}
+.materiel-calendar__empty {
+  margin: 1rem 0 0;
 }
 @media (max-width: 760px) {
   .materiel-calendar__grid {

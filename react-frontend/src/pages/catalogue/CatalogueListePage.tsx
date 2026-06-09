@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { catalogueApi, type RefFamilleArticleRow } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import ArbreCatalogue from '../../components/Catalogue/ArbreCatalogue'
 import CatalogueProlabListe from '../../components/Catalogue/CatalogueProlabListe'
+import ListTableToolbar from '../../components/ListTableToolbar'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 
 /**
@@ -29,6 +30,7 @@ export default function CatalogueListePage() {
   })
 
   const familleOptions = useMemo(() => familles ?? [], [familles])
+  const selectedFamille = familleOptions.find((f) => f.id === familleId)
 
   const { data: articlesFlat = [], isLoading: loadingFlat } = useQuery({
     queryKey: ['catalogue-articles-flat', familleId, withInactif, search],
@@ -41,6 +43,14 @@ export default function CatalogueListePage() {
     enabled: viewMode === 'list',
   })
 
+  const hasActiveFilters = search.trim() !== '' || familleId !== '' || withInactif
+
+  const clearAllFilters = () => {
+    setSearch('')
+    setFamilleId('')
+    setWithInactif(false)
+  }
+
   return (
     <ModuleEntityShell
       shellClassName="module-shell--crm"
@@ -50,7 +60,11 @@ export default function CatalogueListePage() {
       ]}
       moduleBarLabel="Catalogue — PROLAB"
       title="Catalogue produits & essais"
-      subtitle="Vue liste (tarifs, tags, textes, unités HFSQL) ou vue arbre classique. Données alignées import PROLAB / HFSQL."
+      subtitle={
+        viewMode === 'list' && !loadingFlat
+          ? `${articlesFlat.length} article(s) — vue liste`
+          : 'Vue liste (tarifs, tags, textes, unités HFSQL) ou vue arbre classique.'
+      }
       actions={
         isAdmin ? (
           <span className="text-muted" style={{ fontSize: '0.85rem' }}>
@@ -59,128 +73,172 @@ export default function CatalogueListePage() {
         ) : null
       }
     >
-      <div className="catalogue-liste__view-toggle" role="tablist" aria-label="Mode d’affichage catalogue">
-        <button
-          type="button"
-          role="tab"
-          className={`btn btn-sm ${viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setViewMode('list')}
-        >
-          Liste &amp; replis
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className={`btn btn-sm ${viewMode === 'tree' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setViewMode('tree')}
-        >
-          Vue arbre
-        </button>
-      </div>
-      <div className="card catalogue-liste__toolbar list-filter-row">
-        <label className="catalogue-liste__field">
-          <span className="catalogue-liste__label">Famille</span>
-          <select
-            className="form-control"
-            value={familleId === '' ? '' : String(familleId)}
-            onChange={(e) => setFamilleId(e.target.value === '' ? '' : Number(e.target.value))}
+      <div className="catalogue-liste">
+        <div className="catalogue-liste__view-toggle" role="tablist" aria-label="Mode d’affichage catalogue">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'list'}
+            className={`catalogue-liste__view-btn ${viewMode === 'list' ? 'catalogue-liste__view-btn--active' : ''}`}
+            onClick={() => setViewMode('list')}
           >
-            <option value="">Toutes</option>
-            {familleOptions.map((f: RefFamilleArticleRow) => (
-              <option key={f.id} value={f.id}>
-                {f.code} — {f.libelle}
-              </option>
-            ))}
-          </select>
-        </label>
-        {familleOptions.length > 0 && (
-          <div className="catalogue-liste__chips" aria-label="Familles" style={{
-            display: 'flex', flexWrap: 'wrap', gap: '0.4rem',
-            flexBasis: '100%', marginTop: '0.5rem',
-          }}>
-            <button
-              type="button"
-              className="btn btn-sm"
-              aria-pressed={familleId === ''}
-              onClick={() => setFamilleId('')}
-              style={{
-                background: familleId === '' ? '#111827' : '#f3f4f6',
-                color: familleId === '' ? '#fff' : '#374151',
-                border: '1px solid #e5e7eb', borderRadius: 999, padding: '0.2rem 0.7rem', fontSize: '0.78rem',
-              }}
-            >
-              Toutes
-            </button>
-            {familleOptions.map((f) => {
-              const active = familleId === f.id
-              const dot = f.color ?? '#9ca3af'
-              return (
-                <button
-                  key={f.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setFamilleId(f.id)}
-                  title={f.type_ressource ? `Ressource : ${f.type_ressource}` : undefined}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-                    background: active ? dot : '#fff',
-                    color: active ? '#fff' : '#374151',
-                    border: `1px solid ${active ? dot : '#e5e7eb'}`,
-                    borderRadius: 999, padding: '0.2rem 0.7rem', fontSize: '0.78rem',
-                    cursor: 'pointer',
-                  }}
+            Liste &amp; replis
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'tree'}
+            className={`catalogue-liste__view-btn ${viewMode === 'tree' ? 'catalogue-liste__view-btn--active' : ''}`}
+            onClick={() => setViewMode('tree')}
+          >
+            Vue arbre
+          </button>
+        </div>
+
+        <ListTableToolbar
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Code, libellé, norme…"
+          extra={
+            <div className="catalogue-liste__extra-filters">
+              <label>
+                <span className="filter-label">Famille</span>
+                <select
+                  value={familleId === '' ? '' : String(familleId)}
+                  onChange={(e) => setFamilleId(e.target.value === '' ? '' : Number(e.target.value))}
                 >
-                  <span aria-hidden style={{
-                    width: 8, height: 8, borderRadius: '50%',
-                    background: active ? '#fff' : dot, display: 'inline-block',
-                  }} />
-                  {f.libelle}
-                </button>
-              )
-            })}
-          </div>
+                  <option value="">Toutes les familles</option>
+                  {familleOptions.map((f: RefFamilleArticleRow) => (
+                    <option key={f.id} value={f.id}>
+                      {f.code} — {f.libelle}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="catalogue-liste__inactif">
+                <input type="checkbox" checked={withInactif} onChange={(e) => setWithInactif(e.target.checked)} />
+                <span>Inclure inactifs</span>
+              </label>
+            </div>
+          }
+          footer={
+            <>
+              {familleOptions.length > 0 && (
+                <div className="catalogue-liste__famille-section">
+                  <span className="list-table-toolbar__footer-label">Familles</span>
+                  <div className="catalogue-liste__famille-chips" aria-label="Filtrer par famille">
+                    <button
+                      type="button"
+                      className={`catalogue-liste__chip ${familleId === '' ? 'catalogue-liste__chip--active catalogue-liste__chip--neutral' : ''}`}
+                      aria-pressed={familleId === ''}
+                      onClick={() => setFamilleId('')}
+                    >
+                      Toutes
+                    </button>
+                    {familleOptions.map((f) => {
+                      const active = familleId === f.id
+                      const dot = f.color ?? '#9ca3af'
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          className={`catalogue-liste__chip ${active ? 'catalogue-liste__chip--active' : ''}`}
+                          aria-pressed={active}
+                          onClick={() => setFamilleId(f.id)}
+                          title={f.type_ressource ? `Ressource : ${f.type_ressource}` : undefined}
+                          style={
+                            active
+                              ? ({ '--catalogue-chip-color': dot } as CSSProperties)
+                              : ({ '--catalogue-chip-dot': dot } as CSSProperties)
+                          }
+                        >
+                          <span className="catalogue-liste__chip-dot" aria-hidden />
+                          {f.libelle}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              {hasActiveFilters && (
+                <div className="catalogue-liste__active-filters">
+                  <span className="list-table-toolbar__footer-label">Filtres actifs</span>
+                  {search.trim() !== '' && (
+                    <span className="list-table-toolbar__chip">
+                      <span className="list-table-toolbar__chip-text">Recherche : « {search.trim()} »</span>
+                      <button
+                        type="button"
+                        className="list-table-toolbar__chip-remove"
+                        onClick={() => setSearch('')}
+                        aria-label="Retirer la recherche"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  {familleId !== '' && selectedFamille && (
+                    <span className="list-table-toolbar__chip">
+                      <span className="list-table-toolbar__chip-text">
+                        Famille : {selectedFamille.code} — {selectedFamille.libelle}
+                      </span>
+                      <button
+                        type="button"
+                        className="list-table-toolbar__chip-remove"
+                        onClick={() => setFamilleId('')}
+                        aria-label="Retirer le filtre famille"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  {withInactif && (
+                    <span className="list-table-toolbar__chip">
+                      <span className="list-table-toolbar__chip-text">Inclure inactifs</span>
+                      <button
+                        type="button"
+                        className="list-table-toolbar__chip-remove"
+                        onClick={() => setWithInactif(false)}
+                        aria-label="Masquer les inactifs"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={clearAllFilters}>
+                    Tout effacer
+                  </button>
+                </div>
+              )}
+            </>
+          }
+        />
+
+        {viewMode === 'list' && (
+          <CatalogueProlabListe articles={articlesFlat} isLoading={loadingFlat} />
         )}
-        <label className="catalogue-liste__field catalogue-liste__field--search">
-          <span className="catalogue-liste__label">Recherche (code / libellé)</span>
-          <input
-            type="search"
-            className="form-control"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Ex. BETON, FC28, compactage…"
-          />
-        </label>
-        <label className="catalogue-liste__checkbox">
-          <input type="checkbox" checked={withInactif} onChange={(e) => setWithInactif(e.target.checked)} />
-          <span>Inclure inactifs</span>
-        </label>
+
+        {viewMode === 'tree' && (
+          <>
+            <p className="catalogue-liste__legend" role="note">
+              <span className="catalogue-liste__legend-item" title="Béton">
+                🧱 Béton
+              </span>
+              <span className="catalogue-liste__legend-item" title="Sols / compactage">
+                ⚙️ Sols / compactage
+              </span>
+              <span className="catalogue-liste__legend-item" title="Produits manufacturés">
+                📐 Produits manufacturés
+              </span>
+            </p>
+            <ArbreCatalogue
+              withInactif={withInactif}
+              familleIdFilter={familleId === '' ? undefined : familleId}
+              searchQuery={search}
+              linkToArticleFiche
+            />
+          </>
+        )}
       </div>
-
-      {viewMode === 'list' && (
-        <CatalogueProlabListe articles={articlesFlat} isLoading={loadingFlat} />
-      )}
-
-      {viewMode === 'tree' && (
-        <>
-          <p className="catalogue-liste__legend" role="note">
-            <span className="catalogue-liste__legend-item" title="Béton">
-              🧱 Béton
-            </span>
-            <span className="catalogue-liste__legend-item" title="Sols / compactage">
-              ⚙️ Sols / compactage
-            </span>
-            <span className="catalogue-liste__legend-item" title="Produits manufacturés">
-              📐 Produits manufacturés
-            </span>
-          </p>
-          <ArbreCatalogue
-            withInactif={withInactif}
-            familleIdFilter={familleId === '' ? undefined : familleId}
-            searchQuery={search}
-            linkToArticleFiche
-          />
-        </>
-      )}
     </ModuleEntityShell>
   )
 }

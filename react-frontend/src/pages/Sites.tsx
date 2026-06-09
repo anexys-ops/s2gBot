@@ -10,6 +10,7 @@ import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibil
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import TableRowActions from '../components/TableRowActions'
 import ConfirmDialog from '../components/ConfirmDialog'
+import ClientSelectField from '../components/clients/ClientSelectField'
 import { MONEY_UNIT_LABEL } from '../lib/appLocale'
 import SiteStatusPill from '../components/SiteStatusPill'
 import { SITE_STATUS_KEYS, SITE_STATUS_LABELS } from '../lib/siteStatusPresentation'
@@ -329,26 +330,13 @@ export default function Sites() {
       {modal && isAdmin && (
         <Modal title={modal === 'create' ? 'Nouveau chantier' : 'Modifier le chantier'} onClose={() => setModal(null)}>
           <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>Client *</label>
-              <select
-                value={form.client_id ? String(form.client_id) : ''}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, client_id: e.target.value ? Number(e.target.value) : 0 }))
-                }
-                required
-              >
-                <option value="">Choisir…</option>
-                {form.client_id && !clients.some((c) => c.id === form.client_id) ? (
-                  <option value={String(form.client_id)}>Client #{form.client_id}</option>
-                ) : null}
-                {clients.map((c) => (
-                  <option key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <ClientSelectField
+              label="Client"
+              clients={clients}
+              value={form.client_id}
+              onChange={(id) => setForm((f) => ({ ...f, client_id: id }))}
+              required
+            />
             <div className="form-group">
               <label>Nom du chantier *</label>
               <input value={form.name ?? ''} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />

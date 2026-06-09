@@ -926,6 +926,72 @@ th {
   margin-top: 0.25rem;
 }
 
+.client-select-field__search {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+.client-select-field__search:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--ds-focus);
+}
+.client-select-field__selected {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #64748b);
+}
+.client-select-field__list {
+  margin-top: 0.45rem;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+.client-select-field__option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.client-select-field__option:last-child {
+  border-bottom: none;
+}
+.client-select-field__option:hover:not(:disabled) {
+  background: var(--color-surface-2, #f8fafc);
+}
+.client-select-field__option--selected {
+  background: #eff6ff;
+}
+.client-select-field__option--selected:hover:not(:disabled) {
+  background: #dbeafe;
+}
+.client-select-field__option-name {
+  font-weight: 500;
+}
+.client-select-field__option-meta {
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #64748b);
+}
+.client-select-field__empty {
+  margin: 0;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #64748b);
+}
+
 /* ——— BDC-156 : tables denses, boutons module, sections formulaire ——— */
 .table-wrap {
   width: 100%;

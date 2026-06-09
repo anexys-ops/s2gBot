@@ -164,21 +164,24 @@ export default function CatalogueArticleCreateModal({
               Durée estimée (min)
               <input type="number" min={0} value={dureeEstimee} onChange={(e) => setDureeEstimee(e.target.value)} />
             </label>
-            <label className="catalogue-article-new-form__col-4">
+            <label className="catalogue-article-new-form__col-3">
               Prix unitaire HT
               <input type="number" min={0} step="0.01" value={prixHt} onChange={(e) => setPrixHt(e.target.value)} placeholder="0.00" />
             </label>
-            <label className="catalogue-article-new-form__col-4">
+            <label className="catalogue-article-new-form__col-3">
               Prix de revient HT
               <input type="number" min={0} step="0.01" value={prixRevientHt} onChange={(e) => setPrixRevientHt(e.target.value)} placeholder="0.00" />
             </label>
-            <label className="catalogue-article-new-form__col-4">
+            <label className="catalogue-article-new-form__col-3">
               TVA (%)
               <input type="number" min={0} max={100} step="0.01" value={tvaRate} onChange={(e) => setTvaRate(e.target.value)} />
             </label>
-            <label className="catalogue-article-new-form__col-12 catalogue-article-new-form__checkbox">
-              <input type="checkbox" checked={actif} onChange={(e) => setActif(e.target.checked)} />
-              <span>Article actif</span>
+            <label className="catalogue-article-new-form__col-3 catalogue-article-new-form__checkbox-field">
+              <span>Statut</span>
+              <span className="catalogue-article-new-form__checkbox-control">
+                <input type="checkbox" checked={actif} onChange={(e) => setActif(e.target.checked)} />
+                <span>Article actif</span>
+              </span>
             </label>
           </div>
         </section>

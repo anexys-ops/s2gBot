@@ -263,7 +263,7 @@ export default function ArticleProlabEditor({ article, onUpdated }: Props) {
                   }}
                 />
               </label>
-              <label className="catalogue-article-new-form__col-4">
+              <label className="catalogue-article-new-form__col-3">
                 Prix unitaire HT
                 <input
                   type="number"
@@ -281,7 +281,7 @@ export default function ArticleProlabEditor({ article, onUpdated }: Props) {
                   }}
                 />
               </label>
-              <label className="catalogue-article-new-form__col-4">
+              <label className="catalogue-article-new-form__col-3">
                 Prix de revient HT
                 <input
                   type="number"
@@ -299,7 +299,7 @@ export default function ArticleProlabEditor({ article, onUpdated }: Props) {
                   }}
                 />
               </label>
-              <label className="catalogue-article-new-form__col-4">
+              <label className="catalogue-article-new-form__col-3">
                 TVA (%)
                 <input
                   type="number"
@@ -313,13 +313,16 @@ export default function ArticleProlabEditor({ article, onUpdated }: Props) {
                   }}
                 />
               </label>
-              <label className="catalogue-article-new-form__col-12 catalogue-article-new-form__checkbox">
-                <input
-                  type="checkbox"
-                  checked={form.actif}
-                  onChange={(e) => setForm((f) => ({ ...f, actif: e.target.checked }))}
-                />
-                <span>Article actif</span>
+              <label className="catalogue-article-new-form__col-3 catalogue-article-new-form__checkbox-field">
+                <span>Statut</span>
+                <span className="catalogue-article-new-form__checkbox-control">
+                  <input
+                    type="checkbox"
+                    checked={form.actif}
+                    onChange={(e) => setForm((f) => ({ ...f, actif: e.target.checked }))}
+                  />
+                  <span>Article actif</span>
+                </span>
               </label>
             </div>
           </section>

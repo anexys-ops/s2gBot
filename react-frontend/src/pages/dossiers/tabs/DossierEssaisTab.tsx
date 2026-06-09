@@ -1,6 +1,6 @@
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { missionsApi, ordresMissionApi } from '../../../api/client'
+import { missionsApi, ordresMissionApi, type Mission } from '../../../api/client'
 import type { DossierFicheOutletContext } from '../DossierFichePage'
 import StatusBadge, { ordreMissionStatutBadgeProps } from '../../../components/ds/StatusBadge'
 import { formatAppDate } from '../../../lib/appLocale'
@@ -43,7 +43,7 @@ export default function DossierEssaisTab() {
     )
   }
 
-  const missionList = missions ?? dossier.missions ?? []
+  const missionList: Mission[] = missions ?? []
   const omList = ordresMission ?? []
 
   return (

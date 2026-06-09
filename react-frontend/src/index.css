@@ -975,6 +975,10 @@ th {
   width: 1%;
   white-space: nowrap;
 }
+.data-table__status {
+  white-space: nowrap;
+  width: 1%;
+}
 .data-table__actions-inner {
   display: inline-flex;
   align-items: center;

@@ -1,4 +1,6 @@
 import type { HTMLAttributes } from 'react'
+import type { SiteStatusKey } from '../../lib/siteStatusPresentation'
+import { SITE_STATUS_LABELS, presentationSiteStatus } from '../../lib/siteStatusPresentation'
 
 export type StatusBadgeVariant = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'primary'
 
@@ -45,6 +47,21 @@ export function dossierStatutBadgeProps(
   }
   const m = map[statut] ?? { label: statut, variant: 'neutral' as const }
   return { variant: m.variant, children: m.label, label: m.label }
+}
+
+export function siteStatutBadgeProps(
+  status: string | null | undefined,
+): Pick<StatusBadgeProps, 'variant' | 'children'> & { label: string } {
+  const { key } = presentationSiteStatus(status)
+  const variantMap: Record<SiteStatusKey, StatusBadgeVariant> = {
+    not_started: 'neutral',
+    in_progress: 'info',
+    blocked: 'danger',
+    delivered: 'success',
+    archived: 'neutral',
+  }
+  const label = SITE_STATUS_LABELS[key]
+  return { variant: variantMap[key], children: label, label }
 }
 
 export function equipementStatutBadgeProps(status: string): { label: string; variant: StatusBadgeVariant } {

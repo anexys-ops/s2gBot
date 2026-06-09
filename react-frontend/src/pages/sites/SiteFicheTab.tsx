@@ -128,7 +128,7 @@ export default function SiteFicheTab() {
           <div>
             <dt>Statut chantier</dt>
             <dd>
-              <SiteStatusPill status={site.status} />
+              <SiteStatusPill status={site.status} size="md" />
             </dd>
           </div>
           <div>

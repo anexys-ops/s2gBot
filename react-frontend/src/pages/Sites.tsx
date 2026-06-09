@@ -277,8 +277,8 @@ export default function Sites() {
                 )}
                 {visible.client !== false && <td>{s.client?.name}</td>}
                 {visible.status !== false && (
-                  <td>
-                    <SiteStatusPill status={s.status} />
+                  <td className="data-table__status">
+                    <SiteStatusPill status={s.status} size="sm" />
                   </td>
                 )}
                 {visible.created !== false && (

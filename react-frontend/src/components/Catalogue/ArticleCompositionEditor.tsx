@@ -364,6 +364,8 @@ export default function ArticleCompositionEditor({ articleId, canEdit = true }: 
         {reorderMut.isPending ? <span className="text-muted article-composition__reorder-hint">Réordonnancement…</span> : null}
       </section>
 
+      {canEdit ? <AddCompositionForm articleId={articleId} /> : null}
+
       <section className="card dossier-tab-panel dossier-tab-panel--table">
         <div className="dossier-tab-panel__header">
           <h2 className="ds-form-section__title">Composants</h2>
@@ -371,7 +373,7 @@ export default function ArticleCompositionEditor({ articleId, canEdit = true }: 
         {sorted.length === 0 ? (
           <p className="dossier-tab-empty">
             {canEdit
-              ? 'Aucun composant — cet article est une prestation simple. Ajoutez des articles ci-dessous.'
+              ? 'Aucun composant — cet article est une prestation simple. Utilisez le formulaire ci-dessus.'
               : 'Aucun composant — cet article est une prestation simple.'}
           </p>
         ) : (
@@ -412,8 +414,6 @@ export default function ArticleCompositionEditor({ articleId, canEdit = true }: 
           </div>
         )}
       </section>
-
-      {canEdit ? <AddCompositionForm articleId={articleId} /> : null}
 
       {deleteTarget ? (
         <ConfirmDialog

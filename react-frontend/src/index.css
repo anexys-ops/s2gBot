@@ -2393,6 +2393,18 @@ th {
 .modal-body {
   padding: 1.25rem;
 }
+.confirm-dialog__message {
+  margin: 0 0 1rem;
+  line-height: 1.5;
+  color: #334155;
+}
+.confirm-dialog__error {
+  margin: 0 0 1rem;
+}
+.confirm-dialog__actions {
+  margin-top: 0.25rem;
+  justify-content: flex-end;
+}
 .crud-actions {
   display: flex;
   flex-wrap: wrap;

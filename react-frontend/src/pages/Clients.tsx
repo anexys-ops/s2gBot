@@ -11,6 +11,7 @@ import ClientMoroccoFormFields from '../components/clients/ClientMoroccoFormFiel
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import Toast, { toastErrorMessage, type ToastVariant } from '../components/Toast'
 import TableRowActions from '../components/TableRowActions'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 function parseCapital(v: Client['capital_social']): number | undefined {
   if (v === undefined || v === null || v === '') return undefined
@@ -63,6 +64,7 @@ export default function Clients() {
   const [page, setPage] = useState(1)
   const perPage = 20
   const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null)
   const { visible, toggle } = usePersistedColumnVisibility('clients', {
     name: true,
     email: true,
@@ -133,7 +135,10 @@ export default function Clients() {
 
   const deleteMut = useMutation({
     mutationFn: (id: number) => clientsApi.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clients'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] })
+      setClientToDelete(null)
+    },
   })
 
   const openCreate = () => {
@@ -399,9 +404,7 @@ export default function Clients() {
                       editLabel="Modifier le client"
                       deleteLabel="Supprimer définitivement le client"
                       onEdit={() => openEdit(c)}
-                      onDelete={() => {
-                        if (window.confirm(`Supprimer le client « ${c.name} » ?`)) deleteMut.mutate(c.id)
-                      }}
+                      onDelete={() => setClientToDelete(c)}
                     />
                   </td>
                 )}
@@ -443,6 +446,26 @@ export default function Clients() {
       )}
       {toast && (
         <Toast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} />
+      )}
+      {clientToDelete && (
+        <ConfirmDialog
+          title="Supprimer le client"
+          message={
+            <>
+              Supprimer définitivement le client <strong>« {clientToDelete.name} »</strong> ?
+              <br />
+              Cette action est irréversible.
+            </>
+          }
+          confirmLabel="Supprimer"
+          variant="danger"
+          loading={deleteMut.isPending}
+          error={deleteMut.isError ? (deleteMut.error as Error).message : null}
+          onConfirm={() => deleteMut.mutate(clientToDelete.id)}
+          onCancel={() => {
+            if (!deleteMut.isPending) setClientToDelete(null)
+          }}
+        />
       )}
     </ModuleEntityShell>
   )

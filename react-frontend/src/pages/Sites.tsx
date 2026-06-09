@@ -9,6 +9,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import TableRowActions from '../components/TableRowActions'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { MONEY_UNIT_LABEL } from '../lib/appLocale'
 import SiteStatusPill from '../components/SiteStatusPill'
 import { SITE_STATUS_KEYS, SITE_STATUS_LABELS } from '../lib/siteStatusPresentation'
@@ -37,6 +38,7 @@ export default function Sites() {
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [clientFilter, setClientFilter] = useState<string>('')
   const [page, setPage] = useState(1)
+  const [siteToDelete, setSiteToDelete] = useState<Site | null>(null)
   const perPage = 20
   const { visible, toggle } = usePersistedColumnVisibility('sites', {
     name: true,
@@ -106,7 +108,10 @@ export default function Sites() {
 
   const deleteMut = useMutation({
     mutationFn: (id: number) => sitesApi.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sites'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sites'] })
+      setSiteToDelete(null)
+    },
   })
 
   const openCreate = () => {
@@ -289,9 +294,7 @@ export default function Sites() {
                       editLabel="Modifier le chantier"
                       deleteLabel="Supprimer le chantier"
                       onEdit={() => openEdit(s)}
-                      onDelete={() => {
-                        if (window.confirm(`Supprimer le chantier « ${s.name} » ?`)) deleteMut.mutate(s.id)
-                      }}
+                      onDelete={() => setSiteToDelete(s)}
                     />
                   </td>
                 )}
@@ -388,6 +391,26 @@ export default function Sites() {
             </div>
           </form>
         </Modal>
+      )}
+      {siteToDelete && (
+        <ConfirmDialog
+          title="Supprimer le chantier"
+          message={
+            <>
+              Supprimer définitivement le chantier <strong>« {siteToDelete.name} »</strong> ?
+              <br />
+              Cette action est irréversible.
+            </>
+          }
+          confirmLabel="Supprimer"
+          variant="danger"
+          loading={deleteMut.isPending}
+          error={deleteMut.isError ? (deleteMut.error as Error).message : null}
+          onConfirm={() => deleteMut.mutate(siteToDelete.id)}
+          onCancel={() => {
+            if (!deleteMut.isPending) setSiteToDelete(null)
+          }}
+        />
       )}
     </ModuleEntityShell>
   )

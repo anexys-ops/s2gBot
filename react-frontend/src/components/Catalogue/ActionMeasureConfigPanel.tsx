@@ -1,20 +1,19 @@
 /**
- * ActionMeasureConfigPanel
- * Panneau de configuration des mesures/champs de formulaire pour une action article.
- * Affiché dans ArticleActionsPanel sous chaque action (lab_admin).
+ * ActionMeasureConfigPanel — champs de mesure / formulaire pour une action article.
  */
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { measureConfigsApi, type ActionMeasureConfig } from '../../api/client'
+import ConfirmDialog from '../ConfirmDialog'
 
 const FIELD_TYPES = [
-  { value: 'number',  label: 'Nombre' },
-  { value: 'text',    label: 'Texte libre' },
-  { value: 'select',  label: 'Liste de choix' },
+  { value: 'number', label: 'Nombre' },
+  { value: 'text', label: 'Texte libre' },
+  { value: 'select', label: 'Liste de choix' },
   { value: 'boolean', label: 'Oui / Non' },
-  { value: 'date',    label: 'Date' },
-  { value: 'file',    label: 'Fichier / Photo' },
-]
+  { value: 'date', label: 'Date' },
+  { value: 'file', label: 'Fichier / Photo' },
+] as const
 
 type FormState = {
   field_name: string
@@ -29,27 +28,215 @@ type FormState = {
   ordre: number | ''
 }
 
+function emptyForm(ordre = 0): FormState {
+  return {
+    field_name: '',
+    field_type: 'number',
+    unit: '',
+    min_value: '',
+    max_value: '',
+    select_options: '',
+    is_required: true,
+    placeholder: '',
+    help_text: '',
+    ordre,
+  }
+}
+
+function formToPayload(form: FormState): Partial<ActionMeasureConfig> {
+  return {
+    field_name: form.field_name,
+    field_type: form.field_type,
+    unit: form.unit || undefined,
+    min_value: form.min_value !== '' ? Number(form.min_value) : undefined,
+    max_value: form.max_value !== '' ? Number(form.max_value) : undefined,
+    select_options:
+      form.field_type === 'select'
+        ? form.select_options
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined,
+    is_required: form.is_required,
+    placeholder: form.placeholder || undefined,
+    help_text: form.help_text || undefined,
+    ordre: form.ordre !== '' ? Number(form.ordre) : 0,
+  }
+}
+
+function MeasureConfigFormToolbar({
+  form,
+  onChange,
+  onSubmit,
+  onCancel,
+  submitLabel,
+  pending,
+  error,
+}: {
+  form: FormState
+  onChange: (next: FormState) => void
+  onSubmit: () => void
+  onCancel?: () => void
+  submitLabel: string
+  pending: boolean
+  error?: string | null
+}) {
+  return (
+    <div className="article-actions-form article-actions-form--measure">
+      <div className="list-table-toolbar__row article-actions-form__row article-actions-form__row--measure">
+        <label className="list-table-toolbar__field article-actions-form__field-name">
+          <span className="filter-label">Nom du champ *</span>
+          <input
+            type="text"
+            className="article-actions-form__input"
+            value={form.field_name}
+            onChange={(e) => onChange({ ...form, field_name: e.target.value })}
+            required
+            placeholder="Ex. Résistance compression"
+          />
+        </label>
+        <label className="list-table-toolbar__field article-actions-form__field-type">
+          <span className="filter-label">Type *</span>
+          <select
+            className="article-actions-form__select"
+            value={form.field_type}
+            onChange={(e) => onChange({ ...form, field_type: e.target.value as FormState['field_type'] })}
+          >
+            {FIELD_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="list-table-toolbar__field article-actions-form__unit">
+          <span className="filter-label">Unité</span>
+          <input
+            type="text"
+            className="article-actions-form__input"
+            value={form.unit}
+            onChange={(e) => onChange({ ...form, unit: e.target.value })}
+            placeholder="MPa, mm…"
+          />
+        </label>
+        <label className="list-table-toolbar__field article-actions-form__order">
+          <span className="filter-label">Ordre</span>
+          <input
+            type="number"
+            className="article-actions-form__input article-actions-form__input--number"
+            min={0}
+            value={form.ordre}
+            onChange={(e) =>
+              onChange({ ...form, ordre: e.target.value === '' ? '' : Number(e.target.value) })
+            }
+          />
+        </label>
+        <label className="article-actions-form__optional">
+          <input
+            type="checkbox"
+            checked={form.is_required}
+            onChange={(e) => onChange({ ...form, is_required: e.target.checked })}
+          />
+          <span>Requis</span>
+        </label>
+        <div className="article-actions-form__actions">
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={pending || !form.field_name.trim()}
+            onClick={onSubmit}
+          >
+            {pending ? '…' : submitLabel}
+          </button>
+          {onCancel ? (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={onCancel}>
+              Annuler
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="list-table-toolbar__row article-actions-form__row article-actions-form__row--measure-extra">
+          {form.field_type === 'number' ? (
+            <>
+              <label className="list-table-toolbar__field article-actions-form__bound">
+                <span className="filter-label">Min</span>
+                <input
+                  type="number"
+                  step="any"
+                  className="article-actions-form__input article-actions-form__input--number"
+                  value={form.min_value}
+                  onChange={(e) =>
+                    onChange({ ...form, min_value: e.target.value === '' ? '' : Number(e.target.value) })
+                  }
+                />
+              </label>
+              <label className="list-table-toolbar__field article-actions-form__bound">
+                <span className="filter-label">Max</span>
+                <input
+                  type="number"
+                  step="any"
+                  className="article-actions-form__input article-actions-form__input--number"
+                  value={form.max_value}
+                  onChange={(e) =>
+                    onChange({ ...form, max_value: e.target.value === '' ? '' : Number(e.target.value) })
+                  }
+                />
+              </label>
+            </>
+          ) : null}
+          {form.field_type === 'select' ? (
+            <label className="list-table-toolbar__field article-actions-form__select-options">
+              <span className="filter-label">Options (virgules)</span>
+              <input
+                type="text"
+                className="article-actions-form__input"
+                value={form.select_options}
+                onChange={(e) => onChange({ ...form, select_options: e.target.value })}
+                placeholder="Conforme, Non conforme, NA"
+              />
+            </label>
+          ) : null}
+          <label className="list-table-toolbar__field article-actions-form__help">
+            <span className="filter-label">Texte d&apos;aide</span>
+            <input
+              type="text"
+              className="article-actions-form__input"
+              value={form.help_text}
+              onChange={(e) => onChange({ ...form, help_text: e.target.value })}
+              placeholder="Instruction au remplissage…"
+            />
+          </label>
+        </div>
+
+      {error ? <p className="error article-actions-form__error">{error}</p> : null}
+    </div>
+  )
+}
+
 function ConfigRow({
   config,
   articleId,
   actionId,
+  onDeleteRequest,
 }: {
   config: ActionMeasureConfig
   articleId: number
   actionId: number
+  onDeleteRequest: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<FormState>({
-    field_name:     config.field_name,
-    field_type:     config.field_type,
-    unit:           config.unit ?? '',
-    min_value:      config.min_value ?? '',
-    max_value:      config.max_value ?? '',
+    field_name: config.field_name,
+    field_type: config.field_type,
+    unit: config.unit ?? '',
+    min_value: config.min_value ?? '',
+    max_value: config.max_value ?? '',
     select_options: (config.select_options ?? []).join(', '),
-    is_required:    config.is_required,
-    placeholder:    config.placeholder ?? '',
-    help_text:      config.help_text ?? '',
-    ordre:          config.ordre,
+    is_required: config.is_required,
+    placeholder: config.placeholder ?? '',
+    help_text: config.help_text ?? '',
+    ordre: config.ordre,
   })
   const qc = useQueryClient()
 
@@ -62,21 +249,18 @@ function ConfigRow({
     },
   })
 
-  const deleteMut = useMutation({
-    mutationFn: () => measureConfigsApi.delete(articleId, actionId, config.id),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['measure-configs', actionId] }),
-  })
-
   if (editing) {
     return (
-      <tr>
+      <tr className="article-actions-row--editing">
         <td colSpan={7}>
-          <MeasureConfigForm
-            initial={form}
+          <MeasureConfigFormToolbar
+            form={form}
             onChange={setForm}
-            onSubmit={(data) => updateMut.mutate(data)}
+            submitLabel="Enregistrer"
+            pending={updateMut.isPending}
+            error={updateMut.isError ? (updateMut.error as Error).message : null}
+            onSubmit={() => updateMut.mutate(formToPayload(form))}
             onCancel={() => setEditing(false)}
-            isPending={updateMut.isPending}
           />
         </td>
       </tr>
@@ -87,168 +271,45 @@ function ConfigRow({
 
   return (
     <tr>
-      <td style={{ fontSize: '0.82rem' }}>{config.ordre}</td>
-      <td><strong style={{ fontSize: '0.85rem' }}>{config.field_name}</strong></td>
+      <td className="article-actions-cell-muted">{config.ordre}</td>
+      <td>
+        <strong className="article-actions-measure-name">{config.field_name}</strong>
+      </td>
       <td>
         <span className="badge">{typeLabel}</span>
-        {config.unit && <span className="text-muted" style={{ marginLeft: 4, fontSize: '0.78rem' }}>{config.unit}</span>}
+        {config.unit ? <span className="text-muted article-actions-measure-unit">{config.unit}</span> : null}
       </td>
-      <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+      <td className="article-actions-cell-muted">
         {config.min_value != null && config.max_value != null
           ? `${config.min_value} – ${config.max_value}`
-          : config.min_value != null ? `≥ ${config.min_value}`
-          : config.max_value != null ? `≤ ${config.max_value}`
-          : '—'}
+          : config.min_value != null
+            ? `≥ ${config.min_value}`
+            : config.max_value != null
+              ? `≤ ${config.max_value}`
+              : '—'}
       </td>
       <td>
-        {config.is_required
-          ? <span style={{ color: '#ef4444', fontSize: '0.78rem', fontWeight: 600 }}>Requis</span>
-          : <span className="text-muted" style={{ fontSize: '0.78rem' }}>Optionnel</span>}
+        {config.is_required ? (
+          <span className="status-pill status-pill--muted">Requis</span>
+        ) : (
+          <span className="text-muted">Optionnel</span>
+        )}
       </td>
-      <td style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {config.help_text || '—'}
-      </td>
-      <td style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(true)}>✏️</button>
+      <td className="article-actions-cell-muted article-actions-measure-help">{config.help_text || '—'}</td>
+      <td className="article-actions-cell-actions">
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(true)} title="Modifier">
+          ✏️
+        </button>
         <button
           type="button"
           className="btn btn-secondary btn-sm btn-danger-outline"
-          disabled={deleteMut.isPending}
-          onClick={() => { if (window.confirm('Supprimer ce champ ?')) deleteMut.mutate() }}
-        >✕</button>
+          title="Supprimer"
+          onClick={onDeleteRequest}
+        >
+          ✕
+        </button>
       </td>
     </tr>
-  )
-}
-
-function MeasureConfigForm({
-  initial,
-  onChange,
-  onSubmit,
-  onCancel,
-  isPending,
-}: {
-  initial: FormState
-  onChange: (f: FormState) => void
-  onSubmit: (data: Partial<ActionMeasureConfig>) => void
-  onCancel: () => void
-  isPending: boolean
-}) {
-  const form = initial
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const data: Partial<ActionMeasureConfig> = {
-      field_name:     form.field_name,
-      field_type:     form.field_type as ActionMeasureConfig['field_type'],
-      unit:           form.unit || undefined,
-      min_value:      form.min_value !== '' ? Number(form.min_value) : undefined,
-      max_value:      form.max_value !== '' ? Number(form.max_value) : undefined,
-      select_options: form.field_type === 'select'
-        ? form.select_options.split(',').map((s) => s.trim()).filter(Boolean)
-        : undefined,
-      is_required:    form.is_required,
-      placeholder:    form.placeholder || undefined,
-      help_text:      form.help_text || undefined,
-      ordre:          form.ordre !== '' ? Number(form.ordre) : 0,
-    }
-    onSubmit(data)
-  }
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      style={{ padding: '0.5rem', background: 'var(--color-surface)', borderRadius: 6, border: '1px solid var(--color-border)' }}
-    >
-      <div className="quote-form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <label>
-          Nom du champ *
-          <input
-            value={form.field_name}
-            onChange={(e) => onChange({ ...form, field_name: e.target.value })}
-            required
-            placeholder="Ex: Résistance compression"
-          />
-        </label>
-        <label>
-          Type de champ *
-          <select
-            value={form.field_type}
-            onChange={(e) => onChange({ ...form, field_type: e.target.value as FormState['field_type'] })}
-          >
-            {FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
-        </label>
-        <label>
-          Unité
-          <input
-            value={form.unit}
-            onChange={(e) => onChange({ ...form, unit: e.target.value })}
-            placeholder="MPa, mm, °C…"
-          />
-        </label>
-        {form.field_type === 'number' && (
-          <>
-            <label>
-              Valeur min
-              <input
-                type="number" step="any"
-                value={form.min_value}
-                onChange={(e) => onChange({ ...form, min_value: e.target.value === '' ? '' : Number(e.target.value) })}
-              />
-            </label>
-            <label>
-              Valeur max
-              <input
-                type="number" step="any"
-                value={form.max_value}
-                onChange={(e) => onChange({ ...form, max_value: e.target.value === '' ? '' : Number(e.target.value) })}
-              />
-            </label>
-          </>
-        )}
-        {form.field_type === 'select' && (
-          <label style={{ gridColumn: '1 / -1' }}>
-            Options (séparées par virgules)
-            <input
-              value={form.select_options}
-              onChange={(e) => onChange({ ...form, select_options: e.target.value })}
-              placeholder="Conforme, Non conforme, NA"
-            />
-          </label>
-        )}
-        <label>
-          Texte d'aide
-          <input
-            value={form.help_text}
-            onChange={(e) => onChange({ ...form, help_text: e.target.value })}
-            placeholder="Instruction au remplissage…"
-          />
-        </label>
-        <label>
-          Ordre
-          <input
-            type="number" min={0}
-            value={form.ordre}
-            onChange={(e) => onChange({ ...form, ordre: e.target.value === '' ? '' : Number(e.target.value) })}
-          />
-        </label>
-        <label className="quote-form-checkbox-row">
-          <input
-            type="checkbox"
-            checked={form.is_required}
-            onChange={(e) => onChange({ ...form, is_required: e.target.checked })}
-          />
-          Champ requis
-        </label>
-      </div>
-      <div className="crud-actions" style={{ marginTop: '0.5rem' }}>
-        <button type="submit" className="btn btn-primary btn-sm" disabled={isPending}>
-          {isPending ? '…' : 'Enregistrer'}
-        </button>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={onCancel}>Annuler</button>
-      </div>
-    </form>
   )
 }
 
@@ -261,12 +322,7 @@ export default function ActionMeasureConfigPanel({
   actionId: number
   actionLabel?: string
 }) {
-  const [showForm, setShowForm] = useState(false)
-  const [newForm, setNewForm] = useState<FormState>({
-    field_name: '', field_type: 'number', unit: '',
-    min_value: '', max_value: '', select_options: '',
-    is_required: true, placeholder: '', help_text: '', ordre: 0,
-  })
+  const [deleteTarget, setDeleteTarget] = useState<ActionMeasureConfig | null>(null)
   const qc = useQueryClient()
 
   const { data: configs = [], isLoading } = useQuery({
@@ -275,63 +331,105 @@ export default function ActionMeasureConfigPanel({
     staleTime: 60_000,
   })
 
+  const sorted = configs.slice().sort((a, b) => a.ordre - b.ordre)
+  const nextOrdre = sorted.reduce((max, c) => Math.max(max, c.ordre), 0) + 1
+  const [newForm, setNewForm] = useState<FormState>(() => emptyForm(nextOrdre))
+
   const createMut = useMutation({
     mutationFn: (data: Partial<ActionMeasureConfig>) =>
       measureConfigsApi.create(articleId, actionId, data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['measure-configs', actionId] })
-      setShowForm(false)
-      setNewForm({ field_name: '', field_type: 'number', unit: '', min_value: '', max_value: '', select_options: '', is_required: true, placeholder: '', help_text: '', ordre: 0 })
+      setNewForm(emptyForm(nextOrdre + 1))
     },
   })
 
-  if (isLoading) return <p className="text-muted" style={{ fontSize: '0.82rem' }}>Chargement…</p>
+  const deleteMut = useMutation({
+    mutationFn: (configId: number) => measureConfigsApi.delete(articleId, actionId, configId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['measure-configs', actionId] })
+      setDeleteTarget(null)
+    },
+  })
+
+  if (isLoading) {
+    return <p className="text-muted article-actions-measure-loading">Chargement des champs…</p>
+  }
 
   return (
-    <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-border)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
-          📋 Champs du formulaire {actionLabel && `— ${actionLabel}`}
-        </span>
-        <span className="badge">{configs.length}</span>
+    <div className="article-actions-measure">
+      <div className="article-actions-measure__header">
+        <h4 className="article-actions-add__title">
+          Champs du formulaire{actionLabel ? ` — ${actionLabel}` : ''}
+        </h4>
+        <span className="badge">{sorted.length}</span>
       </div>
 
-      {configs.length > 0 && (
-        <div className="table-wrap" style={{ marginBottom: '0.5rem' }}>
-          <table className="data-table data-table--compact">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Champ</th>
-                <th>Type / Unité</th>
-                <th>Bornes</th>
-                <th>Requis</th>
-                <th>Aide</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {configs.slice().sort((a, b) => a.ordre - b.ordre).map((c) => (
-                <ConfigRow key={c.id} config={c} articleId={articleId} actionId={actionId} />
-              ))}
-            </tbody>
-          </table>
+      <section className="card list-table-toolbar article-actions-add article-actions-add--nested">
+        <div className="article-actions-add__head">
+          <span className="article-actions-add__title">Ajouter un champ</span>
         </div>
-      )}
-
-      {showForm ? (
-        <MeasureConfigForm
-          initial={newForm}
+        <MeasureConfigFormToolbar
+          form={newForm}
           onChange={setNewForm}
-          onSubmit={(data) => createMut.mutate(data)}
-          onCancel={() => setShowForm(false)}
-          isPending={createMut.isPending}
+          submitLabel="+ Ajouter"
+          pending={createMut.isPending}
+          error={createMut.isError ? (createMut.error as Error).message : null}
+          onSubmit={() => createMut.mutate(formToPayload(newForm))}
         />
-      ) : (
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowForm(true)}>
-          + Ajouter un champ
-        </button>
-      )}
+      </section>
+
+      <div className="card dossier-tab-panel dossier-tab-panel--table article-actions-section__table">
+        {sorted.length > 0 ? (
+          <div className="table-wrap">
+            <table className="data-table data-table--compact">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Champ</th>
+                  <th>Type / Unité</th>
+                  <th>Bornes</th>
+                  <th>Requis</th>
+                  <th>Aide</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((c) => (
+                  <ConfigRow
+                    key={c.id}
+                    config={c}
+                    articleId={articleId}
+                    actionId={actionId}
+                    onDeleteRequest={() => setDeleteTarget(c)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="dossier-tab-empty">Aucun champ de mesure pour cette action.</p>
+        )}
+      </div>
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Supprimer le champ"
+          message={
+            <>
+              Supprimer le champ <strong>{deleteTarget.field_name}</strong> ?
+            </>
+          }
+          confirmLabel="Supprimer"
+          variant="danger"
+          loading={deleteMut.isPending}
+          error={deleteMut.isError ? (deleteMut.error as Error).message : null}
+          onConfirm={() => deleteMut.mutate(deleteTarget.id)}
+          onCancel={() => {
+            if (!deleteMut.isPending) setDeleteTarget(null)
+          }}
+        />
+      ) : null}
     </div>
   )
 }

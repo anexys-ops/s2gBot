@@ -1,10 +1,5 @@
 /**
- * ArticleActionsPanel
- *
- * Panneau "Actions & matériel" d'une fiche article (lab_admin / lab_technician).
- * - Liste des actions par type (technicien / ingenieur / labo)
- * - CRUD actions (créer / modifier / supprimer)
- * - Liste des équipements requis
+ * ArticleActionsPanel — Actions & matériel (lab_admin / lab_technician).
  */
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -15,29 +10,120 @@ import {
   type ArticleAction,
   type ArticleEquipmentRequirement,
 } from '../../api/client'
+import ConfirmDialog from '../ConfirmDialog'
 import ActionMeasureConfigPanel from './ActionMeasureConfigPanel'
 
-const TYPE_META: Record<string, { label: string; color: string }> = {
-  technicien: { label: 'Terrain / Technicien', color: '#f59e0b' },
-  ingenieur:  { label: 'Ingénieur',            color: '#3b82f6' },
-  labo:       { label: 'Laboratoire',          color: '#10b981' },
+const TYPE_META: Record<string, { label: string; dotClass: string }> = {
+  technicien: { label: 'Terrain / Technicien', dotClass: 'article-actions-type-dot--technicien' },
+  ingenieur: { label: 'Ingénieur', dotClass: 'article-actions-type-dot--ingenieur' },
+  labo: { label: 'Laboratoire', dotClass: 'article-actions-type-dot--labo' },
 }
 
-const MATERIEL_META = { label: 'Matériel requis', color: '#8b5cf6' }
-
 const TYPES = ['technicien', 'ingenieur', 'labo'] as const
+
+type ActionFormState = {
+  libelle: string
+  description: string
+  duree_heures: number
+  ordre: number
+}
+
+function ActionFormToolbar({
+  form,
+  onChange,
+  onSubmit,
+  onCancel,
+  submitLabel,
+  pending,
+  error,
+  cancelLabel = 'Annuler',
+}: {
+  form: ActionFormState
+  onChange: (next: ActionFormState) => void
+  onSubmit: () => void
+  onCancel?: () => void
+  submitLabel: string
+  pending: boolean
+  error?: string | null
+  cancelLabel?: string
+}) {
+  return (
+    <div className="article-actions-form">
+      <div className="list-table-toolbar__row article-actions-form__row article-actions-form__row--action">
+        <label className="list-table-toolbar__field article-actions-form__libelle">
+          <span className="filter-label">Libellé *</span>
+          <input
+            type="text"
+            className="article-actions-form__input"
+            value={form.libelle}
+            onChange={(e) => onChange({ ...form, libelle: e.target.value })}
+            required
+            placeholder="Ex. Essai Proctor"
+          />
+        </label>
+        <label className="list-table-toolbar__field article-actions-form__description">
+          <span className="filter-label">Description</span>
+          <input
+            type="text"
+            className="article-actions-form__input"
+            value={form.description}
+            onChange={(e) => onChange({ ...form, description: e.target.value })}
+            placeholder="Précisions optionnelles"
+          />
+        </label>
+        <label className="list-table-toolbar__field article-actions-form__duration">
+          <span className="filter-label">Durée (h)</span>
+          <input
+            type="number"
+            className="article-actions-form__input article-actions-form__input--number"
+            min={0}
+            step={0.25}
+            value={form.duree_heures}
+            onChange={(e) => onChange({ ...form, duree_heures: Number(e.target.value) })}
+          />
+        </label>
+        <label className="list-table-toolbar__field article-actions-form__order">
+          <span className="filter-label">Ordre</span>
+          <input
+            type="number"
+            className="article-actions-form__input article-actions-form__input--number"
+            min={0}
+            value={form.ordre}
+            onChange={(e) => onChange({ ...form, ordre: Number(e.target.value) })}
+          />
+        </label>
+        <div className="article-actions-form__actions">
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={pending || !form.libelle.trim()}
+            onClick={onSubmit}
+          >
+            {pending ? '…' : submitLabel}
+          </button>
+          {onCancel ? (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={onCancel}>
+              {cancelLabel}
+            </button>
+          ) : null}
+        </div>
+      </div>
+      {error ? <p className="error article-actions-form__error">{error}</p> : null}
+    </div>
+  )
+}
 
 function ActionRow({
   action,
   articleId,
-  onDeleted,
+  onDeleteRequest,
 }: {
   action: ArticleAction
   articleId: number
-  onDeleted: () => void
+  onDeleteRequest: () => void
 }) {
   const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ActionFormState>({
     libelle: action.libelle,
     description: action.description ?? '',
     duree_heures: action.duree_heures ?? 0,
@@ -53,77 +139,28 @@ function ActionRow({
     },
   })
 
-  const deleteMut = useMutation({
-    mutationFn: () => articleActionsApi.delete(articleId, action.id),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['article-actions', articleId] })
-      onDeleted()
-    },
-  })
-
-  const meta = TYPE_META[action.type] ?? { label: action.type, color: '#6b7280' }
+  const meta = TYPE_META[action.type] ?? { label: action.type, dotClass: '' }
 
   if (editing) {
     return (
-      <tr>
+      <tr className="article-actions-row--editing">
         <td colSpan={5}>
-          <form
-            style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap', padding: '0.25rem 0' }}
-            onSubmit={(e) => {
-              e.preventDefault()
+          <ActionFormToolbar
+            form={form}
+            onChange={setForm}
+            submitLabel="Enregistrer"
+            pending={updateMut.isPending}
+            error={updateMut.isError ? (updateMut.error as Error).message : null}
+            onSubmit={() =>
               updateMut.mutate({
                 libelle: form.libelle,
                 description: form.description || undefined,
                 duree_heures: Number(form.duree_heures),
                 ordre: Number(form.ordre),
               })
-            }}
-          >
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.82rem' }}>
-              Libellé *
-              <input
-                value={form.libelle}
-                onChange={(e) => setForm((f) => ({ ...f, libelle: e.target.value }))}
-                required
-                style={{ minWidth: 160 }}
-              />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.82rem' }}>
-              Description
-              <input
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                style={{ minWidth: 180 }}
-              />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.82rem' }}>
-              Durée (h)
-              <input
-                type="number"
-                min={0}
-                step={0.25}
-                value={form.duree_heures}
-                onChange={(e) => setForm((f) => ({ ...f, duree_heures: Number(e.target.value) }))}
-                style={{ width: 70 }}
-              />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.82rem' }}>
-              Ordre
-              <input
-                type="number"
-                min={0}
-                value={form.ordre}
-                onChange={(e) => setForm((f) => ({ ...f, ordre: Number(e.target.value) }))}
-                style={{ width: 60 }}
-              />
-            </label>
-            <button type="submit" className="btn btn-primary btn-sm" disabled={updateMut.isPending}>
-              {updateMut.isPending ? '…' : 'OK'}
-            </button>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(false)}>
-              Annuler
-            </button>
-          </form>
+            }
+            onCancel={() => setEditing(false)}
+          />
         </td>
       </tr>
     )
@@ -132,33 +169,21 @@ function ActionRow({
   return (
     <tr>
       <td>
-        <span
-          style={{
-            display: 'inline-block',
-            width: 10,
-            height: 10,
-            borderRadius: '50%',
-            background: meta.color,
-            marginRight: '0.4rem',
-            verticalAlign: 'middle',
-          }}
-        />
+        <span className={`article-actions-type-dot ${meta.dotClass}`} aria-hidden />
         {action.libelle}
       </td>
-      <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>{action.description || '—'}</td>
-      <td style={{ textAlign: 'right' }}>{action.duree_heures ? `${action.duree_heures} h` : '—'}</td>
-      <td style={{ textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.82rem' }}>{action.ordre ?? 0}</td>
-      <td style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(true)}>
+      <td className="article-actions-cell-muted">{action.description || '—'}</td>
+      <td className="article-actions-cell-amount">{action.duree_heures ? `${action.duree_heures} h` : '—'}</td>
+      <td className="article-actions-cell-amount article-actions-cell-muted">{action.ordre ?? 0}</td>
+      <td className="article-actions-cell-actions">
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(true)} title="Modifier">
           ✏️
         </button>
         <button
           type="button"
           className="btn btn-secondary btn-sm btn-danger-outline"
-          disabled={deleteMut.isPending}
-          onClick={() => {
-            if (window.confirm('Supprimer cette action ?')) deleteMut.mutate()
-          }}
+          title="Supprimer"
+          onClick={onDeleteRequest}
         >
           ✕
         </button>
@@ -167,9 +192,21 @@ function ActionRow({
   )
 }
 
-function NewActionForm({ articleId, type, onCreated }: { articleId: number; type: 'technicien' | 'ingenieur' | 'labo'; onCreated: () => void }) {
-  const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ libelle: '', description: '', duree_heures: 1, ordre: 0 })
+function NewActionForm({
+  articleId,
+  type,
+  nextOrdre,
+}: {
+  articleId: number
+  type: 'technicien' | 'ingenieur' | 'labo'
+  nextOrdre: number
+}) {
+  const [form, setForm] = useState<ActionFormState>({
+    libelle: '',
+    description: '',
+    duree_heures: 1,
+    ordre: nextOrdre,
+  })
   const qc = useQueryClient()
 
   const createMut = useMutation({
@@ -183,96 +220,34 @@ function NewActionForm({ articleId, type, onCreated }: { articleId: number; type
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['article-actions', articleId] })
-      setForm({ libelle: '', description: '', duree_heures: 1, ordre: 0 })
-      setOpen(false)
-      onCreated()
+      setForm({ libelle: '', description: '', duree_heures: 1, ordre: nextOrdre + 1 })
     },
   })
 
-  if (!open) {
-    return (
-      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setOpen(true)} style={{ marginTop: '0.5rem' }}>
-        + Nouvelle action
-      </button>
-    )
-  }
-
   return (
-    <form
-      style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap', marginTop: '0.5rem', padding: '0.5rem', background: 'var(--color-surface)', borderRadius: 6, border: '1px solid var(--color-border)' }}
-      onSubmit={(e) => {
-        e.preventDefault()
-        createMut.mutate()
-      }}
-    >
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.82rem' }}>
-        Libellé *
-        <input
-          value={form.libelle}
-          onChange={(e) => setForm((f) => ({ ...f, libelle: e.target.value }))}
-          required
-          style={{ minWidth: 160 }}
-          placeholder="Ex: Essai Proctor"
-        />
-      </label>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.82rem' }}>
-        Description
-        <input
-          value={form.description}
-          onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          style={{ minWidth: 180 }}
-        />
-      </label>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.82rem' }}>
-        Durée (h)
-        <input
-          type="number"
-          min={0}
-          step={0.25}
-          value={form.duree_heures}
-          onChange={(e) => setForm((f) => ({ ...f, duree_heures: Number(e.target.value) }))}
-          style={{ width: 70 }}
-        />
-      </label>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.82rem' }}>
-        Ordre
-        <input
-          type="number"
-          min={0}
-          value={form.ordre}
-          onChange={(e) => setForm((f) => ({ ...f, ordre: Number(e.target.value) }))}
-          style={{ width: 60 }}
-        />
-      </label>
-      <button type="submit" className="btn btn-primary btn-sm" disabled={createMut.isPending}>
-        {createMut.isPending ? 'Création…' : 'Créer'}
-      </button>
-      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setOpen(false)}>
-        Annuler
-      </button>
-      {createMut.isError && (
-        <span className="error" style={{ fontSize: '0.82rem' }}>
-          {(createMut.error as Error).message}
-        </span>
-      )}
-    </form>
+    <section className="card list-table-toolbar article-actions-add">
+      <div className="article-actions-add__head">
+        <h4 className="article-actions-add__title">Ajouter une action</h4>
+      </div>
+      <ActionFormToolbar
+        form={form}
+        onChange={setForm}
+        submitLabel="+ Ajouter"
+        pending={createMut.isPending}
+        error={createMut.isError ? (createMut.error as Error).message : null}
+        onSubmit={() => createMut.mutate()}
+      />
+    </section>
   )
 }
 
 function EquipmentRequirementRow({
   requirement,
-  articleId,
+  onDeleteRequest,
 }: {
   requirement: ArticleEquipmentRequirement
-  articleId: number
+  onDeleteRequest: () => void
 }) {
-  const qc = useQueryClient()
-  const deleteMut = useMutation({
-    mutationFn: () => articleActionsApi.equipmentRemove(articleId, requirement.id),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['article-equipment-requirements', articleId] })
-    },
-  })
   const eq = requirement.equipment
 
   return (
@@ -280,23 +255,21 @@ function EquipmentRequirementRow({
       <td>
         {eq ? (
           <Link to={`/materiel/equipements/${eq.id}`} className="link-inline">
-            <code>{eq.code ?? `#${eq.id}`}</code> — {eq.name}
+            <code className="code-badge">{eq.code ?? `#${eq.id}`}</code> {eq.name}
           </Link>
         ) : (
           `Équipement #${requirement.equipment_id}`
         )}
       </td>
-      <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>{eq?.type?.trim() || '—'}</td>
-      <td style={{ textAlign: 'right' }}>{requirement.quantite ?? 1}</td>
-      <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>{requirement.notes?.trim() || '—'}</td>
-      <td style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
+      <td className="article-actions-cell-muted">{eq?.type?.trim() || '—'}</td>
+      <td className="article-actions-cell-amount">{requirement.quantite ?? 1}</td>
+      <td className="article-actions-cell-muted">{requirement.notes?.trim() || '—'}</td>
+      <td className="article-actions-cell-actions">
         <button
           type="button"
           className="btn btn-secondary btn-sm btn-danger-outline"
-          disabled={deleteMut.isPending}
-          onClick={() => {
-            if (window.confirm('Retirer cet équipement de la fiche article ?')) deleteMut.mutate()
-          }}
+          title="Retirer"
+          onClick={onDeleteRequest}
         >
           ✕
         </button>
@@ -312,14 +285,12 @@ function NewEquipmentForm({
   articleId: number
   existingEquipmentIds: number[]
 }) {
-  const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ equipment_id: '', quantite: 1, notes: '' })
   const qc = useQueryClient()
 
   const { data: equipments = [] } = useQuery({
     queryKey: ['equipments', 'article-requirements'],
     queryFn: () => equipmentsApi.list(),
-    enabled: open,
     staleTime: 120_000,
   })
 
@@ -337,87 +308,76 @@ function NewEquipmentForm({
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['article-equipment-requirements', articleId] })
       setForm({ equipment_id: '', quantite: 1, notes: '' })
-      setOpen(false)
     },
   })
 
-  if (!open) {
-    return (
-      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setOpen(true)} style={{ marginTop: '0.5rem' }}>
-        + Ajouter un équipement
-      </button>
-    )
-  }
-
   return (
-    <form
-      style={{
-        display: 'flex',
-        gap: '0.5rem',
-        alignItems: 'flex-end',
-        flexWrap: 'wrap',
-        marginTop: '0.5rem',
-        padding: '0.5rem',
-        background: 'var(--color-surface)',
-        borderRadius: 6,
-        border: '1px solid var(--color-border)',
-      }}
-      onSubmit={(e) => {
-        e.preventDefault()
-        createMut.mutate()
-      }}
-    >
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.82rem' }}>
-        Équipement *
-        <select
-          value={form.equipment_id}
-          onChange={(e) => setForm((f) => ({ ...f, equipment_id: e.target.value }))}
-          required
-          style={{ minWidth: 220 }}
-        >
-          <option value="">— Choisir —</option>
-          {available.map((eq) => (
-            <option key={eq.id} value={eq.id}>
-              {eq.code} — {eq.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.82rem' }}>
-        Quantité
-        <input
-          type="number"
-          min={1}
-          value={form.quantite}
-          onChange={(e) => setForm((f) => ({ ...f, quantite: Number(e.target.value) }))}
-          style={{ width: 70 }}
-        />
-      </label>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.82rem' }}>
-        Notes
-        <input
-          value={form.notes}
-          onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-          style={{ minWidth: 180 }}
-          placeholder="Optionnel"
-        />
-      </label>
-      <button type="submit" className="btn btn-primary btn-sm" disabled={createMut.isPending || !form.equipment_id}>
-        {createMut.isPending ? 'Ajout…' : 'Ajouter'}
-      </button>
-      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setOpen(false)}>
-        Annuler
-      </button>
-      {createMut.isError && (
-        <span className="error" style={{ fontSize: '0.82rem' }}>
-          {(createMut.error as Error).message}
-        </span>
-      )}
-    </form>
+    <section className="card list-table-toolbar article-actions-add">
+      <div className="article-actions-add__head">
+        <h4 className="article-actions-add__title">Ajouter un équipement</h4>
+      </div>
+      <div className="article-actions-form">
+        <div className="list-table-toolbar__row article-actions-form__row article-actions-form__row--equipment">
+          <label className="list-table-toolbar__field article-actions-form__equipment">
+            <span className="filter-label">Équipement *</span>
+            <select
+              className="article-actions-form__select"
+              value={form.equipment_id}
+              onChange={(e) => setForm((f) => ({ ...f, equipment_id: e.target.value }))}
+              required
+            >
+              <option value="">— Choisir —</option>
+              {available.map((eq) => (
+                <option key={eq.id} value={eq.id}>
+                  {eq.code} — {eq.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="list-table-toolbar__field article-actions-form__qty">
+            <span className="filter-label">Quantité</span>
+            <input
+              type="number"
+              className="article-actions-form__input article-actions-form__input--number"
+              min={1}
+              value={form.quantite}
+              onChange={(e) => setForm((f) => ({ ...f, quantite: Number(e.target.value) }))}
+            />
+          </label>
+          <label className="list-table-toolbar__field article-actions-form__notes">
+            <span className="filter-label">Notes</span>
+            <input
+              type="text"
+              className="article-actions-form__input"
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              placeholder="Optionnel"
+            />
+          </label>
+          <div className="article-actions-form__actions">
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={createMut.isPending || !form.equipment_id}
+              onClick={() => createMut.mutate()}
+            >
+              {createMut.isPending ? 'Ajout…' : '+ Ajouter'}
+            </button>
+          </div>
+        </div>
+        {createMut.isError ? (
+          <p className="error article-actions-form__error">{(createMut.error as Error).message}</p>
+        ) : null}
+      </div>
+    </section>
   )
 }
 
 export default function ArticleActionsPanel({ articleId }: { articleId: number }) {
+  const qc = useQueryClient()
+  const [deleteActionTarget, setDeleteActionTarget] = useState<ArticleAction | null>(null)
+  const [deleteEquipmentTarget, setDeleteEquipmentTarget] = useState<ArticleEquipmentRequirement | null>(null)
+
   const { data: actions = [], isLoading: loadingActions } = useQuery({
     queryKey: ['article-actions', articleId],
     queryFn: () => articleActionsApi.list(articleId),
@@ -430,63 +390,94 @@ export default function ArticleActionsPanel({ articleId }: { articleId: number }
     staleTime: 60_000,
   })
 
-  if (loadingActions || loadingEquipment) return <p className="text-muted">Chargement des actions et matériel…</p>
+  const deleteActionMut = useMutation({
+    mutationFn: (actionId: number) => articleActionsApi.delete(articleId, actionId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['article-actions', articleId] })
+      setDeleteActionTarget(null)
+    },
+  })
+
+  const deleteEquipmentMut = useMutation({
+    mutationFn: (requirementId: number) => articleActionsApi.equipmentRemove(articleId, requirementId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['article-equipment-requirements', articleId] })
+      setDeleteEquipmentTarget(null)
+    },
+  })
+
+  if (loadingActions || loadingEquipment) {
+    return (
+      <div className="article-actions-panel">
+        <p className="text-muted">Chargement des actions et matériel…</p>
+      </div>
+    )
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="article-actions-panel">
+      <section className="card dossier-tab-panel">
+        <h2 className="ds-form-section__title">Actions &amp; matériel</h2>
+        <p className="dossier-tab-panel__intro">
+          Définissez les actions par profil (terrain, ingénieur, laboratoire), les champs de mesure associés et le
+          matériel requis pour réaliser la prestation.
+        </p>
+      </section>
+
       {TYPES.map((type) => {
         const meta = TYPE_META[type]
-        const typeActions = actions.filter((a) => a.type === type)
+        const typeActions = actions
+          .filter((a) => a.type === type)
+          .slice()
+          .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0))
+        const nextOrdre = typeActions.reduce((max, a) => Math.max(max, a.ordre ?? 0), 0) + 1
 
         return (
-          <section key={type} className="card" style={{ padding: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <span
-                style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: '50%',
-                  background: meta.color,
-                  flexShrink: 0,
-                  display: 'inline-block',
-                }}
-              />
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>{meta.label}</h3>
-              <span className="badge" style={{ marginLeft: 'auto' }}>
+          <section key={type} className="card dossier-tab-panel article-actions-section">
+            <div className="article-actions-section__header">
+              <span className={`article-actions-type-dot ${meta.dotClass}`} aria-hidden />
+              <h3 className="ds-form-section__title">{meta.label}</h3>
+              <span className="badge">
                 {typeActions.length} action{typeActions.length !== 1 ? 's' : ''}
               </span>
             </div>
 
-            {typeActions.length > 0 ? (
-              <div className="table-wrap">
-                <table className="data-table data-table--compact">
-                  <thead>
-                    <tr>
-                      <th>Libellé</th>
-                      <th>Description</th>
-                      <th style={{ textAlign: 'right' }}>Durée</th>
-                      <th style={{ textAlign: 'right' }}>Ordre</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {typeActions
-                      .slice()
-                      .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0))
-                      .map((action) => (
-                        <ActionRow key={action.id} action={action} articleId={articleId} onDeleted={() => {}} />
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="text-muted" style={{ fontSize: '0.85rem', margin: '0 0 0.25rem' }}>
-                Aucune action définie pour ce type.
-              </p>
-            )}
+            <NewActionForm articleId={articleId} type={type} nextOrdre={nextOrdre} />
 
-            {/* Panneau config des mesures par action */}
-            {typeActions.slice().sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0)).map((action) => (
+            <div className="card dossier-tab-panel dossier-tab-panel--table article-actions-section__table">
+              <div className="dossier-tab-panel__header">
+                <h4 className="article-actions-add__title">Actions enregistrées</h4>
+              </div>
+              {typeActions.length > 0 ? (
+                <div className="table-wrap">
+                  <table className="data-table data-table--compact">
+                    <thead>
+                      <tr>
+                        <th>Libellé</th>
+                        <th>Description</th>
+                        <th className="article-actions-cell-amount">Durée</th>
+                        <th className="article-actions-cell-amount">Ordre</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {typeActions.map((action) => (
+                        <ActionRow
+                          key={action.id}
+                          action={action}
+                          articleId={articleId}
+                          onDeleteRequest={() => setDeleteActionTarget(action)}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="dossier-tab-empty">Aucune action définie pour ce type.</p>
+              )}
+            </div>
+
+            {typeActions.map((action) => (
               <ActionMeasureConfigPanel
                 key={action.id}
                 articleId={articleId}
@@ -494,60 +485,98 @@ export default function ArticleActionsPanel({ articleId }: { articleId: number }
                 actionLabel={action.libelle}
               />
             ))}
-
-            <NewActionForm articleId={articleId} type={type} onCreated={() => {}} />
           </section>
         )
       })}
 
-      <section className="card" style={{ padding: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-          <span
-            style={{
-              width: 14,
-              height: 14,
-              borderRadius: '50%',
-              background: MATERIEL_META.color,
-              flexShrink: 0,
-              display: 'inline-block',
-            }}
-          />
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>{MATERIEL_META.label}</h3>
-          <span className="badge" style={{ marginLeft: 'auto' }}>
+      <section className="card dossier-tab-panel article-actions-section">
+        <div className="article-actions-section__header">
+          <span className="article-actions-type-dot article-actions-type-dot--materiel" aria-hidden />
+          <h3 className="ds-form-section__title">Matériel requis</h3>
+          <span className="badge">
             {equipmentRequirements.length} équipement{equipmentRequirements.length !== 1 ? 's' : ''}
           </span>
         </div>
-
-        {equipmentRequirements.length > 0 ? (
-          <div className="table-wrap">
-            <table className="data-table data-table--compact">
-              <thead>
-                <tr>
-                  <th>Équipement</th>
-                  <th>Type</th>
-                  <th style={{ textAlign: 'right' }}>Qté</th>
-                  <th>Notes</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {equipmentRequirements.map((req) => (
-                  <EquipmentRequirementRow key={req.id} requirement={req} articleId={articleId} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="text-muted" style={{ fontSize: '0.85rem', margin: '0 0 0.25rem' }}>
-            Aucun équipement requis défini pour cet article.
-          </p>
-        )}
 
         <NewEquipmentForm
           articleId={articleId}
           existingEquipmentIds={equipmentRequirements.map((r) => r.equipment_id)}
         />
+
+        <div className="card dossier-tab-panel dossier-tab-panel--table article-actions-section__table">
+          <div className="dossier-tab-panel__header">
+            <h4 className="article-actions-add__title">Équipements liés</h4>
+          </div>
+          {equipmentRequirements.length > 0 ? (
+            <div className="table-wrap">
+              <table className="data-table data-table--compact">
+                <thead>
+                  <tr>
+                    <th>Équipement</th>
+                    <th>Type</th>
+                    <th className="article-actions-cell-amount">Qté</th>
+                    <th>Notes</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {equipmentRequirements.map((req) => (
+                    <EquipmentRequirementRow
+                      key={req.id}
+                      requirement={req}
+                      onDeleteRequest={() => setDeleteEquipmentTarget(req)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="dossier-tab-empty">Aucun équipement requis défini pour cet article.</p>
+          )}
+        </div>
       </section>
+
+      {deleteActionTarget ? (
+        <ConfirmDialog
+          title="Supprimer l'action"
+          message={
+            <>
+              Supprimer l&apos;action <strong>{deleteActionTarget.libelle}</strong> ?
+            </>
+          }
+          confirmLabel="Supprimer"
+          variant="danger"
+          loading={deleteActionMut.isPending}
+          error={deleteActionMut.isError ? (deleteActionMut.error as Error).message : null}
+          onConfirm={() => deleteActionMut.mutate(deleteActionTarget.id)}
+          onCancel={() => {
+            if (!deleteActionMut.isPending) setDeleteActionTarget(null)
+          }}
+        />
+      ) : null}
+
+      {deleteEquipmentTarget ? (
+        <ConfirmDialog
+          title="Retirer l'équipement"
+          message={
+            <>
+              Retirer{' '}
+              <strong>
+                {deleteEquipmentTarget.equipment?.name ?? `équipement #${deleteEquipmentTarget.equipment_id}`}
+              </strong>{' '}
+              de la fiche article ?
+            </>
+          }
+          confirmLabel="Retirer"
+          variant="danger"
+          loading={deleteEquipmentMut.isPending}
+          error={deleteEquipmentMut.isError ? (deleteEquipmentMut.error as Error).message : null}
+          onConfirm={() => deleteEquipmentMut.mutate(deleteEquipmentTarget.id)}
+          onCancel={() => {
+            if (!deleteEquipmentMut.isPending) setDeleteEquipmentTarget(null)
+          }}
+        />
+      ) : null}
     </div>
   )
 }

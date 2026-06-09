@@ -64,6 +64,64 @@ export function siteStatutBadgeProps(
   return { variant: variantMap[key], children: label, label }
 }
 
+export function quoteStatutBadgeProps(
+  status: string,
+): Pick<StatusBadgeProps, 'variant' | 'children'> & { label: string } {
+  const map: Record<string, { label: string; variant: StatusBadgeVariant }> = {
+    draft: { label: 'Brouillon', variant: 'neutral' },
+    validated: { label: 'Validé', variant: 'info' },
+    signed: { label: 'Signé', variant: 'info' },
+    sent: { label: 'Envoyé', variant: 'warning' },
+    relanced: { label: 'Relancé', variant: 'warning' },
+    lost: { label: 'Perdu', variant: 'danger' },
+    invoiced: { label: 'Facturé', variant: 'success' },
+    accepted: { label: 'Accepté', variant: 'success' },
+    rejected: { label: 'Refusé', variant: 'danger' },
+  }
+  const m = map[status] ?? { label: status, variant: 'neutral' as const }
+  return { variant: m.variant, children: m.label, label: m.label }
+}
+
+export function bonCommandeStatutBadgeProps(
+  statut: string,
+): Pick<StatusBadgeProps, 'variant' | 'children'> & { label: string } {
+  const map: Record<string, { label: string; variant: StatusBadgeVariant }> = {
+    brouillon: { label: 'Brouillon', variant: 'neutral' },
+    confirme: { label: 'Confirmé', variant: 'info' },
+    en_cours: { label: 'En cours', variant: 'warning' },
+    livre: { label: 'Livré', variant: 'success' },
+    annule: { label: 'Annulé', variant: 'danger' },
+  }
+  const m = map[statut] ?? { label: statut, variant: 'neutral' as const }
+  return { variant: m.variant, children: m.label, label: m.label }
+}
+
+export function bonLivraisonStatutBadgeProps(
+  statut: string,
+): Pick<StatusBadgeProps, 'variant' | 'children'> & { label: string } {
+  const map: Record<string, { label: string; variant: StatusBadgeVariant }> = {
+    brouillon: { label: 'Brouillon', variant: 'neutral' },
+    livre: { label: 'Livré', variant: 'success' },
+    signe: { label: 'Signé', variant: 'success' },
+  }
+  const m = map[statut] ?? { label: statut, variant: 'neutral' as const }
+  return { variant: m.variant, children: m.label, label: m.label }
+}
+
+export function ordreMissionStatutBadgeProps(
+  statut: string,
+): Pick<StatusBadgeProps, 'variant' | 'children'> & { label: string } {
+  const map: Record<string, { label: string; variant: StatusBadgeVariant }> = {
+    brouillon: { label: 'Brouillon', variant: 'neutral' },
+    planifie: { label: 'Planifié', variant: 'info' },
+    en_cours: { label: 'En cours', variant: 'warning' },
+    termine: { label: 'Terminé', variant: 'success' },
+    annule: { label: 'Annulé', variant: 'danger' },
+  }
+  const m = map[statut] ?? { label: statut, variant: 'neutral' as const }
+  return { variant: m.variant, children: m.label, label: m.label }
+}
+
 export function equipementStatutBadgeProps(status: string): { label: string; variant: StatusBadgeVariant } {
   const k = status.toLowerCase()
   if (k === 'active' || k === 'ok' || k === 'in_service' || k.includes('actif')) {

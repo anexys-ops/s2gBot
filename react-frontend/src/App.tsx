@@ -2,7 +2,7 @@ import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import DossiersListPage from './pages/dossiers/DossiersListPage'
 import DossierFichePage from './pages/dossiers/DossierFichePage'
 import DossierInfosTab from './pages/dossiers/tabs/DossierInfosTab'
-import DossierPlaceholderTab from './pages/dossiers/tabs/DossierPlaceholderTab'
+import DossierEssaisTab from './pages/dossiers/tabs/DossierEssaisTab'
 import DossierBcBlTab from './pages/dossiers/tabs/DossierBcBlTab'
 import DossierDevisTab from './pages/dossiers/tabs/DossierDevisTab'
 import DossierDocumentsTab from './pages/dossiers/tabs/DossierDocumentsTab'
@@ -150,10 +150,7 @@ function AppRoutes() {
           <Route path="infos" element={<DossierInfosTab />} />
           <Route path="devis" element={<DossierDevisTab />} />
           <Route path="bc-bl" element={<DossierBcBlTab />} />
-          <Route
-            path="essais"
-            element={<DossierPlaceholderTab label="Essais" description="Lien vers commandes d’essai et résultats." />}
-          />
+          <Route path="essais" element={<DossierEssaisTab />} />
           <Route path="documents" element={<DossierDocumentsTab />} />
           <Route path="extrafields" element={<DossierExtrafieldsTab />} />
         </Route>

@@ -1058,16 +1058,45 @@ th {
   color: var(--color-text-muted, #64748b);
 }
 
+.dossier-tab,
 .dossier-infos-tab {
   display: flex;
   flex-direction: column;
   gap: 1rem;
   width: 100%;
 }
+.dossier-tab-panel,
 .dossier-infos-panel {
   width: 100%;
   max-width: none;
   padding: 1.25rem 1.5rem;
+}
+.dossier-tab-panel--table {
+  padding: 0;
+  overflow: hidden;
+}
+.dossier-tab-panel__header {
+  padding: 1rem 1.5rem 0.5rem;
+}
+.dossier-tab-panel__header .ds-form-section__title {
+  margin: 0;
+}
+.dossier-tab-panel__intro {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: #64748b;
+  line-height: 1.45;
+}
+.dossier-tab-empty {
+  margin: 0;
+  padding: 0.75rem 1.5rem 1.25rem;
+  color: #64748b;
+}
+.dossier-tab-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-top: 0.75rem;
 }
 .dossier-infos-grid {
   display: grid;

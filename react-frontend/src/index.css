@@ -6689,3 +6689,117 @@ a.catalogue-tree__link-article:hover {
     min-height: 12.5rem;
   }
 }
+
+/* ——— Fiche équipement ——— */
+.module-shell--equipment-fiche .module-shell__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.equipment-fiche-tabs {
+  margin-bottom: 0.25rem;
+}
+.equipment-fiche__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+.equipment-fiche {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+.equipment-fiche__summary,
+.equipment-fiche__section {
+  padding: 1.25rem 1.5rem;
+}
+.equipment-fiche__section-title {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.equipment-fiche__grid {
+  margin-bottom: 0.75rem;
+}
+.equipment-fiche__id-line {
+  margin: 0;
+  font-size: 0.82rem;
+}
+.equipment-fiche__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.equipment-fiche__empty {
+  margin: 0;
+  font-size: 0.88rem;
+}
+.equipment-fiche__notes-cell {
+  max-width: 16rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #64748b);
+}
+.equipment-calibration-add {
+  margin: 0;
+  padding: 0.85rem 1rem 1rem;
+}
+.equipment-calibration-add__head {
+  margin-bottom: 0.65rem;
+}
+.equipment-calibration-add__title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #64748b);
+}
+.equipment-calibration-add__row {
+  display: grid;
+  grid-template-columns: minmax(9rem, 1fr) minmax(9rem, 1fr) minmax(10rem, 1.2fr) minmax(11rem, 1fr) auto;
+  align-items: end;
+  gap: 0.65rem 1rem;
+}
+.equipment-calibration-add__submit {
+  align-self: end;
+  justify-self: end;
+}
+.equipment-calibration-add__notes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+}
+.equipment-calibration-add__notes textarea {
+  font-weight: 400;
+  min-height: auto;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.9rem;
+  resize: vertical;
+}
+.equipment-calibration-add__notes textarea:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 1px;
+  border-color: #93c5fd;
+}
+.equipment-calibration-add__error {
+  margin: 0.55rem 0 0;
+  font-size: 0.82rem;
+}
+@media (max-width: 900px) {
+  .equipment-calibration-add__row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .equipment-calibration-add__submit {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}

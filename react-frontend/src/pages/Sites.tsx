@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { sitesApi, clientsApi, type Site } from '../api/client'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
+import { sitesApi, clientsApi, type Client, type Site } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
@@ -13,6 +13,14 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { MONEY_UNIT_LABEL } from '../lib/appLocale'
 import SiteStatusPill from '../components/SiteStatusPill'
 import { SITE_STATUS_KEYS, SITE_STATUS_LABELS } from '../lib/siteStatusPresentation'
+
+function normalizeClientsList(data: unknown): Client[] {
+  if (Array.isArray(data)) return data
+  if (data && typeof data === 'object' && 'data' in data && Array.isArray((data as { data: unknown }).data)) {
+    return (data as { data: Client[] }).data
+  }
+  return []
+}
 
 const emptyForm: Partial<Site> = {
   client_id: 0,
@@ -63,6 +71,7 @@ export default function Sites() {
         page,
         per_page: perPage,
       }),
+    placeholderData: keepPreviousData,
   })
 
   useEffect(() => {
@@ -70,22 +79,30 @@ export default function Sites() {
   }, [debouncedSearch, clientFilter])
 
   const { data: clientsData } = useQuery({
-    queryKey: ['clients'],
+    queryKey: ['clients', 'select-options'],
     queryFn: () => clientsApi.list(),
     enabled: isAdmin,
+    staleTime: 60_000,
   })
 
-  const clients = Array.isArray(clientsData) ? clientsData : []
+  const clients = normalizeClientsList(clientsData)
 
   useEffect(() => {
     const st = location.state as { openCreate?: boolean } | null
-    if (st?.openCreate && isAdmin) {
-      setForm({ ...emptyForm, client_id: clients[0]?.id ?? 0 })
-      setEditingId(null)
-      setModal('create')
-      navigate('.', { replace: true, state: {} })
+    if (!st?.openCreate || !isAdmin) return
+    setForm(emptyForm)
+    setEditingId(null)
+    setModal('create')
+    navigate('.', { replace: true, state: {} })
+  }, [location.state, navigate, isAdmin])
+
+  useEffect(() => {
+    if (modal !== 'create' || form.client_id) return
+    const firstId = clients[0]?.id
+    if (firstId) {
+      setForm((f) => ({ ...f, client_id: firstId }))
     }
-  }, [location.state, navigate, isAdmin, clients])
+  }, [modal, clients, form.client_id])
 
   const createMut = useMutation({
     mutationFn: (body: Partial<Site>) => sitesApi.create(body as { client_id: number; name: string }),
@@ -150,7 +167,9 @@ export default function Sites() {
   const lastPage = data?.last_page ?? 1
   const currentPage = data?.current_page ?? page
 
-  if (isLoading) {
+  const isInitialLoading = isLoading && !data
+
+  if (isInitialLoading) {
     return (
       <ModuleEntityShell
         breadcrumbs={[
@@ -313,13 +332,18 @@ export default function Sites() {
             <div className="form-group">
               <label>Client *</label>
               <select
-                value={form.client_id || ''}
-                onChange={(e) => setForm((f) => ({ ...f, client_id: Number(e.target.value) }))}
+                value={form.client_id ? String(form.client_id) : ''}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, client_id: e.target.value ? Number(e.target.value) : 0 }))
+                }
                 required
               >
                 <option value="">Choisir…</option>
+                {form.client_id && !clients.some((c) => c.id === form.client_id) ? (
+                  <option value={String(form.client_id)}>Client #{form.client_id}</option>
+                ) : null}
                 {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
+                  <option key={c.id} value={String(c.id)}>
                     {c.name}
                   </option>
                 ))}

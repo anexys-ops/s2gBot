@@ -12,7 +12,7 @@ type Props = {
 
 export default function EquipmentCreateModal({ onClose, onCreated }: Props) {
   const queryClient = useQueryClient()
-  const [form, setForm] = useState(emptyEquipmentForm)
+  const [form, setForm] = useState(() => emptyEquipmentForm())
 
   const createMutation = useMutation({
     mutationFn: () => equipmentsApi.create(equipmentFormToPayload(form)),

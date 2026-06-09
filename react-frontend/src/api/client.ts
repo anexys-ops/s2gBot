@@ -2656,7 +2656,10 @@ export type Agency = {
 }
 
 export const agencesApi = {
-  list: () => api<Agency[]>('/agences'),
+  list: async () => {
+    const res = await api<LaravelPaginator<Agency> | Agency[]>('/agences?per_page=200')
+    return Array.isArray(res) ? res : res.data
+  },
   get: (id: number) => api<Agency>(`/agences/${id}`),
   create: (body: Partial<Agency>) => api<Agency>('/agences', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: Partial<Agency>) => api<Agency>(`/agences/${id}`, { method: 'PUT', body: JSON.stringify(body) }),

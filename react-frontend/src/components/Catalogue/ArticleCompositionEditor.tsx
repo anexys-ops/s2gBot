@@ -217,84 +217,113 @@ function AddCompositionForm({ articleId }: { articleId: number }) {
     },
   })
 
+  const displayValue = selectedId ? selectedLabel : search
+
   return (
-    <section className="card article-composition-add">
-      <h3 className="ds-form-section__title">Ajouter un composant</h3>
-      <p className="article-composition-add__intro text-muted">
-        Recherchez un article du catalogue à inclure dans la composition (prestation regroupée, kit, etc.).
-      </p>
+    <section className="card list-table-toolbar article-composition-add">
+      <div className="article-composition-add__head">
+        <h3 className="article-composition-add__title">Ajouter un composant</h3>
+      </div>
       <form
-        className="article-composition-add__form"
         onSubmit={(e) => {
           e.preventDefault()
           createMut.mutate()
         }}
       >
-        <label className="article-composition-add__field article-composition-add__field--picker">
-          Article *
-          <input
-            value={selectedId ? selectedLabel : search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setSelectedId(null)
-              setSelectedLabel('')
-              setShowPicker(true)
-            }}
-            onFocus={() => setShowPicker(true)}
-            onBlur={() => {
-              window.setTimeout(() => setShowPicker(false), 150)
-            }}
-            placeholder="Rechercher par code ou libellé…"
-            autoComplete="off"
-          />
-          {showPicker && filtered.length > 0 ? (
-            <ul className="article-composition-picker" role="listbox">
-              {filtered.map((a) => (
-                <li key={a.id}>
-                  <button
-                    type="button"
-                    role="option"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      setSelectedId(a.id)
-                      setSelectedLabel(`${a.code} — ${a.libelle}`)
-                      setSearch('')
-                      setShowPicker(false)
-                    }}
-                  >
-                    <code>{a.code}</code>
-                    <span>{a.libelle}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </label>
+        <div className="list-table-toolbar__row article-composition-add__row">
+          <label className="list-table-toolbar__field list-table-toolbar__search article-composition-add__article">
+            <span className="filter-label">Article *</span>
+            <div className="list-table-toolbar__search-input-wrap article-composition-add__picker-wrap">
+              <input
+                type="text"
+                className="list-table-toolbar__search-input"
+                value={displayValue}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setSelectedId(null)
+                  setSelectedLabel('')
+                  setShowPicker(true)
+                }}
+                onFocus={() => setShowPicker(true)}
+                onBlur={() => {
+                  window.setTimeout(() => setShowPicker(false), 150)
+                }}
+                placeholder="Rechercher par code ou libellé…"
+                autoComplete="off"
+                aria-autocomplete="list"
+                aria-expanded={showPicker && filtered.length > 0}
+              />
+              {displayValue.trim() !== '' ? (
+                <button
+                  type="button"
+                  className="list-table-toolbar__search-clear"
+                  onClick={() => {
+                    setSearch('')
+                    setSelectedId(null)
+                    setSelectedLabel('')
+                    setShowPicker(false)
+                  }}
+                  aria-label="Effacer la sélection"
+                  title="Effacer"
+                >
+                  ×
+                </button>
+              ) : null}
+              {showPicker && filtered.length > 0 ? (
+                <ul className="article-composition-picker" role="listbox">
+                  {filtered.map((a) => (
+                    <li key={a.id}>
+                      <button
+                        type="button"
+                        role="option"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setSelectedId(a.id)
+                          setSelectedLabel(`${a.code} — ${a.libelle}`)
+                          setSearch('')
+                          setShowPicker(false)
+                        }}
+                      >
+                        <code>{a.code}</code>
+                        <span>{a.libelle}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          </label>
 
-        <label className="article-composition-add__field">
-          Qté / unité
-          <input
-            type="number"
-            min={1}
-            step={1}
-            value={qty}
-            onChange={(e) => {
-              const v = parseInt(e.target.value, 10)
-              setQty(Number.isFinite(v) && v > 0 ? v : 1)
-            }}
-          />
-        </label>
+          <label className="list-table-toolbar__field article-composition-add__qty">
+            <span className="filter-label">Qté / unité</span>
+            <input
+              type="number"
+              className="article-composition-add__qty-input"
+              min={1}
+              step={1}
+              value={qty}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10)
+                setQty(Number.isFinite(v) && v > 0 ? v : 1)
+              }}
+            />
+          </label>
 
-        <label className="article-composition-add__field article-composition-add__field--checkbox">
-          <input type="checkbox" checked={isOptional} onChange={(e) => setIsOptional(e.target.checked)} />
-          Optionnel
-        </label>
+          <label className="article-composition-add__optional">
+            <input type="checkbox" checked={isOptional} onChange={(e) => setIsOptional(e.target.checked)} />
+            <span>Optionnel</span>
+          </label>
 
-        <button type="submit" className="btn btn-primary btn-sm" disabled={createMut.isPending || !selectedId}>
-          {createMut.isPending ? 'Ajout…' : '+ Ajouter'}
-        </button>
+          <div className="article-composition-add__submit">
+            <button type="submit" className="btn btn-primary btn-sm" disabled={createMut.isPending || !selectedId}>
+              {createMut.isPending ? 'Ajout…' : '+ Ajouter'}
+            </button>
+          </div>
+        </div>
 
-        {createMut.isError ? <p className="error article-composition-add__error">{(createMut.error as Error).message}</p> : null}
+        {createMut.isError ? (
+          <p className="error article-composition-add__error">{(createMut.error as Error).message}</p>
+        ) : null}
       </form>
     </section>
   )

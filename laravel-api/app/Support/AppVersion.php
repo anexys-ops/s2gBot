@@ -47,7 +47,7 @@ class AppVersion
             }
         }
 
-        return '1.5.3';
+        return '1.5.4';
     }
 
     public static function resolve(): string

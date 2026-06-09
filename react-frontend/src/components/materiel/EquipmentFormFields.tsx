@@ -142,7 +142,7 @@ export default function EquipmentFormFields({
               maxLength={128}
             />
           </label>
-          <label className="catalogue-article-new-form__col-6">
+          <label className="catalogue-article-new-form__col-6 equipment-create-form__location-field">
             Emplacement
             <input
               value={form.location}
@@ -151,7 +151,7 @@ export default function EquipmentFormFields({
               maxLength={255}
             />
           </label>
-          <label className="catalogue-article-new-form__col-3">
+          <label className="catalogue-article-new-form__col-3 equipment-create-form__purchase-date-field">
             Date d&apos;achat
             <input
               type="date"

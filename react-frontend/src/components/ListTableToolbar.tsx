@@ -14,6 +14,7 @@ type Props = {
   onToggleColumn?: (id: string) => void
   extra?: ReactNode
   footer?: ReactNode
+  className?: string
 }
 
 export default function ListTableToolbar({
@@ -28,6 +29,7 @@ export default function ListTableToolbar({
   onToggleColumn,
   extra,
   footer,
+  className = '',
 }: Props) {
   const visibleColumnCount =
     columns && visibleColumns
@@ -35,7 +37,7 @@ export default function ListTableToolbar({
       : null
 
   return (
-    <div className="card list-table-toolbar">
+    <div className={`card list-table-toolbar${className ? ` ${className}` : ''}`}>
       <div className="list-table-toolbar__row">
         <label className="list-table-toolbar__field list-table-toolbar__search">
           <span className="filter-label">Recherche</span>

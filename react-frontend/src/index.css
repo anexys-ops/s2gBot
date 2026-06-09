@@ -6676,10 +6676,24 @@ a.catalogue-tree__link-article:hover {
   font-size: 0.85rem;
 }
 .equipment-create-form__location-field {
-  padding-right: 0.65rem;
+  grid-column: span 5;
 }
 .equipment-create-form__purchase-date-field {
-  padding-left: 0.65rem;
+  grid-column: 8 / span 3;
+}
+.equipment-create-form__location-field,
+.equipment-create-form__purchase-date-field {
+  gap: 0.55rem;
+}
+.equipment-create-form__field-label {
+  display: block;
+  line-height: 1.35;
+}
+@media (max-width: 640px) {
+  .equipment-create-form__location-field,
+  .equipment-create-form__purchase-date-field {
+    grid-column: span 12;
+  }
 }
 .equipment-edit-panel__intro {
   margin: 0 0 1rem;

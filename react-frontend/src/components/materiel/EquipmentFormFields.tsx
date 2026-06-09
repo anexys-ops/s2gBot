@@ -143,7 +143,7 @@ export default function EquipmentFormFields({
             />
           </label>
           <label className="catalogue-article-new-form__col-6 equipment-create-form__location-field">
-            Emplacement
+            <span className="equipment-create-form__field-label">Emplacement</span>
             <input
               value={form.location}
               onChange={(e) => onChange({ ...form, location: e.target.value })}
@@ -152,7 +152,7 @@ export default function EquipmentFormFields({
             />
           </label>
           <label className="catalogue-article-new-form__col-3 equipment-create-form__purchase-date-field">
-            Date d&apos;achat
+            <span className="equipment-create-form__field-label">Date d&apos;achat</span>
             <input
               type="date"
               value={form.purchase_date}

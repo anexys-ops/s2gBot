@@ -136,10 +136,10 @@ export default function CatalogueListePage() {
         </div>
 
         <ListTableToolbar
-          className="catalogue-liste__toolbar"
+          className={`catalogue-liste__toolbar${viewMode === 'table' ? ' catalogue-liste__toolbar--table' : ''}`}
           searchValue={search}
           onSearchChange={setSearch}
-          searchPlaceholder="Code, libellé…"
+          searchPlaceholder="Code, libellé, norme…"
           columns={
             viewMode === 'table'
               ? [
@@ -164,7 +164,7 @@ export default function CatalogueListePage() {
                   value={familleId === '' ? '' : String(familleId)}
                   onChange={(e) => setFamilleId(e.target.value === '' ? '' : Number(e.target.value))}
                 >
-                  <option value="">Toutes</option>
+                  <option value="">Toutes les familles</option>
                   {familleOptions.map((f: RefFamilleArticleRow) => (
                     <option key={f.id} value={f.id}>
                       {f.code} — {f.libelle}
@@ -172,9 +172,12 @@ export default function CatalogueListePage() {
                   ))}
                 </select>
               </label>
-              <label className="catalogue-liste__inactif">
-                <input type="checkbox" checked={withInactif} onChange={(e) => setWithInactif(e.target.checked)} />
-                <span>Inactifs</span>
+              <label className="catalogue-liste__inactif-field">
+                <span className="filter-label">Affichage</span>
+                <span className="catalogue-liste__inactif-control">
+                  <input type="checkbox" checked={withInactif} onChange={(e) => setWithInactif(e.target.checked)} />
+                  <span>Inclure inactifs</span>
+                </span>
               </label>
             </>
           }

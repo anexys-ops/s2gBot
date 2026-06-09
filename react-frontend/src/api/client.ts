@@ -1038,9 +1038,10 @@ export const reportFormDefinitionsApi = {
 }
 
 export const sitesApi = {
-  list: (params?: { search?: string }) => {
+  list: (params?: { search?: string; client_id?: number }) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
+    if (params?.client_id) q.set('client_id', String(params.client_id))
     const s = q.toString()
     return api<Site[]>(`/sites${s ? `?${s}` : ''}`)
   },

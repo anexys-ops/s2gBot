@@ -222,7 +222,7 @@ export default function Sites() {
         visibleColumns={visible}
         onToggleColumn={toggle}
         extra={
-          <label style={{ minWidth: 220, margin: 0 }}>
+          <label>
             <span className="filter-label">Filtrer par client</span>
             <select
               value={clientFilter}

@@ -4113,6 +4113,25 @@ th {
 .list-table-toolbar__extra select {
   width: 100%;
   min-height: 2.35rem;
+  padding: 0.45rem 2rem 0.45rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 6px);
+  background-color: var(--color-surface, #fff);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 1rem;
+  font: inherit;
+  color: inherit;
+  box-sizing: border-box;
+  appearance: none;
+  cursor: pointer;
+}
+.list-table-toolbar__field select:focus,
+.list-table-toolbar__extra select:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 1px;
+  border-color: #93c5fd;
 }
 .list-table-toolbar__search {
   flex: 1 1 260px;
@@ -4162,8 +4181,8 @@ th {
   flex: 0 1 180px;
 }
 .list-table-toolbar__extra {
-  flex: 0 1 220px;
-  min-width: min(100%, 180px);
+  flex: 0 1 240px;
+  min-width: min(100%, 200px);
 }
 .list-table-toolbar__extra label {
   display: flex;

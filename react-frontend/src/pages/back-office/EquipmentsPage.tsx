@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { equipmentsApi, testTypesApi, type EquipmentRow, type TestType } from '../../api/client'
+import { useQuery } from '@tanstack/react-query'
+import { equipmentsApi, type EquipmentRow } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
-import Modal from '../../components/Modal'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import EquipmentCreateModal from '../../components/materiel/EquipmentCreateModal'
 import { MATERIEL_MODULE_TABS } from '../materiel/materielModuleTabs'
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
@@ -26,11 +26,9 @@ export default function EquipmentsPage() {
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const isAdmin = user?.role === 'lab_admin'
-  const queryClient = useQueryClient()
   const [status, setStatus] = useState('')
   const [dueWithin, setDueWithin] = useState<number | ''>('')
   const [createOpen, setCreateOpen] = useState(false)
-  const [form, setForm] = useState({ name: '', code: '', test_type_ids: [] as number[] })
 
   const listParams = useMemo(() => {
     const p: { status?: string; due_within?: number } = {}
@@ -43,26 +41,6 @@ export default function EquipmentsPage() {
     queryKey: ['equipments', listParams],
     queryFn: () => equipmentsApi.list(listParams),
     enabled: isLab,
-  })
-
-  const { data: testTypes = [] } = useQuery({
-    queryKey: ['test-types'],
-    queryFn: () => testTypesApi.list(),
-    enabled: isLab && createOpen,
-  })
-
-  const createMutation = useMutation({
-    mutationFn: () =>
-      equipmentsApi.create({
-        name: form.name.trim(),
-        code: form.code.trim(),
-        test_type_ids: form.test_type_ids,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipments'] })
-      setCreateOpen(false)
-      setForm({ name: '', code: '', test_type_ids: [] })
-    },
   })
 
   if (!isLab) {
@@ -157,69 +135,7 @@ export default function EquipmentsPage() {
         </div>
       )}
 
-      {createOpen && (
-        <Modal title="Nouvel équipement" onClose={() => setCreateOpen(false)}>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (!form.name.trim() || !form.code.trim()) return
-              createMutation.mutate()
-            }}
-            className="stack"
-            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-          >
-            <label>
-              <span className="design-card__muted">Nom</span>
-              <input
-                className="input"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                required
-              />
-            </label>
-            <label>
-              <span className="design-card__muted">Code unique</span>
-              <input
-                className="input"
-                value={form.code}
-                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                required
-              />
-            </label>
-            <fieldset>
-              <legend className="design-card__muted">Types d’essai liés</legend>
-              <div style={{ maxHeight: 180, overflow: 'auto' }}>
-                {testTypes.map((t: TestType) => (
-                  <label key={t.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={form.test_type_ids.includes(t.id)}
-                      onChange={(e) => {
-                        setForm((f) => ({
-                          ...f,
-                          test_type_ids: e.target.checked
-                            ? [...f.test_type_ids, t.id]
-                            : f.test_type_ids.filter((id) => id !== t.id),
-                        }))
-                      }}
-                    />
-                    {t.name}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            {createMutation.isError && <p className="error">{(createMutation.error as Error).message}</p>}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button type="button" className="btn" onClick={() => setCreateOpen(false)}>
-                Annuler
-              </button>
-              <button type="submit" className="btn btn--primary" disabled={createMutation.isPending}>
-                Créer
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
+      {createOpen ? <EquipmentCreateModal onClose={() => setCreateOpen(false)} /> : null}
     </ModuleEntityShell>
   )
 }

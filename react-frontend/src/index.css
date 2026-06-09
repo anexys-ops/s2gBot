@@ -2641,7 +2641,8 @@ th {
   border-radius: 16px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
 }
-.modal-box:has(.catalogue-article-new-form) {
+.modal-box:has(.catalogue-article-new-form),
+.modal-box:has(.equipment-create-form) {
   max-width: min(92vw, 820px);
 }
 .modal-head {
@@ -6557,6 +6558,92 @@ a.catalogue-tree__link-article:hover {
   flex: 0 1 10rem;
   min-width: min(100%, 9rem);
 }
+
+.equipment-create-form__intro {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.equipment-create-form__types-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+.equipment-create-form__types-head .catalogue-article-new-form__section-title {
+  margin: 0;
+}
+.equipment-create-form__types-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.equipment-create-form__search {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0 0 0.65rem;
+  max-width: 22rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+}
+.equipment-create-form__search input {
+  font-weight: 400;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.9rem;
+}
+.equipment-create-form__search input:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 1px;
+  border-color: #93c5fd;
+}
+.equipment-create-form__types-panel {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface-2, #f8fafc);
+  max-height: 220px;
+  overflow: hidden;
+}
+.equipment-create-form__types-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.equipment-create-form__types-list li + li {
+  border-top: 1px solid var(--color-border, #e2e8f0);
+}
+.equipment-create-form__type-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.55rem 0.75rem;
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 400;
+  color: #334155;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.equipment-create-form__type-option:hover {
+  background: #fff;
+}
+.equipment-create-form__type-option input {
+  margin: 0.15rem 0 0;
+  flex-shrink: 0;
+}
+.equipment-create-form__types-empty {
+  margin: 0;
+  padding: 0.85rem 0.75rem;
+  font-size: 0.85rem;
+}
+
 @media (max-width: 960px) {
   .materiel-hub-choices {
     grid-template-columns: 1fr;

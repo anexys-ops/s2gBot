@@ -5,11 +5,21 @@ import { catalogueApi, type RefFamilleArticleRow } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import ArbreCatalogue from '../../components/Catalogue/ArbreCatalogue'
 import CatalogueProlabListe from '../../components/Catalogue/CatalogueProlabListe'
+import CatalogueProlabTable from '../../components/Catalogue/CatalogueProlabTable'
 import ListTableToolbar from '../../components/ListTableToolbar'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
+
+type CatalogueViewMode = 'table' | 'list' | 'tree'
+
+function parseViewMode(vue: string | null): CatalogueViewMode {
+  if (vue === 'familles') return 'tree'
+  if (vue === 'replis') return 'list'
+  return 'table'
+}
 
 /**
- * BDC-111 — Liste catalogue PROLAB (arbre + filtres).
+ * BDC-111 — Liste catalogue PROLAB (tableau, replis, arbre + filtres).
  */
 export default function CatalogueListePage() {
   const { user } = useAuth()
@@ -18,10 +28,21 @@ export default function CatalogueListePage() {
   const [familleId, setFamilleId] = useState<number | ''>('')
   const [search, setSearch] = useState('')
   const [withInactif, setWithInactif] = useState(false)
-  const [viewMode, setViewMode] = useState<'list' | 'tree'>(searchParams.get('vue') === 'familles' ? 'tree' : 'list')
+  const [viewMode, setViewMode] = useState<CatalogueViewMode>(() => parseViewMode(searchParams.get('vue')))
+
+  const { visible, toggle } = usePersistedColumnVisibility('catalogue-articles', {
+    code: true,
+    libelle: true,
+    famille: true,
+    unite: true,
+    prix: true,
+    tva: true,
+    statut: true,
+    actions: true,
+  })
 
   useEffect(() => {
-    setViewMode(searchParams.get('vue') === 'familles' ? 'tree' : 'list')
+    setViewMode(parseViewMode(searchParams.get('vue')))
   }, [searchParams])
 
   const { data: familles } = useQuery({
@@ -32,6 +53,8 @@ export default function CatalogueListePage() {
   const familleOptions = useMemo(() => familles ?? [], [familles])
   const selectedFamille = familleOptions.find((f) => f.id === familleId)
 
+  const needsFlatArticles = viewMode === 'table' || viewMode === 'list'
+
   const { data: articlesFlat = [], isLoading: loadingFlat } = useQuery({
     queryKey: ['catalogue-articles-flat', familleId, withInactif, search],
     queryFn: () =>
@@ -40,7 +63,7 @@ export default function CatalogueListePage() {
         with_inactif: withInactif,
         q: search.trim() || undefined,
       }),
-    enabled: viewMode === 'list',
+    enabled: needsFlatArticles,
   })
 
   const hasActiveFilters = search.trim() !== '' || familleId !== '' || withInactif
@@ -51,6 +74,18 @@ export default function CatalogueListePage() {
     setWithInactif(false)
   }
 
+  const viewSubtitle = (() => {
+    if (viewMode === 'tree') {
+      return 'Vue arbre classique par familles.'
+    }
+    if (!loadingFlat) {
+      const label =
+        viewMode === 'table' ? 'vue tableau' : 'vue liste & replis'
+      return `${articlesFlat.length} article(s) — ${label}`
+    }
+    return 'Tableau, liste repliable ou vue arbre — tarifs, tags, unités HFSQL.'
+  })()
+
   return (
     <ModuleEntityShell
       shellClassName="module-shell--crm"
@@ -60,11 +95,7 @@ export default function CatalogueListePage() {
       ]}
       moduleBarLabel="Catalogue — PROLAB"
       title="Catalogue produits & essais"
-      subtitle={
-        viewMode === 'list' && !loadingFlat
-          ? `${articlesFlat.length} article(s) — vue liste`
-          : 'Vue liste (tarifs, tags, textes, unités HFSQL) ou vue arbre classique.'
-      }
+      subtitle={viewSubtitle}
       actions={
         isAdmin ? (
           <span className="text-muted" style={{ fontSize: '0.85rem' }}>
@@ -75,6 +106,15 @@ export default function CatalogueListePage() {
     >
       <div className="catalogue-liste">
         <div className="catalogue-liste__view-toggle" role="tablist" aria-label="Mode d’affichage catalogue">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'table'}
+            className={`catalogue-liste__view-btn ${viewMode === 'table' ? 'catalogue-liste__view-btn--active' : ''}`}
+            onClick={() => setViewMode('table')}
+          >
+            Tableau
+          </button>
           <button
             type="button"
             role="tab"
@@ -99,6 +139,22 @@ export default function CatalogueListePage() {
           searchValue={search}
           onSearchChange={setSearch}
           searchPlaceholder="Code, libellé, norme…"
+          columns={
+            viewMode === 'table'
+              ? [
+                  { id: 'code', label: 'Code' },
+                  { id: 'libelle', label: 'Libellé' },
+                  { id: 'famille', label: 'Famille' },
+                  { id: 'unite', label: 'Unité' },
+                  { id: 'prix', label: 'PU HT' },
+                  { id: 'tva', label: 'TVA' },
+                  { id: 'statut', label: 'Statut' },
+                  { id: 'actions', label: 'Actions' },
+                ]
+              : undefined
+          }
+          visibleColumns={viewMode === 'table' ? visible : undefined}
+          onToggleColumn={viewMode === 'table' ? toggle : undefined}
           extra={
             <div className="catalogue-liste__extra-filters">
               <label>
@@ -212,6 +268,10 @@ export default function CatalogueListePage() {
             </>
           }
         />
+
+        {viewMode === 'table' && (
+          <CatalogueProlabTable articles={articlesFlat} isLoading={loadingFlat} visibleColumns={visible} />
+        )}
 
         {viewMode === 'list' && (
           <CatalogueProlabListe articles={articlesFlat} isLoading={loadingFlat} />

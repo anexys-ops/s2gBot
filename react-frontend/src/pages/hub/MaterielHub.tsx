@@ -1,63 +1,91 @@
 import { Link } from 'react-router-dom'
-import { OutlineIcon } from '../../components/OutlineIcons'
+import { OutlineIcon, type HubIconId } from '../../components/OutlineIcons'
+import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
+import { MATERIEL_MODULE_TABS } from '../materiel/materielModuleTabs'
 
-const cards = [
+type Choice = {
+  to: string
+  title: string
+  desc: string
+  icon: HubIconId
+  tone: 'equipements' | 'planning' | 'stocks'
+}
+
+const choices: Choice[] = [
   {
     to: '/materiel/equipements',
     title: 'Parc équipements',
-    desc: 'Liste du matériel, étalonnages, fiches détaillées et alertes de calibration.',
-    icon: 'calculator' as const,
+    desc: 'Inventaire du matériel, fiches détaillées, étalonnages et alertes de calibration.',
+    icon: 'calculator',
+    tone: 'equipements',
   },
   {
     to: '/materiel/planning',
     title: 'Planning matériel',
     desc: 'Calendrier des échéances de maintenance, étalonnages et dates de chantiers prévues.',
-    icon: 'trend' as const,
+    icon: 'trend',
+    tone: 'planning',
   },
   {
     to: '/materiel/stocks',
     title: 'Stocks',
-    desc: 'Tableau des produits, consommables et quantités suivies en stock.',
-    icon: 'catalog' as const,
+    desc: 'Produits, consommables et quantités suivies en stock pour le laboratoire.',
+    icon: 'catalog',
+    tone: 'stocks',
   },
-] as const
+]
 
 export default function MaterielHub() {
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
 
   return (
-    <div className="hub-page hub-page--terrain hub-page--v2">
-      <header className="hub-header hub-header--v2">
-        <p className="hub-kicker">Matériel</p>
-        <h1>Matériel et parc</h1>
-        <p className="hub-lead">
-          Inventaire, suivi d’affectation et fiches (garantie, prix, certification) — point d’entrée unique pour
-          l’équipement, distinct du volet essais du laboratoire.
-        </p>
-      </header>
-      <div className="hub-grid hub-grid--v2">
-        {cards.map((c) => (
-          <Link key={c.to} to={c.to} className="hub-card hub-card--v2">
-            <span className="hub-card-v2__icon" aria-hidden>
+    <ModuleEntityShell
+      shellClassName="module-shell--materiel-hub"
+      breadcrumbs={[
+        { label: 'Accueil', to: '/' },
+        { label: 'Matériel' },
+      ]}
+      moduleBarLabel="Matériel"
+      title="Matériel et parc"
+      subtitle="Inventaire, suivi d’affectation et fiches (garantie, prix, certification) — distinct du volet essais du laboratoire."
+      tabs={MATERIEL_MODULE_TABS}
+    >
+      <div className="materiel-hub-choices" role="list">
+        {choices.map((c) => (
+          <Link
+            key={c.to}
+            to={c.to}
+            className={`materiel-hub-choice materiel-hub-choice--${c.tone}`}
+            role="listitem"
+          >
+            <span className="materiel-hub-choice__icon" aria-hidden>
               <OutlineIcon id={c.icon} />
             </span>
-            <span className="hub-card-title">{c.title}</span>
-            <span className="hub-card-desc">{c.desc}</span>
+            <span className="materiel-hub-choice__body">
+              <span className="materiel-hub-choice__title">{c.title}</span>
+              <span className="materiel-hub-choice__desc">{c.desc}</span>
+            </span>
+            <span className="materiel-hub-choice__cta">Ouvrir →</span>
           </Link>
         ))}
       </div>
-      {isLab && (
-        <p className="hub-footnote text-muted" style={{ marginTop: '1.25rem' }}>
-          Réserves / prêts de matériel pourront compléter cette entrée.
+
+      {isLab ? (
+        <p className="materiel-hub-footnote text-muted">
+          Les réserves et prêts de matériel pourront compléter ce module ultérieurement.
         </p>
-      )}
-      <p className="hub-footnote hub-footnote--switch">
-        <Link to="/labo" className="hub-footnote__link">
+      ) : null}
+
+      <div className="materiel-hub-links">
+        <Link to="/labo" className="link-inline">
           Espace laboratoire (essais) →
         </Link>
-      </p>
-    </div>
+        <Link to="/catalogue" className="link-inline">
+          Catalogue articles →
+        </Link>
+      </div>
+    </ModuleEntityShell>
   )
 }

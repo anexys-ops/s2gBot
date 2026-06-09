@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { bonsCommandeApi, equipmentsApi, type EquipmentRow } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import { MATERIEL_MODULE_TABS } from './materielModuleTabs'
 
 type PlanningEvent = {
   id: string
@@ -130,6 +131,7 @@ export default function MaterielPlanningPage() {
       moduleBarLabel="Matériel"
       title="Planning matériel"
       subtitle="Calendrier croisant les échéances de maintenance/étalonnage et les dates prévues des chantiers."
+      tabs={MATERIEL_MODULE_TABS}
     >
       <div className="card materiel-planning-toolbar">
         <label>

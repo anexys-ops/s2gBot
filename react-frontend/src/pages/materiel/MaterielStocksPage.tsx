@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { commercialOfferingsApi } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import { MATERIEL_MODULE_TABS } from './materielModuleTabs'
 import { formatMoney } from '../../lib/appLocale'
 
 export default function MaterielStocksPage() {
@@ -35,6 +36,7 @@ export default function MaterielStocksPage() {
       moduleBarLabel="Matériel"
       title="Stocks"
       subtitle="Tableau des produits et consommables suivis en stock."
+      tabs={MATERIEL_MODULE_TABS}
     >
       <div className="card" style={{ marginBottom: '1rem' }}>
         <label style={{ display: 'block', maxWidth: 420 }}>

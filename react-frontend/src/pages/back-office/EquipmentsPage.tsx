@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { equipmentsApi, testTypesApi, type EquipmentRow, type TestType } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import Modal from '../../components/Modal'
+import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import { MATERIEL_MODULE_TABS } from '../materiel/materielModuleTabs'
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '', label: 'Tous statuts' },
@@ -68,73 +70,90 @@ export default function EquipmentsPage() {
   }
 
   return (
-    <div className="design-card">
-      <p style={{ marginBottom: 8 }}>
-        <Link to="/materiel">← Matériel (vue d’ensemble)</Link>
-      </p>
-      <div className="design-card__toolbar" style={{ marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-        <label className="design-card__muted" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          Statut
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="input">
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.value || 'all'} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="design-card__muted" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          Échéance dans (j.)
-          <input
-            type="number"
-            min={1}
-            max={365}
-            className="input"
-            style={{ width: 90 }}
-            value={dueWithin}
-            onChange={(e) => {
-              const v = e.target.value
-              setDueWithin(v === '' ? '' : Math.min(365, Math.max(1, Number(v))))
-            }}
-            placeholder="ex. 30"
-          />
-        </label>
-        {isAdmin && (
-          <button type="button" className="btn btn--primary" onClick={() => setCreateOpen(true)}>
+    <ModuleEntityShell
+      breadcrumbs={[
+        { label: 'Accueil', to: '/' },
+        { label: 'Matériel', to: '/materiel' },
+        { label: 'Parc équipements' },
+      ]}
+      moduleBarLabel="Matériel"
+      title="Parc équipements"
+      subtitle="Liste du matériel, étalonnages et fiches détaillées."
+      tabs={MATERIEL_MODULE_TABS}
+      actions={
+        isAdmin ? (
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setCreateOpen(true)}>
             Nouvel équipement
           </button>
-        )}
+        ) : undefined
+      }
+    >
+      <div className="card list-table-toolbar materiel-equipments-toolbar">
+        <div className="list-table-toolbar__row">
+          <label className="list-table-toolbar__field list-table-toolbar__status">
+            <span className="filter-label">Statut</span>
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o.value || 'all'} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="list-table-toolbar__field materiel-equipments-toolbar__due">
+            <span className="filter-label">Échéance dans (j.)</span>
+            <input
+              type="number"
+              className="article-actions-form__input article-actions-form__input--number"
+              min={1}
+              max={365}
+              value={dueWithin}
+              onChange={(e) => {
+                const v = e.target.value
+                setDueWithin(v === '' ? '' : Math.min(365, Math.max(1, Number(v))))
+              }}
+              placeholder="ex. 30"
+            />
+          </label>
+        </div>
       </div>
 
-      {isLoading && <p className="design-card__muted">Chargement…</p>}
+      {isLoading && <p className="text-muted">Chargement…</p>}
       {error && <p className="error">{(error as Error).message}</p>}
       {!isLoading && !error && (
-        <div className="activity-table-wrap">
-          <table className="activity-table">
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Nom</th>
-                <th>Statut</th>
-                <th>Agence</th>
-                <th>Prochain étalonnage</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((eq) => (
-                <tr key={eq.id}>
-                  <td>
-                    <Link to={`/materiel/equipements/${eq.id}`}>{eq.code}</Link>
-                  </td>
-                  <td>{eq.name}</td>
-                  <td>{eq.status}</td>
-                  <td>{eq.agency?.name ?? '—'}</td>
-                  <td>{nextDueLabel(eq)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {rows.length === 0 && <p className="design-card__muted">Aucun équipement pour ces filtres.</p>}
+        <div className="card dossier-tab-panel dossier-tab-panel--table">
+          {rows.length > 0 ? (
+            <div className="table-wrap">
+              <table className="data-table data-table--compact">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Nom</th>
+                    <th>Statut</th>
+                    <th>Agence</th>
+                    <th>Prochain étalonnage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((eq) => (
+                    <tr key={eq.id}>
+                      <td>
+                        <Link to={`/materiel/equipements/${eq.id}`} className="link-inline">
+                          <code className="code-badge">{eq.code}</code>
+                        </Link>
+                      </td>
+                      <td>{eq.name}</td>
+                      <td>{eq.status}</td>
+                      <td>{eq.agency?.name ?? '—'}</td>
+                      <td>{nextDueLabel(eq)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="dossier-tab-empty">Aucun équipement pour ces filtres.</p>
+          )}
         </div>
       )}
 
@@ -201,6 +220,6 @@ export default function EquipmentsPage() {
           </form>
         </Modal>
       )}
-    </div>
+    </ModuleEntityShell>
   )
 }

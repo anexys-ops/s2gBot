@@ -8,6 +8,7 @@ import StatusBadge, { equipementStatutBadgeProps } from '../../components/ds/Sta
 import ListTableToolbar from '../../components/ListTableToolbar'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import EquipmentCreateModal from '../../components/materiel/EquipmentCreateModal'
+import EquipmentEditModal from '../../components/materiel/EquipmentEditModal'
 import { MATERIEL_MODULE_TABS } from '../materiel/materielModuleTabs'
 
 const STATUS_OPTIONS = [
@@ -55,6 +56,7 @@ export default function EquipmentsPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<EquipmentRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<EquipmentRow | null>(null)
 
   const { data: rows = [], isLoading, error } = useQuery({
@@ -194,14 +196,23 @@ export default function EquipmentsPage() {
                             Fiche
                           </Link>
                           {isAdmin ? (
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm btn-danger-outline"
-                              title="Supprimer"
-                              onClick={() => setDeleteTarget(eq)}
-                            >
-                              Supprimer
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => setEditTarget(eq)}
+                              >
+                                Modifier
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm btn-danger-outline"
+                                title="Supprimer"
+                                onClick={() => setDeleteTarget(eq)}
+                              >
+                                Supprimer
+                              </button>
+                            </>
                           ) : null}
                         </td>
                       </tr>
@@ -221,6 +232,10 @@ export default function EquipmentsPage() {
       )}
 
       {createOpen ? <EquipmentCreateModal onClose={() => setCreateOpen(false)} /> : null}
+
+      {editTarget ? (
+        <EquipmentEditModal equipment={editTarget} onClose={() => setEditTarget(null)} />
+      ) : null}
 
       {deleteTarget ? (
         <ConfirmDialog

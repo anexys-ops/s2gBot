@@ -4,12 +4,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { equipmentsApi, type CalibrationRow, type EquipmentRow } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import StatusBadge, { equipementStatutBadgeProps } from '../../components/ds/StatusBadge'
+import EquipmentEditorPanel from '../../components/materiel/EquipmentEditorPanel'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { MATERIEL_MODULE_TABS } from '../materiel/materielModuleTabs'
 import { formatAppDate } from '../../lib/appLocale'
 
-type TabId = 'overview' | 'calibrations' | 'extrafields'
+type TabId = 'overview' | 'edit' | 'calibrations' | 'extrafields'
 
 const STATUS_LABELS: Record<string, string> = {
   active: 'Actif',
@@ -337,11 +338,17 @@ export default function EquipmentDetailPage() {
   const isAdmin = user?.role === 'lab_admin'
   const [tab, setTab] = useState<TabId>('overview')
 
+  const queryClient = useQueryClient()
+
   const { data: eq, isLoading, error } = useQuery({
     queryKey: ['equipment', equipmentId],
     queryFn: () => equipmentsApi.get(equipmentId),
     enabled: isLab && Number.isFinite(equipmentId) && equipmentId > 0,
   })
+
+  function refreshEquipment() {
+    void queryClient.invalidateQueries({ queryKey: ['equipment', equipmentId] })
+  }
 
   if (!isLab) {
     return <Navigate to="/" replace />
@@ -422,6 +429,7 @@ export default function EquipmentDetailPage() {
       <div className="article-fiche-tabs equipment-fiche-tabs" role="tablist" aria-label="Sections fiche équipement">
         {[
           { id: 'overview' as const, label: 'Fiche' },
+          ...(isAdmin ? [{ id: 'edit' as const, label: 'Modifier' }] : []),
           { id: 'calibrations' as const, label: `Étalonnages (${calCount})` },
           ...(isAdmin ? [{ id: 'extrafields' as const, label: 'Champs personnalisés' }] : []),
         ].map((t) => (
@@ -438,6 +446,9 @@ export default function EquipmentDetailPage() {
       </div>
 
       {tab === 'overview' && <EquipmentOverview eq={eq} />}
+      {tab === 'edit' && isAdmin && (
+        <EquipmentEditorPanel equipment={eq} onUpdated={refreshEquipment} />
+      )}
       {tab === 'calibrations' && (
         <EquipmentCalibrationsTab eq={eq} equipmentId={equipmentId} isAdmin={isAdmin} />
       )}

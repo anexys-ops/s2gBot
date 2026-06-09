@@ -6675,6 +6675,14 @@ a.catalogue-tree__link-article:hover {
   padding: 0.85rem 0.75rem;
   font-size: 0.85rem;
 }
+.equipment-edit-panel__intro {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+.equipment-edit-form__saved {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+}
 
 @media (max-width: 960px) {
   .materiel-hub-choices {

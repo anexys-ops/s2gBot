@@ -5761,6 +5761,46 @@ a.catalogue-tree__link-article:hover {
   background: #fff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
+.catalogue-article-new-form__grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+}
+.catalogue-article-new-form__grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+}
+.catalogue-article-new-form__grid input,
+.catalogue-article-new-form__grid select {
+  font-weight: 400;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-surface, #fff);
+  font: inherit;
+  box-sizing: border-box;
+}
+.catalogue-article-new-form__col-4 {
+  grid-column: span 4;
+}
+.catalogue-article-new-form__col-8 {
+  grid-column: span 8;
+}
+.catalogue-article-new-form__col-12 {
+  grid-column: span 12;
+}
+@media (max-width: 640px) {
+  .catalogue-article-new-form__col-4,
+  .catalogue-article-new-form__col-8 {
+    grid-column: span 12;
+  }
+}
 /* Liste PROLAB — replis */
 .catalogue-prolab-liste__hint {
   font-size: 0.86rem;

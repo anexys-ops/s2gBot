@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { catalogueApi, type RefFamilleArticleRow } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import ArbreCatalogue from '../../components/Catalogue/ArbreCatalogue'
 import CatalogueProlabListe from '../../components/Catalogue/CatalogueProlabListe'
 import CatalogueProlabTable from '../../components/Catalogue/CatalogueProlabTable'
+import CatalogueArticleCreateModal from '../../components/Catalogue/CatalogueArticleCreateModal'
 import ListTableToolbar from '../../components/ListTableToolbar'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
@@ -24,7 +25,10 @@ function parseViewMode(vue: string | null): CatalogueViewMode {
 export default function CatalogueListePage() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'lab_admin'
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [familleId, setFamilleId] = useState<number | ''>('')
   const [search, setSearch] = useState('')
   const [withInactif, setWithInactif] = useState(false)
@@ -98,9 +102,9 @@ export default function CatalogueListePage() {
       subtitle={viewSubtitle}
       actions={
         isAdmin ? (
-          <span className="text-muted" style={{ fontSize: '0.85rem' }}>
-            Création / archivage d’articles : fiche article ou API.
-          </span>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>
+            Nouvel article
+          </button>
         ) : null
       }
     >
@@ -303,6 +307,21 @@ export default function CatalogueListePage() {
           </>
         )}
       </div>
+
+      {showCreateModal && isAdmin && (
+        <CatalogueArticleCreateModal
+          familleOptions={familleOptions}
+          defaultFamilleId={familleId}
+          onClose={() => setShowCreateModal(false)}
+          onCreated={(article) => {
+            setShowCreateModal(false)
+            void queryClient.invalidateQueries({ queryKey: ['catalogue-articles-flat'] })
+            void queryClient.invalidateQueries({ queryKey: ['catalogue-familles'] })
+            void queryClient.invalidateQueries({ queryKey: ['catalogue-arbre'] })
+            navigate(`/catalogue/articles/${article.id}`)
+          }}
+        />
+      )}
     </ModuleEntityShell>
   )
 }

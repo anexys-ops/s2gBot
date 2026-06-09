@@ -5041,6 +5041,37 @@ a.catalogue-tree__link-article:hover {
   color: #475569;
 }
 
+.list-table-toolbar__date-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  align-items: flex-end;
+  width: 100%;
+  margin-bottom: 0.15rem;
+}
+.list-table-toolbar__date-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  min-width: min(100%, 10.5rem);
+}
+.list-table-toolbar__date-row input[type='date'] {
+  width: 100%;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-surface, #fff);
+  font: inherit;
+  box-sizing: border-box;
+}
+.list-table-toolbar__date-row input[type='date']:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 1px;
+  border-color: #93c5fd;
+}
+
 .dossiers-grid--cards {
   display: none;
 }

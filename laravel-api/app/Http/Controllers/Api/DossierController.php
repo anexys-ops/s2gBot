@@ -34,7 +34,27 @@ class DossierController extends Controller
             $q->whereDate('date_debut', '<=', (string) $request->query('date_debut_to'));
         }
 
-        return response()->json($q->ordonne()->get());
+        if ($search = trim((string) $request->query('search', ''))) {
+            $q->where(function ($query) use ($search) {
+                $query->where('reference', 'like', '%'.$search.'%')
+                    ->orWhere('titre', 'like', '%'.$search.'%')
+                    ->orWhere('maitre_ouvrage', 'like', '%'.$search.'%')
+                    ->orWhere('entreprise_chantier', 'like', '%'.$search.'%')
+                    ->orWhereHas('client', fn ($c) => $c->where('name', 'like', '%'.$search.'%'))
+                    ->orWhereHas('site', fn ($s) => $s->where('name', 'like', '%'.$search.'%'));
+            });
+        }
+
+        $q->ordonne();
+
+        if ($request->has('page') || $request->has('per_page')) {
+            $perPage = (int) $request->query('per_page', 20);
+            $perPage = min(100, max(1, $perPage));
+
+            return response()->json($q->paginate($perPage));
+        }
+
+        return response()->json($q->get());
     }
 
     public function show(Request $request, Dossier $dossier): JsonResponse

@@ -720,6 +720,7 @@ export const dossiersApi = {
     site_id?: number
     date_debut_from?: string
     date_debut_to?: string
+    search?: string
   }) => {
     const q = new URLSearchParams()
     if (params?.client_id) q.set('client_id', String(params.client_id))
@@ -727,8 +728,30 @@ export const dossiersApi = {
     if (params?.site_id) q.set('site_id', String(params.site_id))
     if (params?.date_debut_from) q.set('date_debut_from', params.date_debut_from)
     if (params?.date_debut_to) q.set('date_debut_to', params.date_debut_to)
+    if (params?.search) q.set('search', params.search)
     const s = q.toString()
     return api<DossierRow[]>(`/v1/dossiers${s ? `?${s}` : ''}`)
+  },
+  listPaginated: (params?: {
+    client_id?: number
+    statut?: DossierStatut
+    site_id?: number
+    date_debut_from?: string
+    date_debut_to?: string
+    search?: string
+    page?: number
+    per_page?: number
+  }) => {
+    const q = new URLSearchParams()
+    if (params?.client_id) q.set('client_id', String(params.client_id))
+    if (params?.statut) q.set('statut', params.statut)
+    if (params?.site_id) q.set('site_id', String(params.site_id))
+    if (params?.date_debut_from) q.set('date_debut_from', params.date_debut_from)
+    if (params?.date_debut_to) q.set('date_debut_to', params.date_debut_to)
+    if (params?.search) q.set('search', params.search)
+    q.set('page', String(params?.page ?? 1))
+    q.set('per_page', String(params?.per_page ?? 20))
+    return api<LaravelPaginator<DossierRow>>(`/v1/dossiers?${q.toString()}`)
   },
   get: (id: number) => api<DossierRow>(`/v1/dossiers/${id}`),
   create: (body: DossierCreateInput) => api<DossierRow>('/v1/dossiers', { method: 'POST', body: JSON.stringify(body) }),

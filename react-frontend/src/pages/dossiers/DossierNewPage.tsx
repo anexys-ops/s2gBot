@@ -114,7 +114,7 @@ export default function DossierNewPage() {
         </Link>
       }
     >
-      <div className="card dossier-new-form" style={{ padding: '1.25rem 1.35rem' }}>
+      <div className="card dossier-new-form">
         <p className="dossier-new-form__intro">
           Rattachez le dossier à un <strong>client</strong> et un <strong>chantier</strong>, puis renseignez les informations
           du dossier technique.
@@ -141,89 +141,91 @@ export default function DossierNewPage() {
         >
           <section className="ds-form-section">
             <h2 className="ds-form-section__title">Contexte client & chantier</h2>
-            <ClientSelectField
-              label="Client"
-              clients={clients}
-              value={clientId === '' ? 0 : clientId}
-              onChange={(id) => {
-                setClientId(id)
-                setSiteId('')
-                setMissionId('')
-              }}
-              required
-            />
-            <SiteSelectField
-              label="Chantier"
-              sites={sites}
-              value={siteId === '' ? 0 : siteId}
-              onChange={(id) => {
-                setSiteId(id)
-                setMissionId('')
-              }}
-              required
-              disabled={clientId === ''}
-              loading={clientId !== '' && sitesLoading}
-            />
-            {clientId !== '' && !sitesLoading && sites.length === 0 ? (
-              <p className="site-select-field__empty" style={{ marginTop: '-0.35rem' }}>
-                Ce client n&apos;a pas encore de chantier.{' '}
-                <Link to="/sites" state={{ openCreate: true }}>
-                  Créer un chantier
-                </Link>
-              </p>
-            ) : null}
-            <div className="form-group">
-              <label htmlFor="dossier-mission">Mission existante (optionnel)</label>
-              <select
-                id="dossier-mission"
-                value={missionId === '' ? '' : String(missionId)}
-                onChange={(e) => setMissionId(e.target.value === '' ? '' : Number(e.target.value))}
-                disabled={siteId === '' || missionsLoading}
-              >
-                <option value="">— Aucune —</option>
-                {missions.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.reference}
-                    {m.title ? ` — ${m.title}` : ''}
-                  </option>
-                ))}
-              </select>
-              {siteId !== '' && missionsLoading ? (
-                <p className="text-muted" style={{ fontSize: '0.82rem', marginTop: '0.35rem' }}>
-                  Chargement des missions…
+            <div className="dossier-new-form__grid">
+              <div className="dossier-new-form__col-6">
+                <ClientSelectField
+                  label="Client"
+                  clients={clients}
+                  value={clientId === '' ? 0 : clientId}
+                  onChange={(id) => {
+                    setClientId(id)
+                    setSiteId('')
+                    setMissionId('')
+                  }}
+                  required
+                />
+              </div>
+              <div className="dossier-new-form__col-6">
+                <SiteSelectField
+                  label="Chantier"
+                  sites={sites}
+                  value={siteId === '' ? 0 : siteId}
+                  onChange={(id) => {
+                    setSiteId(id)
+                    setMissionId('')
+                  }}
+                  required
+                  disabled={clientId === ''}
+                  loading={clientId !== '' && sitesLoading}
+                />
+              </div>
+              {clientId !== '' && !sitesLoading && sites.length === 0 ? (
+                <p className="dossier-new-form__col-12 site-select-field__empty">
+                  Ce client n&apos;a pas encore de chantier.{' '}
+                  <Link to="/sites" state={{ openCreate: true }}>
+                    Créer un chantier
+                  </Link>
                 </p>
               ) : null}
+              <div className="dossier-new-form__col-6 form-group">
+                <label htmlFor="dossier-mission">Mission existante (optionnel)</label>
+                <select
+                  id="dossier-mission"
+                  value={missionId === '' ? '' : String(missionId)}
+                  onChange={(e) => setMissionId(e.target.value === '' ? '' : Number(e.target.value))}
+                  disabled={siteId === '' || missionsLoading}
+                >
+                  <option value="">— Aucune —</option>
+                  {missions.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.reference}
+                      {m.title ? ` — ${m.title}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {siteId !== '' && missionsLoading ? (
+                  <p className="text-muted" style={{ fontSize: '0.82rem', marginTop: '0.35rem' }}>
+                    Chargement des missions…
+                  </p>
+                ) : null}
+              </div>
             </div>
           </section>
 
           <section className="ds-form-section">
-            <h2 className="ds-form-section__title">Identité du dossier</h2>
-            <div className="form-group">
-              <label htmlFor="dossier-titre">Titre *</label>
-              <input
-                id="dossier-titre"
-                value={titre}
-                onChange={(e) => setTitre(e.target.value)}
-                placeholder="ex. Étude géotechnique fondations"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="dossier-statut">Statut</label>
-              <select id="dossier-statut" value={statut} onChange={(e) => setStatut(e.target.value as DossierStatut)}>
-                {STATUTS.map((s) => (
-                  <option key={s.v} value={s.v}>
-                    {s.l}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </section>
-
-          <section className="ds-form-section">
-            <h2 className="ds-form-section__title">Calendrier</h2>
-            <div className="dossier-new-form__grid-2">
-              <div className="form-group">
+            <h2 className="ds-form-section__title">Informations du dossier</h2>
+            <div className="dossier-new-form__grid">
+              <div className="dossier-new-form__col-8 form-group">
+                <label htmlFor="dossier-titre">Titre *</label>
+                <input
+                  id="dossier-titre"
+                  value={titre}
+                  onChange={(e) => setTitre(e.target.value)}
+                  placeholder="ex. Étude géotechnique fondations"
+                  required
+                />
+              </div>
+              <div className="dossier-new-form__col-4 form-group">
+                <label htmlFor="dossier-statut">Statut</label>
+                <select id="dossier-statut" value={statut} onChange={(e) => setStatut(e.target.value as DossierStatut)}>
+                  {STATUTS.map((s) => (
+                    <option key={s.v} value={s.v}>
+                      {s.l}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="dossier-new-form__col-4 form-group">
                 <label htmlFor="dossier-date-debut">Date de début *</label>
                 <input
                   id="dossier-date-debut"
@@ -233,26 +235,22 @@ export default function DossierNewPage() {
                   required
                 />
               </div>
-              <div className="form-group">
+              <div className="dossier-new-form__col-4 form-group">
                 <label htmlFor="dossier-date-fin">Fin prévue</label>
                 <input id="dossier-date-fin" type="date" value={dateFin} onChange={(e) => setDateFin(e.target.value)} />
               </div>
-            </div>
-          </section>
-
-          <section className="ds-form-section">
-            <h2 className="ds-form-section__title">Intervenants & notes</h2>
-            <div className="form-group">
-              <label htmlFor="dossier-maitre">Maître d&apos;ouvrage</label>
-              <input id="dossier-maitre" value={maitre} onChange={(e) => setMaitre(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label htmlFor="dossier-entreprise">Entreprise chantier</label>
-              <input id="dossier-entreprise" value={entreprise} onChange={(e) => setEntreprise(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label htmlFor="dossier-notes">Notes</label>
-              <textarea id="dossier-notes" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <div className="dossier-new-form__col-4 form-group">
+                <label htmlFor="dossier-maitre">Maître d&apos;ouvrage</label>
+                <input id="dossier-maitre" value={maitre} onChange={(e) => setMaitre(e.target.value)} />
+              </div>
+              <div className="dossier-new-form__col-6 form-group">
+                <label htmlFor="dossier-entreprise">Entreprise chantier</label>
+                <input id="dossier-entreprise" value={entreprise} onChange={(e) => setEntreprise(e.target.value)} />
+              </div>
+              <div className="dossier-new-form__col-12 form-group">
+                <label htmlFor="dossier-notes">Notes</label>
+                <textarea id="dossier-notes" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+              </div>
             </div>
           </section>
 

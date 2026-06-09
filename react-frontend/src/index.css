@@ -1059,13 +1059,42 @@ th {
 }
 
 .dossier-new-form {
-  max-width: 42rem;
+  width: 100%;
+  max-width: none;
+  padding: 1.25rem 1.5rem;
 }
 .dossier-new-form__intro {
   margin: 0 0 1.25rem;
   font-size: 0.9rem;
   color: var(--color-text-muted, #64748b);
   line-height: 1.45;
+}
+.dossier-new-form__grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+  align-items: start;
+}
+.dossier-new-form__col-4 {
+  grid-column: span 4;
+}
+.dossier-new-form__col-6 {
+  grid-column: span 6;
+}
+.dossier-new-form__col-8 {
+  grid-column: span 8;
+}
+.dossier-new-form__col-12 {
+  grid-column: span 12;
+}
+.dossier-new-form__grid .form-group,
+.dossier-new-form__grid .client-select-field,
+.dossier-new-form__grid .site-select-field {
+  margin-bottom: 0;
+}
+.dossier-new-form .client-select-field__list,
+.dossier-new-form .site-select-field__list {
+  max-height: 180px;
 }
 .dossier-new-form__actions {
   display: flex;
@@ -1075,14 +1104,11 @@ th {
   padding-top: 1rem;
   border-top: 1px solid var(--color-border);
 }
-.dossier-new-form__grid-2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.85rem 1rem;
-}
-@media (max-width: 560px) {
-  .dossier-new-form__grid-2 {
-    grid-template-columns: 1fr;
+@media (max-width: 960px) {
+  .dossier-new-form__col-4,
+  .dossier-new-form__col-6,
+  .dossier-new-form__col-8 {
+    grid-column: span 12;
   }
 }
 

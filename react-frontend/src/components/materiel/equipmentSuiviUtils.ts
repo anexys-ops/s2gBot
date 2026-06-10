@@ -29,11 +29,33 @@ export function affectationEndDate(row: {
   return row.date_retour_effective ?? row.date_retour_prevue ?? row.date_debut
 }
 
+/** Today as YYYY-MM-DD in local timezone (safe for date inputs). */
+export function todayDateInput(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Normalize API / form dates to YYYY-MM-DD without UTC day shift. */
+export function dateInputValue(value: string): string {
+  const raw = String(value).trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/)
+  if (match) return match[1]
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return raw.slice(0, 10)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Format a Date as YYYY-MM-DD in local timezone. */
+export function toLocalDateInput(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 /** Expand a date range into individual day strings (inclusive, local dates). */
 export function daysInRange(from: string, to: string): string[] {
   const out: string[] = []
-  const [y1, m1, d1] = from.slice(0, 10).split('-').map(Number)
-  const [y2, m2, d2] = to.slice(0, 10).split('-').map(Number)
+  const [y1, m1, d1] = dateInputValue(from).split('-').map(Number)
+  const [y2, m2, d2] = dateInputValue(to).split('-').map(Number)
   const cur = new Date(y1, m1 - 1, d1)
   const end = new Date(y2, m2 - 1, d2)
   if (Number.isNaN(cur.getTime()) || Number.isNaN(end.getTime())) return out
@@ -54,8 +76,8 @@ export function isAffectationActiveOn(
   },
   day: string,
 ): boolean {
-  const d = day.slice(0, 10)
-  const start = row.date_debut.slice(0, 10)
-  const end = affectationEndDate(row).slice(0, 10)
+  const d = dateInputValue(day)
+  const start = dateInputValue(row.date_debut)
+  const end = dateInputValue(affectationEndDate(row))
   return d >= start && d <= end
 }

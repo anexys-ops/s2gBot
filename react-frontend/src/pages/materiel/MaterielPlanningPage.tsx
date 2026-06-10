@@ -2,7 +2,13 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { bonsCommandeApi, equipmentsApi, materielAffectationsApi } from '../../api/client'
-import { affectationEndDate, daysInRange, maintenanceKindLabel } from '../../components/materiel/equipmentSuiviUtils'
+import {
+  affectationEndDate,
+  dateInputValue,
+  daysInRange,
+  maintenanceKindLabel,
+  toLocalDateInput,
+} from '../../components/materiel/equipmentSuiviUtils'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { MATERIEL_HOME, MATERIEL_MODULE_TABS } from './materielModuleTabs'
 
@@ -31,10 +37,6 @@ const EQUIPMENT_STATUS_OPTIONS = [
   { value: 'retired', label: 'Retiré' },
 ] as const
 
-function toDateInput(d: Date) {
-  return d.toISOString().slice(0, 10)
-}
-
 function addDays(date: Date, days: number) {
   const d = new Date(date)
   d.setDate(d.getDate() + days)
@@ -56,7 +58,7 @@ function monthLabel(month: string) {
 }
 
 function eventDay(date: string) {
-  return String(date).slice(0, 10)
+  return dateInputValue(date)
 }
 
 function statusLabel(value: string): string {
@@ -77,7 +79,7 @@ export default function MaterielPlanningPage() {
     const first = new Date(`${month}-01T12:00:00`)
     const gridStart = addDays(first, -((first.getDay() + 6) % 7))
     const gridEnd = addDays(gridStart, 41)
-    return { from: toDateInput(gridStart), to: toDateInput(gridEnd) }
+    return { from: toLocalDateInput(gridStart), to: toLocalDateInput(gridEnd) }
   }, [month])
 
   const { data: equipments = [], isLoading: loadingEquipments } = useQuery({
@@ -184,7 +186,7 @@ export default function MaterielPlanningPage() {
     const first = new Date(`${month}-01T00:00:00`)
     const start = addDays(first, -((first.getDay() + 6) % 7))
     return Array.from({ length: 42 }, (_, i) => {
-      const date = toDateInput(addDays(start, i))
+      const date = toLocalDateInput(addDays(start, i))
       return {
         date,
         inMonth: date.startsWith(month),

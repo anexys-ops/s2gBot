@@ -3,31 +3,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   adminUsersApi,
   equipmentsApi,
-  type CalibrationRow,
   type EquipmentMaintenancePlanRow,
   type EquipmentRow,
   type MaterielAffectationRow,
 } from '../../api/client'
-import StatusBadge from '../ds/StatusBadge'
 import { formatAppDate } from '../../lib/appLocale'
 import {
+  dateInputValue,
   intervalLabel,
   MAINTENANCE_INTERVAL_OPTIONS,
   MAINTENANCE_KIND_OPTIONS,
   maintenanceKindLabel,
+  todayDateInput,
 } from './equipmentSuiviUtils'
-
-const CAL_RESULT_LABELS: Record<CalibrationRow['result'], string> = {
-  ok: 'Conforme',
-  ok_with_reserve: 'Conforme avec réserve',
-  failed: 'Non conforme',
-}
-
-const CAL_RESULT_VARIANT: Record<CalibrationRow['result'], 'success' | 'warning' | 'danger'> = {
-  ok: 'success',
-  ok_with_reserve: 'warning',
-  failed: 'danger',
-}
 
 type Props = {
   equipment: EquipmentRow
@@ -39,7 +27,6 @@ export default function EquipmentSuiviTab({ equipment, equipmentId, isAdmin }: P
   const queryClient = useQueryClient()
   const plans = equipment.maintenance_plans ?? []
   const affectations = equipment.affectations ?? []
-  const calibrations = equipment.calibrations ?? []
 
   const { data: usersPage } = useQuery({
     queryKey: ['admin-users', 'equipment-suivi'],
@@ -51,31 +38,28 @@ export default function EquipmentSuiviTab({ equipment, equipmentId, isAdmin }: P
   )
 
   const [planForm, setPlanForm] = useState({
-    label: 'Étalonnage',
+    label: '',
     kind: 'etalonnage' as EquipmentMaintenancePlanRow['kind'],
     interval_months: 12,
-    next_due_at: new Date().toISOString().slice(0, 10),
+    next_due_at: todayDateInput(),
     provider: '',
     notes: '',
   })
 
   const [affectForm, setAffectForm] = useState({
     user_id: '',
-    date_debut: new Date().toISOString().slice(0, 10),
+    date_debut: todayDateInput(),
     date_retour_prevue: '',
     observations: '',
   })
 
-  const [recordPlanId, setRecordPlanId] = useState<number | null>(null)
-  const [recordForm, setRecordForm] = useState({
-    performed_at: new Date().toISOString().slice(0, 10),
-    result: 'ok' as CalibrationRow['result'],
-    notes: '',
-  })
+  const [planSavingId, setPlanSavingId] = useState<number | null>(null)
 
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: ['equipment', equipmentId] })
     void queryClient.invalidateQueries({ queryKey: ['equipments'] })
+    void queryClient.invalidateQueries({ queryKey: ['materiel-affectations'] })
+    void queryClient.invalidateQueries({ queryKey: ['equipment-maintenance-due'] })
   }
 
   const createPlan = useMutation({
@@ -88,6 +72,22 @@ export default function EquipmentSuiviTab({ equipment, equipmentId, isAdmin }: P
         provider: planForm.provider.trim() || null,
         notes: planForm.notes.trim() || null,
       }),
+    onSuccess: () => {
+      refresh()
+      setPlanForm((f) => ({ ...f, label: '', provider: '', notes: '' }))
+    },
+  })
+
+  const updatePlan = useMutation({
+    mutationFn: ({
+      planId,
+      body,
+    }: {
+      planId: number
+      body: Parameters<typeof equipmentsApi.updateMaintenancePlan>[2]
+    }) => equipmentsApi.updateMaintenancePlan(equipmentId, planId, body),
+    onMutate: ({ planId }) => setPlanSavingId(planId),
+    onSettled: () => setPlanSavingId(null),
     onSuccess: refresh,
   })
 
@@ -115,20 +115,9 @@ export default function EquipmentSuiviTab({ equipment, equipmentId, isAdmin }: P
     onSuccess: refresh,
   })
 
-  const recordPlan = useMutation({
-    mutationFn: () => {
-      if (recordPlanId == null) throw new Error('Programme requis.')
-      return equipmentsApi.recordMaintenancePlan(equipmentId, recordPlanId, recordForm)
-    },
-    onSuccess: () => {
-      setRecordPlanId(null)
-      refresh()
-    },
-  })
-
-  const sortedCals = [...calibrations].sort((a, b) =>
-    String(b.calibration_date).localeCompare(String(a.calibration_date)),
-  )
+  function patchPlan(plan: EquipmentMaintenancePlanRow, body: Parameters<typeof equipmentsApi.updateMaintenancePlan>[2]) {
+    updatePlan.mutate({ planId: plan.id, body })
+  }
 
   return (
     <div className="equipment-fiche equipment-suivi">
@@ -155,6 +144,7 @@ export default function EquipmentSuiviTab({ equipment, equipmentId, isAdmin }: P
                   className="article-actions-form__input"
                   value={planForm.label}
                   onChange={(e) => setPlanForm((f) => ({ ...f, label: e.target.value }))}
+                  placeholder="Ex. Contrôle annuel"
                   required
                 />
               </label>
@@ -215,10 +205,11 @@ export default function EquipmentSuiviTab({ equipment, equipmentId, isAdmin }: P
 
         {plans.length > 0 ? (
           <div className="table-wrap">
-            <table className="data-table data-table--compact">
+            <table className="data-table data-table--compact equipment-suivi__table">
               <thead>
                 <tr>
-                  <th>Programme</th>
+                  <th>Libellé</th>
+                  <th>Type</th>
                   <th>Fréquence</th>
                   <th>Prochaine échéance</th>
                   <th>Dernière réalisation</th>
@@ -230,33 +221,90 @@ export default function EquipmentSuiviTab({ equipment, equipmentId, isAdmin }: P
                 {plans.map((p) => (
                   <tr key={p.id}>
                     <td>
-                      <strong>{p.label}</strong>
-                      <span className="text-muted equipment-suivi__kind">{maintenanceKindLabel(p.kind)}</span>
+                      {isAdmin ? (
+                        <input
+                          className="article-actions-form__input equipment-suivi__cell-input"
+                          defaultValue={p.label}
+                          key={`${p.id}-${p.label}`}
+                          onBlur={(e) => {
+                            const next = e.target.value.trim()
+                            if (next && next !== p.label) patchPlan(p, { label: next })
+                          }}
+                          disabled={planSavingId === p.id}
+                        />
+                      ) : (
+                        p.label
+                      )}
                     </td>
-                    <td>{intervalLabel(p.interval_months)}</td>
-                    <td>{formatAppDate(p.next_due_at)}</td>
+                    <td>
+                      {isAdmin ? (
+                        <select
+                          className="article-actions-form__select equipment-suivi__cell-input"
+                          value={p.kind}
+                          onChange={(e) =>
+                            patchPlan(p, { kind: e.target.value as EquipmentMaintenancePlanRow['kind'] })
+                          }
+                          disabled={planSavingId === p.id}
+                        >
+                          {MAINTENANCE_KIND_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        maintenanceKindLabel(p.kind)
+                      )}
+                    </td>
+                    <td>
+                      {isAdmin ? (
+                        <select
+                          className="article-actions-form__select equipment-suivi__cell-input"
+                          value={p.interval_months}
+                          onChange={(e) => patchPlan(p, { interval_months: Number(e.target.value) })}
+                          disabled={planSavingId === p.id}
+                        >
+                          {MAINTENANCE_INTERVAL_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        intervalLabel(p.interval_months)
+                      )}
+                    </td>
+                    <td>
+                      {isAdmin ? (
+                        <input
+                          type="date"
+                          className="article-actions-form__input equipment-suivi__cell-input"
+                          value={dateInputValue(p.next_due_at)}
+                          onChange={(e) => patchPlan(p, { next_due_at: e.target.value })}
+                          disabled={planSavingId === p.id}
+                        />
+                      ) : (
+                        formatAppDate(p.next_due_at)
+                      )}
+                    </td>
                     <td>{p.last_performed_at ? formatAppDate(p.last_performed_at) : '—'}</td>
                     <td>
-                      <StatusBadge variant={p.active ? 'success' : 'neutral'} size="sm">
-                        {p.active ? 'Actif' : 'Inactif'}
-                      </StatusBadge>
+                      {isAdmin ? (
+                        <select
+                          className="article-actions-form__select equipment-suivi__cell-input"
+                          value={p.active ? '1' : '0'}
+                          onChange={(e) => patchPlan(p, { active: e.target.value === '1' })}
+                          disabled={planSavingId === p.id}
+                        >
+                          <option value="1">Actif</option>
+                          <option value="0">Inactif</option>
+                        </select>
+                      ) : (
+                        p.active ? 'Actif' : 'Inactif'
+                      )}
                     </td>
                     {isAdmin ? (
                       <td className="equipment-suivi__actions">
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => {
-                            setRecordPlanId(p.id)
-                            setRecordForm({
-                              performed_at: new Date().toISOString().slice(0, 10),
-                              result: 'ok',
-                              notes: '',
-                            })
-                          }}
-                        >
-                          Réaliser
-                        </button>
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm btn-danger-outline"
@@ -278,61 +326,7 @@ export default function EquipmentSuiviTab({ equipment, equipmentId, isAdmin }: P
         ) : (
           <p className="dossier-tab-empty">Aucun programme périodique configuré.</p>
         )}
-
-        {recordPlanId != null ? (
-          <form
-            className="card equipment-suivi__record"
-            onSubmit={(e) => {
-              e.preventDefault()
-              recordPlan.mutate()
-            }}
-          >
-            <h3 className="equipment-suivi__record-title">Enregistrer une réalisation</h3>
-            <div className="list-table-toolbar__row">
-              <label className="list-table-toolbar__field">
-                <span className="filter-label">Date *</span>
-                <input
-                  type="date"
-                  className="article-actions-form__input"
-                  value={recordForm.performed_at}
-                  onChange={(e) => setRecordForm((f) => ({ ...f, performed_at: e.target.value }))}
-                  required
-                />
-              </label>
-              <label className="list-table-toolbar__field">
-                <span className="filter-label">Résultat</span>
-                <select
-                  className="article-actions-form__select"
-                  value={recordForm.result}
-                  onChange={(e) =>
-                    setRecordForm((f) => ({ ...f, result: e.target.value as CalibrationRow['result'] }))
-                  }
-                >
-                  <option value="ok">Conforme</option>
-                  <option value="ok_with_reserve">Conforme avec réserve</option>
-                  <option value="failed">Non conforme</option>
-                </select>
-              </label>
-            </div>
-            <label className="equipment-suivi__notes">
-              <span className="filter-label">Notes</span>
-              <textarea
-                rows={2}
-                value={recordForm.notes}
-                onChange={(e) => setRecordForm((f) => ({ ...f, notes: e.target.value }))}
-              />
-            </label>
-            <div className="crud-actions">
-              <button type="submit" className="btn btn-primary btn-sm" disabled={recordPlan.isPending}>
-                {recordPlan.isPending ? 'Enregistrement…' : 'Valider'}
-              </button>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setRecordPlanId(null)}>
-                Annuler
-              </button>
-            </div>
-            {recordPlan.isError ? <p className="error">{(recordPlan.error as Error).message}</p> : null}
-          </form>
-        ) : null}
+        {updatePlan.isError ? <p className="error">{(updatePlan.error as Error).message}</p> : null}
       </section>
 
       <section className="card equipment-suivi__section">
@@ -378,12 +372,21 @@ export default function EquipmentSuiviTab({ equipment, equipmentId, isAdmin }: P
                 />
               </label>
               <label className="list-table-toolbar__field">
-                <span className="filter-label">Retour prévu</span>
+                <span className="filter-label">Fin prévue / effective</span>
                 <input
                   type="date"
                   className="article-actions-form__input"
                   value={affectForm.date_retour_prevue}
                   onChange={(e) => setAffectForm((f) => ({ ...f, date_retour_prevue: e.target.value }))}
+                />
+              </label>
+              <label className="list-table-toolbar__field equipment-suivi__field-grow">
+                <span className="filter-label">Observations</span>
+                <input
+                  className="article-actions-form__input"
+                  value={affectForm.observations}
+                  onChange={(e) => setAffectForm((f) => ({ ...f, observations: e.target.value }))}
+                  placeholder="Chantier, dossier, contexte…"
                 />
               </label>
               <div className="equipment-suivi__form-submit">
@@ -392,22 +395,13 @@ export default function EquipmentSuiviTab({ equipment, equipmentId, isAdmin }: P
                 </button>
               </div>
             </div>
-            <label className="equipment-suivi__notes">
-              <span className="filter-label">Observations</span>
-              <input
-                className="article-actions-form__input"
-                value={affectForm.observations}
-                onChange={(e) => setAffectForm((f) => ({ ...f, observations: e.target.value }))}
-                placeholder="Chantier, dossier, contexte…"
-              />
-            </label>
             {createAffect.isError ? <p className="error">{(createAffect.error as Error).message}</p> : null}
           </form>
         ) : null}
 
         {affectations.length > 0 ? (
           <div className="table-wrap">
-            <table className="data-table data-table--compact">
+            <table className="data-table data-table--compact equipment-suivi__table">
               <thead>
                 <tr>
                   <th>Responsable</th>
@@ -452,45 +446,6 @@ export default function EquipmentSuiviTab({ equipment, equipmentId, isAdmin }: P
           </div>
         ) : (
           <p className="dossier-tab-empty">Aucune affectation enregistrée.</p>
-        )}
-      </section>
-
-      <section className="card equipment-suivi__section dossier-tab-panel dossier-tab-panel--table">
-        <div className="dossier-tab-panel__header">
-          <h2 className="ds-form-section__title">Historique des interventions</h2>
-          <span className="badge">{sortedCals.length} entrée{sortedCals.length !== 1 ? 's' : ''}</span>
-        </div>
-        {sortedCals.length > 0 ? (
-          <div className="table-wrap">
-            <table className="data-table data-table--compact">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Prochaine échéance</th>
-                  <th>Fournisseur</th>
-                  <th>Résultat</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedCals.map((c) => (
-                  <tr key={c.id}>
-                    <td>{formatAppDate(c.calibration_date)}</td>
-                    <td>{c.next_due_date ? formatAppDate(c.next_due_date) : '—'}</td>
-                    <td>{c.provider?.trim() || '—'}</td>
-                    <td>
-                      <StatusBadge variant={CAL_RESULT_VARIANT[c.result]} size="sm">
-                        {CAL_RESULT_LABELS[c.result]}
-                      </StatusBadge>
-                    </td>
-                    <td className="equipment-fiche__notes-cell">{c.notes?.trim() || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="dossier-tab-empty">Aucune intervention enregistrée.</p>
         )}
       </section>
     </div>

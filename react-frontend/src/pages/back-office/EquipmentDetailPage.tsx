@@ -5,7 +5,7 @@ import { equipmentsApi, type EquipmentRow } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import StatusBadge, { equipementStatutBadgeProps } from '../../components/ds/StatusBadge'
 import EquipmentSuiviTab from '../../components/materiel/EquipmentSuiviTab'
-import { affectationEndDate } from '../../components/materiel/equipmentSuiviUtils'
+import { affectationEndDate, todayDateInput } from '../../components/materiel/equipmentSuiviUtils'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { MATERIEL_HOME, MATERIEL_MODULE_TABS } from '../materiel/materielModuleTabs'
@@ -35,7 +35,7 @@ function nextMaintenancePlan(eq: EquipmentRow) {
 }
 
 function currentAffectation(eq: EquipmentRow) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayDateInput()
   return (eq.affectations ?? []).find((a) => {
     const start = a.date_debut.slice(0, 10)
     const end = affectationEndDate(a).slice(0, 10)

@@ -6834,31 +6834,23 @@ a.catalogue-tree__link-article:hover {
   align-self: flex-end;
   padding-bottom: 0.05rem;
 }
-.equipment-suivi__kind {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 500;
-  margin-top: 0.15rem;
+.equipment-suivi__table td {
+  vertical-align: middle;
+}
+.equipment-suivi__cell-input {
+  width: 100%;
+  min-width: 7rem;
+  margin: 0;
+}
+.equipment-suivi__field-grow {
+  flex: 1 1 12rem;
+  min-width: 10rem;
 }
 .equipment-suivi__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-}
-.equipment-suivi__record {
-  margin-top: 1rem;
-  padding: 1rem 1.15rem;
-}
-.equipment-suivi__record-title {
-  margin: 0 0 0.75rem;
-  font-size: 0.95rem;
-}
-.equipment-suivi__notes {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  margin: 0.65rem 0 0;
-  width: 100%;
+  white-space: nowrap;
 }
 
 @media (max-width: 960px) {

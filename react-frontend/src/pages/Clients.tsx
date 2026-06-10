@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { clientsApi, type Client } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
@@ -86,6 +86,7 @@ export default function Clients() {
         page,
         per_page: perPage,
       }),
+    placeholderData: keepPreviousData,
   })
 
   useEffect(() => {
@@ -202,7 +203,7 @@ export default function Clients() {
     setPage(1)
   }
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <ModuleEntityShell
         breadcrumbs={[

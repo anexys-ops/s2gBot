@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import {
   commercialOfferingsApi,
   equipmentsApi,
@@ -102,6 +102,7 @@ export default function MaterielStocksPage() {
         page,
       }),
     enabled: isLab,
+    placeholderData: keepPreviousData,
   })
 
   const { data: equipmentList = [] } = useQuery({
@@ -328,10 +329,10 @@ export default function MaterielStocksPage() {
         }
       />
 
-      {isLoading && <p className="text-muted">Chargement des consommables…</p>}
+      {isLoading && !data && <p className="text-muted">Chargement des consommables…</p>}
       {error && <p className="error">{(error as Error).message}</p>}
 
-      {!isLoading && !error && (
+      {!error && (data || isLoading) && (
         <div className="card dossier-tab-panel dossier-tab-panel--table materiel-stocks-table-card">
           <div className="dossier-tab-panel__header">
             <h2 className="ds-form-section__title">Les consommables</h2>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { pdfApi, quotesApi, type EntityMetaPayload } from '../api/client'
 import { QuotePdfButton, QuoteRowActions } from '../components/crm/QuoteListTableActions'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -58,6 +58,7 @@ export default function Devis() {
         status: statusFilter || undefined,
         page,
       }),
+    placeholderData: keepPreviousData,
   })
 
   const quoteMetaMut = useMutation({
@@ -90,7 +91,7 @@ export default function Devis() {
   const statusOptions = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
   const hasActiveFilters = searchInput.trim() !== '' || statusFilter !== ''
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <ModuleEntityShell
         shellClassName="module-shell--crm"

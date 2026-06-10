@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import {
   clientContactsApi,
@@ -135,6 +135,7 @@ export default function Invoices() {
         page,
         client_id: clientFilter ? Number(clientFilter) : undefined,
       }),
+    placeholderData: keepPreviousData,
   })
 
   const { data: ordersData } = useQuery({
@@ -279,7 +280,7 @@ export default function Invoices() {
     })
   }
 
-  if (isLoading) return <p>Chargement...</p>
+  if (isLoading && !data) return <p>Chargement...</p>
   if (error) return <p className="error">Erreur : {String(error)}</p>
 
   return (

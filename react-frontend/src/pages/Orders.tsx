@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { ordersApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
@@ -47,9 +47,10 @@ export default function Orders() {
         status: statusFilter || undefined,
         page,
       }),
+    placeholderData: keepPreviousData,
   })
 
-  if (isLoading) return <p>Chargement...</p>
+  if (isLoading && !data) return <p>Chargement...</p>
   if (error) return <p className="error">Erreur: {String(error)}</p>
 
   const orders = data?.data ?? []

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import {
   accessGroupsApi,
   adminUsersApi,
@@ -53,6 +53,7 @@ export default function SettingsUsersPage() {
     queryKey: ['admin-users', debouncedSearch, page],
     queryFn: () => adminUsersApi.list({ search: debouncedSearch.trim() || undefined, page }),
     enabled: allowed,
+    placeholderData: keepPreviousData,
   })
   const { data: groupsRes } = useQuery({
     queryKey: ['admin-access-groups'],
@@ -176,7 +177,7 @@ export default function SettingsUsersPage() {
           </button>
         }
       />
-      {isLoading && <p>Chargement…</p>}
+      {isLoading && !data && <p>Chargement…</p>}
       {error && <p className="error">{(error as Error).message}</p>}
       <div className="card">
         <table>

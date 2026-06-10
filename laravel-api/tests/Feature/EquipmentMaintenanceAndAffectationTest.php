@@ -174,4 +174,34 @@ class EquipmentMaintenanceAndAffectationTest extends TestCase
         $this->assertGreaterThanOrEqual(2, count($dates));
         $this->assertContains($from, $dates);
     }
+
+    public function test_equipment_show_includes_planning_slots_and_maintenance_plans(): void
+    {
+        $admin = User::factory()->labAdmin()->create();
+        $equipment = $this->createEquipment('EQ-SHOW-'.uniqid());
+
+        EquipmentMaintenancePlan::create([
+            'equipment_id' => $equipment->id,
+            'label' => 'Contrôle semestriel',
+            'kind' => EquipmentMaintenancePlan::KIND_VERIFICATION,
+            'interval_months' => 6,
+            'next_due_at' => now()->addMonths(6)->toDateString(),
+            'active' => true,
+        ]);
+
+        \App\Models\PlanningEquipment::create([
+            'equipment_id' => $equipment->id,
+            'date_debut' => now()->toDateString(),
+            'date_fin' => now()->addDays(3)->toDateString(),
+            'type_evenement' => 'utilisation',
+            'user_id' => $admin->id,
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson("/api/equipments/{$equipment->id}")
+            ->assertOk()
+            ->assertJsonPath('id', $equipment->id)
+            ->assertJsonCount(1, 'maintenance_plans')
+            ->assertJsonCount(1, 'planning_slots');
+    }
 }

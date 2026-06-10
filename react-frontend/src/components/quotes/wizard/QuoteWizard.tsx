@@ -31,6 +31,8 @@ type Props = {
   removeLine: (index: number) => void
   onOpenCommercialCatalog: (lineIndex: number) => void
   onOpenProlabCatalog: (lineIndex: number) => void
+  onAddFromCommercialCatalog?: () => void
+  onAddFromProlabCatalog?: () => void
   totals: DocumentTotalsResult
   metaFraisTtc: number
   isCreate: boolean
@@ -82,6 +84,8 @@ export default function QuoteWizard({
   removeLine,
   onOpenCommercialCatalog,
   onOpenProlabCatalog,
+  onAddFromCommercialCatalog,
+  onAddFromProlabCatalog,
   totals,
   metaFraisTtc,
   isCreate,
@@ -188,6 +192,8 @@ export default function QuoteWizard({
             removeLine={removeLine}
             onOpenCommercialCatalog={onOpenCommercialCatalog}
             onOpenProlabCatalog={onOpenProlabCatalog}
+            onAddFromCommercialCatalog={onAddFromCommercialCatalog}
+            onAddFromProlabCatalog={onAddFromProlabCatalog}
           />
         </fieldset>
       )}

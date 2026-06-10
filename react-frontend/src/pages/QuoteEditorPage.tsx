@@ -530,6 +530,20 @@ export default function QuoteEditorPage() {
     return f?.articles?.filter((a) => a.actif) ?? []
   }, [prolabFamilleId, prolabFamilles])
 
+  const addLineFromCommercialCatalog = () => {
+    const idx = form.lines.length
+    addLine()
+    setCatalogPick({ target: 'line', index: idx })
+    setCatalogSearch('')
+  }
+
+  const addLineFromProlabCatalog = () => {
+    const idx = form.lines.length
+    addLine()
+    setProlabPick({ target: 'line', index: idx })
+    setProlabFamilleId('')
+  }
+
   if (!isLab) {
     return (
       <div className="container">
@@ -603,6 +617,8 @@ export default function QuoteEditorPage() {
             setProlabPick({ target: 'line', index: i })
             setProlabFamilleId('')
           }}
+          onAddFromCommercialCatalog={isReadOnly ? undefined : addLineFromCommercialCatalog}
+          onAddFromProlabCatalog={isReadOnly ? undefined : addLineFromProlabCatalog}
           wizardStep={wizardStep}
           onWizardStepChange={setWizardStep}
         />

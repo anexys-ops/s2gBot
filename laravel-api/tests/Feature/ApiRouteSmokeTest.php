@@ -30,6 +30,8 @@ class ApiRouteSmokeTest extends TestCase
             '/api/sites?per_page=1',
             '/api/test-types?per_page=1',
             '/api/equipments?per_page=1',
+            '/api/equipments-maintenance-plans/due?from='.now()->startOfMonth()->toDateString().'&to='.now()->endOfMonth()->toDateString(),
+            '/api/materiel/affectations?from='.now()->startOfMonth()->toDateString().'&to='.now()->endOfMonth()->toDateString(),
             '/api/invoices?per_page=1',
             '/api/quotes?per_page=1',
             '/api/commercial-offerings?per_page=1',

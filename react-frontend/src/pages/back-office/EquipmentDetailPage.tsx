@@ -1,35 +1,22 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { equipmentsApi, type CalibrationRow, type EquipmentRow } from '../../api/client'
+import { useQuery } from '@tanstack/react-query'
+import { equipmentsApi, type EquipmentRow } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import StatusBadge, { equipementStatutBadgeProps } from '../../components/ds/StatusBadge'
+import EquipmentSuiviTab from '../../components/materiel/EquipmentSuiviTab'
+import { affectationEndDate } from '../../components/materiel/equipmentSuiviUtils'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { MATERIEL_HOME, MATERIEL_MODULE_TABS } from '../materiel/materielModuleTabs'
 import { formatAppDate } from '../../lib/appLocale'
 
-type TabId = 'overview' | 'calibrations' | 'extrafields'
+type TabId = 'overview' | 'suivi' | 'extrafields'
 
 const STATUS_LABELS: Record<string, string> = {
   active: 'Actif',
   maintenance: 'Maintenance',
   retired: 'Retiré',
-}
-
-const CAL_RESULT_LABELS: Record<CalibrationRow['result'], string> = {
-  ok: 'Conforme',
-  ok_with_reserve: 'Conforme avec réserve',
-  failed: 'Non conforme',
-}
-
-const CAL_RESULT_VARIANT: Record<
-  CalibrationRow['result'],
-  'success' | 'warning' | 'danger'
-> = {
-  ok: 'success',
-  ok_with_reserve: 'warning',
-  failed: 'danger',
 }
 
 function statusLabel(value: string): string {
@@ -41,139 +28,32 @@ function formatDate(value: string | null | undefined): string {
   return formatAppDate(value)
 }
 
-function upcomingCalibration(eq: EquipmentRow): CalibrationRow | null {
-  const cals = eq.calibrations ?? []
-  if (cals.length === 0) return null
-  const withDue = cals.filter((c) => c.next_due_date)
-  if (withDue.length === 0) return cals[0] ?? null
-  return [...withDue].sort((a, b) => String(a.next_due_date).localeCompare(String(b.next_due_date)))[0]
+function nextMaintenancePlan(eq: EquipmentRow) {
+  const plans = (eq.maintenance_plans ?? []).filter((p) => p.active)
+  if (plans.length === 0) return null
+  return [...plans].sort((a, b) => String(a.next_due_at).localeCompare(String(b.next_due_at)))[0]
 }
 
-function latestCalibration(eq: EquipmentRow): CalibrationRow | null {
+function currentAffectation(eq: EquipmentRow) {
+  const today = new Date().toISOString().slice(0, 10)
+  return (eq.affectations ?? []).find((a) => {
+    const start = a.date_debut.slice(0, 10)
+    const end = affectationEndDate(a).slice(0, 10)
+    return today >= start && today <= end
+  })
+}
+
+function latestIntervention(eq: EquipmentRow) {
   const cals = eq.calibrations ?? []
   if (cals.length === 0) return null
   return [...cals].sort((a, b) => String(b.calibration_date).localeCompare(String(a.calibration_date)))[0]
 }
 
-function AddCalibrationForm({
-  equipmentId,
-  isAdmin,
-}: {
-  equipmentId: number
-  isAdmin: boolean
-}) {
-  const queryClient = useQueryClient()
-  const [form, setForm] = useState({
-    calibration_date: new Date().toISOString().slice(0, 10),
-    next_due_date: '',
-    provider: '',
-    result: 'ok' as CalibrationRow['result'],
-    notes: '',
-  })
-
-  const addCal = useMutation({
-    mutationFn: () =>
-      equipmentsApi.createCalibration(equipmentId, {
-        calibration_date: form.calibration_date,
-        next_due_date: form.next_due_date || null,
-        provider: form.provider || null,
-        result: form.result,
-        notes: form.notes || null,
-      }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['equipment', equipmentId] })
-      void queryClient.invalidateQueries({ queryKey: ['equipments'] })
-      setForm((f) => ({
-        ...f,
-        next_due_date: '',
-        provider: '',
-        notes: '',
-      }))
-    },
-  })
-
-  if (!isAdmin) return null
-
-  return (
-    <section className="card list-table-toolbar equipment-calibration-add">
-      <div className="equipment-calibration-add__head">
-        <h3 className="equipment-calibration-add__title">Ajouter un étalonnage</h3>
-      </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          addCal.mutate()
-        }}
-      >
-        <div className="list-table-toolbar__row equipment-calibration-add__row">
-          <label className="list-table-toolbar__field">
-            <span className="filter-label">Date d&apos;étalonnage *</span>
-            <input
-              type="date"
-              className="article-actions-form__input"
-              value={form.calibration_date}
-              onChange={(e) => setForm((f) => ({ ...f, calibration_date: e.target.value }))}
-              required
-            />
-          </label>
-          <label className="list-table-toolbar__field">
-            <span className="filter-label">Prochaine échéance</span>
-            <input
-              type="date"
-              className="article-actions-form__input"
-              value={form.next_due_date}
-              onChange={(e) => setForm((f) => ({ ...f, next_due_date: e.target.value }))}
-            />
-          </label>
-          <label className="list-table-toolbar__field equipment-calibration-add__provider">
-            <span className="filter-label">Fournisseur</span>
-            <input
-              type="text"
-              className="article-actions-form__input"
-              value={form.provider}
-              onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))}
-              placeholder="Organisme, labo…"
-            />
-          </label>
-          <label className="list-table-toolbar__field equipment-calibration-add__result">
-            <span className="filter-label">Résultat</span>
-            <select
-              className="article-actions-form__select"
-              value={form.result}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, result: e.target.value as CalibrationRow['result'] }))
-              }
-            >
-              <option value="ok">Conforme</option>
-              <option value="ok_with_reserve">Conforme avec réserve</option>
-              <option value="failed">Non conforme</option>
-            </select>
-          </label>
-          <div className="equipment-calibration-add__submit">
-            <button type="submit" className="btn btn-primary btn-sm" disabled={addCal.isPending}>
-              {addCal.isPending ? 'Enregistrement…' : '+ Enregistrer'}
-            </button>
-          </div>
-        </div>
-        <label className="equipment-calibration-add__notes">
-          <span className="filter-label">Notes</span>
-          <textarea
-            rows={2}
-            value={form.notes}
-            onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-            placeholder="Observations, réserve, référence certificat…"
-          />
-        </label>
-        {addCal.isError ? <p className="error equipment-calibration-add__error">{(addCal.error as Error).message}</p> : null}
-      </form>
-    </section>
-  )
-}
-
 function EquipmentOverview({ eq }: { eq: EquipmentRow }) {
   const st = equipementStatutBadgeProps(eq.status)
-  const nextCal = upcomingCalibration(eq)
-  const lastCal = latestCalibration(eq)
+  const nextPlan = nextMaintenancePlan(eq)
+  const activeAffect = currentAffectation(eq)
+  const lastIntervention = latestIntervention(eq)
 
   return (
     <div className="equipment-fiche">
@@ -227,23 +107,23 @@ function EquipmentOverview({ eq }: { eq: EquipmentRow }) {
             <dd>{formatDate(eq.purchase_date)}</dd>
           </div>
           <div>
-            <dt>Dernier étalonnage</dt>
-            <dd>{lastCal ? formatDate(lastCal.calibration_date) : '—'}</dd>
+            <dt>Prochaine échéance</dt>
+            <dd>{nextPlan ? formatDate(nextPlan.next_due_at) : '—'}</dd>
           </div>
           <div>
-            <dt>Prochaine échéance</dt>
-            <dd>{nextCal?.next_due_date ? formatDate(nextCal.next_due_date) : '—'}</dd>
+            <dt>Affectation en cours</dt>
+            <dd>
+              {activeAffect
+                ? `${activeAffect.user?.name ?? 'Non assigné'} — jusqu'au ${formatDate(affectationEndDate(activeAffect))}`
+                : '—'}
+            </dd>
+          </div>
+          <div>
+            <dt>Dernière intervention</dt>
+            <dd>{lastIntervention ? formatDate(lastIntervention.calibration_date) : '—'}</dd>
           </div>
         </dl>
-        <p className="equipment-fiche__id-line text-muted">
-          Réf. interne #{eq.id}
-          {lastCal?.provider ? (
-            <>
-              {' '}
-              — Dernier prestataire : {lastCal.provider}
-            </>
-          ) : null}
-        </p>
+        <p className="equipment-fiche__id-line text-muted">Réf. interne #{eq.id}</p>
       </section>
 
       <section className="card equipment-fiche__section">
@@ -258,71 +138,6 @@ function EquipmentOverview({ eq }: { eq: EquipmentRow }) {
           </ul>
         ) : (
           <p className="text-muted equipment-fiche__empty">Aucun type d&apos;essai associé.</p>
-        )}
-      </section>
-    </div>
-  )
-}
-
-function EquipmentCalibrationsTab({
-  eq,
-  equipmentId,
-  isAdmin,
-}: {
-  eq: EquipmentRow
-  equipmentId: number
-  isAdmin: boolean
-}) {
-  const sorted = useMemo(
-    () =>
-      [...(eq.calibrations ?? [])].sort((a, b) =>
-        String(b.calibration_date).localeCompare(String(a.calibration_date)),
-      ),
-    [eq.calibrations],
-  )
-
-  return (
-    <div className="equipment-fiche">
-      <AddCalibrationForm equipmentId={equipmentId} isAdmin={isAdmin} />
-
-      <section className="card dossier-tab-panel dossier-tab-panel--table">
-        <div className="dossier-tab-panel__header">
-          <h2 className="ds-form-section__title">Historique des étalonnages</h2>
-          <span className="badge">
-            {sorted.length} enregistrement{sorted.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-        {sorted.length > 0 ? (
-          <div className="table-wrap">
-            <table className="data-table data-table--compact">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Prochaine échéance</th>
-                  <th>Fournisseur</th>
-                  <th>Résultat</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((c) => (
-                  <tr key={c.id}>
-                    <td>{formatDate(c.calibration_date)}</td>
-                    <td>{formatDate(c.next_due_date)}</td>
-                    <td>{c.provider?.trim() || '—'}</td>
-                    <td>
-                      <StatusBadge variant={CAL_RESULT_VARIANT[c.result]} size="sm">
-                        {CAL_RESULT_LABELS[c.result]}
-                      </StatusBadge>
-                    </td>
-                    <td className="equipment-fiche__notes-cell">{c.notes?.trim() || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="dossier-tab-empty">Aucun étalonnage enregistré pour cet équipement.</p>
         )}
       </section>
     </div>
@@ -388,7 +203,8 @@ export default function EquipmentDetailPage() {
   }
 
   const st = equipementStatutBadgeProps(eq.status)
-  const calCount = eq.calibrations?.length ?? 0
+  const planCount = eq.maintenance_plans?.filter((p) => p.active).length ?? 0
+  const affectCount = eq.affectations?.length ?? 0
 
   return (
     <ModuleEntityShell
@@ -419,7 +235,10 @@ export default function EquipmentDetailPage() {
       <div className="article-fiche-tabs equipment-fiche-tabs" role="tablist" aria-label="Sections fiche équipement">
         {[
           { id: 'overview' as const, label: 'Fiche' },
-          { id: 'calibrations' as const, label: `Étalonnages (${calCount})` },
+          {
+            id: 'suivi' as const,
+            label: `Suivi & planning (${planCount + affectCount})`,
+          },
           ...(isAdmin ? [{ id: 'extrafields' as const, label: 'Champs personnalisés' }] : []),
         ].map((t) => (
           <button
@@ -435,8 +254,8 @@ export default function EquipmentDetailPage() {
       </div>
 
       {tab === 'overview' && <EquipmentOverview eq={eq} />}
-      {tab === 'calibrations' && (
-        <EquipmentCalibrationsTab eq={eq} equipmentId={equipmentId} isAdmin={isAdmin} />
+      {tab === 'suivi' && (
+        <EquipmentSuiviTab equipment={eq} equipmentId={equipmentId} isAdmin={isAdmin} />
       )}
       {tab === 'extrafields' && isAdmin && (
         <ExtrafieldsForm entityType="equipment" entityId={eq.id} canEdit title="Champs personnalisés matériel" />

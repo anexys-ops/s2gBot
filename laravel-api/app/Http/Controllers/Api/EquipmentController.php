@@ -67,7 +67,16 @@ class EquipmentController extends Controller
         }
 
         return response()->json(
-            $equipment->load(['agency', 'testTypes', 'calibrations', 'attachments.uploader'])
+            $equipment->load([
+                'agency',
+                'testTypes',
+                'calibrations',
+                'maintenancePlans',
+                'affectations.user:id,name',
+                'affectations.dossier:id,reference',
+                'planningSlots.user:id,name',
+                'attachments.uploader',
+            ])
         );
     }
 

@@ -1090,6 +1090,50 @@ export interface CalibrationRow {
   provider?: string | null
   result: 'ok' | 'ok_with_reserve' | 'failed'
   notes?: string | null
+  maintenance_plan_id?: number | null
+}
+
+export type EquipmentMaintenancePlanKind = 'etalonnage' | 'maintenance' | 'verification'
+
+export interface EquipmentMaintenancePlanRow {
+  id: number
+  equipment_id: number
+  label: string
+  kind: EquipmentMaintenancePlanKind
+  interval_months: number
+  next_due_at: string
+  last_performed_at?: string | null
+  provider?: string | null
+  notes?: string | null
+  active: boolean
+  equipment?: { id: number; code: string; name: string }
+}
+
+export interface EquipmentMaintenanceDueEvent {
+  plan_id: number
+  equipment_id: number
+  date: string
+  label: string
+  kind: EquipmentMaintenancePlanKind
+  interval_months: number
+  equipment?: { id: number; code: string; name: string }
+}
+
+export interface MaterielAffectationRow {
+  id: number
+  equipment_id: number
+  dossier_id?: number | null
+  user_id?: number | null
+  ordre_mission_id?: number | null
+  date_debut: string
+  date_retour_prevue?: string | null
+  date_retour_effective?: string | null
+  etat_depart?: 'bon' | 'usage' | 'degrade'
+  etat_retour?: 'bon' | 'usage' | 'degrade' | null
+  observations?: string | null
+  user?: { id: number; name: string } | null
+  dossier?: { id: number; reference?: string } | null
+  equipment?: { id: number; code: string; name: string }
 }
 
 export interface EquipmentRow {
@@ -1110,6 +1154,9 @@ export interface EquipmentRow {
   agency?: { id: number; name: string } | null
   test_types?: Array<{ id: number; name: string }>
   calibrations?: CalibrationRow[]
+  maintenance_plans?: EquipmentMaintenancePlanRow[]
+  affectations?: MaterielAffectationRow[]
+  planning_slots?: PlanningEquipmentSlot[]
 }
 
 export const equipmentsApi = {
@@ -1188,6 +1235,111 @@ export const equipmentsApi = {
     }),
   deleteCalibration: (equipmentId: number, calibrationId: number) =>
     api(`/equipments/${equipmentId}/calibrations/${calibrationId}`, { method: 'DELETE' }),
+  listMaintenancePlans: (equipmentId: number) =>
+    api<EquipmentMaintenancePlanRow[]>(`/equipments/${equipmentId}/maintenance-plans`),
+  createMaintenancePlan: (
+    equipmentId: number,
+    body: {
+      label: string
+      kind?: EquipmentMaintenancePlanKind
+      interval_months: number
+      next_due_at: string
+      last_performed_at?: string | null
+      provider?: string | null
+      notes?: string | null
+      active?: boolean
+    },
+  ) =>
+    api<EquipmentMaintenancePlanRow>(`/equipments/${equipmentId}/maintenance-plans`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateMaintenancePlan: (
+    equipmentId: number,
+    planId: number,
+    body: Partial<{
+      label: string
+      kind: EquipmentMaintenancePlanKind
+      interval_months: number
+      next_due_at: string
+      last_performed_at: string | null
+      provider: string | null
+      notes: string | null
+      active: boolean
+    }>,
+  ) =>
+    api<EquipmentMaintenancePlanRow>(`/equipments/${equipmentId}/maintenance-plans/${planId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  deleteMaintenancePlan: (equipmentId: number, planId: number) =>
+    api(`/equipments/${equipmentId}/maintenance-plans/${planId}`, { method: 'DELETE' }),
+  recordMaintenancePlan: (
+    equipmentId: number,
+    planId: number,
+    body: {
+      performed_at: string
+      result: CalibrationRow['result']
+      provider?: string | null
+      notes?: string | null
+      next_due_at?: string | null
+    },
+  ) =>
+    api<{ plan: EquipmentMaintenancePlanRow; calibration: CalibrationRow }>(
+      `/equipments/${equipmentId}/maintenance-plans/${planId}/record`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  listAffectations: (equipmentId: number) =>
+    api<MaterielAffectationRow[]>(`/equipments/${equipmentId}/affectations`),
+  createAffectation: (
+    equipmentId: number,
+    body: {
+      user_id?: number | null
+      dossier_id?: number | null
+      date_debut: string
+      date_retour_prevue?: string | null
+      date_retour_effective?: string | null
+      observations?: string | null
+    },
+  ) =>
+    api<MaterielAffectationRow>(`/equipments/${equipmentId}/affectations`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateAffectation: (
+    equipmentId: number,
+    affectationId: number,
+    body: Partial<{
+      user_id: number | null
+      dossier_id: number | null
+      date_debut: string
+      date_retour_prevue: string | null
+      date_retour_effective: string | null
+      observations: string | null
+    }>,
+  ) =>
+    api<MaterielAffectationRow>(`/equipments/${equipmentId}/affectations/${affectationId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  deleteAffectation: (equipmentId: number, affectationId: number) =>
+    api(`/equipments/${equipmentId}/affectations/${affectationId}`, { method: 'DELETE' }),
+  maintenancePlansDue: (params: { from: string; to: string; equipment_id?: number }) => {
+    const q = new URLSearchParams({ from: params.from, to: params.to })
+    if (params.equipment_id != null) q.set('equipment_id', String(params.equipment_id))
+    return api<EquipmentMaintenanceDueEvent[]>(`/equipments-maintenance-plans/due?${q}`)
+  },
+}
+
+export const materielAffectationsApi = {
+  list: (params?: { from?: string; to?: string; equipment_id?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.from) q.set('from', params.from)
+    if (params?.to) q.set('to', params.to)
+    if (params?.equipment_id != null) q.set('equipment_id', String(params.equipment_id))
+    const s = q.toString()
+    return api<MaterielAffectationRow[]>(`/materiel/affectations${s ? `?${s}` : ''}`)
+  },
 }
 
 export type NonConformityRow = {
@@ -2413,12 +2565,14 @@ export interface PlanningEquipmentSlot {
   id: number
   equipment_id: number
   mission_task_id?: number | null
+  user_id?: number | null
   date_debut: string
   date_fin: string
   type_evenement: 'utilisation' | 'maintenance' | 'indispo' | 'autre'
   notes?: string | null
   equipment?: { id: number; name: string; code?: string }
   missionTask?: { id: number; statut: string }
+  user?: { id: number; name: string }
 }
 
 export interface StockPersonnel {

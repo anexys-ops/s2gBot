@@ -62,7 +62,7 @@ class PlanningController extends Controller
     /** GET /planning/equipments?from=&to=&equipment_id= */
     public function equipmentsIndex(Request $request): JsonResponse
     {
-        $q = PlanningEquipment::query()->with(['equipment:id,name,code', 'missionTask:id,statut']);
+        $q = PlanningEquipment::query()->with(['equipment:id,name,code', 'missionTask:id,statut', 'user:id,name']);
 
         if ($from = $request->string('from')) {
             $q->where('date_fin', '>=', $from);
@@ -83,6 +83,7 @@ class PlanningController extends Controller
         $data = $request->validate([
             'equipment_id'    => 'required|exists:equipments,id',
             'mission_task_id' => 'nullable|exists:mission_tasks,id',
+            'user_id'         => 'nullable|exists:users,id',
             'date_debut'      => 'required|date',
             'date_fin'        => 'required|date|after_or_equal:date_debut',
             'type_evenement'  => 'in:utilisation,maintenance,indispo,autre',
@@ -90,7 +91,7 @@ class PlanningController extends Controller
         ]);
 
         $slot = PlanningEquipment::create($data);
-        return response()->json($slot->load(['equipment:id,name,code', 'missionTask:id,statut']), 201);
+        return response()->json($slot->load(['equipment:id,name,code', 'missionTask:id,statut', 'user:id,name']), 201);
     }
 
     /** DELETE /planning/equipments/{id} */

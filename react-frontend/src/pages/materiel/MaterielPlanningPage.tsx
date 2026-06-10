@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { bonsCommandeApi, equipmentsApi, type EquipmentRow } from '../../api/client'
+import { bonsCommandeApi, equipmentsApi, materielAffectationsApi } from '../../api/client'
+import { affectationEndDate, daysInRange, maintenanceKindLabel } from '../../components/materiel/equipmentSuiviUtils'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { MATERIEL_HOME, MATERIEL_MODULE_TABS } from './materielModuleTabs'
 
@@ -10,17 +11,17 @@ type PlanningEvent = {
   date: string
   title: string
   subtitle: string
-  kind: 'maintenance' | 'chantier'
-  status?: string
+  kind: 'echeance' | 'affectation' | 'chantier'
   equipmentId?: number
   to?: string
 }
 
-type EventKindFilter = '' | 'maintenance' | 'chantier'
+type EventKindFilter = '' | 'echeance' | 'affectation' | 'chantier'
 
 const EVENT_KIND_OPTIONS: { value: EventKindFilter; label: string }[] = [
   { value: '', label: 'Tous les événements' },
-  { value: 'maintenance', label: 'Maintenance / étalonnage' },
+  { value: 'echeance', label: 'Échéances périodiques' },
+  { value: 'affectation', label: 'Affectations / utilisation' },
   { value: 'chantier', label: 'Chantiers' },
 ]
 
@@ -50,17 +51,12 @@ function shiftMonth(month: string, delta: number) {
   return toMonthInput(d)
 }
 
-function eventDay(date: string) {
-  return String(date).slice(0, 10)
-}
-
 function monthLabel(month: string) {
   return new Date(`${month}-01T00:00:00`).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
 }
 
-function latestCalibration(eq: EquipmentRow) {
-  const cals = eq.calibrations ?? []
-  return cals.find((c) => c.next_due_date) ?? cals[0]
+function eventDay(date: string) {
+  return String(date).slice(0, 10)
 }
 
 function statusLabel(value: string): string {
@@ -77,8 +73,12 @@ export default function MaterielPlanningPage() {
   const [locationDraft, setLocationDraft] = useState('')
   const [saved, setSaved] = useState(false)
 
-  const monthStart = `${month}-01`
-  const monthEnd = toDateInput(addDays(new Date(`${month}-01T00:00:00`), 40))
+  const calendarRange = useMemo(() => {
+    const first = new Date(`${month}-01T12:00:00`)
+    const gridStart = addDays(first, -((first.getDay() + 6) % 7))
+    const gridEnd = addDays(gridStart, 41)
+    return { from: toDateInput(gridStart), to: toDateInput(gridEnd) }
+  }, [month])
 
   const { data: equipments = [], isLoading: loadingEquipments } = useQuery({
     queryKey: ['equipments', 'planning'],
@@ -87,6 +87,24 @@ export default function MaterielPlanningPage() {
   const { data: bonsCommande = [], isLoading: loadingBc } = useQuery({
     queryKey: ['bons-commande', 'materiel-planning'],
     queryFn: () => bonsCommandeApi.list(),
+  })
+  const { data: duePlans = [], isLoading: loadingDue } = useQuery({
+    queryKey: ['equipment-maintenance-due', calendarRange.from, calendarRange.to, calendarEquipmentId],
+    queryFn: () =>
+      equipmentsApi.maintenancePlansDue({
+        from: calendarRange.from,
+        to: calendarRange.to,
+        equipment_id: calendarEquipmentId === '' ? undefined : calendarEquipmentId,
+      }),
+  })
+  const { data: affectations = [], isLoading: loadingAffect } = useQuery({
+    queryKey: ['materiel-affectations', calendarRange.from, calendarRange.to, calendarEquipmentId],
+    queryFn: () =>
+      materielAffectationsApi.list({
+        from: calendarRange.from,
+        to: calendarRange.to,
+        equipment_id: calendarEquipmentId === '' ? undefined : calendarEquipmentId,
+      }),
   })
 
   const editEquipment = equipments.find((eq) => eq.id === editEquipmentId)
@@ -107,19 +125,30 @@ export default function MaterielPlanningPage() {
   })
 
   const allEvents = useMemo<PlanningEvent[]>(() => {
-    const maintenanceEvents = equipments.flatMap((eq) => {
-      const cal = latestCalibration(eq)
-      if (!cal?.next_due_date) return []
-      return [{
-        id: `maintenance-${eq.id}-${cal.id}`,
-        date: eventDay(cal.next_due_date),
-        title: eq.code,
-        subtitle: `Maintenance / étalonnage : ${eq.name}`,
-        kind: 'maintenance' as const,
-        status: eq.status,
-        equipmentId: eq.id,
-        to: `/materiel/equipements/${eq.id}`,
-      }]
+    const echeanceEvents = duePlans.map((item) => ({
+      id: `echeance-${item.plan_id}-${item.date}`,
+      date: eventDay(item.date),
+      title: item.equipment?.code ?? `#${item.equipment_id}`,
+      subtitle: `${item.label} (${maintenanceKindLabel(item.kind)})`,
+      kind: 'echeance' as const,
+      equipmentId: item.equipment_id,
+      to: `/materiel/equipements/${item.equipment_id}`,
+    }))
+
+    const affectationEvents = affectations.flatMap((a) => {
+      const end = affectationEndDate(a)
+      const days = daysInRange(a.date_debut, end)
+      return days.map((date) => ({
+        id: `affect-${a.id}-${date}`,
+        date: eventDay(date),
+        title: a.equipment?.code ?? `#${a.equipment_id}`,
+        subtitle: a.user?.name
+          ? `Utilisation — ${a.user.name}`
+          : 'Affectation matériel',
+        kind: 'affectation' as const,
+        equipmentId: a.equipment_id,
+        to: `/materiel/equipements/${a.equipment_id}`,
+      }))
     })
 
     const chantierEvents = bonsCommande.flatMap((bc) => {
@@ -133,24 +162,20 @@ export default function MaterielPlanningPage() {
           title: bc.numero,
           subtitle: `${index === 0 ? 'Début' : 'Fin'} chantier prévu : ${ligne.libelle}`,
           kind: 'chantier' as const,
-          status: bc.statut,
           to: `/bons-commande/${bc.id}`,
         }))
       })
     })
 
-    return [...maintenanceEvents, ...chantierEvents]
-      .filter((e) => e.date >= monthStart && e.date <= monthEnd)
+    return [...echeanceEvents, ...affectationEvents, ...chantierEvents]
+      .filter((e) => e.date >= calendarRange.from && e.date <= calendarRange.to)
       .sort((a, b) => a.date.localeCompare(b.date) || a.kind.localeCompare(b.kind))
-  }, [bonsCommande, equipments, monthEnd, monthStart])
+  }, [affectations, bonsCommande, calendarRange.from, calendarRange.to, duePlans])
 
   const events = useMemo(() => {
     return allEvents.filter((event) => {
       if (eventKind && event.kind !== eventKind) return false
-      if (calendarEquipmentId !== '') {
-        if (event.kind !== 'maintenance') return false
-        if (event.equipmentId !== calendarEquipmentId) return false
-      }
+      if (calendarEquipmentId !== '' && event.equipmentId !== calendarEquipmentId) return false
       return true
     })
   }, [allEvents, calendarEquipmentId, eventKind])
@@ -208,7 +233,7 @@ export default function MaterielPlanningPage() {
           <div className="materiel-planning-toolbar__block-head">
             <h2 className="materiel-planning-toolbar__block-title">Affichage calendrier</h2>
             <p className="materiel-planning-toolbar__block-hint text-muted">
-              Naviguez par mois et filtrez les échéances maintenance ou les dates chantier.
+              Naviguez par mois et filtrez échéances périodiques, affectations et chantiers.
             </p>
           </div>
           <div className="list-table-toolbar__row materiel-planning-toolbar__row">
@@ -260,7 +285,7 @@ export default function MaterielPlanningPage() {
             </label>
 
             <label className="list-table-toolbar__field materiel-planning-toolbar__equipment-filter">
-              <span className="filter-label">Équipement (échéances)</span>
+              <span className="filter-label">Équipement</span>
               <select
                 value={calendarEquipmentId === '' ? '' : String(calendarEquipmentId)}
                 onChange={(e) => setCalendarEquipmentId(e.target.value ? Number(e.target.value) : '')}
@@ -388,7 +413,9 @@ export default function MaterielPlanningPage() {
         </section>
       </div>
 
-      {(loadingEquipments || loadingBc) && <p className="text-muted">Chargement du planning…</p>}
+      {(loadingEquipments || loadingBc || loadingDue || loadingAffect) && (
+        <p className="text-muted">Chargement du planning…</p>
+      )}
       {updateEquipmentMut.isError ? <p className="error">{(updateEquipmentMut.error as Error).message}</p> : null}
       {saved ? <p className="text-muted materiel-planning-toolbar__saved">Matériel mis à jour.</p> : null}
 
@@ -396,7 +423,8 @@ export default function MaterielPlanningPage() {
         <div className="materiel-calendar__head">
           <h2>{monthLabel(month)}</h2>
           <div className="materiel-calendar__legend">
-            <span className="materiel-calendar__dot materiel-calendar__dot--maintenance" /> Maintenance / étalonnage
+            <span className="materiel-calendar__dot materiel-calendar__dot--echeance" /> Échéance périodique
+            <span className="materiel-calendar__dot materiel-calendar__dot--affectation" /> Affectation / utilisation
             <span className="materiel-calendar__dot materiel-calendar__dot--chantier" /> Chantier
           </div>
         </div>

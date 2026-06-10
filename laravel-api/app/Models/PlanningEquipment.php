@@ -10,6 +10,7 @@ class PlanningEquipment extends Model
     protected $fillable = [
         'equipment_id',
         'mission_task_id',
+        'user_id',
         'date_debut',
         'date_fin',
         'type_evenement',
@@ -29,5 +30,10 @@ class PlanningEquipment extends Model
     public function missionTask(): BelongsTo
     {
         return $this->belongsTo(MissionTask::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }

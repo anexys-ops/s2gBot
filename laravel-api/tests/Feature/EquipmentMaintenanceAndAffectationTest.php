@@ -106,12 +106,17 @@ class EquipmentMaintenanceAndAffectationTest extends TestCase
 
         $this->actingAs($admin, 'sanctum');
 
+        $dateDebut = '2026-06-17';
+        $dateFin = '2026-06-20';
+
         $create = $this->postJson("/api/equipments/{$equipment->id}/affectations", [
             'user_id' => $technician->id,
-            'date_debut' => now()->toDateString(),
-            'date_retour_prevue' => now()->addDays(5)->toDateString(),
+            'date_debut' => $dateDebut,
+            'date_retour_prevue' => $dateFin,
             'observations' => 'Chantier démo',
-        ])->assertCreated();
+        ])->assertCreated()
+            ->assertJsonPath('date_debut', $dateDebut)
+            ->assertJsonPath('date_retour_prevue', $dateFin);
 
         $affectationId = (int) $create->json('id');
 

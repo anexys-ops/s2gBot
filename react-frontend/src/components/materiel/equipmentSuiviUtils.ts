@@ -35,15 +35,14 @@ export function todayDateInput(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** Normalize API / form dates to YYYY-MM-DD without UTC day shift. */
+/** Normalize API / form dates to YYYY-MM-DD in the browser's local calendar. */
 export function dateInputValue(value: string): string {
   const raw = String(value).trim()
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
-  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/)
-  if (match) return match[1]
   const d = new Date(raw)
-  if (Number.isNaN(d.getTime())) return raw.slice(0, 10)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  if (!Number.isNaN(d.getTime())) return toLocalDateInput(d)
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/)
+  return match ? match[1] : raw.slice(0, 10)
 }
 
 /** Format a Date as YYYY-MM-DD in local timezone. */

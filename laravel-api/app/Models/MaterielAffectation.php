@@ -32,6 +32,24 @@ class MaterielAffectation extends Model
         ];
     }
 
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        $attributes = parent::toArray();
+
+        foreach (['date_debut', 'date_retour_prevue', 'date_retour_effective'] as $field) {
+            if (! array_key_exists($field, $attributes) || $attributes[$field] === null) {
+                continue;
+            }
+            $value = $this->{$field};
+            if ($value instanceof Carbon) {
+                $attributes[$field] = $value->format('Y-m-d');
+            }
+        }
+
+        return $attributes;
+    }
+
     public function equipment(): BelongsTo
     {
         return $this->belongsTo(Equipment::class);

@@ -682,9 +682,17 @@ export default function QuoteFormFields({
                         <input
                           type="number"
                           min={1}
+                          step={1}
                           className="quote-lines-table__num"
                           value={line.quantity}
-                          onChange={(e) => updateLine(index, 'quantity', Number(e.target.value))}
+                          onChange={(e) => {
+                            const raw = e.target.value
+                            if (raw === '') {
+                              updateLine(index, 'quantity', 0)
+                              return
+                            }
+                            updateLine(index, 'quantity', Math.max(0, Math.round(Number(raw))))
+                          }}
                         />
                       </td>
                       <td>
@@ -713,10 +721,21 @@ export default function QuoteFormFields({
                           type="number"
                           min={0}
                           max={100}
-                          step={0.01}
+                          step={1}
                           className="quote-lines-table__num"
                           value={line.tva_rate ?? form.tva_rate ?? 20}
-                          onChange={(e) => updateLine(index, 'tva_rate', Number(e.target.value))}
+                          onChange={(e) => {
+                            const raw = e.target.value
+                            if (raw === '') {
+                              updateLine(index, 'tva_rate', 0)
+                              return
+                            }
+                            updateLine(
+                              index,
+                              'tva_rate',
+                              Math.min(100, Math.max(0, Math.round(Number(raw)))),
+                            )
+                          }}
                         />
                       </td>
                       <td className="quote-lines-table__total">

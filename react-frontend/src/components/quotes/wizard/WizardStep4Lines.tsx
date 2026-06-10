@@ -284,10 +284,17 @@ export default function WizardStep4Lines({
                       <input
                         className="quote-lines-table__num"
                         type="number"
-                        min={0}
-                        step={0.01}
+                        min={1}
+                        step={1}
                         value={line.quantity}
-                        onChange={(e) => updateLine(i, 'quantity', Number(e.target.value))}
+                        onChange={(e) => {
+                          const raw = e.target.value
+                          if (raw === '') {
+                            updateLine(i, 'quantity', 0)
+                            return
+                          }
+                          updateLine(i, 'quantity', Math.max(0, Math.round(Number(raw))))
+                        }}
                       />
                     </td>
                     {!isForfait && (
@@ -319,9 +326,20 @@ export default function WizardStep4Lines({
                             type="number"
                             min={0}
                             max={100}
-                            step={0.01}
+                            step={1}
                             value={line.tva_rate ?? form.tva_rate ?? 20}
-                            onChange={(e) => updateLine(i, 'tva_rate', Number(e.target.value))}
+                            onChange={(e) => {
+                              const raw = e.target.value
+                              if (raw === '') {
+                                updateLine(i, 'tva_rate', 0)
+                                return
+                              }
+                              updateLine(
+                                i,
+                                'tva_rate',
+                                Math.min(100, Math.max(0, Math.round(Number(raw)))),
+                              )
+                            }}
                           />
                         </td>
                         <td className="quote-lines-table__total">{formatMoney(ht)}</td>

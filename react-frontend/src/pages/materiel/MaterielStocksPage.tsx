@@ -48,8 +48,18 @@ function emptyConsumableForm(): Partial<CommercialOffering> & { name: string; ki
   }
 }
 
+function toWholeNumber(value: number | string | null | undefined): number {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, Math.round(n))
+}
+
 function formatStockQty(value: number): string {
-  return Number(value).toFixed(Number(value) % 1 ? 3 : 0)
+  return String(toWholeNumber(value))
+}
+
+function formatTvaRate(value: number): string {
+  return `${toWholeNumber(value)} %`
 }
 
 function matchesStockFilter(row: CommercialOffering, filter: StockFilter): boolean {
@@ -120,6 +130,8 @@ export default function MaterielStocksPage() {
         name: form.name!.trim(),
         kind: 'product',
         track_stock: true,
+        stock_quantity: toWholeNumber(form.stock_quantity),
+        default_tva_rate: toWholeNumber(form.default_tva_rate),
         equipment_id: form.equipment_id ?? null,
       }),
     onSuccess: () => {
@@ -135,6 +147,8 @@ export default function MaterielStocksPage() {
         ...form,
         kind: 'product',
         track_stock: true,
+        stock_quantity: toWholeNumber(form.stock_quantity),
+        default_tva_rate: toWholeNumber(form.default_tva_rate),
         equipment_id: form.equipment_id ?? null,
       }),
     onSuccess: () => {
@@ -164,8 +178,8 @@ export default function MaterielStocksPage() {
       unit: row.unit ?? 'u',
       purchase_price_ht: row.purchase_price_ht,
       sale_price_ht: row.sale_price_ht,
-      default_tva_rate: row.default_tva_rate,
-      stock_quantity: row.stock_quantity,
+      default_tva_rate: toWholeNumber(row.default_tva_rate),
+      stock_quantity: toWholeNumber(row.stock_quantity),
       track_stock: true,
       active: row.active,
       equipment_id: row.equipment_id ?? undefined,
@@ -338,7 +352,7 @@ export default function MaterielStocksPage() {
                 </thead>
                 <tbody>
                   {rows.map((row) => {
-                    const qty = Number(row.stock_quantity)
+                    const qty = toWholeNumber(row.stock_quantity)
                     const stockVariant = qty <= 0 ? 'danger' : qty <= 5 ? 'warning' : 'success'
                     return (
                       <tr key={row.id}>
@@ -359,7 +373,7 @@ export default function MaterielStocksPage() {
                         </td>
                         <td>{formatMoney(Number(row.purchase_price_ht))}</td>
                         <td>{formatMoney(Number(row.sale_price_ht))}</td>
-                        <td>{Number(row.default_tva_rate).toFixed(0)} %</td>
+                        <td>{formatTvaRate(row.default_tva_rate)}</td>
                         <td>
                           {row.equipment ? (
                             <Link to={`/materiel/equipements/${row.equipment.id}`} className="link-inline">
@@ -450,10 +464,13 @@ export default function MaterielStocksPage() {
               <input
                 type="number"
                 min={0}
-                step={0.001}
+                step={1}
+                inputMode="numeric"
                 className="article-actions-form__input"
                 value={form.stock_quantity ?? 0}
-                onChange={(e) => setForm((f) => ({ ...f, stock_quantity: Number(e.target.value) }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, stock_quantity: toWholeNumber(e.target.value) }))
+                }
               />
             </label>
             <label>
@@ -484,10 +501,13 @@ export default function MaterielStocksPage() {
                 type="number"
                 min={0}
                 max={100}
-                step={0.01}
+                step={1}
+                inputMode="numeric"
                 className="article-actions-form__input"
                 value={form.default_tva_rate ?? 20}
-                onChange={(e) => setForm((f) => ({ ...f, default_tva_rate: Number(e.target.value) }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, default_tva_rate: toWholeNumber(e.target.value) }))
+                }
               />
             </label>
             <label style={{ gridColumn: '1 / -1' }}>

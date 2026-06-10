@@ -33,18 +33,19 @@
 .qw-step__line { flex: 1; height: 2px; background: #e5e7eb; margin: 0 .5rem; }
 .qw-step--done .qw-step__line { background: var(--color-primary, #2563eb); }
 
-/* Wizard shell — scrollable step body, nav always visible */
+/* Wizard shell — scrollable step body, nav pinned at bottom */
 .qw-shell {
   display: flex;
   flex-direction: column;
   max-height: min(760px, calc(100dvh - 13rem));
-  min-height: 360px;
+  min-height: min(480px, calc(100dvh - 13rem));
 }
 .qw-shell__body {
   flex: 1 1 auto;
   overflow-y: auto;
   min-height: 0;
   overscroll-behavior: contain;
+  padding-bottom: 0.5rem;
 }
 
 /* Step content */
@@ -78,18 +79,24 @@
 .qw-mode-btn { padding: .5rem 1.1rem; border-radius: 8px; border: 2px solid #e5e7eb; background: #fff; font-weight: 600; font-size: .85rem; cursor: pointer; transition: all .15s; }
 .qw-mode-btn--active { border-color: var(--color-primary, #2563eb); background: #eff6ff; color: var(--color-primary, #2563eb); }
 
-/* Nav buttons */
-.qw-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e5e7eb; }
+/* Nav buttons — fixed dock at bottom of wizard */
+.qw-nav { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e5e7eb; }
 .qw-nav--dock {
   flex-shrink: 0;
-  margin-top: 0;
-  padding: 1rem 2rem 1.25rem;
+  margin-top: auto;
+  padding: 1rem 2rem calc(1rem + env(safe-area-inset-bottom, 0px));
   background: var(--color-surface, #fff);
   border-top: 1px solid #e5e7eb;
   box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.06);
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
 }
-.qw-nav--back-only {
-  justify-content: flex-start;
+.qw-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
 }
 .qw-nav__back { padding: .6rem 1.4rem; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #374151; font-weight: 600; cursor: pointer; }
 .qw-nav__next { padding: .6rem 1.4rem; border-radius: 8px; background: var(--color-primary, #2563eb); color: #fff; font-weight: 700; border: none; cursor: pointer; font-size: .95rem; }

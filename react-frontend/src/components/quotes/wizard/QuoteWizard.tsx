@@ -198,44 +198,38 @@ export default function QuoteWizard({
           setForm={setForm}
           totals={totals}
           metaFraisTtc={metaFraisTtc}
-          isSubmitting={isSubmitting}
-          submitLabel={submitLabel}
-          onCancel={onCancel}
           readOnly={readOnly}
         />
       )}
 
       </div>
 
-      {/* Navigation — not shown on step 5 (has its own submit buttons) */}
-      {step !== 5 && (
-        <div className="qw-nav qw-nav--dock">
-          <button
-            type="button"
-            className="qw-nav__back"
-            onClick={step === 1 ? onCancel : goBack}
-          >
-            {step === 1 ? (readOnly ? 'Retour à la liste' : 'Annuler') : '← Retour'}
-          </button>
-          <button
-            type="button"
-            className="qw-nav__next"
-            onClick={goNext}
-            disabled={!canGoNext}
-          >
-            Suivant →
-          </button>
+      <div className="qw-nav qw-nav--dock">
+        <button
+          type="button"
+          className="qw-nav__back"
+          onClick={step === 1 ? onCancel : goBack}
+        >
+          {step === 1 ? (readOnly ? 'Retour à la liste' : 'Annuler') : '← Retour'}
+        </button>
+        <div className="qw-nav__actions">
+          {step < 5 && (
+            <button
+              type="button"
+              className="qw-nav__next"
+              onClick={goNext}
+              disabled={!canGoNext}
+            >
+              Suivant →
+            </button>
+          )}
+          {step === 5 && !readOnly && (
+            <button type="submit" className="qw-nav__submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Enregistrement…' : submitLabel}
+            </button>
+          )}
         </div>
-      )}
-
-      {/* Back button on step 5 */}
-      {step === 5 && (
-        <div className="qw-nav qw-nav--dock qw-nav--back-only">
-          <button type="button" className="qw-nav__back" onClick={goBack}>
-            ← Retour
-          </button>
-        </div>
-      )}
+      </div>
     </div>
   )
 }

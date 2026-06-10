@@ -1,30 +1,188 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { commercialOfferingsApi } from '../../api/client'
+import { Link, Navigate } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  commercialOfferingsApi,
+  equipmentsApi,
+  type CommercialOffering,
+  type EquipmentRow,
+} from '../../api/client'
+import { useAuth } from '../../contexts/AuthContext'
+import ListTableToolbar, { PaginationBar } from '../../components/ListTableToolbar'
+import Modal from '../../components/Modal'
+import StatusBadge from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import { MATERIEL_HOME, MATERIEL_MODULE_TABS } from './materielModuleTabs'
-import { formatMoney } from '../../lib/appLocale'
+
+type StockFilter = '' | 'available' | 'empty'
+type ActiveFilter = '' | 'active' | 'inactive'
+
+const STOCK_FILTER_OPTIONS = [
+  { value: '', label: 'Tous les stocks' },
+  { value: 'available', label: 'En stock (> 0)' },
+  { value: 'empty', label: 'Rupture (0)' },
+] as const
+
+const ACTIVE_FILTER_OPTIONS = [
+  { value: '', label: 'Tous' },
+  { value: 'active', label: 'Actifs' },
+  { value: 'inactive', label: 'Inactifs' },
+] as const
+
+function emptyConsumableForm(): Partial<CommercialOffering> & { name: string; kind: 'product' } {
+  return {
+    code: '',
+    name: '',
+    description: '',
+    kind: 'product',
+    unit: 'u',
+    purchase_price_ht: 0,
+    sale_price_ht: 0,
+    default_tva_rate: 20,
+    stock_quantity: 0,
+    track_stock: true,
+    active: true,
+    equipment_id: undefined,
+  }
+}
+
+function formatStockQty(value: number): string {
+  return Number(value).toFixed(Number(value) % 1 ? 3 : 0)
+}
+
+function matchesStockFilter(row: CommercialOffering, filter: StockFilter): boolean {
+  if (filter === 'available') return Number(row.stock_quantity) > 0
+  if (filter === 'empty') return Number(row.stock_quantity) <= 0
+  return true
+}
+
+function matchesActiveFilter(row: CommercialOffering, filter: ActiveFilter): boolean {
+  if (filter === 'active') return row.active
+  if (filter === 'inactive') return !row.active
+  return true
+}
 
 export default function MaterielStocksPage() {
+  const { user } = useAuth()
+  const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
+  const isAdmin = user?.role === 'lab_admin'
+  const queryClient = useQueryClient()
+
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search, 300)
+  const [stockFilter, setStockFilter] = useState<StockFilter>('')
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('')
+  const [page, setPage] = useState(1)
+  const [modal, setModal] = useState<'create' | 'edit' | null>(null)
+  const [editing, setEditing] = useState<CommercialOffering | null>(null)
+  const [form, setForm] = useState(emptyConsumableForm())
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['commercial-offerings', 'stocks'],
-    queryFn: () => commercialOfferingsApi.list({ per_page: 200 }),
+    queryKey: ['commercial-offerings', 'consommables', debouncedSearch, page],
+    queryFn: () =>
+      commercialOfferingsApi.list({
+        search: debouncedSearch.trim() || undefined,
+        kind: 'product',
+        track_stock: true,
+        per_page: 30,
+        page,
+      }),
+    enabled: isLab,
   })
 
+  const { data: equipmentList = [] } = useQuery({
+    queryKey: ['equipments', 'consommables-form'],
+    queryFn: () => equipmentsApi.list(),
+    enabled: !!modal,
+  })
+
+  const equipmentSorted = useMemo(
+    () => [...equipmentList].sort((a, b) => a.code.localeCompare(b.code, 'fr')),
+    [equipmentList],
+  )
+
   const rows = useMemo(() => {
-    const term = search.trim().toLowerCase()
     return (data?.data ?? [])
-      .filter((row) => row.track_stock)
-      .filter((row) => {
-        if (!term) return true
-        return [row.code, row.name, row.unit, row.equipment?.name, row.equipment?.code]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(term))
-      })
-      .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
-  }, [data?.data, search])
+      .filter((row) => matchesStockFilter(row, stockFilter))
+      .filter((row) => matchesActiveFilter(row, activeFilter))
+  }, [activeFilter, data?.data, stockFilter])
+
+  const lastPage = data?.last_page ?? 1
+  const totalLoaded = data?.data?.length ?? 0
+  const hasActiveFilters = search.trim() !== '' || stockFilter !== '' || activeFilter !== ''
+
+  const createMut = useMutation({
+    mutationFn: () =>
+      commercialOfferingsApi.create({
+        ...(form as Parameters<typeof commercialOfferingsApi.create>[0]),
+        name: form.name!.trim(),
+        kind: 'product',
+        track_stock: true,
+        equipment_id: form.equipment_id ?? null,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['commercial-offerings'] })
+      setModal(null)
+      setForm(emptyConsumableForm())
+    },
+  })
+
+  const updateMut = useMutation({
+    mutationFn: () =>
+      commercialOfferingsApi.update(editing!.id, {
+        ...form,
+        kind: 'product',
+        track_stock: true,
+        equipment_id: form.equipment_id ?? null,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['commercial-offerings'] })
+      setModal(null)
+      setEditing(null)
+    },
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => commercialOfferingsApi.delete(id),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['commercial-offerings'] }),
+  })
+
+  function openCreate() {
+    setForm(emptyConsumableForm())
+    setModal('create')
+  }
+
+  function openEdit(row: CommercialOffering) {
+    setEditing(row)
+    setForm({
+      code: row.code ?? '',
+      name: row.name,
+      description: row.description ?? '',
+      kind: 'product',
+      unit: row.unit ?? 'u',
+      purchase_price_ht: row.purchase_price_ht,
+      sale_price_ht: row.sale_price_ht,
+      default_tva_rate: row.default_tva_rate,
+      stock_quantity: row.stock_quantity,
+      track_stock: true,
+      active: row.active,
+      equipment_id: row.equipment_id ?? undefined,
+    })
+    setModal('edit')
+  }
+
+  function resetFilters() {
+    setSearch('')
+    setStockFilter('')
+    setActiveFilter('')
+    setPage(1)
+  }
+
+  if (!isLab) {
+    return <Navigate to="/" replace />
+  }
 
   return (
     <ModuleEntityShell
@@ -34,68 +192,359 @@ export default function MaterielStocksPage() {
         { label: 'Stocks' },
       ]}
       moduleBarLabel="Matériel"
-      title="Stocks"
-      subtitle="Tableau des produits et consommables suivis en stock."
+      title="Stocks — consommables"
+      subtitle={
+        <>
+          {rows.length} consommable{rows.length !== 1 ? 's' : ''} affiché{rows.length !== 1 ? 's' : ''}
+          {hasActiveFilters && totalLoaded !== rows.length ? (
+            <span className="text-muted"> (sur {totalLoaded} sur cette page)</span>
+          ) : null}
+        </>
+      }
       tabs={MATERIEL_MODULE_TABS}
+      actions={
+        isLab ? (
+          <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
+            + Consommable
+          </button>
+        ) : undefined
+      }
     >
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <label style={{ display: 'block', maxWidth: 420 }}>
-          Recherche stock
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Code, libellé, unité, matériel lié…"
-            style={{ width: '100%', marginTop: '0.25rem' }}
-          />
-        </label>
-      </div>
-      {isLoading && <p className="text-muted">Chargement des stocks…</p>}
-      {error && <p className="error">{(error as Error).message}</p>}
-      {!isLoading && !error && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div className="table-wrap">
-            <table className="data-table data-table--compact" style={{ width: '100%' }}>
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Article / consommable</th>
-                  <th>Unité</th>
-                  <th>Quantité stock</th>
-                  <th>Prix vente HT</th>
-                  <th>Matériel lié</th>
-                  <th>Actif</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    <td><code>{row.code ?? '—'}</code></td>
-                    <td>
-                      <strong>{row.name}</strong>
-                      {row.description && <div className="text-muted" style={{ fontSize: '0.82rem' }}>{row.description}</div>}
-                    </td>
-                    <td>{row.unit ?? '—'}</td>
-                    <td>{Number(row.stock_quantity).toFixed(Number(row.stock_quantity) % 1 ? 3 : 0)}</td>
-                    <td>{formatMoney(Number(row.sale_price_ht))}</td>
-                    <td>
-                      {row.equipment ? (
-                        <Link to={`/materiel/equipements/${row.equipment.id}`} className="link-inline">
-                          {row.equipment.code} — {row.equipment.name}
-                        </Link>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td>{row.active ? 'Oui' : 'Non'}</td>
-                  </tr>
+      <ListTableToolbar
+        className="materiel-stocks-toolbar"
+        searchValue={search}
+        onSearchChange={(v) => {
+          setSearch(v)
+          setPage(1)
+        }}
+        searchPlaceholder="Code, libellé, unité, description…"
+        extra={
+          <>
+            <label className="list-table-toolbar__field list-table-toolbar__status">
+              <span className="filter-label">Niveau de stock</span>
+              <select
+                value={stockFilter}
+                onChange={(e) => {
+                  setStockFilter(e.target.value as StockFilter)
+                  setPage(1)
+                }}
+              >
+                {STOCK_FILTER_OPTIONS.map((o) => (
+                  <option key={o.value || 'all'} value={o.value}>
+                    {o.label}
+                  </option>
                 ))}
-              </tbody>
-            </table>
+              </select>
+            </label>
+            <label className="list-table-toolbar__field list-table-toolbar__status">
+              <span className="filter-label">Statut</span>
+              <select
+                value={activeFilter}
+                onChange={(e) => {
+                  setActiveFilter(e.target.value as ActiveFilter)
+                  setPage(1)
+                }}
+              >
+                {ACTIVE_FILTER_OPTIONS.map((o) => (
+                  <option key={o.value || 'all'} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        }
+        footer={
+          hasActiveFilters ? (
+            <>
+              <span className="list-table-toolbar__footer-label">Filtres actifs</span>
+              {search.trim() !== '' ? (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">Recherche : « {search.trim()} »</span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => setSearch('')}
+                    aria-label="Effacer la recherche"
+                  >
+                    ×
+                  </button>
+                </span>
+              ) : null}
+              {stockFilter ? (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">
+                    {STOCK_FILTER_OPTIONS.find((o) => o.value === stockFilter)?.label}
+                  </span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => setStockFilter('')}
+                    aria-label="Effacer le filtre stock"
+                  >
+                    ×
+                  </button>
+                </span>
+              ) : null}
+              {activeFilter ? (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">
+                    {ACTIVE_FILTER_OPTIONS.find((o) => o.value === activeFilter)?.label}
+                  </span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => setActiveFilter('')}
+                    aria-label="Effacer le filtre statut"
+                  >
+                    ×
+                  </button>
+                </span>
+              ) : null}
+              <button type="button" className="btn btn-secondary btn-sm" onClick={resetFilters}>
+                Tout effacer
+              </button>
+            </>
+          ) : null
+        }
+      />
+
+      {isLoading && <p className="text-muted">Chargement des consommables…</p>}
+      {error && <p className="error">{(error as Error).message}</p>}
+
+      {!isLoading && !error && (
+        <div className="card dossier-tab-panel dossier-tab-panel--table materiel-stocks-table-card">
+          <div className="dossier-tab-panel__header">
+            <h2 className="ds-form-section__title">Les consommables</h2>
+            <span className="badge">{rows.length}</span>
           </div>
-          {rows.length === 0 && <p style={{ padding: '1rem' }}>Aucun stock suivi.</p>}
+
+          {rows.length > 0 ? (
+            <div className="table-wrap">
+              <table className="data-table data-table--compact">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Désignation</th>
+                    <th>Unité</th>
+                    <th>Stock</th>
+                    <th>Prix achat HT</th>
+                    <th>Prix vente HT</th>
+                    <th>TVA</th>
+                    <th>Matériel lié</th>
+                    <th>Statut</th>
+                    {isLab ? <th className="materiel-stocks-table__actions">Actions</th> : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => {
+                    const qty = Number(row.stock_quantity)
+                    const stockVariant = qty <= 0 ? 'danger' : qty <= 5 ? 'warning' : 'success'
+                    return (
+                      <tr key={row.id}>
+                        <td>
+                          <code className="code-badge">{row.code?.trim() || '—'}</code>
+                        </td>
+                        <td>
+                          <strong>{row.name}</strong>
+                          {row.description?.trim() ? (
+                            <div className="text-muted materiel-stocks-table__desc">{row.description}</div>
+                          ) : null}
+                        </td>
+                        <td>{row.unit?.trim() || '—'}</td>
+                        <td>
+                          <StatusBadge variant={stockVariant} size="sm">
+                            {formatStockQty(qty)}
+                          </StatusBadge>
+                        </td>
+                        <td>{formatMoney(Number(row.purchase_price_ht))}</td>
+                        <td>{formatMoney(Number(row.sale_price_ht))}</td>
+                        <td>{Number(row.default_tva_rate).toFixed(0)} %</td>
+                        <td>
+                          {row.equipment ? (
+                            <Link to={`/materiel/equipements/${row.equipment.id}`} className="link-inline">
+                              {row.equipment.code}
+                            </Link>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td>
+                          <StatusBadge variant={row.active ? 'success' : 'neutral'} size="sm">
+                            {row.active ? 'Actif' : 'Inactif'}
+                          </StatusBadge>
+                        </td>
+                        {isLab ? (
+                          <td className="crud-actions materiel-stocks-table__actions">
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => openEdit(row)}
+                            >
+                              Modifier
+                            </button>
+                            {isAdmin ? (
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm btn-danger-outline"
+                                onClick={() => {
+                                  if (window.confirm(`Supprimer le consommable « ${row.name} » ?`)) {
+                                    deleteMut.mutate(row.id)
+                                  }
+                                }}
+                              >
+                                Supprimer
+                              </button>
+                            ) : null}
+                          </td>
+                        ) : null}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="dossier-tab-empty">Aucun consommable ne correspond aux filtres.</p>
+          )}
+
+          <PaginationBar page={page} lastPage={lastPage} onPage={setPage} />
         </div>
       )}
+
+      {modal ? (
+        <Modal
+          title={modal === 'create' ? 'Nouveau consommable' : 'Modifier le consommable'}
+          onClose={() => setModal(null)}
+        >
+          <div className="commercial-catalog-form materiel-stocks-form">
+            <label>
+              Code référence
+              <input
+                className="article-actions-form__input"
+                value={form.code ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+                placeholder="Ex. CONS-001"
+              />
+            </label>
+            <label>
+              Désignation *
+              <input
+                className="article-actions-form__input"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                required
+              />
+            </label>
+            <label>
+              Unité *
+              <input
+                className="article-actions-form__input"
+                value={form.unit ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
+                placeholder="u, L, kg, ml…"
+              />
+            </label>
+            <label>
+              Quantité en stock *
+              <input
+                type="number"
+                min={0}
+                step={0.001}
+                className="article-actions-form__input"
+                value={form.stock_quantity ?? 0}
+                onChange={(e) => setForm((f) => ({ ...f, stock_quantity: Number(e.target.value) }))}
+              />
+            </label>
+            <label>
+              Prix d&apos;achat HT ({MONEY_UNIT_LABEL})
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                className="article-actions-form__input"
+                value={form.purchase_price_ht ?? 0}
+                onChange={(e) => setForm((f) => ({ ...f, purchase_price_ht: Number(e.target.value) }))}
+              />
+            </label>
+            <label>
+              Prix de vente HT ({MONEY_UNIT_LABEL})
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                className="article-actions-form__input"
+                value={form.sale_price_ht ?? 0}
+                onChange={(e) => setForm((f) => ({ ...f, sale_price_ht: Number(e.target.value) }))}
+              />
+            </label>
+            <label>
+              TVA (%)
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                className="article-actions-form__input"
+                value={form.default_tva_rate ?? 20}
+                onChange={(e) => setForm((f) => ({ ...f, default_tva_rate: Number(e.target.value) }))}
+              />
+            </label>
+            <label style={{ gridColumn: '1 / -1' }}>
+              Matériel lié (optionnel)
+              <select
+                className="article-actions-form__select"
+                value={form.equipment_id ?? ''}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    equipment_id: e.target.value === '' ? undefined : Number(e.target.value),
+                  }))
+                }
+              >
+                <option value="">— Aucun —</option>
+                {equipmentSorted.map((eq: EquipmentRow) => (
+                  <option key={eq.id} value={eq.id}>
+                    {eq.code} — {eq.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ gridColumn: '1 / -1' }}>
+              Description
+              <textarea
+                rows={3}
+                value={form.description ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              />
+            </label>
+            <label className="materiel-stocks-form__checkbox">
+              <input
+                type="checkbox"
+                checked={form.active ?? true}
+                onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
+              />
+              Actif (disponible à la consommation)
+            </label>
+          </div>
+          {(createMut.isError || updateMut.isError) && (
+            <p className="error">{((createMut.error ?? updateMut.error) as Error).message}</p>
+          )}
+          <div className="crud-actions" style={{ marginTop: '1rem' }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!form.name?.trim() || createMut.isPending || updateMut.isPending}
+              onClick={() => (modal === 'create' ? createMut.mutate() : updateMut.mutate())}
+            >
+              {createMut.isPending || updateMut.isPending ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>
+              Annuler
+            </button>
+          </div>
+        </Modal>
+      ) : null}
     </ModuleEntityShell>
   )
 }

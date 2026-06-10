@@ -1772,11 +1772,19 @@ export interface CommercialOffering {
 }
 
 export const commercialOfferingsApi = {
-  list: (params?: { search?: string; kind?: string; active_only?: boolean; per_page?: number; page?: number }) => {
+  list: (params?: {
+    search?: string
+    kind?: string
+    active_only?: boolean
+    track_stock?: boolean
+    per_page?: number
+    page?: number
+  }) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
     if (params?.kind) q.set('kind', params.kind)
     if (params?.active_only) q.set('active_only', '1')
+    if (params?.track_stock != null) q.set('track_stock', params.track_stock ? '1' : '0')
     if (params?.per_page) q.set('per_page', String(params.per_page))
     if (params?.page) q.set('page', String(params.page))
     const s = q.toString()

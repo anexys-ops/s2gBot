@@ -35,6 +35,10 @@ class CommercialOfferingController extends Controller
             $q->where('kind', $request->query('kind'));
         }
 
+        if ($request->has('track_stock')) {
+            $q->where('track_stock', $request->boolean('track_stock'));
+        }
+
         $perPage = min(100, max(1, (int) $request->query('per_page', 50)));
 
         return response()->json($q->paginate($perPage));

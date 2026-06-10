@@ -6853,6 +6853,24 @@ a.catalogue-tree__link-article:hover {
   white-space: nowrap;
 }
 
+.materiel-stocks-table-card .dossier-tab-panel__header {
+  padding: 1rem 1.25rem 0.5rem;
+}
+.materiel-stocks-table__desc {
+  font-size: 0.82rem;
+  margin-top: 0.15rem;
+  line-height: 1.35;
+}
+.materiel-stocks-table__actions {
+  white-space: nowrap;
+}
+.materiel-stocks-form__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 960px) {
   .materiel-hub-choices {
     grid-template-columns: 1fr;

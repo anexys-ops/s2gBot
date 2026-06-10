@@ -8,6 +8,7 @@ import {
   type EquipmentRow,
 } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import ListTableToolbar, { PaginationBar } from '../../components/ListTableToolbar'
 import Modal from '../../components/Modal'
 import StatusBadge from '../../components/ds/StatusBadge'
@@ -87,6 +88,7 @@ export default function MaterielStocksPage() {
   const [page, setPage] = useState(1)
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [editing, setEditing] = useState<CommercialOffering | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<CommercialOffering | null>(null)
   const [form, setForm] = useState(emptyConsumableForm())
 
   const { data, isLoading, error } = useQuery({
@@ -160,7 +162,10 @@ export default function MaterielStocksPage() {
 
   const deleteMut = useMutation({
     mutationFn: (id: number) => commercialOfferingsApi.delete(id),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['commercial-offerings'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['commercial-offerings'] })
+      setDeleteTarget(null)
+    },
   })
 
   function openCreate() {
@@ -401,11 +406,7 @@ export default function MaterielStocksPage() {
                               <button
                                 type="button"
                                 className="btn btn-secondary btn-sm btn-danger-outline"
-                                onClick={() => {
-                                  if (window.confirm(`Supprimer le consommable « ${row.name} » ?`)) {
-                                    deleteMut.mutate(row.id)
-                                  }
-                                }}
+                                onClick={() => setDeleteTarget(row)}
                               >
                                 Supprimer
                               </button>
@@ -425,6 +426,30 @@ export default function MaterielStocksPage() {
           <PaginationBar page={page} lastPage={lastPage} onPage={setPage} />
         </div>
       )}
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Supprimer le consommable"
+          message={
+            <>
+              Supprimer définitivement{' '}
+              <strong>{deleteTarget.code?.trim() || deleteTarget.name}</strong>
+              {deleteTarget.code?.trim() ? <> — {deleteTarget.name}</> : null} ?
+              <span className="text-muted" style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                Stock actuel : {formatStockQty(deleteTarget.stock_quantity)} {deleteTarget.unit ?? 'u'}
+              </span>
+            </>
+          }
+          confirmLabel="Supprimer"
+          variant="danger"
+          loading={deleteMut.isPending}
+          error={deleteMut.isError ? (deleteMut.error as Error).message : null}
+          onConfirm={() => deleteMut.mutate(deleteTarget.id)}
+          onCancel={() => {
+            if (!deleteMut.isPending) setDeleteTarget(null)
+          }}
+        />
+      ) : null}
 
       {modal ? (
         <Modal

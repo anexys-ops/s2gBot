@@ -7,7 +7,7 @@ import StatusBadge, { equipementStatutBadgeProps } from '../../components/ds/Sta
 import EquipmentEditorPanel from '../../components/materiel/EquipmentEditorPanel'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
-import { MATERIEL_MODULE_TABS } from '../materiel/materielModuleTabs'
+import { MATERIEL_HOME, MATERIEL_MODULE_TABS } from '../materiel/materielModuleTabs'
 import { formatAppDate } from '../../lib/appLocale'
 
 type TabId = 'overview' | 'edit' | 'calibrations' | 'extrafields'
@@ -362,8 +362,7 @@ export default function EquipmentDetailPage() {
       <ModuleEntityShell
         breadcrumbs={[
           { label: 'Accueil', to: '/' },
-          { label: 'Matériel', to: '/materiel' },
-          { label: 'Parc équipements', to: '/materiel/equipements' },
+          { label: 'Parc équipements', to: MATERIEL_HOME },
           { label: '…' },
         ]}
         moduleBarLabel="Matériel"
@@ -380,8 +379,7 @@ export default function EquipmentDetailPage() {
       <ModuleEntityShell
         breadcrumbs={[
           { label: 'Accueil', to: '/' },
-          { label: 'Matériel', to: '/materiel' },
-          { label: 'Parc équipements', to: '/materiel/equipements' },
+          { label: 'Parc équipements', to: MATERIEL_HOME },
           { label: 'Erreur' },
         ]}
         moduleBarLabel="Matériel"
@@ -404,8 +402,7 @@ export default function EquipmentDetailPage() {
       shellClassName="module-shell--equipment-fiche"
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'Matériel', to: '/materiel' },
-        { label: 'Parc équipements', to: '/materiel/equipements' },
+        { label: 'Parc équipements', to: MATERIEL_HOME },
         { label: eq.code },
       ]}
       moduleBarLabel="Matériel — Fiche équipement"

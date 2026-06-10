@@ -82,7 +82,6 @@ import ComptaFondationPage from './pages/commercial/ComptaFondationPage'
 import OrdresMissionPage from './pages/commercial/OrdresMissionPage'
 import OrdreMissionFichePage from './pages/commercial/OrdreMissionFichePage'
 import OrdreMissionPlanningPage from './pages/commercial/OrdreMissionPlanningPage'
-import MaterielHub from './pages/hub/MaterielHub'
 import MaterielModuleLayout from './pages/materiel/MaterielModuleLayout'
 import MaterielPlanningPage from './pages/materiel/MaterielPlanningPage'
 import MaterielStocksPage from './pages/materiel/MaterielStocksPage'
@@ -159,7 +158,7 @@ function AppRoutes() {
         <Route path="terrain/chantiers" element={<TerrainChantiersCartePage />} />
         <Route path="terrain/planning" element={<PlanningTechniciensPage />} />
         <Route path="materiel" element={<MaterielModuleLayout />}>
-          <Route index element={<MaterielHub />} />
+          <Route index element={<Navigate to="equipements" replace />} />
           <Route path="equipements" element={<EquipmentsPage />} />
           <Route path="equipements/:id" element={<EquipmentDetailPage />} />
           <Route path="planning" element={<MaterielPlanningPage />} />

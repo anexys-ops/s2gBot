@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { commercialOfferingsApi } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
-import { MATERIEL_MODULE_TABS } from './materielModuleTabs'
+import { MATERIEL_HOME, MATERIEL_MODULE_TABS } from './materielModuleTabs'
 import { formatMoney } from '../../lib/appLocale'
 
 export default function MaterielStocksPage() {
@@ -30,7 +30,7 @@ export default function MaterielStocksPage() {
     <ModuleEntityShell
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'Matériel', to: '/materiel' },
+        { label: 'Parc équipements', to: MATERIEL_HOME },
         { label: 'Stocks' },
       ]}
       moduleBarLabel="Matériel"

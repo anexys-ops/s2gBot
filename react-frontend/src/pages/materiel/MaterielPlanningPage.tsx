@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { bonsCommandeApi, equipmentsApi, type EquipmentRow } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
-import { MATERIEL_MODULE_TABS } from './materielModuleTabs'
+import { MATERIEL_HOME, MATERIEL_MODULE_TABS } from './materielModuleTabs'
 
 type PlanningEvent = {
   id: string
@@ -187,7 +187,7 @@ export default function MaterielPlanningPage() {
     <ModuleEntityShell
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'Matériel', to: '/materiel' },
+        { label: 'Parc équipements', to: MATERIEL_HOME },
         { label: 'Planning matériel' },
       ]}
       moduleBarLabel="Matériel"

@@ -56,7 +56,7 @@ export default function TerrainHub() {
           Espace laboratoire (essais) →
         </Link>
         {' · '}
-        <Link to="/materiel" className="hub-footnote__link">
+        <Link to="/materiel/equipements" className="hub-footnote__link">
           Matériel →
         </Link>
       </p>

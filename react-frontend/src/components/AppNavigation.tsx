@@ -161,7 +161,7 @@ export default function AppNavigation() {
         label: 'Catalogue',
         items: filterItems([
           { to: '/catalogue', label: 'Articles & essais' },
-          { to: '/materiel', label: 'Matériel / Équipements' },
+          { to: '/materiel/equipements', label: 'Matériel / Équipements' },
           { to: '/labo/fiches', label: 'Fiches techniques dynamiques' },
         ]),
       },

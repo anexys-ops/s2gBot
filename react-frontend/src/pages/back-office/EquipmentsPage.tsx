@@ -88,7 +88,6 @@ export default function EquipmentsPage() {
     <ModuleEntityShell
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'Matériel', to: '/materiel' },
         { label: 'Parc équipements' },
       ]}
       moduleBarLabel="Matériel"

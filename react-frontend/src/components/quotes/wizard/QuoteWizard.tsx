@@ -113,6 +113,20 @@ export default function QuoteWizard({
     if (step > 1) setStep((s) => s - 1)
   }
 
+  const canGoToStep = (target: number) => {
+    if (target < 1 || target > 5) return false
+    if (readOnly || !isCreate) return true
+    if (target <= step) return true
+    for (let s = 1; s < target; s++) {
+      if (!isStepValid(s, form)) return false
+    }
+    return true
+  }
+
+  const goToStep = (target: number) => {
+    if (canGoToStep(target)) setStep(target)
+  }
+
   // Step 6 — shown after successful creation
   if (step === 6 && createdQuote) {
     const contactEmail =
@@ -131,7 +145,7 @@ export default function QuoteWizard({
 
   return (
     <div className="qw-shell">
-      <WizardStepperBar current={step} />
+      <WizardStepperBar current={step} onStepClick={goToStep} canGoToStep={canGoToStep} />
 
       <div className="qw-shell__body">
       {step === 1 && (

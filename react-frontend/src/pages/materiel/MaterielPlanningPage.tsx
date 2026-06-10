@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { bonsCommandeApi, equipmentsApi, materielAffectationsApi } from '../../api/client'
 import {
   affectationEndDate,
@@ -31,12 +31,6 @@ const EVENT_KIND_OPTIONS: { value: EventKindFilter; label: string }[] = [
   { value: 'chantier', label: 'Chantiers' },
 ]
 
-const EQUIPMENT_STATUS_OPTIONS = [
-  { value: 'active', label: 'Actif' },
-  { value: 'maintenance', label: 'Maintenance' },
-  { value: 'retired', label: 'Retiré' },
-] as const
-
 function addDays(date: Date, days: number) {
   const d = new Date(date)
   d.setDate(d.getDate() + days)
@@ -61,19 +55,10 @@ function eventDay(date: string) {
   return dateInputValue(date)
 }
 
-function statusLabel(value: string): string {
-  return EQUIPMENT_STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value
-}
-
 export default function MaterielPlanningPage() {
-  const qc = useQueryClient()
   const [month, setMonth] = useState(() => toMonthInput(new Date()))
   const [eventKind, setEventKind] = useState<EventKindFilter>('')
   const [calendarEquipmentId, setCalendarEquipmentId] = useState<number | ''>('')
-  const [editEquipmentId, setEditEquipmentId] = useState<number | ''>('')
-  const [statusDraft, setStatusDraft] = useState('')
-  const [locationDraft, setLocationDraft] = useState('')
-  const [saved, setSaved] = useState(false)
 
   const calendarRange = useMemo(() => {
     const first = new Date(`${month}-01T12:00:00`)
@@ -107,23 +92,6 @@ export default function MaterielPlanningPage() {
         to: calendarRange.to,
         equipment_id: calendarEquipmentId === '' ? undefined : calendarEquipmentId,
       }),
-  })
-
-  const editEquipment = equipments.find((eq) => eq.id === editEquipmentId)
-
-  const updateEquipmentMut = useMutation({
-    mutationFn: () => {
-      if (!editEquipment) throw new Error('Sélectionnez un matériel.')
-      return equipmentsApi.update(editEquipment.id, {
-        status: statusDraft || editEquipment.status,
-        location: locationDraft,
-      })
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['equipments'] })
-      setSaved(true)
-      window.setTimeout(() => setSaved(false), 4000)
-    },
   })
 
   const allEvents = useMemo<PlanningEvent[]>(() => {
@@ -197,13 +165,6 @@ export default function MaterielPlanningPage() {
 
   const hasCalendarFilters = eventKind !== '' || calendarEquipmentId !== ''
   const calendarEquipment = equipments.find((eq) => eq.id === calendarEquipmentId)
-
-  function selectEditEquipment(nextId: number | '') {
-    const eq = equipments.find((item) => item.id === nextId)
-    setEditEquipmentId(nextId)
-    setStatusDraft(eq?.status ?? '')
-    setLocationDraft(eq?.location ?? '')
-  }
 
   function resetCalendarFilters() {
     setEventKind('')
@@ -341,85 +302,11 @@ export default function MaterielPlanningPage() {
             </div>
           ) : null}
         </section>
-
-        <section className="materiel-planning-toolbar__block materiel-planning-toolbar__block--edit">
-          <div className="materiel-planning-toolbar__block-head">
-            <h2 className="materiel-planning-toolbar__block-title">Mise à jour rapide du matériel</h2>
-            <p className="materiel-planning-toolbar__block-hint text-muted">
-              Modifiez le statut ou l&apos;emplacement d&apos;un équipement sans quitter le planning.
-            </p>
-          </div>
-          <div className="list-table-toolbar__row materiel-planning-toolbar__row">
-            <label className="list-table-toolbar__field materiel-planning-toolbar__equipment-edit">
-              <span className="filter-label">Matériel</span>
-              <select
-                value={editEquipmentId === '' ? '' : String(editEquipmentId)}
-                onChange={(e) => selectEditEquipment(e.target.value ? Number(e.target.value) : '')}
-              >
-                <option value="">Choisir un équipement…</option>
-                {equipments.map((eq) => (
-                  <option key={eq.id} value={eq.id}>
-                    {eq.code} — {eq.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {editEquipment ? (
-              <>
-                <label className="list-table-toolbar__field list-table-toolbar__status">
-                  <span className="filter-label">Statut</span>
-                  <select value={statusDraft} onChange={(e) => setStatusDraft(e.target.value)}>
-                    {EQUIPMENT_STATUS_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="list-table-toolbar__field materiel-planning-toolbar__location">
-                  <span className="filter-label">Emplacement</span>
-                  <input
-                    className="materiel-planning-toolbar__text-input"
-                    value={locationDraft}
-                    onChange={(e) => setLocationDraft(e.target.value)}
-                    placeholder="Dépôt, chantier, labo…"
-                  />
-                </label>
-                <div className="materiel-planning-toolbar__actions">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => updateEquipmentMut.mutate()}
-                    disabled={updateEquipmentMut.isPending}
-                  >
-                    {updateEquipmentMut.isPending ? 'Enregistrement…' : 'Enregistrer'}
-                  </button>
-                  <Link to={`/materiel/equipements/${editEquipment.id}`} className="btn btn-secondary">
-                    Ouvrir la fiche
-                  </Link>
-                </div>
-              </>
-            ) : (
-              <p className="materiel-planning-toolbar__edit-placeholder text-muted">
-                Sélectionnez un matériel pour mettre à jour son statut ou son emplacement.
-              </p>
-            )}
-          </div>
-          {editEquipment ? (
-            <p className="materiel-planning-toolbar__edit-meta text-muted">
-              {editEquipment.code} — statut actuel : {statusLabel(editEquipment.status)}
-              {editEquipment.location?.trim() ? ` · ${editEquipment.location}` : ''}
-            </p>
-          ) : null}
-        </section>
       </div>
 
       {(loadingEquipments || loadingBc || loadingDue || loadingAffect) && (
         <p className="text-muted">Chargement du planning…</p>
       )}
-      {updateEquipmentMut.isError ? <p className="error">{(updateEquipmentMut.error as Error).message}</p> : null}
-      {saved ? <p className="text-muted materiel-planning-toolbar__saved">Matériel mis à jour.</p> : null}
 
       <div className="card materiel-calendar">
         <div className="materiel-calendar__head">

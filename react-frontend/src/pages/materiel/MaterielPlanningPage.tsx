@@ -40,10 +40,14 @@ function addDays(date: Date, days: number) {
   return d
 }
 
+function toMonthInput(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
 function shiftMonth(month: string, delta: number) {
-  const d = new Date(`${month}-01T00:00:00`)
-  d.setMonth(d.getMonth() + delta)
-  return d.toISOString().slice(0, 7)
+  const [y, m] = month.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta, 1)
+  return toMonthInput(d)
 }
 
 function eventDay(date: string) {
@@ -65,8 +69,7 @@ function statusLabel(value: string): string {
 
 export default function MaterielPlanningPage() {
   const qc = useQueryClient()
-  const today = new Date()
-  const [month, setMonth] = useState(today.toISOString().slice(0, 7))
+  const [month, setMonth] = useState(() => toMonthInput(new Date()))
   const [eventKind, setEventKind] = useState<EventKindFilter>('')
   const [calendarEquipmentId, setCalendarEquipmentId] = useState<number | ''>('')
   const [editEquipmentId, setEditEquipmentId] = useState<number | ''>('')
@@ -238,7 +241,7 @@ export default function MaterielPlanningPage() {
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
-                  onClick={() => setMonth(today.toISOString().slice(0, 7))}
+                  onClick={() => setMonth(toMonthInput(new Date()))}
                 >
                   Aujourd&apos;hui
                 </button>

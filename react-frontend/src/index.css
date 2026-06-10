@@ -4980,7 +4980,7 @@ a.ds-icon-btn {
   background: var(--color-surface);
 }
 .quote-editor-page__form {
-  padding-bottom: calc(var(--layout-footer-dock-reserve, 3.5rem) + 8.5rem);
+  padding-bottom: calc(var(--layout-footer-dock-reserve, 3.5rem) + 6rem);
 }
 .quote-editor-tabs {
   display: flex;

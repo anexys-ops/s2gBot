@@ -42,6 +42,8 @@ type Props = {
   /** Externally controlled step override (e.g. jump to 6 after creation) */
   wizardStep?: number | null
   onWizardStepChange?: (step: number) => void
+  /** Non-draft quotes: browse wizard without editing */
+  readOnly?: boolean
 }
 
 function isStepValid(step: number, form: QuoteFormState): boolean {
@@ -89,6 +91,7 @@ export default function QuoteWizard({
   createdQuote,
   wizardStep,
   onWizardStepChange,
+  readOnly = false,
 }: Props) {
   const [internalStep, setInternalStep] = useState(isCreate ? 1 : 4)
 
@@ -131,37 +134,47 @@ export default function QuoteWizard({
       <WizardStepperBar current={step} />
 
       {step === 1 && (
-        <WizardStep1Context
-          form={form}
-          setForm={setForm}
-          clients={clients}
-          allSites={allSites}
-          dossiers={dossiers}
-        />
+        <fieldset disabled={readOnly} className="qw-step-fieldset">
+          <WizardStep1Context
+            form={form}
+            setForm={setForm}
+            clients={clients}
+            allSites={allSites}
+            dossiers={dossiers}
+          />
+        </fieldset>
       )}
 
-      {step === 2 && <WizardStep2Dates form={form} setForm={setForm} />}
+      {step === 2 && (
+        <fieldset disabled={readOnly} className="qw-step-fieldset">
+          <WizardStep2Dates form={form} setForm={setForm} />
+        </fieldset>
+      )}
 
       {step === 3 && (
-        <WizardStep3Infos
-          form={form}
-          setForm={setForm}
-          clientContacts={clientContacts}
-          addresses={addresses}
-          quoteTemplates={quoteTemplates}
-        />
+        <fieldset disabled={readOnly} className="qw-step-fieldset">
+          <WizardStep3Infos
+            form={form}
+            setForm={setForm}
+            clientContacts={clientContacts}
+            addresses={addresses}
+            quoteTemplates={quoteTemplates}
+          />
+        </fieldset>
       )}
 
       {step === 4 && (
-        <WizardStep4Lines
-          form={form}
-          setForm={setForm}
-          addLine={addLine}
-          updateLine={updateLine}
-          removeLine={removeLine}
-          onOpenCommercialCatalog={onOpenCommercialCatalog}
-          onOpenProlabCatalog={onOpenProlabCatalog}
-        />
+        <fieldset disabled={readOnly} className="qw-step-fieldset">
+          <WizardStep4Lines
+            form={form}
+            setForm={setForm}
+            addLine={addLine}
+            updateLine={updateLine}
+            removeLine={removeLine}
+            onOpenCommercialCatalog={onOpenCommercialCatalog}
+            onOpenProlabCatalog={onOpenProlabCatalog}
+          />
+        </fieldset>
       )}
 
       {step === 5 && (
@@ -173,6 +186,7 @@ export default function QuoteWizard({
           isSubmitting={isSubmitting}
           submitLabel={submitLabel}
           onCancel={onCancel}
+          readOnly={readOnly}
         />
       )}
 
@@ -184,7 +198,7 @@ export default function QuoteWizard({
             className="qw-nav__back"
             onClick={step === 1 ? onCancel : goBack}
           >
-            {step === 1 ? 'Annuler' : '← Retour'}
+            {step === 1 ? (readOnly ? 'Retour à la liste' : 'Annuler') : '← Retour'}
           </button>
           <button
             type="button"

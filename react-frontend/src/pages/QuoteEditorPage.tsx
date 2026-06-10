@@ -24,6 +24,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { formatMoney } from '../lib/appLocale'
+import { QUOTE_STATUS_LABELS } from '../lib/commercialStatusLabels'
 import { computeQuoteFormDocumentTotals, sumFraisSupplementairesTtc } from '../lib/quoteTotals'
 import {
   getEffectiveDevisParcours,
@@ -244,10 +245,6 @@ export default function QuoteEditorPage() {
 
   useEffect(() => {
     if (!quote || isCreate) return
-    if (quote.status !== 'draft') {
-      navigate('/devis', { replace: true })
-      return
-    }
     const ql = quote.quote_lines ?? []
     const defaultTva = Number(quote.tva_rate ?? 20)
     const lines: QuoteLineDraft[] = ql.map((l) => ({
@@ -298,7 +295,9 @@ export default function QuoteEditorPage() {
       lines,
       meta: baseMeta,
     })
-  }, [quote, isCreate, navigate])
+  }, [quote, isCreate])
+
+  const isReadOnly = !isCreate && quote != null && quote.status !== 'draft'
 
   const createMutation = useMutation({
     mutationFn: (body: QuoteCreateBody) => quotesApi.create(body),
@@ -487,6 +486,7 @@ export default function QuoteEditorPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (isReadOnly) return
     if (form.client_id <= 0) return
     const body = toApiBody(form)
     if (isCreate) {
@@ -549,12 +549,25 @@ export default function QuoteEditorPage() {
   return (
     <div className="container quote-editor-page">
       <PageBackNav back={{ to: '/devis', label: 'Liste des devis' }} />
-      <h1>{isCreate ? 'Nouveau devis' : `Modifier le devis ${quote?.number ?? ''}`}</h1>
-      <p className="text-muted" style={{ maxWidth: '48rem' }}>
-        Aucune ligne d’article au départ. Le <strong>contexte</strong> (client, chantier, dates, contact, modèle PDF) est
-        en tête. Les onglets <strong>Lignes, Frais, Tarif & conditions, Aperçu</strong> regroupent l’édition. Les totaux
-        (alignés recalcul serveur) et l’enregistrement restent en barre basse.
-      </p>
+      <h1>
+        {isCreate
+          ? 'Nouveau devis'
+          : isReadOnly
+            ? `Consulter le devis ${quote?.number ?? ''}`
+            : `Modifier le devis ${quote?.number ?? ''}`}
+      </h1>
+      {isReadOnly ? (
+        <p className="text-muted" style={{ maxWidth: '48rem' }}>
+          Devis <strong>{QUOTE_STATUS_LABELS[quote?.status ?? ''] ?? quote?.status}</strong> — consultation seule. Pour
+          modifier les lignes et le tarif, repassez le devis en <strong>brouillon</strong> depuis la liste.
+        </p>
+      ) : (
+        <p className="text-muted" style={{ maxWidth: '48rem' }}>
+          Aucune ligne d’article au départ. Le <strong>contexte</strong> (client, chantier, dates, contact, modèle PDF) est
+          en tête. Les onglets <strong>Lignes, Frais, Tarif & conditions, Aperçu</strong> regroupent l’édition. Les totaux
+          (alignés recalcul serveur) et l’enregistrement restent en barre basse.
+        </p>
+      )}
 
       <form
         onSubmit={handleSubmit}
@@ -577,13 +590,16 @@ export default function QuoteEditorPage() {
           isCreate={isCreate}
           isSubmitting={createMutation.isPending || updateMutation.isPending}
           submitLabel={isCreate ? 'Créer le devis' : 'Enregistrer'}
+          readOnly={isReadOnly}
           onCancel={() => navigate('/devis')}
           createdQuote={createdQuote}
           onOpenCommercialCatalog={(i) => {
+            if (isReadOnly) return
             setCatalogPick({ target: 'line', index: i })
             setCatalogSearch('')
           }}
           onOpenProlabCatalog={(i) => {
+            if (isReadOnly) return
             setProlabPick({ target: 'line', index: i })
             setProlabFamilleId('')
           }}

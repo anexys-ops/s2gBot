@@ -10,6 +10,7 @@ type Props = {
   isSubmitting: boolean
   submitLabel: string
   onCancel: () => void
+  readOnly?: boolean
 }
 
 const MODES_PAIEMENT = ['virement', 'chèque', 'CB', 'espèces']
@@ -23,6 +24,7 @@ export default function WizardStep5Pricing({
   isSubmitting,
   submitLabel,
   onCancel,
+  readOnly = false,
 }: Props) {
   const set = <K extends keyof QuoteFormState>(field: K, value: QuoteFormState[K]) =>
     setForm((f) => ({ ...f, [field]: value }))
@@ -59,6 +61,8 @@ export default function WizardStep5Pricing({
   }
 
   return (
+    <>
+    <fieldset disabled={readOnly} className="qw-step-fieldset">
     <div className="qw-body">
       <p className="qw-section-title">Tarif &amp; Validation</p>
       <p className="qw-section-sub">Remise, frais, TVA, conditions et récapitulatif.</p>
@@ -279,24 +283,47 @@ export default function WizardStep5Pricing({
         </div>
       </div>
 
-      {/* Actions */}
-      <div style={{ display: 'flex', gap: '1rem', marginTop: '.5rem' }}>
-        <button
-          type="submit"
-          className="qw-nav__submit"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Enregistrement…' : submitLabel}
-        </button>
-        <button
-          type="button"
-          className="qw-nav__back"
-          onClick={onCancel}
-          disabled={isSubmitting}
-        >
-          Annuler
+    </div>
+    </fieldset>
+    <WizardStep5Actions
+      readOnly={readOnly}
+      isSubmitting={isSubmitting}
+      submitLabel={submitLabel}
+      onCancel={onCancel}
+    />
+    </>
+  )
+}
+
+function WizardStep5Actions({
+  readOnly,
+  isSubmitting,
+  submitLabel,
+  onCancel,
+}: {
+  readOnly: boolean
+  isSubmitting: boolean
+  submitLabel: string
+  onCancel: () => void
+}) {
+  if (readOnly) {
+    return (
+      <div style={{ display: 'flex', gap: '1rem', marginTop: '.5rem', padding: '0 2rem 2rem' }}>
+        <button type="button" className="qw-nav__back" onClick={onCancel}>
+          Retour à la liste
         </button>
       </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: '1rem', marginTop: '.5rem', padding: '0 2rem 2rem' }}>
+      <button type="submit" className="qw-nav__submit" disabled={isSubmitting}>
+        {isSubmitting ? 'Enregistrement…' : submitLabel}
+      </button>
+      <button type="button" className="qw-nav__back" onClick={onCancel} disabled={isSubmitting}>
+        Annuler
+      </button>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api } from '../../../api/client'
+import { quotesApi } from '../../../api/client'
 
 type Props = {
   quoteId: number
@@ -18,7 +18,7 @@ export default function WizardStep6Send({ quoteId, quoteNumber, contactEmail, on
     setSendState('loading')
     setErrorMsg('')
     try {
-      await api(`/v1/quotes/${quoteId}/send-email`, { method: 'POST' })
+      await quotesApi.sendEmail(quoteId)
       setSendState('success')
     } catch (err) {
       setSendState('error')

@@ -30,7 +30,7 @@ class AuthController extends Controller
         $user = Auth::user();
         $device = $request->input('device_name');
         $tokenName = is_string($device) && trim($device) !== '' ? trim($device) : 'spa';
-        $user->tokens()->where('name', $tokenName)->delete();
+        // Keep existing SPA tokens so another tab/device login does not disconnect active sessions.
         $token = $user->createToken($tokenName)->plainTextToken;
 
         $user->load(['client', 'site', 'accessGroups', 'agencies']);

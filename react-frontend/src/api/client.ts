@@ -6,11 +6,40 @@ function getToken(): string | null {
   return localStorage.getItem('token')
 }
 
+const AUTH_PUBLIC_PATHS = new Set(['/login', '/register'])
+
+function authPathBase(path: string): string {
+  return path.split('?')[0] ?? path
+}
+
+/** Invalidate SPA session after a protected API returned 401 (expired / revoked token). */
+function invalidateSessionAndRedirect(): void {
+  localStorage.removeItem('token')
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('s2g:session-expired'))
+    if (!window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login'
+    }
+  }
+}
+
+function handleApiUnauthorized(path: string, hadToken: boolean): never {
+  const base = authPathBase(path)
+  if (AUTH_PUBLIC_PATHS.has(base)) {
+    throw new Error(base === '/login' ? 'Identifiants invalides' : 'Non autorisé')
+  }
+  if (hadToken) {
+    invalidateSessionAndRedirect()
+  }
+  throw new Error('Session expirée — reconnectez-vous.')
+}
+
 export async function api<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
   const token = getToken()
+  const hadToken = Boolean(token)
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -31,9 +60,7 @@ export async function api<T>(
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
   if (res.status === 401) {
-    localStorage.removeItem('token')
-    window.location.href = '/login'
-    throw new Error('Non autorisé')
+    handleApiUnauthorized(path, hadToken)
   }
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
@@ -313,9 +340,7 @@ export const attachmentsApi = {
       body: fd,
     })
     if (res.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
-      throw new Error('Non autorisé')
+      handleApiUnauthorized('/attachments', Boolean(token))
     }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data.message || `Erreur ${res.status}`)
@@ -328,11 +353,8 @@ export const attachmentsApi = {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
     if (res.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
-      throw new Error('Non autorisé')
+      handleApiUnauthorized(`/attachments/${attachmentId}/download`, Boolean(token))
     }
-    if (!res.ok) throw new Error('Téléchargement impossible')
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -978,9 +1000,7 @@ export const brandingApi = {
       body: fd,
     })
     if (res.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
-      throw new Error('Non autorisé')
+      handleApiUnauthorized('/branding/logo', Boolean(token))
     }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -1863,6 +1883,7 @@ export const quotesApi = {
   update: (id: number, body: Partial<QuoteCreateBody> & { status?: string; meta?: EntityMetaPayload | null }) =>
     api<Quote>(`/quotes/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/quotes/${id}`, { method: 'DELETE' }),
+  sendEmail: (id: number) => api<{ message?: string }>(`/quotes/${id}/send-email`, { method: 'POST' }),
 }
 
 export interface QuoteCreateBody {
@@ -1912,9 +1933,7 @@ export const pdfApi = {
       },
     })
     if (res.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
-      throw new Error('Non autorisé')
+      handleApiUnauthorized(`/pdf/examples/${slug}`, Boolean(token))
     }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -1939,6 +1958,9 @@ export const pdfApi = {
       },
       body: JSON.stringify({ type, id, template_id: templateId }),
     })
+    if (res.status === 401) {
+      handleApiUnauthorized('/pdf/generate', Boolean(token))
+    }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       throw new Error(data.message || 'Erreur génération PDF')

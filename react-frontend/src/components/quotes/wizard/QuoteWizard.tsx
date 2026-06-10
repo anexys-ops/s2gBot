@@ -130,9 +130,10 @@ export default function QuoteWizard({
   }
 
   return (
-    <>
+    <div className="qw-shell">
       <WizardStepperBar current={step} />
 
+      <div className="qw-shell__body">
       {step === 1 && (
         <fieldset disabled={readOnly} className="qw-step-fieldset">
           <WizardStep1Context
@@ -190,9 +191,11 @@ export default function QuoteWizard({
         />
       )}
 
+      </div>
+
       {/* Navigation — not shown on step 5 (has its own submit buttons) */}
       {step !== 5 && (
-        <div className="qw-nav" style={{ padding: '0 2rem 2rem' }}>
+        <div className="qw-nav qw-nav--dock">
           <button
             type="button"
             className="qw-nav__back"
@@ -213,12 +216,12 @@ export default function QuoteWizard({
 
       {/* Back button on step 5 */}
       {step === 5 && (
-        <div style={{ padding: '0 2rem 1rem' }}>
+        <div className="qw-nav qw-nav--dock qw-nav--back-only">
           <button type="button" className="qw-nav__back" onClick={goBack}>
             ← Retour
           </button>
         </div>
       )}
-    </>
+    </div>
   )
 }

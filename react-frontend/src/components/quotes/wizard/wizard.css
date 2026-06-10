@@ -10,6 +10,20 @@
 .qw-step__line { flex: 1; height: 2px; background: #e5e7eb; margin: 0 .5rem; }
 .qw-step--done .qw-step__line { background: var(--color-primary, #2563eb); }
 
+/* Wizard shell — scrollable step body, nav always visible */
+.qw-shell {
+  display: flex;
+  flex-direction: column;
+  max-height: min(760px, calc(100dvh - 13rem));
+  min-height: 360px;
+}
+.qw-shell__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
 /* Step content */
 .qw-body { padding: 2rem; max-width: 900px; margin: 0 auto; }
 .qw-section-title { font-size: 1.25rem; font-weight: 700; color: #111827; margin-bottom: .25rem; }
@@ -17,6 +31,18 @@
 
 /* Client/Site tiles */
 .qw-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .75rem; margin-top: 1rem; }
+.qw-tiles--scroll {
+  max-height: min(320px, 42vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: .2rem;
+  align-content: start;
+}
+.qw-picker-meta {
+  margin: 0 0 .25rem;
+  font-size: .82rem;
+  color: #6b7280;
+}
 .qw-tile { padding: 1rem; border: 2px solid #e5e7eb; border-radius: 10px; cursor: pointer; transition: all .15s; text-align: left; background: #fff; }
 .qw-tile:hover { border-color: var(--color-primary, #2563eb); background: #eff6ff; }
 .qw-tile--selected { border-color: var(--color-primary, #2563eb); background: #eff6ff; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
@@ -31,6 +57,17 @@
 
 /* Nav buttons */
 .qw-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e5e7eb; }
+.qw-nav--dock {
+  flex-shrink: 0;
+  margin-top: 0;
+  padding: 1rem 2rem 1.25rem;
+  background: var(--color-surface, #fff);
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.06);
+}
+.qw-nav--back-only {
+  justify-content: flex-start;
+}
 .qw-nav__back { padding: .6rem 1.4rem; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #374151; font-weight: 600; cursor: pointer; }
 .qw-nav__next { padding: .6rem 1.4rem; border-radius: 8px; background: var(--color-primary, #2563eb); color: #fff; font-weight: 700; border: none; cursor: pointer; font-size: .95rem; }
 .qw-step-fieldset {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { QuoteFormState, ContextMode } from '../QuoteFormFields'
 import type { Site, DossierRow } from '../../../api/client'
 
@@ -10,7 +10,10 @@ type Props = {
   dossiers: DossierRow[]
 }
 
+const PICKER_HINT_THRESHOLD = 12
+
 export default function WizardStep1Context({ form, setForm, clients, allSites, dossiers }: Props) {
+  const searchRef = useRef<HTMLInputElement>(null)
   const [search, setSearch] = useState('')
   const [selectedClientId, setSelectedClientId] = useState<number | null>(
     form.client_id > 0 ? form.client_id : null,
@@ -42,6 +45,22 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
       ? allSites.filter((s) => s.client_id === selectedClientId)
       : []
 
+  useEffect(() => {
+    searchRef.current?.focus()
+  }, [mode])
+
+  const pickerCount =
+    mode === 'client'
+      ? filteredClients.length
+      : mode === 'chantier'
+        ? filteredSites.length
+        : filteredDossiers.length
+
+  const totalCount =
+    mode === 'client' ? clients.length : mode === 'chantier' ? allSites.length : dossiers.length
+
+  const showPickerHint = totalCount > PICKER_HINT_THRESHOLD && search.trim() === ''
+
   return (
     <div className="qw-body">
       <p className="qw-section-title">Client &amp; Chantier</p>
@@ -72,16 +91,30 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
       </div>
 
       <input
+        ref={searchRef}
         className="qw-search"
         type="search"
-        placeholder="Rechercher…"
+        placeholder={
+          mode === 'client'
+            ? 'Filtrer par nom de client…'
+            : mode === 'chantier'
+              ? 'Filtrer par chantier ou n° client…'
+              : 'Filtrer par référence, titre ou client…'
+        }
         value={search}
         onChange={(e) => setSearch(e.target.value)}
+        aria-describedby="qw-picker-meta"
       />
+
+      <p id="qw-picker-meta" className="qw-picker-meta">
+        {pickerCount} résultat{pickerCount !== 1 ? 's' : ''}
+        {search.trim() !== '' ? ` pour « ${search.trim()} »` : ''}
+        {showPickerHint ? ` — ${totalCount} au total, filtrez pour retrouver plus vite.` : ''}
+      </p>
 
       {mode === 'client' && (
         <>
-          <div className="qw-tiles">
+          <div className="qw-tiles qw-tiles--scroll">
             {filteredClients.map((c) => (
               <button
                 key={c.id}
@@ -112,7 +145,7 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
               <p style={{ marginTop: '1.5rem', fontWeight: 600, color: '#374151' }}>
                 Chantier associé (optionnel)
               </p>
-              <div className="qw-tiles">
+              <div className="qw-tiles qw-tiles--scroll">
                 <button
                   type="button"
                   className={`qw-tile${!form.site_id ? ' qw-tile--selected' : ''}`}
@@ -139,7 +172,7 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
       )}
 
       {mode === 'chantier' && (
-        <div className="qw-tiles">
+        <div className="qw-tiles qw-tiles--scroll">
           {filteredSites.map((s) => {
             const clientName = clients.find((c) => c.id === s.client_id)?.name ?? `Client #${s.client_id}`
             return (
@@ -169,7 +202,7 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
       )}
 
       {mode === 'dossier' && (
-        <div className="qw-tiles">
+        <div className="qw-tiles qw-tiles--scroll">
           {filteredDossiers.map((d) => {
             const clientName = clients.find((c) => c.id === d.client_id)?.name ?? `Client #${d.client_id}`
             return (

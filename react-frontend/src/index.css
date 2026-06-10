@@ -6797,10 +6797,6 @@ a.catalogue-tree__link-article:hover {
     grid-column: span 12;
   }
 }
-.equipment-edit-panel__intro {
-  margin: 0 0 1rem;
-  font-size: 0.9rem;
-}
 .equipment-edit-form__saved {
   margin: 0.75rem 0 0;
   font-size: 0.9rem;

@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { quotesApi, pdfApi, type EntityMetaPayload } from '../api/client'
+import { pdfApi, quotesApi, type EntityMetaPayload } from '../api/client'
+import { QuotePdfButton, QuoteRowActions } from '../components/crm/QuoteListTableActions'
+import ConfirmDialog from '../components/ConfirmDialog'
+import StatusBadge, { quoteStatutBadgeProps } from '../components/ds/StatusBadge'
 import EntityMetaCard from '../components/module/EntityMetaCard'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import { useAuth } from '../contexts/AuthContext'
@@ -9,7 +12,7 @@ import Modal from '../components/Modal'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
-import { formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
+import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
@@ -30,6 +33,7 @@ export default function Devis() {
   const queryClient = useQueryClient()
   const [statusModalId, setStatusModalId] = useState<number | null>(null)
   const [metaModalQuote, setMetaModalQuote] = useState<{ id: number; number: string; meta: unknown } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; number: string } | null>(null)
   const [statusValue, setStatusValue] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
@@ -75,12 +79,16 @@ export default function Devis() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => quotesApi.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['quotes'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotes'] })
+      setDeleteTarget(null)
+    },
   })
 
   const quotes = data?.data ?? []
   const lastPage = data?.last_page ?? 1
   const statusOptions = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
+  const hasActiveFilters = searchInput.trim() !== '' || statusFilter !== ''
 
   if (isLoading) {
     return (
@@ -162,85 +170,114 @@ export default function Devis() {
         ]}
         visibleColumns={visible}
         onToggleColumn={toggle}
+        footer={
+          hasActiveFilters ? (
+            <>
+              <span className="list-table-toolbar__footer-label">Filtres actifs</span>
+              {searchInput.trim() !== '' ? (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">Recherche : « {searchInput.trim()} »</span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => setSearchInput('')}
+                    aria-label="Effacer la recherche"
+                  >
+                    ×
+                  </button>
+                </span>
+              ) : null}
+              {statusFilter ? (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">
+                    {STATUS_LABELS[statusFilter] ?? statusFilter}
+                  </span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => setStatusFilter('')}
+                    aria-label="Effacer le filtre statut"
+                  >
+                    ×
+                  </button>
+                </span>
+              ) : null}
+            </>
+          ) : null
+        }
       />
-      <div className="card">
-        <table>
-          <thead>
-            <tr>
-              {visible.number !== false && <th>Numéro</th>}
-              {visible.client !== false && <th>Client</th>}
-              {visible.date !== false && <th>Date</th>}
-              {visible.ttc !== false && <th>Montant TTC ({MONEY_UNIT_LABEL})</th>}
-              {visible.travel !== false && <th>Dépl. HT ({MONEY_UNIT_LABEL})</th>}
-              {visible.status !== false && <th>Statut</th>}
-              {isLab && visible.pdf !== false && <th>PDF</th>}
-              {isLab && visible.actions !== false && <th>Actions</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {quotes.map((q) => (
-              <tr key={q.id}>
-                {visible.number !== false && <td>{q.number}</td>}
-                {visible.client !== false && <td>{q.client?.name}</td>}
-                {visible.date !== false && <td>{new Date(q.quote_date).toLocaleDateString('fr-FR')}</td>}
-                {visible.ttc !== false && <td>{formatMoney(Number(q.amount_ttc))}</td>}
-                {visible.travel !== false && <td>{formatMoney(Number(q.travel_fee_ht ?? 0))}</td>}
-                {visible.status !== false && <td>{STATUS_LABELS[q.status] ?? q.status}</td>}
-                {isLab && visible.pdf !== false && (
-                  <td>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => pdfApi.generate('quote', q.id, q.pdf_template_id)}
-                    >
-                      PDF
-                    </button>
-                  </td>
-                )}
-                {isLab && visible.actions !== false && (
-                  <td>
-                    <div className="crud-actions">
-                      {q.status === 'draft' && (
-                        <Link to={`/devis/${q.id}/editer`} className="btn btn-secondary btn-sm">
-                          Modifier
-                        </Link>
+
+      <div className="card dossier-tab-panel dossier-tab-panel--table">
+        {quotes.length > 0 ? (
+          <div className="table-wrap">
+            <table className="data-table data-table--compact">
+              <thead>
+                <tr>
+                  {visible.number !== false && <th>Numéro</th>}
+                  {visible.client !== false && <th>Client</th>}
+                  {visible.date !== false && <th>Date</th>}
+                  {visible.ttc !== false && <th>Montant TTC ({MONEY_UNIT_LABEL})</th>}
+                  {visible.travel !== false && <th>Dépl. HT ({MONEY_UNIT_LABEL})</th>}
+                  {visible.status !== false && <th>Statut</th>}
+                  {isLab && visible.pdf !== false && <th className="data-table__pdf">PDF</th>}
+                  {isLab && visible.actions !== false && <th className="data-table__actions">Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {quotes.map((q) => {
+                  const st = quoteStatutBadgeProps(q.status)
+                  return (
+                    <tr key={q.id}>
+                      {visible.number !== false && (
+                        <td>
+                          <Link to={`/devis/${q.id}/editer`} className="link-inline">
+                            <code className="code-badge">{q.number}</code>
+                          </Link>
+                        </td>
                       )}
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => {
-                          setStatusModalId(q.id)
-                          setStatusValue(q.status)
-                        }}
-                      >
-                        Statut
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => setMetaModalQuote({ id: q.id, number: q.number, meta: q.meta })}
-                      >
-                        Métadonnées
-                      </button>
-                      {isAdmin && (
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm btn-danger-outline"
-                          onClick={() => {
-                            if (window.confirm(`Supprimer le devis ${q.number} ?`)) deleteMutation.mutate(q.id)
-                          }}
-                        >
-                          Supprimer
-                        </button>
+                      {visible.client !== false && <td>{q.client?.name ?? '—'}</td>}
+                      {visible.date !== false && <td>{formatAppDate(q.quote_date)}</td>}
+                      {visible.ttc !== false && <td>{formatMoney(Number(q.amount_ttc))}</td>}
+                      {visible.travel !== false && <td>{formatMoney(Number(q.travel_fee_ht ?? 0))}</td>}
+                      {visible.status !== false && (
+                        <td className="data-table__status">
+                          <StatusBadge variant={st.variant} size="sm">
+                            {st.label}
+                          </StatusBadge>
+                        </td>
                       )}
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {quotes.length === 0 && <p style={{ padding: '1rem' }}>Aucun devis.</p>}
+                      {isLab && visible.pdf !== false && (
+                        <td className="data-table__pdf">
+                          <QuotePdfButton
+                            onClick={() => pdfApi.generate('quote', q.id, q.pdf_template_id)}
+                          />
+                        </td>
+                      )}
+                      {isLab && visible.actions !== false && (
+                        <td className="data-table__actions">
+                          <QuoteRowActions
+                            quoteId={q.id}
+                            quoteNumber={q.number}
+                            status={q.status}
+                            isAdmin={isAdmin}
+                            onStatus={() => {
+                              setStatusModalId(q.id)
+                              setStatusValue(q.status)
+                            }}
+                            onMeta={() => setMetaModalQuote({ id: q.id, number: q.number, meta: q.meta })}
+                            onDelete={() => setDeleteTarget({ id: q.id, number: q.number })}
+                          />
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="dossier-tab-empty">Aucun devis ne correspond aux filtres.</p>
+        )}
         <PaginationBar page={data?.current_page ?? 1} lastPage={lastPage} onPage={setPage} />
       </div>
 
@@ -284,6 +321,25 @@ export default function Devis() {
           />
         </Modal>
       )}
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Supprimer le devis"
+          message={
+            <>
+              Supprimer définitivement le devis <strong>{deleteTarget.number}</strong> ?
+            </>
+          }
+          confirmLabel="Supprimer"
+          variant="danger"
+          loading={deleteMutation.isPending}
+          error={deleteMutation.isError ? (deleteMutation.error as Error).message : null}
+          onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
+          onCancel={() => {
+            if (!deleteMutation.isPending) setDeleteTarget(null)
+          }}
+        />
+      ) : null}
     </ModuleEntityShell>
   )
 }

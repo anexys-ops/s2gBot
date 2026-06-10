@@ -1363,6 +1363,11 @@ th {
   width: 1%;
   white-space: nowrap;
 }
+.data-table__pdf {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+}
 .data-table__status {
   white-space: nowrap;
   width: 1%;
@@ -1461,6 +1466,19 @@ th {
 .ds-icon-btn--danger:hover {
   background: #fdedeb;
   border-color: var(--color-danger);
+}
+.ds-icon-btn--pdf {
+  border-color: #bfdbfe;
+  color: var(--color-primary);
+}
+.ds-icon-btn--pdf:hover {
+  background: #eff6ff;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+a.ds-icon-btn {
+  text-decoration: none;
+  box-sizing: border-box;
 }
 
 .ds-form-section {

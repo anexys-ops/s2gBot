@@ -724,6 +724,8 @@ export type BonCommande = {
   client?: { id: number; name: string }
   clientContact?: ClientContactRow
   dossier?: DossierRow
+  quote?: Pick<Quote, 'id' | 'number' | 'status'>
+  bons_livraison?: Array<Pick<BonLivraison, 'id' | 'numero' | 'statut' | 'date_livraison'>>
 }
 
 export type BonLivraisonLigne = {

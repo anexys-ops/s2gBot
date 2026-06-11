@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 const stroke = {
@@ -64,6 +65,10 @@ function IconMail() {
   )
 }
 
+function ActionSlot({ children }: { children?: ReactNode }) {
+  return <div className="data-table__action-slot">{children}</div>
+}
+
 type PdfButtonProps = {
   onClick: () => void
   label?: string
@@ -83,7 +88,7 @@ export function QuotePdfButton({ onClick, label = 'Télécharger le PDF' }: PdfB
   )
 }
 
-type RowActionsProps = {
+type RowActionCellsProps = {
   quoteId: number
   quoteNumber: string
   status: string
@@ -95,7 +100,8 @@ type RowActionsProps = {
   sendEmailLoading?: boolean
 }
 
-export function QuoteRowActions({
+/** Une colonne par action — l’emplacement email reste réservé après envoi. */
+export function QuoteRowActionCells({
   quoteId,
   quoteNumber,
   status,
@@ -105,60 +111,102 @@ export function QuoteRowActions({
   onDelete,
   onSendEmail,
   sendEmailLoading = false,
-}: RowActionsProps) {
+}: RowActionCellsProps) {
   const canSendEmail = status !== 'sent' && onSendEmail != null
 
   return (
-    <div className="data-table__actions-inner">
-      <Link
-        to={`/devis/${quoteId}/editer`}
-        className="ds-icon-btn"
-        title={status === 'draft' ? 'Modifier le devis' : 'Ouvrir le devis'}
-        aria-label={`${status === 'draft' ? 'Modifier' : 'Ouvrir'} le devis ${quoteNumber}`}
-      >
-        <IconPencil />
-      </Link>
-      {canSendEmail ? (
-        <button
-          type="button"
-          className="ds-icon-btn"
-          title="Envoyer par email"
-          aria-label={`Envoyer le devis ${quoteNumber} par email`}
-          onClick={onSendEmail}
-          disabled={sendEmailLoading}
-        >
-          <IconMail />
-        </button>
-      ) : null}
-      <button
-        type="button"
-        className="ds-icon-btn"
-        title="Changer le statut"
-        aria-label={`Changer le statut du devis ${quoteNumber}`}
-        onClick={onStatus}
-      >
-        <IconStatus />
-      </button>
-      <button
-        type="button"
-        className="ds-icon-btn"
-        title="Métadonnées"
-        aria-label={`Métadonnées du devis ${quoteNumber}`}
-        onClick={onMeta}
-      >
-        <IconMeta />
-      </button>
-      {isAdmin ? (
-        <button
-          type="button"
-          className="ds-icon-btn ds-icon-btn--danger"
-          title="Supprimer le devis"
-          aria-label={`Supprimer le devis ${quoteNumber}`}
-          onClick={onDelete}
-        >
-          <IconTrash />
-        </button>
-      ) : null}
-    </div>
+    <>
+      <td className="data-table__action-cell">
+        <ActionSlot>
+          <Link
+            to={`/devis/${quoteId}/editer`}
+            className="ds-icon-btn"
+            title={status === 'draft' ? 'Modifier le devis' : 'Ouvrir le devis'}
+            aria-label={`${status === 'draft' ? 'Modifier' : 'Ouvrir'} le devis ${quoteNumber}`}
+          >
+            <IconPencil />
+          </Link>
+        </ActionSlot>
+      </td>
+      <td className="data-table__action-cell">
+        <ActionSlot>
+          {canSendEmail ? (
+            <button
+              type="button"
+              className="ds-icon-btn"
+              title="Envoyer par email"
+              aria-label={`Envoyer le devis ${quoteNumber} par email`}
+              onClick={onSendEmail}
+              disabled={sendEmailLoading}
+            >
+              <IconMail />
+            </button>
+          ) : null}
+        </ActionSlot>
+      </td>
+      <td className="data-table__action-cell">
+        <ActionSlot>
+          <button
+            type="button"
+            className="ds-icon-btn"
+            title="Changer le statut"
+            aria-label={`Changer le statut du devis ${quoteNumber}`}
+            onClick={onStatus}
+          >
+            <IconStatus />
+          </button>
+        </ActionSlot>
+      </td>
+      <td className="data-table__action-cell">
+        <ActionSlot>
+          <button
+            type="button"
+            className="ds-icon-btn"
+            title="Métadonnées"
+            aria-label={`Métadonnées du devis ${quoteNumber}`}
+            onClick={onMeta}
+          >
+            <IconMeta />
+          </button>
+        </ActionSlot>
+      </td>
+      <td className="data-table__action-cell">
+        <ActionSlot>
+          {isAdmin ? (
+            <button
+              type="button"
+              className="ds-icon-btn ds-icon-btn--danger"
+              title="Supprimer le devis"
+              aria-label={`Supprimer le devis ${quoteNumber}`}
+              onClick={onDelete}
+            >
+              <IconTrash />
+            </button>
+          ) : null}
+        </ActionSlot>
+      </td>
+    </>
+  )
+}
+
+export function QuoteRowActionHeaders() {
+  return (
+    <>
+      <th className="data-table__action-cell" title="Modifier / ouvrir">
+        Éd.
+      </th>
+      <th className="data-table__action-cell" title="Envoyer par email">
+        Mail
+      </th>
+      <th className="data-table__action-cell" title="Changer le statut">
+        Stat.
+      </th>
+      <th className="data-table__action-cell" title="Métadonnées">
+        Meta
+      </th>
+      <th className="data-table__action-cell" title="Supprimer">
+        Suppr.
+      </th>
+    </>
   )
 }

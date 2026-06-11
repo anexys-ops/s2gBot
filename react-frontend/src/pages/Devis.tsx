@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { pdfApi, quotesApi, type EntityMetaPayload, type Quote } from '../api/client'
-import { QuotePdfButton, QuoteRowActions } from '../components/crm/QuoteListTableActions'
+import { QuotePdfButton, QuoteRowActionCells, QuoteRowActionHeaders } from '../components/crm/QuoteListTableActions'
 import ConfirmDialog from '../components/ConfirmDialog'
 import StatusBadge, { quoteStatutBadgeProps } from '../components/ds/StatusBadge'
 import EntityMetaCard from '../components/module/EntityMetaCard'
@@ -235,7 +235,7 @@ export default function Devis() {
                   {visible.travel !== false && <th>Dépl. HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.status !== false && <th>Statut</th>}
                   {isLab && visible.pdf !== false && <th className="data-table__pdf">PDF</th>}
-                  {isLab && visible.actions !== false && <th className="data-table__actions">Actions</th>}
+                  {isLab && visible.actions !== false && <QuoteRowActionHeaders />}
                 </tr>
               </thead>
               <tbody>
@@ -269,29 +269,27 @@ export default function Devis() {
                         </td>
                       )}
                       {isLab && visible.actions !== false && (
-                        <td className="data-table__actions">
-                          <QuoteRowActions
-                            quoteId={q.id}
-                            quoteNumber={q.number}
-                            status={q.status}
-                            isAdmin={isAdmin}
-                            onStatus={() => {
-                              setStatusModalId(q.id)
-                              setStatusValue(q.status)
-                            }}
-                            onMeta={() => setMetaModalQuote({ id: q.id, number: q.number, meta: q.meta })}
-                            onDelete={() => setDeleteTarget({ id: q.id, number: q.number })}
-                            onSendEmail={
-                              q.status !== 'sent'
-                                ? () => {
-                                    setSendError('')
-                                    setSendTarget(q)
-                                  }
-                                : undefined
-                            }
-                            sendEmailLoading={sendEmailMutation.isPending && sendTarget?.id === q.id}
-                          />
-                        </td>
+                        <QuoteRowActionCells
+                          quoteId={q.id}
+                          quoteNumber={q.number}
+                          status={q.status}
+                          isAdmin={isAdmin}
+                          onStatus={() => {
+                            setStatusModalId(q.id)
+                            setStatusValue(q.status)
+                          }}
+                          onMeta={() => setMetaModalQuote({ id: q.id, number: q.number, meta: q.meta })}
+                          onDelete={() => setDeleteTarget({ id: q.id, number: q.number })}
+                          onSendEmail={
+                            q.status !== 'sent'
+                              ? () => {
+                                  setSendError('')
+                                  setSendTarget(q)
+                                }
+                              : undefined
+                          }
+                          sendEmailLoading={sendEmailMutation.isPending && sendTarget?.id === q.id}
+                        />
                       )}
                     </tr>
                   )

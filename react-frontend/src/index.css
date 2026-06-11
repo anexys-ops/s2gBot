@@ -1380,6 +1380,31 @@ th {
   opacity: 0.45;
   transition: opacity 0.15s;
 }
+.data-table__action-cell {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+  vertical-align: middle;
+  padding: 0.4rem 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.02em;
+}
+.data-table__action-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.125rem;
+  height: 2.125rem;
+}
+.data-table tbody tr .data-table__action-cell .ds-icon-btn {
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+.data-table tbody tr:hover .data-table__action-cell .ds-icon-btn {
+  opacity: 1;
+}
 .data-table tbody tr:hover .data-table__actions-inner {
   opacity: 1;
 }

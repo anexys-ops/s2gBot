@@ -167,7 +167,7 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
                       setForm((f) => ({
                         ...f,
                         site_id: s.id,
-                        dossier_id: resolveUniqueDossierForChantier(dossiers, c.id, s.id),
+                        dossier_id: resolveUniqueDossierForChantier(dossiers, s.client_id, s.id),
                       }))
                     }
                   >

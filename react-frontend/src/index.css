@@ -7460,6 +7460,36 @@ a.catalogue-tree__link-article:hover {
 .bc-lignes-table__col-money {
   width: 8rem;
 }
+.bc-lignes-table--delivery {
+  width: 100%;
+  max-width: 100%;
+}
+.bc-lignes-table--delivery .bc-lignes-table__col-libelle {
+  min-width: 10rem;
+}
+.bc-lignes-table--delivery .bc-lignes-table__col-qty {
+  width: 4.5rem;
+}
+.bl-delivery-context {
+  margin: 0 1.5rem 0.75rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--color-surface-2);
+  border-radius: 8px;
+  font-size: 0.84rem;
+  color: var(--color-text-muted);
+}
+.bl-delivery-context__list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}
+.bl-delivery-context__list li {
+  margin: 0.15rem 0;
+}
+.bl-ligne-qty-over {
+  color: var(--color-danger, #b42318);
+  font-size: 0.78rem;
+  margin-top: 0.2rem;
+}
 .bc-lignes-table th:first-child,
 .bc-lignes-table td:first-child {
   padding-right: 0.1rem;

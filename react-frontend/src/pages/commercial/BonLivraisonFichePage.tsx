@@ -9,9 +9,14 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ClientContactPicker, { formatClientContactLabel } from '../../components/clients/ClientContactPicker'
-import { dateInputFromApi, formatAppDate } from '../../lib/appLocale'
+import { dateInputFromApi, formatAppDate, formatQuantity } from '../../lib/appLocale'
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
+
+function qtyNum(value: string | number | null | undefined): number {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : 0
+}
 
 const BL_STATUT_OPTIONS = [
   { value: 'brouillon', label: 'Brouillon' },
@@ -49,7 +54,7 @@ export default function BonLivraisonFichePage() {
   const serverLignesKey = useMemo(
     () =>
       (bl?.lignes ?? [])
-        .map((l) => `${l.id}:${l.quantite_livree}:${l.libelle}`)
+        .map((l) => `${l.id}:${l.quantite_livree}:${l.quantite_restante}:${l.libelle}`)
         .join('|'),
     [bl?.lignes],
   )
@@ -76,10 +81,23 @@ export default function BonLivraisonFichePage() {
     if (!bl?.lignes?.length) return 0
     return bl.lignes.reduce((sum, l) => {
       const raw = ligneQty[l.id]
-      const n = raw === undefined || raw === '' ? Number(l.quantite_livree) : Number(raw)
+      const n = raw === undefined || raw === '' ? qtyNum(l.quantite_livree) : Number(raw)
       return sum + (Number.isFinite(n) ? n : 0)
     }, 0)
   }, [bl?.lignes, ligneQty])
+
+  const ligneOverLimit = useMemo(() => {
+    const over: Record<number, boolean> = {}
+    for (const l of bl?.lignes ?? []) {
+      const raw = ligneQty[l.id]
+      const n = raw === undefined || raw === '' ? qtyNum(l.quantite_livree) : Number(raw)
+      const max = qtyNum(l.quantite_restante)
+      over[l.id] = Number.isFinite(n) && n > max + 1e-9
+    }
+    return over
+  }, [bl?.lignes, ligneQty])
+
+  const hasOverLimit = useMemo(() => Object.values(ligneOverLimit).some(Boolean), [ligneOverLimit])
 
   const mutSaveLignes = useMutation({
     mutationFn: (qty: Record<number, string>) => {
@@ -278,7 +296,7 @@ export default function BonLivraisonFichePage() {
             <div className="bc-fiche__summary-item">
               <span className="bc-fiche__summary-label">Qté totale livrée</span>
               <span className="bc-fiche__summary-value bc-fiche__summary-value--amount">
-                {totalQtyLivree}
+                {formatQuantity(totalQtyLivree)}
               </span>
             </div>
           </div>
@@ -290,9 +308,36 @@ export default function BonLivraisonFichePage() {
               <div className="dossier-tab-panel__header">
                 <h2 className="ds-form-section__title">Lignes livrées</h2>
                 <p className="dossier-tab-panel__intro">
-                  Articles et prestations repris du bon de commande — quantités effectivement livrées.
+                  {canEdit
+                    ? 'Quantités du bon de commande, déjà livrées sur d’autres BL (Livré / Signé), reste à livrer et saisie pour ce BL.'
+                    : 'Articles et prestations repris du bon de commande — quantités effectivement livrées.'}
                 </p>
               </div>
+
+              {canEdit && (bl.autres_bons_livraison?.length ?? 0) > 0 ? (
+                <div className="bl-delivery-context">
+                  <p>
+                    Autres bons de livraison sur ce BC — seuls les statuts <strong>Livré</strong> et{' '}
+                    <strong>Signé</strong> sont pris en compte dans la colonne « Déjà livrée ».
+                  </p>
+                  <ul className="bl-delivery-context__list">
+                    {bl.autres_bons_livraison!.map((other) => {
+                      const st = bonLivraisonStatutBadgeProps(other.statut)
+                      return (
+                        <li key={other.id}>
+                          <Link to={`/bons-livraison/${other.id}`} className="link-inline">
+                            {other.numero}
+                          </Link>
+                          {' — '}
+                          <StatusBadge variant={st.variant} size="sm">
+                            {st.label}
+                          </StatusBadge>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              ) : null}
 
               {ligneCount === 0 ? (
                 <p className="dossier-tab-empty">Aucune ligne sur ce bon de livraison.</p>
@@ -308,7 +353,8 @@ export default function BonLivraisonFichePage() {
                           setToast(null)
                           mutSaveLignes.mutate(ligneQty)
                         }}
-                        disabled={mutSaveLignes.isPending}
+                        disabled={mutSaveLignes.isPending || hasOverLimit}
+                        title={hasOverLimit ? 'Corrigez les quantités qui dépassent le reste à livrer.' : undefined}
                       >
                         {mutSaveLignes.isPending ? 'Enregistrement…' : 'Enregistrer les quantités'}
                       </button>
@@ -336,47 +382,79 @@ export default function BonLivraisonFichePage() {
                   ) : null}
 
                   <div className="table-wrap">
-                    <table className="data-table data-table--compact bc-lignes-table">
+                    <table className="data-table data-table--compact bc-lignes-table bc-lignes-table--delivery">
                       <colgroup>
                         <col className="bc-lignes-table__col-libelle" />
+                        <col className="bc-lignes-table__col-qty" />
+                        <col className="bc-lignes-table__col-qty" />
+                        <col className="bc-lignes-table__col-qty" />
                         <col className="bc-lignes-table__col-qty" />
                       </colgroup>
                       <thead>
                         <tr>
                           <th scope="col">Libellé</th>
                           <th scope="col" className="data-table__num">
+                            Qté BC
+                          </th>
+                          <th scope="col" className="data-table__num">
+                            Déjà livrée
+                          </th>
+                          <th scope="col" className="data-table__num">
+                            Reste
+                          </th>
+                          <th scope="col" className="data-table__num">
                             Qté livrée
                           </th>
                         </tr>
                       </thead>
                       <tbody>
-                        {bl.lignes!.map((l) => (
-                          <tr key={l.id}>
-                            <td>{l.libelle}</td>
-                            <td className="data-table__num">
-                              {canEdit ? (
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step="0.01"
-                                  className="bc-fiche__qty-input"
-                                  value={ligneQty[l.id] ?? String(l.quantite_livree)}
-                                  onChange={(e) => {
-                                    mutSaveLignes.reset()
-                                    setLigneQty((m) => ({ ...m, [l.id]: e.target.value }))
-                                  }}
-                                />
-                              ) : (
-                                l.quantite_livree
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {bl.lignes!.map((l) => {
+                          const reste = qtyNum(l.quantite_restante)
+                          const over = ligneOverLimit[l.id]
+                          return (
+                            <tr key={l.id}>
+                              <td>{l.libelle}</td>
+                              <td className="data-table__num">{formatQuantity(l.quantite_commandee ?? 0)}</td>
+                              <td className="data-table__num">{formatQuantity(l.quantite_deja_livree ?? 0)}</td>
+                              <td className="data-table__num">{formatQuantity(reste)}</td>
+                              <td className="data-table__num">
+                                {canEdit ? (
+                                  <div>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={reste}
+                                      step={1}
+                                      className="bc-fiche__qty-input"
+                                      value={ligneQty[l.id] ?? String(l.quantite_livree)}
+                                      aria-invalid={over || undefined}
+                                      onChange={(e) => {
+                                        mutSaveLignes.reset()
+                                        setLigneQty((m) => ({ ...m, [l.id]: e.target.value }))
+                                      }}
+                                    />
+                                    {over ? (
+                                      <div className="bl-ligne-qty-over" role="alert">
+                                        Max. {formatQuantity(reste)}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ) : (
+                                  formatQuantity(l.quantite_livree)
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                       <tfoot>
                         <tr>
-                          <td className="data-table__foot-label">Total livré</td>
-                          <td className="data-table__num data-table__foot-value">{totalQtyLivree}</td>
+                          <td colSpan={4} className="data-table__foot-label">
+                            Total livré (ce BL)
+                          </td>
+                          <td className="data-table__num data-table__foot-value">
+                            {formatQuantity(totalQtyLivree)}
+                          </td>
                         </tr>
                       </tfoot>
                     </table>

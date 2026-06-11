@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\BonLivraison;
 use App\Models\BonLivraisonLigne;
+use App\Services\BonLivraisonDeliveryService;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
 use Illuminate\Http\JsonResponse;
@@ -12,6 +13,7 @@ use Illuminate\Http\Request;
 
 class BonLivraisonController extends Controller
 {
+    public function __construct(private readonly BonLivraisonDeliveryService $deliveryService) {}
     public function index(Request $request): JsonResponse
     {
         $q = BonLivraison::query()
@@ -55,9 +57,7 @@ class BonLivraisonController extends Controller
         if (! AgencyAccess::userMayAccessBonLivraison($request->user(), $bonLivraison)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
-        $bonLivraison->load(['lignes', 'dossier', 'client', 'clientContact', 'bonCommande']);
-
-        return response()->json($bonLivraison);
+        return response()->json($this->deliveryService->formatBonLivraison($bonLivraison));
     }
 
     public function update(Request $request, BonLivraison $bonLivraison): JsonResponse
@@ -87,6 +87,13 @@ class BonLivraisonController extends Controller
         $bonLivraison->refresh();
         ClientContactDocument::assertBelongsToClient($bonLivraison->contact_id, (int) $bonLivraison->client_id);
         if (! empty($data['lignes'])) {
+            if ($bonLivraison->statut !== BonLivraison::STATUT_BROUILLON) {
+                return response()->json(['message' => 'Seul un BL en brouillon peut modifier les quantités livrées.'], 422);
+            }
+            $validationError = $this->deliveryService->validateLigneQuantities($bonLivraison, $data['lignes']);
+            if ($validationError !== null) {
+                return response()->json(['message' => $validationError], 422);
+            }
             foreach ($data['lignes'] as $row) {
                 $lid = (int) $row['id'];
                 $ligne = BonLivraisonLigne::query()
@@ -99,7 +106,7 @@ class BonLivraisonController extends Controller
             }
         }
 
-        return response()->json($bonLivraison->fresh()->load(['lignes', 'clientContact']));
+        return response()->json($this->deliveryService->formatBonLivraison($bonLivraison->fresh(), ['lignes', 'clientContact', 'bonCommande']));
     }
 
     public function destroy(Request $request, BonLivraison $bonLivraison): JsonResponse
@@ -130,8 +137,21 @@ class BonLivraisonController extends Controller
         if ($bonLivraison->statut !== BonLivraison::STATUT_BROUILLON) {
             return response()->json(['message' => 'Seul un BL en brouillon peut être validé.'], 422);
         }
+        $bonLivraison->load(['lignes.bonCommandeLigne']);
+        $validationError = $this->deliveryService->validateLigneQuantities(
+            $bonLivraison,
+            $bonLivraison->lignes
+                ->map(fn (BonLivraisonLigne $ligne) => [
+                    'id' => $ligne->id,
+                    'quantite_livree' => $ligne->quantite_livree,
+                ])
+                ->all(),
+        );
+        if ($validationError !== null) {
+            return response()->json(['message' => $validationError], 422);
+        }
         $bonLivraison->update(['statut' => BonLivraison::STATUT_LIVRE]);
 
-        return response()->json($bonLivraison->fresh()->load(['lignes', 'clientContact']));
+        return response()->json($this->deliveryService->formatBonLivraison($bonLivraison->fresh(), ['lignes', 'clientContact', 'bonCommande']));
     }
 }

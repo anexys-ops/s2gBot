@@ -734,6 +734,9 @@ export type BonLivraisonLigne = {
   quantite_livree: string | number
   ref_article_id?: number | null
   bon_commande_ligne_id?: number | null
+  quantite_commandee?: string | number
+  quantite_deja_livree?: string | number
+  quantite_restante?: string | number
 }
 
 export type BonLivraison = {
@@ -751,6 +754,7 @@ export type BonLivraison = {
   clientContact?: ClientContactRow
   dossier?: DossierRow
   bonCommande?: Pick<BonCommande, 'id' | 'numero'>
+  autres_bons_livraison?: Array<Pick<BonLivraison, 'id' | 'numero' | 'statut' | 'date_livraison'>>
 }
 
 export const dossiersApi = {

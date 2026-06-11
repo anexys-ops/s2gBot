@@ -299,4 +299,125 @@ class BonCommandeWorkflowTest extends TestCase
         $this->assertNotContains($withBc->id, $ids);
         $this->assertCount(1, $ids);
     }
+
+    public function test_bl_show_includes_delivery_tracking_on_lignes(): void
+    {
+        [$lab, $bcId, $blId, $blLineId, $bcLineId] = $this->seedBcWithBl();
+
+        BonCommandeLigne::query()->whereKey($bcLineId)->update(['quantite' => 5]);
+
+        $show = $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-livraison/{$blId}");
+        $show->assertOk();
+        $show->assertJsonPath('lignes.0.quantite_commandee', 5);
+        $show->assertJsonPath('lignes.0.quantite_deja_livree', 0);
+        $show->assertJsonPath('lignes.0.quantite_restante', 5);
+
+        $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-livraison/{$blId}", [
+            'lignes' => [['id' => $blLineId, 'quantite_livree' => 2]],
+        ])->assertOk();
+        $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-livraison/{$blId}/valider")->assertOk();
+
+        $bl2 = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/transformer-bl");
+        $bl2->assertCreated();
+        $bl2Id = (int) $bl2->json('id');
+
+        $show2 = $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-livraison/{$bl2Id}");
+        $show2->assertOk();
+        $show2->assertJsonPath('lignes.0.quantite_commandee', 5);
+        $show2->assertJsonPath('lignes.0.quantite_deja_livree', 2);
+        $show2->assertJsonPath('lignes.0.quantite_restante', 3);
+        $show2->assertJsonPath('autres_bons_livraison.0.id', $blId);
+    }
+
+    public function test_bl_rejects_quantity_over_remaining(): void
+    {
+        [$lab, $bcId, $blId, $blLineId, $bcLineId] = $this->seedBcWithBl();
+
+        BonCommandeLigne::query()->whereKey($bcLineId)->update(['quantite' => 5]);
+
+        $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-livraison/{$blId}", [
+            'lignes' => [['id' => $blLineId, 'quantite_livree' => 3]],
+        ])->assertOk();
+        $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-livraison/{$blId}/valider")->assertOk();
+
+        $bl2 = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/transformer-bl");
+        $bl2Id = (int) $bl2->json('id');
+        $bl2LineId = (int) $bl2->json('lignes.0.id');
+
+        $over = $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-livraison/{$bl2Id}", [
+            'lignes' => [['id' => $bl2LineId, 'quantite_livree' => 3]],
+        ]);
+        $over->assertStatus(422);
+
+        $ok = $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-livraison/{$bl2Id}", [
+            'lignes' => [['id' => $bl2LineId, 'quantite_livree' => 2]],
+        ]);
+        $ok->assertOk();
+        $ok->assertJsonPath('lignes.0.quantite_livree', 2);
+    }
+
+    public function test_bl_brouillon_quantities_not_counted_as_deja_livree(): void
+    {
+        [$lab, $bcId, $blId, $blLineId, $bcLineId] = $this->seedBcWithBl();
+
+        BonCommandeLigne::query()->whereKey($bcLineId)->update(['quantite' => 5]);
+
+        $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-livraison/{$blId}", [
+            'lignes' => [['id' => $blLineId, 'quantite_livree' => 4]],
+        ])->assertOk();
+
+        $bl2 = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/transformer-bl");
+        $bl2Id = (int) $bl2->json('id');
+
+        $show2 = $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-livraison/{$bl2Id}");
+        $show2->assertJsonPath('lignes.0.quantite_deja_livree', 0);
+        $show2->assertJsonPath('lignes.0.quantite_restante', 5);
+    }
+
+    /**
+     * @return array{0: User, 1: int, 2: int, 3: int, 4: int}
+     */
+    private function seedBcWithBl(): array
+    {
+        $client = Client::query()->create(['name' => 'BL Delivery Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site BL']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0099',
+            'titre' => 'D BL',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-BL-DEL',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 50,
+            'amount_ttc' => 60,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai livraison',
+            'quantity' => 1,
+            'unit_price' => 50,
+            'tva_rate' => 20,
+            'total' => 50,
+        ]);
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $bcId = (int) $bc['id'];
+        $bcLineId = (int) $bc['lignes'][0]['id'];
+        $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/confirmer")->assertOk();
+        $bl = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/transformer-bl")->json();
+        $blId = (int) $bl['id'];
+        $blLineId = (int) $bl['lignes'][0]['id'];
+
+        return [$lab, $bcId, $blId, $blLineId, $bcLineId];
+    }
 }

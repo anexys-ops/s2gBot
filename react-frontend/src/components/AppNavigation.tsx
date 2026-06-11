@@ -115,7 +115,6 @@ export default function AppNavigation() {
         label: 'Commercial',
         items: filterItems([
           { to: '/clients', label: 'Clients' },
-          { to: '/clients/contacts', label: 'Contacts clients', labOnly: true },
           { to: '/sites', label: 'Chantiers' },
           { to: '/dossiers', label: 'Dossiers' },
           { to: '/devis', label: 'Devis' },

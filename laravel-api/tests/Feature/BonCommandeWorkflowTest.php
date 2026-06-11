@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BonCommande;
 use App\Models\Client;
 use App\Models\Dossier;
 use App\Models\Quote;
@@ -117,5 +118,73 @@ class BonCommandeWorkflowTest extends TestCase
     public function test_guest_cannot_transform_devis(): void
     {
         $this->postJson('/api/v1/devis/1/transformer-bc')->assertUnauthorized();
+    }
+
+    public function test_quotes_eligible_bc_filter_excludes_draft_and_existing_bc(): void
+    {
+        $client = Client::query()->create(['name' => 'Eligible BC Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site E']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0003',
+            'titre' => 'D3',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+
+        $eligible = Quote::query()->create([
+            'number' => 'Q-ELIG',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 100,
+            'amount_ttc' => 120,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_ACCEPTED,
+        ]);
+        Quote::query()->create([
+            'number' => 'Q-DRAFT',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 50,
+            'amount_ttc' => 60,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_DRAFT,
+        ]);
+        $withBc = Quote::query()->create([
+            'number' => 'Q-HASBC',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 80,
+            'amount_ttc' => 96,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        BonCommande::query()->create([
+            'numero' => 'BCC-TEST-1',
+            'quote_id' => $withBc->id,
+            'dossier_id' => $dossier->id,
+            'client_id' => $client->id,
+            'date_commande' => '2026-02-02',
+            'montant_ht' => 80,
+            'montant_ttc' => 96,
+            'statut' => BonCommande::STATUT_BROUILLON,
+            'created_by' => $lab->id,
+        ]);
+
+        $r = $this->actingAs($lab, 'sanctum')->getJson('/api/quotes?eligible_bc=1');
+        $r->assertOk();
+        $ids = collect($r->json('data'))->pluck('id')->all();
+        $this->assertContains($eligible->id, $ids);
+        $this->assertNotContains($withBc->id, $ids);
+        $this->assertCount(1, $ids);
     }
 }

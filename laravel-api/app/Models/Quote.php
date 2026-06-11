@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Quote extends Model
@@ -139,6 +140,11 @@ class Quote extends Model
     public function devisTaches(): HasMany
     {
         return $this->hasMany(DevisTache::class, 'quote_id')->orderBy('ordre');
+    }
+
+    public function bonCommande(): HasOne
+    {
+        return $this->hasOne(BonCommande::class, 'quote_id');
     }
 
     public function attachments(): MorphMany

@@ -89,7 +89,16 @@ class QuoteController extends Controller
             $query->where('status', $status);
         }
 
-        $quotes = $query->orderByDesc('quote_date')->paginate(15);
+        if ($request->boolean('eligible_bc')) {
+            $query
+                ->whereNotNull('dossier_id')
+                ->whereIn('status', [Quote::STATUS_SIGNED, Quote::STATUS_ACCEPTED])
+                ->whereDoesntHave('bonCommande');
+        }
+
+        $perPage = min(max((int) $request->query('per_page', 15), 1), 100);
+
+        $quotes = $query->orderByDesc('quote_date')->paginate($perPage);
 
         return response()->json($quotes);
     }

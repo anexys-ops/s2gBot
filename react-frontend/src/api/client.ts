@@ -1865,20 +1865,25 @@ export interface Quote {
   client?: Client
   client_contact?: ClientContactRow
   site?: Site
+  dossier?: Pick<DossierRow, 'id' | 'reference' | 'titre'>
   billing_address?: ClientAddress
   delivery_address?: ClientAddress
   quote_lines?: QuoteLine[]
 }
 
 export const quotesApi = {
-  list: (params?: { search?: string; status?: string; page?: number }) => {
+  list: (params?: { search?: string; status?: string; page?: number; per_page?: number; eligible_bc?: boolean }) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
     if (params?.status) q.set('status', params.status)
     if (params?.page) q.set('page', String(params.page))
+    if (params?.per_page) q.set('per_page', String(params.per_page))
+    if (params?.eligible_bc) q.set('eligible_bc', '1')
     const s = q.toString()
     return api<LaravelPaginator<Quote>>(`/quotes${s ? `?${s}` : ''}`)
   },
+  /** Devis signés/acceptés avec dossier, sans BC existant — pour « Créer depuis un devis ». */
+  listEligibleForBc: () => quotesApi.list({ eligible_bc: true, per_page: 100 }),
   get: (id: number) => api<Quote>(`/quotes/${id}`),
   create: (body: QuoteCreateBody) => api<Quote>('/quotes', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: Partial<QuoteCreateBody> & { status?: string; meta?: EntityMetaPayload | null }) =>

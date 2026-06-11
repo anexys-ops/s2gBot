@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { bonsCommandeApi, devisV1Api, quotesApi, type BonCommande } from '../../api/client'
+import { bonsCommandeApi, devisV1Api, quotesApi, type BonCommande, type Quote } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
-import StatusBadge, { bonCommandeStatutBadgeProps } from '../../components/ds/StatusBadge'
+import StatusBadge, { bonCommandeStatutBadgeProps, quoteStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ListTableToolbar from '../../components/ListTableToolbar'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import TableRowActions from '../../components/TableRowActions'
@@ -22,6 +22,191 @@ const STATUT_LABELS: Record<string, string> = {
 
 const statusOptions = Object.entries(STATUT_LABELS).map(([value, label]) => ({ value, label }))
 
+function BonCommandeCreateFromDevisPanel() {
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const [quoteId, setQuoteId] = useState('')
+
+  const { data: eligiblePage, isLoading, isError, error } = useQuery({
+    queryKey: ['quotes', 'eligible-bc'],
+    queryFn: () => quotesApi.listEligibleForBc(),
+  })
+
+  const eligibleQuotes = eligiblePage?.data ?? []
+
+  const selectedQuote = useMemo(
+    () => eligibleQuotes.find((q) => String(q.id) === quoteId),
+    [eligibleQuotes, quoteId],
+  )
+
+  const createMut = useMutation({
+    mutationFn: (id: number) => devisV1Api.transformerBc(id),
+    onSuccess: (bc) => {
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+      void qc.invalidateQueries({ queryKey: ['quotes', 'eligible-bc'] })
+      setQuoteId('')
+      if (bc?.id) navigate(`/bons-commande/${bc.id}`)
+    },
+  })
+
+  const handleCreate = () => {
+    const id = Number(quoteId)
+    if (!id) return
+    createMut.mutate(id)
+  }
+
+  return (
+    <section className="card bc-from-devis-panel" aria-labelledby="bc-from-devis-title">
+      <header className="bc-from-devis-panel__header">
+        <h2 id="bc-from-devis-title" className="bc-from-devis-panel__title">
+          Créer depuis un devis
+        </h2>
+        <p className="bc-from-devis-panel__intro text-muted">
+          Générez un bon de commande (BCC) à partir d&apos;un devis <strong>signé</strong> ou{' '}
+          <strong>accepté</strong>, rattaché à un dossier et sans BC existant.
+        </p>
+      </header>
+
+      {isLoading ? (
+        <p className="text-muted bc-from-devis-panel__status">Chargement des devis éligibles…</p>
+      ) : isError ? (
+        <p className="error bc-from-devis-panel__status">{(error as Error).message}</p>
+      ) : eligibleQuotes.length === 0 ? (
+        <div className="bc-from-devis-panel__empty dossier-tab-empty">
+          <p>Aucun devis éligible pour le moment.</p>
+          <ul className="bc-from-devis-panel__criteria">
+            <li>Statut : signé ou accepté</li>
+            <li>Rattaché à un dossier chantier</li>
+            <li>Sans bon de commande déjà créé</li>
+          </ul>
+          <p className="bc-from-devis-panel__empty-actions">
+            <Link to="/devis" className="btn btn-secondary btn-sm">
+              Voir les devis
+            </Link>
+            <Link to="/dossiers" className="btn btn-secondary btn-sm">
+              Voir les dossiers
+            </Link>
+          </p>
+        </div>
+      ) : (
+        <div className="bc-from-devis-panel__body">
+          <div className="bc-from-devis-panel__form">
+            <label className="form-group bc-from-devis-panel__field">
+              <span className="bc-from-devis-panel__label">Devis source</span>
+              <select
+                value={quoteId}
+                onChange={(e) => {
+                  setQuoteId(e.target.value)
+                  createMut.reset()
+                }}
+              >
+                <option value="">Sélectionner un devis…</option>
+                {eligibleQuotes.map((quote) => (
+                  <option key={quote.id} value={quote.id}>
+                    {formatQuoteOptionLabel(quote)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="bc-from-devis-panel__actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!quoteId || createMut.isPending}
+                onClick={handleCreate}
+              >
+                {createMut.isPending ? 'Création en cours…' : 'Créer le BC'}
+              </button>
+              {quoteId ? (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={createMut.isPending}
+                  onClick={() => {
+                    setQuoteId('')
+                    createMut.reset()
+                  }}
+                >
+                  Annuler
+                </button>
+              ) : null}
+            </div>
+
+            {createMut.isError ? (
+              <p className="error bc-from-devis-panel__error">{(createMut.error as Error).message}</p>
+            ) : null}
+          </div>
+
+          {selectedQuote ? (
+            <aside className="bc-from-devis-panel__preview" aria-label="Aperçu du devis sélectionné">
+              <h3 className="bc-from-devis-panel__preview-title">Devis sélectionné</h3>
+              <dl className="bc-from-devis-panel__meta">
+                <div>
+                  <dt>Numéro</dt>
+                  <dd>
+                    <Link to={`/devis/${selectedQuote.id}`} className="link-inline">
+                      <code className="code-badge">{selectedQuote.number}</code>
+                    </Link>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Client</dt>
+                  <dd>{selectedQuote.client?.name ?? `Client #${selectedQuote.client_id}`}</dd>
+                </div>
+                <div>
+                  <dt>Dossier</dt>
+                  <dd>
+                    {selectedQuote.dossier_id ? (
+                      <Link to={`/dossiers/${selectedQuote.dossier_id}/devis`} className="link-inline">
+                        {selectedQuote.dossier?.reference ?? `#${selectedQuote.dossier_id}`}
+                      </Link>
+                    ) : (
+                      '—'
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Date</dt>
+                  <dd>{formatAppDate(selectedQuote.quote_date)}</dd>
+                </div>
+                <div>
+                  <dt>Montant TTC</dt>
+                  <dd>{formatMoney(Number(selectedQuote.amount_ttc))}</dd>
+                </div>
+                <div>
+                  <dt>Statut</dt>
+                  <dd>
+                    {(() => {
+                      const st = quoteStatutBadgeProps(selectedQuote.status)
+                      return (
+                        <StatusBadge variant={st.variant} size="sm">
+                          {st.label}
+                        </StatusBadge>
+                      )
+                    })()}
+                  </dd>
+                </div>
+              </dl>
+            </aside>
+          ) : (
+            <aside className="bc-from-devis-panel__hint text-muted">
+              Sélectionnez un devis pour afficher le détail avant création du bon de commande.
+            </aside>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function formatQuoteOptionLabel(quote: Quote): string {
+  const client = quote.client?.name ?? `Client #${quote.client_id}`
+  const dossierRef = quote.dossier?.reference ?? (quote.dossier_id ? `#${quote.dossier_id}` : '—')
+  const amount = formatMoney(Number(quote.amount_ttc))
+  return `${quote.number} — ${client} — ${dossierRef} — ${amount} TTC`
+}
+
 export default function BonsCommandeListPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -31,7 +216,6 @@ export default function BonsCommandeListPage() {
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statutFilter, setStatutFilter] = useState('')
-  const [quoteId, setQuoteId] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<BonCommande | null>(null)
 
   const { visible, toggle } = usePersistedColumnVisibility('bons-commande', {
@@ -55,41 +239,11 @@ export default function BonsCommandeListPage() {
     placeholderData: keepPreviousData,
   })
 
-  const { data: signedQuotes } = useQuery({
-    queryKey: ['quotes', 'bc-source', 'signed'],
-    queryFn: () => quotesApi.list({ status: 'signed' }),
-    enabled: isLab,
-  })
-  const { data: acceptedQuotes } = useQuery({
-    queryKey: ['quotes', 'bc-source', 'accepted'],
-    queryFn: () => quotesApi.list({ status: 'accepted' }),
-    enabled: isLab,
-  })
-  const { data: validatedQuotes } = useQuery({
-    queryKey: ['quotes', 'bc-source', 'validated'],
-    queryFn: () => quotesApi.list({ status: 'validated' }),
-    enabled: isLab,
-  })
-
-  const quoteOptions = [
-    ...(signedQuotes?.data ?? []),
-    ...(acceptedQuotes?.data ?? []),
-    ...(validatedQuotes?.data ?? []),
-  ].filter((q, index, arr) => q.dossier_id && arr.findIndex((x) => x.id === q.id) === index)
-
-  const createMut = useMutation({
-    mutationFn: () => devisV1Api.transformerBc(Number(quoteId)),
-    onSuccess: (bc) => {
-      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
-      setQuoteId('')
-      if (bc?.id) navigate(`/bons-commande/${bc.id}`)
-    },
-  })
-
   const deleteMut = useMutation({
     mutationFn: (id: number) => bonsCommandeApi.delete(id),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+      void qc.invalidateQueries({ queryKey: ['quotes', 'eligible-bc'] })
       setDeleteTarget(null)
     },
   })
@@ -127,39 +281,7 @@ export default function BonsCommandeListPage() {
 
   return (
     <ModuleEntityShell {...shellProps}>
-      {isLab && (
-        <section className="card ds-form-section" style={{ marginBottom: '1rem' }}>
-          <h2 className="ds-form-section__title" style={{ marginTop: 0 }}>
-            Créer depuis un devis
-          </h2>
-          <p className="text-muted" style={{ fontSize: '0.88rem', marginTop: 0 }}>
-            Transformation depuis un devis signé, accepté ou validé rattaché à un dossier chantier.
-          </p>
-          <div className="crud-actions" style={{ flexWrap: 'wrap', alignItems: 'flex-end', gap: '0.75rem' }}>
-            <label className="form-group" style={{ margin: 0, minWidth: 'min(100%, 22rem)' }}>
-              Devis source
-              <select value={quoteId} onChange={(e) => setQuoteId(e.target.value)}>
-                <option value="">Choisir un devis signé / accepté avec dossier…</option>
-                {quoteOptions.map((quote) => (
-                  <option key={quote.id} value={quote.id}>
-                    {quote.number} — {quote.client?.name ?? `Client #${quote.client_id}`} — dossier #
-                    {quote.dossier_id}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              disabled={!quoteId || createMut.isPending}
-              onClick={() => createMut.mutate()}
-            >
-              {createMut.isPending ? 'Création…' : 'Créer le BC'}
-            </button>
-          </div>
-          {createMut.isError && <p className="error">{(createMut.error as Error).message}</p>}
-        </section>
-      )}
+      {isLab ? <BonCommandeCreateFromDevisPanel /> : null}
 
       <ListTableToolbar
         searchValue={searchInput}

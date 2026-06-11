@@ -8,7 +8,7 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ClientContactPicker from '../../components/clients/ClientContactPicker'
-import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import { dateInputFromApi, formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
 
@@ -59,12 +59,12 @@ export default function BonCommandeFichePage() {
     for (const l of bc.lignes) {
       const dl = l as BonCommandeLigne
       next[l.id] = {
-        debut: dl.date_debut_prevue ? String(dl.date_debut_prevue).slice(0, 10) : '',
-        fin: dl.date_fin_prevue ? String(dl.date_fin_prevue).slice(0, 10) : '',
+        debut: dateInputFromApi(dl.date_debut_prevue),
+        fin: dateInputFromApi(dl.date_fin_prevue),
       }
       nextExtra[l.id] = {
         technicien_id: dl.technicien_id ?? null,
-        date_livraison: dl.date_livraison ? String(dl.date_livraison).slice(0, 10) : '',
+        date_livraison: dateInputFromApi(dl.date_livraison),
         notes_ligne: dl.notes_ligne ?? '',
       }
     }
@@ -95,8 +95,10 @@ export default function BonCommandeFichePage() {
         const extra = ligneExtraEdits[l.id]
         if (!periode && !extra) continue
 
-        const prevD = l.date_debut_prevue ? String(l.date_debut_prevue).slice(0, 10) : ''
-        const prevF = l.date_fin_prevue ? String(l.date_fin_prevue).slice(0, 10) : ''
+        const prevD = dateInputFromApi(l.date_debut_prevue)
+        const prevF = dateInputFromApi(l.date_fin_prevue)
+        const prevLivraison = dateInputFromApi(l.date_livraison)
+        const prevNotes = l.notes_ligne ?? ''
         const body: Parameters<typeof bonsCommandeApi.updateLigne>[2] = {}
 
         if (periode && (periode.debut !== prevD || periode.fin !== prevF)) {
@@ -104,9 +106,15 @@ export default function BonCommandeFichePage() {
           body.date_fin_prevue = periode.fin || null
         }
         if (extra) {
-          body.technicien_id = extra.technicien_id
-          body.date_livraison = extra.date_livraison || null
-          body.notes_ligne = extra.notes_ligne || null
+          const extraChanged =
+            extra.technicien_id !== (l.technicien_id ?? null) ||
+            extra.date_livraison !== prevLivraison ||
+            extra.notes_ligne !== prevNotes
+          if (extraChanged) {
+            body.technicien_id = extra.technicien_id
+            body.date_livraison = extra.date_livraison || null
+            body.notes_ligne = extra.notes_ligne || null
+          }
         }
 
         if (Object.keys(body).length > 0) {
@@ -116,6 +124,8 @@ export default function BonCommandeFichePage() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
+      void qc.invalidateQueries({ queryKey: ['planning-terrain'] })
+      void qc.invalidateQueries({ queryKey: ['planning-overview'] })
     },
   })
 

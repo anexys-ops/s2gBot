@@ -15,6 +15,7 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 type TabId = 'personnel' | 'materiel' | 'indispo'
 
 const EVENT_COLORS: Record<string, string> = {
+  terrain_bc:   '#0ea5e9',
   tache:        '#3b82f6',
   utilisation:  '#3b82f6',
   conge:        '#10b981',
@@ -27,14 +28,18 @@ const EVENT_COLORS: Record<string, string> = {
   autre:        '#6b7280',
 }
 
+function ymdLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function monthRange(year: number, month: number) {
   const first = new Date(year, month, 1)
-  const last  = new Date(year, month + 1, 0)
+  const last = new Date(year, month + 1, 0)
   return {
-    from:     first.toISOString().slice(0, 10),
-    to:       last.toISOString().slice(0, 10),
-    days:     last.getDate(),
-    label:    first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+    from: ymdLocal(first),
+    to: ymdLocal(last),
+    days: last.getDate(),
+    label: first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
   }
 }
 
@@ -61,17 +66,29 @@ export default function PlanningGlobalPage() {
 
   // Grouper les slots par personne/équipement pour la grille
   const humanSlots   = overview?.humans ?? []
+  const terrainBc    = overview?.terrain_bc ?? []
   const equipSlots   = overview?.equipments ?? []
   const stockPerso   = overview?.stock_personnels ?? []
   const stockEquip   = overview?.stock_equipments ?? []
 
-  const humanNames   = [...new Map(humanSlots.map((s) => [s.user_id, s.user?.name ?? `#${s.user_id}`])).entries()]
+  const humanNames   = [
+    ...new Map([
+      ...humanSlots.map((s) => [s.user_id, s.user?.name ?? `#${s.user_id}`] as const),
+      ...terrainBc.map((s) => [s.user_id, s.user?.name ?? `#${s.user_id}`] as const),
+    ]).entries(),
+  ]
   const equipNames   = [...new Map(equipSlots.map((s) => [s.equipment_id, s.equipment?.name ?? `#${s.equipment_id}`])).entries()]
 
   function slotsForDay(day: number, userId?: number, equipId?: number): Array<{ label: string; color: string }> {
-    const d = new Date(year, month, day).toISOString().slice(0, 10)
+    const d = ymdLocal(new Date(year, month, day))
     if (userId !== undefined) {
       return [
+        ...terrainBc
+          .filter((s) => s.user_id === userId && s.date_debut <= d && s.date_fin >= d)
+          .map((s) => ({
+            label: s.bon_commande_ligne?.bon_commande?.numero ?? 'BC terrain',
+            color: EVENT_COLORS.terrain_bc,
+          })),
         ...humanSlots
           .filter((s) => s.user_id === userId && s.date_debut <= d && s.date_fin >= d)
           .map((s) => ({

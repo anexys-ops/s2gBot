@@ -26,6 +26,19 @@ class BcLignePlanningAffectation extends Model
         ];
     }
 
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        $array = parent::toArray();
+        foreach (['date_debut', 'date_fin'] as $attr) {
+            if ($this->{$attr} !== null) {
+                $array[$attr] = $this->{$attr}->format('Y-m-d');
+            }
+        }
+
+        return $array;
+    }
+
     public function bonCommandeLigne(): BelongsTo
     {
         return $this->belongsTo(BonCommandeLigne::class, 'bon_commande_ligne_id');

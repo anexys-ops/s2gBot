@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\BcLignePlanningAffectation;
 use App\Models\PlanningEquipment;
 use App\Models\PlanningHuman;
 use App\Models\StockEquipment;
@@ -216,6 +217,16 @@ class PlanningController extends Controller
                 ->where('date_fin', '>=', $from)
                 ->where('date_debut', '<=', $to)
                 ->with('equipment:id,name,code')
+                ->get(),
+            'terrain_bc' => BcLignePlanningAffectation::query()
+                ->where('date_debut', '<=', $to)
+                ->where('date_fin', '>=', $from)
+                ->with([
+                    'user:id,name',
+                    'bonCommandeLigne:id,bon_commande_id,libelle',
+                    'bonCommandeLigne.bonCommande:id,numero,dossier_id',
+                ])
+                ->orderBy('date_debut')
                 ->get(),
         ]);
     }

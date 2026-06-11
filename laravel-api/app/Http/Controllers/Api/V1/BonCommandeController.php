@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\BcLignePlanningAffectation;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
 use App\Services\CommercialDocumentWorkflowService;
@@ -168,9 +169,32 @@ class BonCommandeController extends Controller
         }
 
         $ligne->save();
+        $this->syncTerrainPlanningAffectation($ligne, (int) $request->user()->id);
         $ligne->load(['planningAffectations.user', 'technicien']);
 
         return response()->json($ligne);
+    }
+
+    private function syncTerrainPlanningAffectation(BonCommandeLigne $ligne, int $actorId): void
+    {
+        $ligne->refresh();
+
+        if (! $ligne->technicien_id || ! $ligne->date_debut_prevue || ! $ligne->date_fin_prevue) {
+            return;
+        }
+
+        BcLignePlanningAffectation::query()->updateOrCreate(
+            [
+                'bon_commande_ligne_id' => $ligne->id,
+                'user_id' => $ligne->technicien_id,
+            ],
+            [
+                'date_debut' => $ligne->date_debut_prevue->format('Y-m-d'),
+                'date_fin' => $ligne->date_fin_prevue->format('Y-m-d'),
+                'notes' => $ligne->notes_ligne,
+                'created_by' => $actorId,
+            ]
+        );
     }
 
     public function confirmer(Request $request, BonCommande $bonCommande): JsonResponse

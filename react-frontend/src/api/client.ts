@@ -2638,11 +2638,26 @@ export interface StockEquipmentEntry {
   equipment?: { id: number; name: string; code?: string }
 }
 
+export type PlanningTerrainBcSlot = {
+  id: number
+  user_id: number
+  date_debut: string
+  date_fin: string
+  notes?: string | null
+  user?: { id: number; name: string }
+  bon_commande_ligne?: {
+    id: number
+    libelle: string
+    bon_commande?: { id: number; numero: string; dossier_id: number }
+  }
+}
+
 export interface PlanningOverview {
   humans: PlanningHuman[]
   equipments: PlanningEquipmentSlot[]
   stock_personnels: StockPersonnel[]
   stock_equipments: StockEquipmentEntry[]
+  terrain_bc?: PlanningTerrainBcSlot[]
 }
 
 export const planningApi = {

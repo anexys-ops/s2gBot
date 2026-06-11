@@ -38,6 +38,19 @@ class BonCommandeLigne extends Model
         ];
     }
 
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        $array = parent::toArray();
+        foreach (['date_debut_prevue', 'date_fin_prevue', 'date_livraison'] as $attr) {
+            if ($this->{$attr} !== null) {
+                $array[$attr] = $this->{$attr}->format('Y-m-d');
+            }
+        }
+
+        return $array;
+    }
+
     public function bonCommande(): BelongsTo
     {
         return $this->belongsTo(BonCommande::class, 'bon_commande_id');

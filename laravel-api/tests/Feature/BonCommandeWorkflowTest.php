@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BcLignePlanningAffectation;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
 use App\Models\Client;
@@ -103,13 +104,69 @@ class BonCommandeWorkflowTest extends TestCase
         ]);
         $r->assertOk();
         $r->assertJsonPath('technicien_id', $tech->id);
-        $this->assertStringStartsWith('2026-03-15', (string) $r->json('date_livraison'));
+        $r->assertJsonPath('date_livraison', '2026-03-15');
         $r->assertJsonPath('notes_ligne', 'Accès chantier nord');
 
         $ligne = BonCommandeLigne::query()->findOrFail($ligneId);
         $this->assertSame($tech->id, $ligne->technicien_id);
         $this->assertSame('2026-03-15', $ligne->date_livraison?->format('Y-m-d'));
         $this->assertSame('Accès chantier nord', $ligne->notes_ligne);
+    }
+
+    public function test_update_bc_ligne_syncs_terrain_planning_affectation(): void
+    {
+        $client = Client::query()->create(['name' => 'BC Sync Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site S']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $tech = User::factory()->create(['role' => User::ROLE_LAB_TECHNICIAN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0011',
+            'titre' => 'D11',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-11',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 100,
+            'amount_ttc' => 120,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai sync',
+            'quantity' => 1,
+            'unit_price' => 100,
+            'tva_rate' => 20,
+            'total' => 100,
+        ]);
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $bcId = (int) $bc['id'];
+        $ligneId = (int) $bc['lignes'][0]['id'];
+
+        $r = $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-commande/{$bcId}/lignes/{$ligneId}", [
+            'date_debut_prevue' => '2026-04-10',
+            'date_fin_prevue' => '2026-04-14',
+            'technicien_id' => $tech->id,
+            'notes_ligne' => 'Mission terrain',
+        ]);
+        $r->assertOk();
+        $r->assertJsonPath('date_debut_prevue', '2026-04-10');
+        $r->assertJsonPath('date_fin_prevue', '2026-04-14');
+
+        $aff = BcLignePlanningAffectation::query()->where('bon_commande_ligne_id', $ligneId)->first();
+        $this->assertNotNull($aff);
+        $this->assertSame($tech->id, $aff->user_id);
+        $this->assertSame('2026-04-10', $aff->date_debut->format('Y-m-d'));
+        $this->assertSame('2026-04-14', $aff->date_fin->format('Y-m-d'));
+        $this->assertSame('Mission terrain', $aff->notes);
     }
 
     public function test_gest_confirmer_transformer_bl_valider(): void

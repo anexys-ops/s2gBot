@@ -9,6 +9,7 @@ import {
 } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
+import { dateInputFromApi } from '../../lib/appLocale'
 
 function toYmd(d: Date) {
   return d.toISOString().slice(0, 10)
@@ -47,8 +48,8 @@ function affectationOnDay(
   day: Date
 ): boolean {
   const t = ymdLocal(day)
-  const ds = String(a.date_debut).slice(0, 10)
-  const de = String(a.date_fin).slice(0, 10)
+  const ds = dateInputFromApi(a.date_debut)
+  const de = dateInputFromApi(a.date_fin)
   return t >= ds && t <= de
 }
 
@@ -446,7 +447,7 @@ export default function PlanningTechniciensPage() {
                   return (
                     <tr key={a.id}>
                       <td>
-                        {String(a.date_debut).slice(0, 10)} → {String(a.date_fin).slice(0, 10)}
+                        {dateInputFromApi(a.date_debut)} → {dateInputFromApi(a.date_fin)}
                       </td>
                       <td>{a.user?.name ?? `Utilisateur #${a.user_id}`}</td>
                       <td>

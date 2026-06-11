@@ -16,6 +16,17 @@ export function formatMoney(amount: number): string {
 /** Libellé unité pour en-têtes (ex. colonne « TTC (DH) »). */
 export const MONEY_UNIT_LABEL = 'DH'
 
+/** Valeur `YYYY-MM-DD` pour un `<input type="date">` depuis une date API (évite le décalage UTC). */
+export function dateInputFromApi(value: string | number | Date | null | undefined): string {
+  if (value == null || value === '') return ''
+  const s = String(value)
+  const plain = s.match(/^(\d{4}-\d{2}-\d{2})$/)
+  if (plain) return plain[1]
+  const d = typeof value === 'object' && value instanceof Date ? value : new Date(s)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function formatAppDate(
   value: string | number | Date,
   options?: Intl.DateTimeFormatOptions,

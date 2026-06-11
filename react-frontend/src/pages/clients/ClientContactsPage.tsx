@@ -2,6 +2,11 @@ import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { clientContactsApi, clientsApi, type ClientContactRow } from '../../api/client'
+import ClientContactFormFields, {
+  CONTACT_TYPE_OPTIONS,
+  type ClientContactFormState,
+  type ContactType,
+} from '../../components/clients/ClientContactFormFields'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import StatusBadge, { type StatusBadgeVariant } from '../../components/ds/StatusBadge'
 import ListTableToolbar from '../../components/ListTableToolbar'
@@ -10,17 +15,6 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import TableRowActions from '../../components/TableRowActions'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
-
-const CONTACT_TYPES = [
-  { value: 'facturation', label: 'Facturation' },
-  { value: 'livraison', label: 'Livraison' },
-  { value: 'technique', label: 'Technique' },
-  { value: 'chantier', label: 'Chantier' },
-  { value: 'commercial', label: 'Commercial' },
-  { value: 'autre', label: 'Autre' },
-] as const
-
-type ContactType = (typeof CONTACT_TYPES)[number]['value']
 
 const CONTACT_TYPE_BADGE: Record<ContactType, StatusBadgeVariant> = {
   facturation: 'info',
@@ -31,19 +25,7 @@ const CONTACT_TYPE_BADGE: Record<ContactType, StatusBadgeVariant> = {
   autre: 'neutral',
 }
 
-type ContactForm = {
-  client_id: number | ''
-  contact_type: ContactType
-  prenom: string
-  nom: string
-  poste: string
-  departement: string
-  email: string
-  telephone_direct: string
-  telephone_mobile: string
-  is_principal: boolean
-  notes: string
-}
+type ContactForm = ClientContactFormState
 
 const emptyForm: ContactForm = {
   client_id: '',
@@ -64,7 +46,7 @@ function contactName(prenom?: string | null, nom?: string | null) {
 }
 
 function contactTypeLabel(type?: string | null) {
-  return CONTACT_TYPES.find((t) => t.value === type)?.label ?? 'Commercial'
+  return CONTACT_TYPE_OPTIONS.find((t) => t.value === type)?.label ?? 'Commercial'
 }
 
 function contactTypeVariant(type?: string | null): StatusBadgeVariant {
@@ -287,7 +269,7 @@ export default function ClientContactsPage() {
             <span className="filter-label">Type de contact</span>
             <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
               <option value="">Tous</option>
-              {CONTACT_TYPES.map((type) => (
+              {CONTACT_TYPE_OPTIONS.map((type) => (
                 <option key={type.value} value={type.value}>
                   {type.label}
                 </option>
@@ -456,95 +438,40 @@ export default function ClientContactsPage() {
       {modal && (
         <Modal title={modal === 'create' ? 'Nouveau contact' : 'Modifier le contact'} onClose={() => setModal(null)}>
           <form
+            className="client-contact-form"
             onSubmit={(e) => {
               e.preventDefault()
               if (modal === 'create') createMut.mutate()
               else updateMut.mutate()
             }}
           >
-            <div className="quote-form-grid">
-              <label>
-                Client
-                <select
-                  value={form.client_id === '' ? '' : String(form.client_id)}
-                  onChange={(e) => setForm((f) => ({ ...f, client_id: e.target.value ? Number(e.target.value) : '' }))}
-                  disabled={modal === 'edit'}
-                  required
-                >
-                  <option value="">Choisir…</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Type
-                <select
-                  value={form.contact_type}
-                  onChange={(e) => setForm((f) => ({ ...f, contact_type: e.target.value as ContactType }))}
-                >
-                  {CONTACT_TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Prénom
-                <input value={form.prenom} onChange={(e) => setForm((f) => ({ ...f, prenom: e.target.value }))} required />
-              </label>
-              <label>
-                Nom
-                <input value={form.nom} onChange={(e) => setForm((f) => ({ ...f, nom: e.target.value }))} required />
-              </label>
-              <label>
-                Poste
-                <input value={form.poste} onChange={(e) => setForm((f) => ({ ...f, poste: e.target.value }))} />
-              </label>
-              <label>
-                Service
-                <input value={form.departement} onChange={(e) => setForm((f) => ({ ...f, departement: e.target.value }))} />
-              </label>
-              <label>
-                Email
-                <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-              </label>
-              <label>
-                Téléphone direct
-                <input
-                  value={form.telephone_direct}
-                  onChange={(e) => setForm((f) => ({ ...f, telephone_direct: e.target.value }))}
-                />
-              </label>
-              <label>
-                Mobile
-                <input
-                  value={form.telephone_mobile}
-                  onChange={(e) => setForm((f) => ({ ...f, telephone_mobile: e.target.value }))}
-                />
-              </label>
-              <label className="quote-form-checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={form.is_principal}
-                  onChange={(e) => setForm((f) => ({ ...f, is_principal: e.target.checked }))}
-                />
-                Contact principal
-              </label>
-            </div>
-            <label>
-              Notes
-              <textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={3} />
-            </label>
+            <p className="text-muted client-contact-form__lead">
+              {modal === 'create'
+                ? 'Personne de contact rattachée à un client — utilisée sur les devis, bons de commande et factures.'
+                : 'Mettez à jour les informations du contact. Le rattachement client reste inchangé.'}
+            </p>
+            <ClientContactFormFields
+              form={form}
+              setForm={setForm}
+              clients={clients}
+              clientSelectDisabled={modal === 'edit'}
+            />
             {(createMut.isError || updateMut.isError) && (
               <p className="error">{((createMut.error ?? updateMut.error) as Error).message}</p>
             )}
-            <div className="crud-actions" style={{ marginTop: '1rem' }}>
-              <button type="submit" className="btn btn-primary" disabled={createMut.isPending || updateMut.isPending}>
-                Enregistrer
+            <div className="crud-actions client-contact-form__actions">
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={
+                  createMut.isPending ||
+                  updateMut.isPending ||
+                  !form.prenom.trim() ||
+                  !form.nom.trim() ||
+                  form.client_id === ''
+                }
+              >
+                {createMut.isPending || updateMut.isPending ? 'Enregistrement…' : 'Enregistrer'}
               </button>
               <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>
                 Annuler

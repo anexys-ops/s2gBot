@@ -7307,6 +7307,14 @@ a.catalogue-tree__link-article:hover {
 .bc-fiche__planning-error {
   margin: 0 0 0.85rem;
 }
+.bc-fiche__planning-status {
+  margin: 0 0 0.85rem;
+  font-size: 0.88rem;
+}
+.bc-fiche__planning-status--success {
+  color: var(--color-success, #15803d);
+  font-weight: 500;
+}
 .bc-fiche__ligne-cards {
   display: flex;
   flex-direction: column;

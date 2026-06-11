@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { bonsCommandeApi, planningTerrainApi, type BonCommandeLigne } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
 import StatusBadge, { bonCommandeStatutBadgeProps, bonLivraisonStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
@@ -28,6 +29,7 @@ export default function BonCommandeFichePage() {
   const [ligneEdits, setLigneEdits] = useState<Record<number, LignePeriodeEdit>>({})
   const [ligneExtraEdits, setLigneExtraEdits] = useState<Record<number, LigneExtraEdit>>({})
   const [confirmAction, setConfirmAction] = useState<'confirmer' | 'bl' | null>(null)
+  const [planningToast, setPlanningToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
 
   const { data: bc, isLoading, error } = useQuery({
     queryKey: ['bon-commande', bcId],
@@ -47,6 +49,23 @@ export default function BonCommandeFichePage() {
     setNotes(typeof bc.notes === 'string' ? bc.notes : '')
     setContactId(bc.contact_id ?? null)
   }, [bc?.id])
+
+  const serverLignesKey = useMemo(
+    () =>
+      (bc?.lignes ?? [])
+        .map((l) =>
+          [
+            l.id,
+            dateInputFromApi(l.date_debut_prevue),
+            dateInputFromApi(l.date_fin_prevue),
+            l.technicien_id ?? '',
+            dateInputFromApi(l.date_livraison),
+            l.notes_ligne ?? '',
+          ].join(':'),
+        )
+        .join('|'),
+    [bc?.lignes],
+  )
 
   useEffect(() => {
     if (!bc?.lignes?.length) {
@@ -70,7 +89,7 @@ export default function BonCommandeFichePage() {
     }
     setLigneEdits(next)
     setLigneExtraEdits(nextExtra)
-  }, [bc?.id, bc?.lignes])
+  }, [bc?.id, serverLignesKey])
 
   const mutUpdate = useMutation({
     mutationFn: () => bonsCommandeApi.update(bcId, { notes: notes || undefined, contact_id: contactId }),
@@ -88,44 +107,38 @@ export default function BonCommandeFichePage() {
   })
 
   const mutLignes = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (payload: {
+      edits: Record<number, LignePeriodeEdit>
+      extras: Record<number, LigneExtraEdit>
+    }) => {
       if (!bc?.lignes?.length) return
       for (const l of bc.lignes) {
-        const periode = ligneEdits[l.id]
-        const extra = ligneExtraEdits[l.id]
-        if (!periode && !extra) continue
-
-        const prevD = dateInputFromApi(l.date_debut_prevue)
-        const prevF = dateInputFromApi(l.date_fin_prevue)
-        const prevLivraison = dateInputFromApi(l.date_livraison)
-        const prevNotes = l.notes_ligne ?? ''
-        const body: Parameters<typeof bonsCommandeApi.updateLigne>[2] = {}
-
-        if (periode && (periode.debut !== prevD || periode.fin !== prevF)) {
-          body.date_debut_prevue = periode.debut || null
-          body.date_fin_prevue = periode.fin || null
+        const periode = payload.edits[l.id] ?? { debut: '', fin: '' }
+        const extra = payload.extras[l.id] ?? {
+          technicien_id: null,
+          date_livraison: '',
+          notes_ligne: '',
         }
-        if (extra) {
-          const extraChanged =
-            extra.technicien_id !== (l.technicien_id ?? null) ||
-            extra.date_livraison !== prevLivraison ||
-            extra.notes_ligne !== prevNotes
-          if (extraChanged) {
-            body.technicien_id = extra.technicien_id
-            body.date_livraison = extra.date_livraison || null
-            body.notes_ligne = extra.notes_ligne || null
-          }
-        }
-
-        if (Object.keys(body).length > 0) {
-          await bonsCommandeApi.updateLigne(bcId, l.id, body)
-        }
+        await bonsCommandeApi.updateLigne(bcId, l.id, {
+          date_debut_prevue: periode.debut || null,
+          date_fin_prevue: periode.fin || null,
+          technicien_id: extra.technicien_id,
+          date_livraison: extra.date_livraison || null,
+          notes_ligne: extra.notes_ligne || null,
+        })
       }
     },
     onSuccess: () => {
+      setPlanningToast({ message: 'Planification enregistrée.', variant: 'success' })
       void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
       void qc.invalidateQueries({ queryKey: ['planning-terrain'] })
       void qc.invalidateQueries({ queryKey: ['planning-overview'] })
+    },
+    onError: (err) => {
+      setPlanningToast({
+        message: toastErrorMessage(err, 'Échec de l’enregistrement de la planification.'),
+        variant: 'error',
+      })
     },
   })
 
@@ -374,13 +387,26 @@ export default function BonCommandeFichePage() {
                   <button
                     type="button"
                     className="btn btn-primary btn-sm"
-                    onClick={() => mutLignes.mutate()}
+                    onClick={() => {
+                      setPlanningToast(null)
+                      mutLignes.mutate({ edits: ligneEdits, extras: ligneExtraEdits })
+                    }}
                     disabled={mutLignes.isPending}
                   >
                     {mutLignes.isPending ? 'Enregistrement…' : 'Enregistrer la planification'}
                   </button>
                 </div>
 
+                {mutLignes.isPending ? (
+                  <p className="bc-fiche__planning-status text-muted" role="status">
+                    Enregistrement de la planification en cours…
+                  </p>
+                ) : null}
+                {mutLignes.isSuccess && !mutLignes.isPending ? (
+                  <p className="bc-fiche__planning-status bc-fiche__planning-status--success" role="status">
+                    Planification enregistrée avec succès.
+                  </p>
+                ) : null}
                 {mutLignes.isError ? (
                   <p className="error bc-fiche__planning-error">{(mutLignes.error as Error).message}</p>
                 ) : null}
@@ -400,12 +426,13 @@ export default function BonCommandeFichePage() {
                           <input
                             type="date"
                             value={ligneEdits[l.id]?.debut ?? ''}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              mutLignes.reset()
                               setLigneEdits((s) => ({
                                 ...s,
-                                [l.id]: { ...s[l.id], debut: e.target.value, fin: s[l.id]?.fin ?? '' },
+                                [l.id]: { debut: e.target.value, fin: s[l.id]?.fin ?? '' },
                               }))
-                            }
+                            }}
                           />
                         </label>
                         <label className="form-group">
@@ -413,12 +440,13 @@ export default function BonCommandeFichePage() {
                           <input
                             type="date"
                             value={ligneEdits[l.id]?.fin ?? ''}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              mutLignes.reset()
                               setLigneEdits((s) => ({
                                 ...s,
                                 [l.id]: { debut: s[l.id]?.debut ?? '', fin: e.target.value },
                               }))
-                            }
+                            }}
                           />
                         </label>
                         <label className="form-group">
@@ -618,6 +646,14 @@ export default function BonCommandeFichePage() {
           onCancel={() => {
             if (!mutBl.isPending) setConfirmAction(null)
           }}
+        />
+      ) : null}
+
+      {planningToast ? (
+        <Toast
+          message={planningToast.message}
+          variant={planningToast.variant}
+          onClose={() => setPlanningToast(null)}
         />
       ) : null}
     </ModuleEntityShell>

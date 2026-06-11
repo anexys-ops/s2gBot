@@ -7393,3 +7393,8 @@ a.catalogue-tree__link-article:hover {
 .data-table__foot-value {
   font-weight: 600;
 }
+.bc-fiche__qty-input {
+  width: 6.5rem;
+  max-width: 100%;
+  text-align: right;
+}

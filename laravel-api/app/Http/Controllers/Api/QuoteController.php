@@ -386,7 +386,7 @@ class QuoteController extends Controller
             ], 503);
         }
 
-        $subject = "Devis {$quote->number} — " . config('app.name', 'Lab BTP');
+        $subject = "Devis {$quote->number} — " . \App\Support\AppDisplayName::resolve();
 
         try {
             Mail::to($recipientEmail)
@@ -405,8 +405,8 @@ class QuoteController extends Controller
                 'sent_at' => now(),
             ]);
 
-            // Marquer comme envoyé si le devis est encore au statut brouillon
-            if ($quote->status === Quote::STATUS_DRAFT) {
+            // Marquer comme envoyé si ce n'est pas déjà le cas
+            if ($quote->status !== Quote::STATUS_SENT) {
                 $quote->update(['status' => Quote::STATUS_SENT]);
             }
 

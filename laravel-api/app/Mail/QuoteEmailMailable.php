@@ -24,7 +24,7 @@ class QuoteEmailMailable extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "Devis {$this->quote->number} — " . config('app.name', 'Lab BTP'),
+            subject: "Devis {$this->quote->number} — " . \App\Support\AppDisplayName::resolve(),
         );
     }
 
@@ -37,6 +37,7 @@ class QuoteEmailMailable extends Mailable
                 'recipientName' => $this->recipientName,
                 'customMessage' => $this->customMessage,
                 'currencyLabel' => config('app.currency_display', 'DH'),
+                'brandName'     => \App\Support\AppDisplayName::resolve(),
             ],
         );
     }

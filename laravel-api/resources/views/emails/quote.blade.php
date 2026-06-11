@@ -14,7 +14,7 @@
         <tr>
           <td style="background:linear-gradient(135deg,#1e40af 0%,#2563eb 100%);padding:28px 32px;text-align:center;">
             <p style="margin:0;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.85);">Devis commercial</p>
-            <h1 style="margin:8px 0 0;font-size:22px;font-weight:700;color:#ffffff;line-height:1.3;">{{ config('app.name', 'Lab BTP') }}</h1>
+            <h1 style="margin:8px 0 0;font-size:22px;font-weight:700;color:#ffffff;line-height:1.3;">{{ $brandName ?? 'Lab BTP' }}</h1>
           </td>
         </tr>
 
@@ -61,7 +61,7 @@
 
             <p style="margin:0;font-size:15px;line-height:1.6;color:#374151;">
               Cordialement,<br>
-              <strong style="color:#111827;">{{ auth()->user()?->name ?? config('app.name') }}</strong>
+              <strong style="color:#111827;">{{ auth()->user()?->name ?? ($brandName ?? 'Lab BTP') }}</strong>
             </p>
           </td>
         </tr>
@@ -70,7 +70,7 @@
         <tr>
           <td style="padding:20px 32px;background-color:#f9fafb;border-top:1px solid #e5e7eb;">
             <p style="margin:0;font-size:12px;line-height:1.5;color:#9ca3af;text-align:center;">
-              {{ config('app.name') }} — Ce message est automatique, merci de ne pas y répondre directement.
+              {{ $brandName ?? 'Lab BTP' }} — Ce message est automatique, merci de ne pas y répondre directement.
             </p>
           </td>
         </tr>

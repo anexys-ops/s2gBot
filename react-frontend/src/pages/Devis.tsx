@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { pdfApi, quotesApi, type EntityMetaPayload } from '../api/client'
+import { pdfApi, quotesApi, type EntityMetaPayload, type Quote } from '../api/client'
 import { QuotePdfButton, QuoteRowActions } from '../components/crm/QuoteListTableActions'
 import ConfirmDialog from '../components/ConfirmDialog'
 import StatusBadge, { quoteStatutBadgeProps } from '../components/ds/StatusBadge'
@@ -13,6 +13,7 @@ import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
+import { quoteEmailRecipient } from '../lib/quoteEmailRecipient'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
@@ -34,6 +35,8 @@ export default function Devis() {
   const [statusModalId, setStatusModalId] = useState<number | null>(null)
   const [metaModalQuote, setMetaModalQuote] = useState<{ id: number; number: string; meta: unknown } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; number: string } | null>(null)
+  const [sendTarget, setSendTarget] = useState<Quote | null>(null)
+  const [sendError, setSendError] = useState('')
   const [statusValue, setStatusValue] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
@@ -84,6 +87,17 @@ export default function Devis() {
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
       setDeleteTarget(null)
     },
+  })
+
+  const sendEmailMutation = useMutation({
+    mutationFn: ({ id, email, name }: { id: number; email: string; name: string }) =>
+      quotesApi.sendEmail(id, { recipient_email: email, recipient_name: name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotes'] })
+      setSendTarget(null)
+      setSendError('')
+    },
+    onError: (err: Error) => setSendError(err.message),
   })
 
   const quotes = data?.data ?? []
@@ -267,6 +281,15 @@ export default function Devis() {
                             }}
                             onMeta={() => setMetaModalQuote({ id: q.id, number: q.number, meta: q.meta })}
                             onDelete={() => setDeleteTarget({ id: q.id, number: q.number })}
+                            onSendEmail={
+                              q.status !== 'sent'
+                                ? () => {
+                                    setSendError('')
+                                    setSendTarget(q)
+                                  }
+                                : undefined
+                            }
+                            sendEmailLoading={sendEmailMutation.isPending && sendTarget?.id === q.id}
                           />
                         </td>
                       )}
@@ -341,6 +364,76 @@ export default function Devis() {
           }}
         />
       ) : null}
+
+      {sendTarget && (
+        <Modal
+          title={`Envoyer le devis ${sendTarget.number}`}
+          onClose={() => {
+            if (!sendEmailMutation.isPending) {
+              setSendTarget(null)
+              setSendError('')
+            }
+          }}
+        >
+          {(() => {
+            const recipient = quoteEmailRecipient(sendTarget)
+            if (!recipient) {
+              return (
+                <>
+                  <p className="text-muted" style={{ marginTop: 0 }}>
+                    Aucun email trouvé pour ce devis. Ajoutez un contact avec email sur la fiche client ou renseignez
+                    l&apos;email du client, puis réessayez.
+                  </p>
+                  <div className="crud-actions">
+                    <Link to={`/devis/${sendTarget.id}/editer`} className="btn btn-primary">
+                      Ouvrir le devis
+                    </Link>
+                    <button type="button" className="btn btn-secondary" onClick={() => setSendTarget(null)}>
+                      Fermer
+                    </button>
+                  </div>
+                </>
+              )
+            }
+            return (
+              <>
+                <p style={{ marginTop: 0 }}>
+                  Envoyer le devis <strong>{sendTarget.number}</strong> à{' '}
+                  <strong>{recipient.name}</strong> — <a href={`mailto:${recipient.email}`}>{recipient.email}</a> ?
+                </p>
+                <p className="text-muted" style={{ fontSize: '0.88rem' }}>
+                  Le PDF du devis sera joint à l&apos;email. Le statut passera à <strong>Envoyé</strong>.
+                </p>
+                <div className="crud-actions">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={sendEmailMutation.isPending}
+                    onClick={() =>
+                      sendEmailMutation.mutate({
+                        id: sendTarget.id,
+                        email: recipient.email,
+                        name: recipient.name,
+                      })
+                    }
+                  >
+                    {sendEmailMutation.isPending ? 'Envoi…' : 'Envoyer par email'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={sendEmailMutation.isPending}
+                    onClick={() => setSendTarget(null)}
+                  >
+                    Annuler
+                  </button>
+                </div>
+                {sendError ? <p className="error">{sendError}</p> : null}
+              </>
+            )
+          })()}
+        </Modal>
+      )}
     </ModuleEntityShell>
   )
 }

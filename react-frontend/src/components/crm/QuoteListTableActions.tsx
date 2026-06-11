@@ -55,6 +55,15 @@ function IconTrash() {
   )
 }
 
+function IconMail() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" {...stroke} />
+      <path d="m22 6-10 7L2 6" {...stroke} />
+    </svg>
+  )
+}
+
 type PdfButtonProps = {
   onClick: () => void
   label?: string
@@ -82,6 +91,8 @@ type RowActionsProps = {
   onStatus: () => void
   onMeta: () => void
   onDelete: () => void
+  onSendEmail?: () => void
+  sendEmailLoading?: boolean
 }
 
 export function QuoteRowActions({
@@ -92,7 +103,11 @@ export function QuoteRowActions({
   onStatus,
   onMeta,
   onDelete,
+  onSendEmail,
+  sendEmailLoading = false,
 }: RowActionsProps) {
+  const canSendEmail = status !== 'sent' && onSendEmail != null
+
   return (
     <div className="data-table__actions-inner">
       <Link
@@ -103,6 +118,18 @@ export function QuoteRowActions({
       >
         <IconPencil />
       </Link>
+      {canSendEmail ? (
+        <button
+          type="button"
+          className="ds-icon-btn"
+          title="Envoyer par email"
+          aria-label={`Envoyer le devis ${quoteNumber} par email`}
+          onClick={onSendEmail}
+          disabled={sendEmailLoading}
+        >
+          <IconMail />
+        </button>
+      ) : null}
       <button
         type="button"
         className="ds-icon-btn"

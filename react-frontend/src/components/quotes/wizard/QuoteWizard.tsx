@@ -133,15 +133,20 @@ export default function QuoteWizard({
 
   // Step 6 — shown after successful creation
   if (step === 6 && createdQuote) {
-    const contactEmail =
+    const selectedContact =
       form.contact_id != null
-        ? clientContacts.find((c) => c.id === form.contact_id)?.email ?? undefined
+        ? clientContacts.find((c) => c.id === form.contact_id)
         : undefined
+    const contactEmail = selectedContact?.email?.trim() || undefined
+    const contactName = selectedContact
+      ? [selectedContact.prenom, selectedContact.nom].filter(Boolean).join(' ').trim() || undefined
+      : undefined
     return (
       <WizardStep6Send
         quoteId={createdQuote.id}
         quoteNumber={createdQuote.number}
         contactEmail={contactEmail}
+        contactName={contactName}
         onDone={onCancel}
       />
     )

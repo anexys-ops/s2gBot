@@ -1883,7 +1883,10 @@ export const quotesApi = {
   update: (id: number, body: Partial<QuoteCreateBody> & { status?: string; meta?: EntityMetaPayload | null }) =>
     api<Quote>(`/quotes/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/quotes/${id}`, { method: 'DELETE' }),
-  sendEmail: (id: number) => api<{ message?: string }>(`/quotes/${id}/send-email`, { method: 'POST' }),
+  sendEmail: (
+    id: number,
+    body: { recipient_email: string; recipient_name: string; message?: string | null },
+  ) => api<{ message?: string }>(`/quotes/${id}/send-email`, { method: 'POST', body: JSON.stringify(body) }),
 }
 
 export interface QuoteCreateBody {

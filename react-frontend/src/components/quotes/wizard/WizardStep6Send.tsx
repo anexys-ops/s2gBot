@@ -5,20 +5,35 @@ type Props = {
   quoteId: number
   quoteNumber: string
   contactEmail?: string
+  contactName?: string
   onDone: () => void
 }
 
 type SendState = 'idle' | 'loading' | 'success' | 'error'
 
-export default function WizardStep6Send({ quoteId, quoteNumber, contactEmail, onDone }: Props) {
+export default function WizardStep6Send({
+  quoteId,
+  quoteNumber,
+  contactEmail,
+  contactName,
+  onDone,
+}: Props) {
   const [sendState, setSendState] = useState<SendState>('idle')
   const [errorMsg, setErrorMsg] = useState('')
 
   const handleSendEmail = async () => {
+    if (!contactEmail?.trim()) {
+      setSendState('error')
+      setErrorMsg('Email du destinataire requis.')
+      return
+    }
     setSendState('loading')
     setErrorMsg('')
     try {
-      await quotesApi.sendEmail(quoteId)
+      await quotesApi.sendEmail(quoteId, {
+        recipient_email: contactEmail.trim(),
+        recipient_name: contactName?.trim() || contactEmail.split('@')[0] || 'Contact',
+      })
       setSendState('success')
     } catch (err) {
       setSendState('error')
@@ -42,7 +57,13 @@ export default function WizardStep6Send({ quoteId, quoteNumber, contactEmail, on
         <div className="qw-send-card">
           <p className="qw-send-card__title">Envoyer par email</p>
           <p style={{ fontSize: '.9rem', color: '#374151', marginBottom: '1rem' }}>
-            Destinataire : <strong>{contactEmail}</strong>
+            Destinataire : <strong>{contactName}</strong>
+            {contactEmail ? (
+              <>
+                {' '}
+                — <a href={`mailto:${contactEmail}`}>{contactEmail}</a>
+              </>
+            ) : null}
           </p>
           {sendState === 'success' ? (
             <p style={{ color: '#16a34a', fontWeight: 600 }}>

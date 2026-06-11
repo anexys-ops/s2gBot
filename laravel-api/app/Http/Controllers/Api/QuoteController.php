@@ -334,16 +334,40 @@ class QuoteController extends Controller
         }
 
         $validated = $request->validate([
-            'recipient_email' => 'required|email',
-            'recipient_name'  => 'required|string|max:100',
+            'recipient_email' => 'nullable|email',
+            'recipient_name'  => 'nullable|string|max:100',
             'message'         => 'nullable|string|max:2000',
         ]);
 
+        $recipientEmail = trim((string) ($validated['recipient_email'] ?? ''));
+        $recipientName = trim((string) ($validated['recipient_name'] ?? ''));
+
+        if ($recipientEmail === '' && $quote->clientContact?->email) {
+            $recipientEmail = trim((string) $quote->clientContact->email);
+        }
+        if ($recipientName === '' && $quote->clientContact) {
+            $recipientName = trim(
+                ($quote->clientContact->prenom ?? '') . ' ' . ($quote->clientContact->nom ?? '')
+            );
+        }
+        if ($recipientEmail === '' && $quote->client?->email) {
+            $recipientEmail = trim((string) $quote->client->email);
+        }
+        if ($recipientName === '' && $quote->client?->name) {
+            $recipientName = trim((string) $quote->client->name);
+        }
+
+        if ($recipientEmail === '' || $recipientName === '') {
+            return response()->json([
+                'message' => 'Destinataire incomplet : email et nom du contact (ou du client) requis.',
+            ], 422);
+        }
+
         try {
-            Mail::to($validated['recipient_email'])
+            Mail::to($recipientEmail)
                 ->send(new QuoteEmailMailable(
                     $quote,
-                    $validated['recipient_name'],
+                    $recipientName,
                     $validated['message'] ?? null,
                 ));
 
@@ -353,7 +377,7 @@ class QuoteController extends Controller
             }
 
             return response()->json([
-                'message' => 'Devis envoyé avec succès à ' . $validated['recipient_email'],
+                'message' => 'Devis envoyé avec succès à ' . $recipientEmail,
                 'quote'   => $this->loadQuoteForResponse($quote->fresh()),
             ]);
         } catch (\Exception $e) {

@@ -126,9 +126,14 @@ class QuoteController extends Controller
             'lines' => 'required|array|min:0',
         ], self::QUOTE_LINE_BASE, self::TACHES_RULES));
 
+        $dossierId = $this->resolveDossierIdForChantier(
+            (int) $validated['client_id'],
+            isset($validated['site_id']) ? (int) $validated['site_id'] : null,
+            isset($validated['dossier_id']) ? (int) $validated['dossier_id'] : null,
+        );
         $this->assertDossierForClient(
             (int) $validated['client_id'],
-            isset($validated['dossier_id']) ? (int) $validated['dossier_id'] : null,
+            $dossierId,
             isset($validated['site_id']) ? (int) $validated['site_id'] : null,
         );
         ClientContactDocument::assertBelongsToClient(
@@ -166,7 +171,7 @@ class QuoteController extends Controller
             'contact_id' => $validated['contact_id'] ?? null,
             'agency_id' => $agencyId,
             'site_id' => $validated['site_id'] ?? null,
-            'dossier_id' => $validated['dossier_id'] ?? null,
+            'dossier_id' => $dossierId,
             'quote_date' => $validated['quote_date'],
             'order_date' => $validated['order_date'] ?? null,
             'site_delivery_date' => $validated['site_delivery_date'] ?? null,
@@ -271,6 +276,16 @@ class QuoteController extends Controller
             }
         }
         $quote->fill($fill);
+
+        if (! $quote->dossier_id && $quote->site_id) {
+            $resolvedDossierId = Dossier::resolveUniqueIdForClientSite(
+                (int) $quote->client_id,
+                (int) $quote->site_id,
+            );
+            if ($resolvedDossierId) {
+                $quote->dossier_id = $resolvedDossierId;
+            }
+        }
 
         if (array_key_exists('site_id', $fill) || array_key_exists('client_id', $fill)) {
             $cid = (int) $quote->client_id;
@@ -451,6 +466,18 @@ class QuoteController extends Controller
             $request->user(),
             DocumentStatusHistory::SOURCE_API,
         );
+    }
+
+    private function resolveDossierIdForChantier(int $clientId, ?int $siteId, ?int $dossierId): ?int
+    {
+        if ($dossierId !== null) {
+            return $dossierId;
+        }
+        if ($siteId === null) {
+            return null;
+        }
+
+        return Dossier::resolveUniqueIdForClientSite($clientId, $siteId);
     }
 
     private function assertDossierForClient(int $clientId, ?int $dossierId, ?int $siteId): void

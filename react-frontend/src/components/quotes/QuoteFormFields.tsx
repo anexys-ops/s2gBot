@@ -7,6 +7,7 @@ import {
   filterDevisParcoursRemoveJalon,
 } from '../../lib/devisParcours'
 import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import { resolveUniqueDossierForChantier } from '../../lib/resolveDossierForChantier'
 import { lineHt, type DocumentTotalsResult } from '../../lib/quoteTotals'
 
 export type QuoteLineDraft = {
@@ -164,7 +165,7 @@ export default function QuoteFormFields({
       contextMode: 'chantier',
       site_id: s.id,
       client_id: s.client_id,
-      dossier_id: undefined,
+      dossier_id: resolveUniqueDossierForChantier(dossiers, s.client_id, s.id),
       contact_id: undefined,
     }))
   }
@@ -407,7 +408,17 @@ export default function QuoteFormFields({
               Chantier
               <select
                 value={form.site_id ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, site_id: e.target.value ? Number(e.target.value) : undefined }))}
+                onChange={(e) => {
+                  const siteId = e.target.value ? Number(e.target.value) : undefined
+                  setForm((f) => ({
+                    ...f,
+                    site_id: siteId,
+                    dossier_id:
+                      siteId && f.client_id
+                        ? resolveUniqueDossierForChantier(dossiers, f.client_id, siteId)
+                        : undefined,
+                  }))
+                }}
               >
                 <option value="">—</option>
                 {sitesForClient.map((s) => (

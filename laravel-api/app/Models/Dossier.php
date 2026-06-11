@@ -126,4 +126,17 @@ class Dossier extends Model
     {
         return $query->orderByDesc('date_debut')->orderBy('reference');
     }
+
+    /**
+     * When a single dossier exists for this client + chantier, return its id (auto-link devis).
+     */
+    public static function resolveUniqueIdForClientSite(int $clientId, int $siteId): ?int
+    {
+        $ids = static::query()
+            ->where('client_id', $clientId)
+            ->where('site_id', $siteId)
+            ->pluck('id');
+
+        return $ids->count() === 1 ? (int) $ids->first() : null;
+    }
 }

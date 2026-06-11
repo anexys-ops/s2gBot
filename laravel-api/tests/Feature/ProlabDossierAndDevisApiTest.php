@@ -7,6 +7,7 @@ use App\Models\Catalogue\Article;
 use App\Models\Catalogue\Tache;
 use App\Models\Client;
 use App\Models\DevisTache;
+use App\Models\Dossier;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\CatalogueProLabSeeder;
@@ -118,6 +119,104 @@ class ProlabDossierAndDevisApiTest extends TestCase
         $q->assertJsonPath('quote_lines.0.ref_article_id', $article->id);
         $q->assertJsonPath('devis_taches.0.ref_tache_id', $tache->id);
         $q->assertJsonPath('devis_taches.0.quantite', 2);
+    }
+
+    public function test_quote_chantier_auto_links_unique_dossier(): void
+    {
+        $client = Client::query()->create(['name' => 'Auto Link Co']);
+        Agency::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Siège',
+            'is_headquarters' => true,
+        ]);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Chantier unique']);
+        $lab = User::factory()->create([
+            'role' => User::ROLE_LAB_TECHNICIAN,
+            'client_id' => null,
+            'site_id' => null,
+        ]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0099',
+            'titre' => 'Dossier auto-link',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-03-01',
+            'created_by' => $lab->id,
+        ]);
+
+        $payload = [
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'quote_date' => '2026-04-20',
+            'lines' => [
+                [
+                    'description' => 'Ligne test',
+                    'quantity' => 1,
+                    'unit_price' => 50,
+                ],
+            ],
+        ];
+
+        $q = $this->actingAs($lab, 'sanctum')->postJson('/api/quotes', $payload);
+        $q->assertCreated();
+        $q->assertJsonPath('dossier_id', $dossier->id);
+
+        $devis = $this->actingAs($lab, 'sanctum')->getJson("/api/v1/dossiers/{$dossier->id}/devis");
+        $devis->assertOk();
+        $this->assertCount(1, $devis->json());
+        $this->assertSame($q->json('id'), $devis->json('0.id'));
+    }
+
+    public function test_quote_chantier_does_not_auto_link_when_multiple_dossiers(): void
+    {
+        $client = Client::query()->create(['name' => 'Multi Dossier Co']);
+        Agency::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Siège',
+            'is_headquarters' => true,
+        ]);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Chantier partagé']);
+        $lab = User::factory()->create([
+            'role' => User::ROLE_LAB_TECHNICIAN,
+            'client_id' => null,
+            'site_id' => null,
+        ]);
+        Dossier::query()->create([
+            'reference' => 'DOS-2099-0100',
+            'titre' => 'Dossier A',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-03-01',
+            'created_by' => $lab->id,
+        ]);
+        Dossier::query()->create([
+            'reference' => 'DOS-2099-0101',
+            'titre' => 'Dossier B',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_EN_COURS,
+            'date_debut' => '2026-04-01',
+            'created_by' => $lab->id,
+        ]);
+
+        $payload = [
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'quote_date' => '2026-04-20',
+            'lines' => [
+                [
+                    'description' => 'Ligne test',
+                    'quantity' => 1,
+                    'unit_price' => 50,
+                ],
+            ],
+        ];
+
+        $q = $this->actingAs($lab, 'sanctum')->postJson('/api/quotes', $payload);
+        $q->assertCreated();
+        $q->assertJsonPath('dossier_id', null);
     }
 
     public function test_dossier_bons_index_returns_bcc_bl_arrays(): void

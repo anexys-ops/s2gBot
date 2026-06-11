@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { QuoteFormState, ContextMode } from '../QuoteFormFields'
 import type { Site, DossierRow } from '../../../api/client'
+import { resolveUniqueDossierForChantier } from '../../../lib/resolveDossierForChantier'
 
 type Props = {
   form: QuoteFormState
@@ -60,6 +61,9 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
     mode === 'client' ? clients.length : mode === 'chantier' ? allSites.length : dossiers.length
 
   const showPickerHint = totalCount > PICKER_HINT_THRESHOLD && search.trim() === ''
+
+  const linkedDossier =
+    form.dossier_id != null ? dossiers.find((d) => d.id === form.dossier_id) : undefined
 
   return (
     <div className="qw-body">
@@ -159,7 +163,13 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
                     key={s.id}
                     type="button"
                     className={`qw-tile${form.site_id === s.id ? ' qw-tile--selected' : ''}`}
-                    onClick={() => setForm((f) => ({ ...f, site_id: s.id }))}
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        site_id: s.id,
+                        dossier_id: resolveUniqueDossierForChantier(dossiers, c.id, s.id),
+                      }))
+                    }
                   >
                     <div className="qw-tile__name">{s.name}</div>
                     <div className="qw-tile__sub">#{s.id}</div>
@@ -185,7 +195,7 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
                     ...f,
                     site_id: s.id,
                     client_id: s.client_id,
-                    dossier_id: undefined,
+                    dossier_id: resolveUniqueDossierForChantier(dossiers, s.client_id, s.id),
                     contextMode: 'chantier',
                   }))
                 }
@@ -199,6 +209,16 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
             <p style={{ color: '#6b7280', fontSize: '.88rem' }}>Aucun chantier trouvé.</p>
           )}
         </div>
+      )}
+
+      {form.site_id != null && linkedDossier && (mode === 'chantier' || mode === 'client') && (
+        <p className="qw-section-sub" style={{ marginTop: '0.75rem' }}>
+          Rattaché au dossier{' '}
+          <strong>
+            {linkedDossier.reference ? `${linkedDossier.reference} — ` : ''}
+            {linkedDossier.titre}
+          </strong>
+        </p>
       )}
 
       {mode === 'dossier' && (

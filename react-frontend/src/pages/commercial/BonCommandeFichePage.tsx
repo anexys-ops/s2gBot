@@ -333,13 +333,25 @@ export default function BonCommandeFichePage() {
                 <p className="dossier-tab-empty">Aucune ligne sur ce bon de commande.</p>
               ) : (
                 <div className="table-wrap">
-                  <table className="data-table data-table--compact">
+                  <table className="data-table data-table--compact bc-lignes-table">
+                    <colgroup>
+                      <col className="bc-lignes-table__col-libelle" />
+                      <col className="bc-lignes-table__col-qty" />
+                      <col className="bc-lignes-table__col-money" />
+                      <col className="bc-lignes-table__col-money" />
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th>Libellé</th>
-                        <th className="data-table__num">Qté</th>
-                        <th className="data-table__num">PU HT</th>
-                        <th className="data-table__num">Montant HT</th>
+                        <th scope="col">Libellé</th>
+                        <th scope="col" className="data-table__num">
+                          Qté
+                        </th>
+                        <th scope="col" className="data-table__num">
+                          PU HT ({MONEY_UNIT_LABEL})
+                        </th>
+                        <th scope="col" className="data-table__num">
+                          Montant HT ({MONEY_UNIT_LABEL})
+                        </th>
                       </tr>
                     </thead>
                     <tbody>

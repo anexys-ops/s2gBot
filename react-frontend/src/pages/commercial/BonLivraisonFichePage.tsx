@@ -336,11 +336,17 @@ export default function BonLivraisonFichePage() {
                   ) : null}
 
                   <div className="table-wrap">
-                    <table className="data-table data-table--compact">
+                    <table className="data-table data-table--compact bc-lignes-table">
+                      <colgroup>
+                        <col className="bc-lignes-table__col-libelle" />
+                        <col className="bc-lignes-table__col-qty" />
+                      </colgroup>
                       <thead>
                         <tr>
-                          <th>Libellé</th>
-                          <th className="data-table__num">Qté livrée</th>
+                          <th scope="col">Libellé</th>
+                          <th scope="col" className="data-table__num">
+                            Qté livrée
+                          </th>
                         </tr>
                       </thead>
                       <tbody>

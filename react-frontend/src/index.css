@@ -7439,10 +7439,25 @@ a.catalogue-tree__link-article:hover {
   margin: 0.75rem 0 0;
   font-size: 0.85rem;
 }
-.data-table__num {
+.data-table th.data-table__num,
+.data-table td.data-table__num {
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.bc-lignes-table {
+  table-layout: fixed;
+  width: 100%;
+}
+.bc-lignes-table__col-libelle {
+  width: auto;
+  min-width: 12rem;
+}
+.bc-lignes-table__col-qty {
+  width: 5.5rem;
+}
+.bc-lignes-table__col-money {
+  width: 8.5rem;
 }
 .data-table__foot-label {
   text-align: right;
@@ -7457,4 +7472,6 @@ a.catalogue-tree__link-article:hover {
   width: 6.5rem;
   max-width: 100%;
   text-align: right;
+  margin-left: auto;
+  display: block;
 }

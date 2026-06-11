@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\BonCommande;
+use App\Models\BonCommandeLigne;
 use App\Models\Client;
 use App\Models\Dossier;
 use App\Models\Quote;
@@ -55,6 +56,60 @@ class BonCommandeWorkflowTest extends TestCase
         $r->assertJsonPath('numero', 'BCC-2026-0001');
         $r->assertJsonPath('lignes.0.libelle', 'Essai A');
         $this->assertNotNull(Quote::query()->find($q->id)->meta);
+    }
+
+    public function test_update_bc_ligne_persists_planning_extra_fields(): void
+    {
+        $client = Client::query()->create(['name' => 'BC Ligne Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site L']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $tech = User::factory()->create(['role' => User::ROLE_LAB_TECHNICIAN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0010',
+            'titre' => 'D10',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-10',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 100,
+            'amount_ttc' => 120,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai planif',
+            'quantity' => 1,
+            'unit_price' => 100,
+            'tva_rate' => 20,
+            'total' => 100,
+        ]);
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $bcId = (int) $bc['id'];
+        $ligneId = (int) $bc['lignes'][0]['id'];
+
+        $r = $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-commande/{$bcId}/lignes/{$ligneId}", [
+            'technicien_id' => $tech->id,
+            'date_livraison' => '2026-03-15',
+            'notes_ligne' => 'Accès chantier nord',
+        ]);
+        $r->assertOk();
+        $r->assertJsonPath('technicien_id', $tech->id);
+        $this->assertStringStartsWith('2026-03-15', (string) $r->json('date_livraison'));
+        $r->assertJsonPath('notes_ligne', 'Accès chantier nord');
+
+        $ligne = BonCommandeLigne::query()->findOrFail($ligneId);
+        $this->assertSame($tech->id, $ligne->technicien_id);
+        $this->assertSame('2026-03-15', $ligne->date_livraison?->format('Y-m-d'));
+        $this->assertSame('Accès chantier nord', $ligne->notes_ligne);
     }
 
     public function test_gest_confirmer_transformer_bl_valider(): void

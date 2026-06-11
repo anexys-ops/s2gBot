@@ -61,6 +61,7 @@ class BonCommandeController extends Controller
         }
         $bonCommande->load([
             'lignes.planningAffectations.user',
+            'lignes.technicien',
             'dossier',
             'client',
             'clientContact',
@@ -136,9 +137,12 @@ class BonCommandeController extends Controller
         $data = $request->validate([
             'date_debut_prevue' => 'sometimes|nullable|date',
             'date_fin_prevue' => 'sometimes|nullable|date',
+            'technicien_id' => 'sometimes|nullable|integer|exists:users,id',
+            'date_livraison' => 'sometimes|nullable|date',
+            'notes_ligne' => 'sometimes|nullable|string|max:500',
         ]);
         if ($data === []) {
-            $ligne->load('planningAffectations.user');
+            $ligne->load(['planningAffectations.user', 'technicien']);
 
             return response()->json($ligne);
         }
@@ -148,6 +152,15 @@ class BonCommandeController extends Controller
         if (array_key_exists('date_fin_prevue', $data)) {
             $ligne->date_fin_prevue = $data['date_fin_prevue'];
         }
+        if (array_key_exists('technicien_id', $data)) {
+            $ligne->technicien_id = $data['technicien_id'];
+        }
+        if (array_key_exists('date_livraison', $data)) {
+            $ligne->date_livraison = $data['date_livraison'];
+        }
+        if (array_key_exists('notes_ligne', $data)) {
+            $ligne->notes_ligne = $data['notes_ligne'];
+        }
         if ($ligne->date_debut_prevue && $ligne->date_fin_prevue
             && $ligne->date_debut_prevue->format('Y-m-d') > $ligne->date_fin_prevue->format('Y-m-d')
         ) {
@@ -155,7 +168,7 @@ class BonCommandeController extends Controller
         }
 
         $ligne->save();
-        $ligne->load('planningAffectations.user');
+        $ligne->load(['planningAffectations.user', 'technicien']);
 
         return response()->json($ligne);
     }

@@ -7446,18 +7446,27 @@ a.catalogue-tree__link-article:hover {
   white-space: nowrap;
 }
 .bc-lignes-table {
-  table-layout: fixed;
-  width: 100%;
+  table-layout: auto;
+  width: max-content;
+  max-width: 100%;
 }
 .bc-lignes-table__col-libelle {
   width: auto;
-  min-width: 12rem;
+  min-width: 8rem;
 }
 .bc-lignes-table__col-qty {
   width: 5.5rem;
 }
 .bc-lignes-table__col-money {
   width: 8.5rem;
+}
+.bc-lignes-table th:first-child,
+.bc-lignes-table td:first-child {
+  padding-right: 0.25rem;
+}
+.bc-lignes-table th.data-table__num,
+.bc-lignes-table td.data-table__num {
+  padding-left: 0.35rem;
 }
 .data-table__foot-label {
   text-align: right;

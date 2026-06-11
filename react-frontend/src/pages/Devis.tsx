@@ -281,7 +281,7 @@ export default function Devis() {
                           onMeta={() => setMetaModalQuote({ id: q.id, number: q.number, meta: q.meta })}
                           onDelete={() => setDeleteTarget({ id: q.id, number: q.number })}
                           onSendEmail={
-                            q.status !== 'sent'
+                            q.status === 'draft'
                               ? () => {
                                   setSendError('')
                                   setSendTarget(q)

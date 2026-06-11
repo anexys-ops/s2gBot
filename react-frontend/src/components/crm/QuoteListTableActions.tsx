@@ -112,7 +112,7 @@ export function QuoteRowActionCells({
   onSendEmail,
   sendEmailLoading = false,
 }: RowActionCellsProps) {
-  const canSendEmail = status !== 'sent' && onSendEmail != null
+  const canSendEmail = status === 'draft' && onSendEmail != null
 
   return (
     <>

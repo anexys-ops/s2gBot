@@ -8,10 +8,16 @@ import StatusBadge, { bonLivraisonStatutBadgeProps } from '../../components/ds/S
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
-import ClientContactPicker from '../../components/clients/ClientContactPicker'
+import ClientContactPicker, { formatClientContactLabel } from '../../components/clients/ClientContactPicker'
 import { dateInputFromApi, formatAppDate } from '../../lib/appLocale'
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
+
+const BL_STATUT_OPTIONS = [
+  { value: 'brouillon', label: 'Brouillon' },
+  { value: 'livre', label: 'Livré' },
+  { value: 'signe', label: 'Signé' },
+] as const
 
 export default function BonLivraisonFichePage() {
   const { id } = useParams<{ id: string }>()
@@ -135,6 +141,21 @@ export default function BonLivraisonFichePage() {
     },
   })
 
+  const mutStatut = useMutation({
+    mutationFn: (statut: string) => bonsLivraisonApi.update(blId, { statut }),
+    onSuccess: () => {
+      setToast({ message: 'Statut du BL mis à jour.', variant: 'success' })
+      void qc.invalidateQueries({ queryKey: ['bon-livraison', blId] })
+      void qc.invalidateQueries({ queryKey: ['bons-livraison'] })
+    },
+    onError: (err) => {
+      setToast({
+        message: toastErrorMessage(err, 'Échec de la mise à jour du statut.'),
+        variant: 'error',
+      })
+    },
+  })
+
   const shellProps = {
     shellClassName: 'module-shell--crm' as const,
     moduleBarLabel: 'Commercial — Bon de livraison',
@@ -211,16 +232,32 @@ export default function BonLivraisonFichePage() {
         </span>
       }
       actions={
-        canEdit ? (
+        lab ? (
           <div className="bc-fiche__header-actions">
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => setConfirmValider(true)}
-              disabled={mutValider.isPending}
-            >
-              Valider le BL
-            </button>
+            <label className="bc-fiche__statut-select">
+              <span className="bc-fiche__statut-select-label">Statut</span>
+              <select
+                value={bl.statut}
+                disabled={mutStatut.isPending}
+                onChange={(e) => mutStatut.mutate(e.target.value)}
+              >
+                {BL_STATUT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {canEdit ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => setConfirmValider(true)}
+                disabled={mutValider.isPending}
+              >
+                Valider le BL
+              </button>
+            ) : null}
           </div>
         ) : null
       }
@@ -247,11 +284,7 @@ export default function BonLivraisonFichePage() {
             <div className="bc-fiche__summary-item">
               <span className="bc-fiche__summary-label">Contact livraison</span>
               <span className="bc-fiche__summary-value">
-                {bl.clientContact
-                  ? `${[bl.clientContact.prenom, bl.clientContact.nom].filter(Boolean).join(' ')}${
-                      bl.clientContact.poste ? ` — ${bl.clientContact.poste}` : ''
-                    }`
-                  : '—'}
+                {bl.clientContact ? formatClientContactLabel(bl.clientContact) : '—'}
               </span>
             </div>
             <div className="bc-fiche__summary-item">
@@ -435,11 +468,11 @@ export default function BonLivraisonFichePage() {
               </section>
             ) : null}
 
-            {!canEdit && bl.statut !== 'brouillon' ? (
+            {!canEdit && lab ? (
               <section className="card bc-fiche__aside-panel">
                 <p className="text-muted" style={{ margin: 0, fontSize: '0.88rem' }}>
-                  Ce bon de livraison est <strong>{statutBadge?.label ?? bl.statut}</strong> — modification
-                  désactivée.
+                  Statut <strong>{statutBadge?.label ?? bl.statut}</strong> — édition verrouillée. Repassez en{' '}
+                  <strong>Brouillon</strong> via le sélecteur de statut en haut pour modifier à nouveau.
                 </p>
               </section>
             ) : null}

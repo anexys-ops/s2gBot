@@ -73,12 +73,13 @@ class BonLivraisonController extends Controller
             'notes' => 'sometimes|nullable|string',
             'date_livraison' => 'sometimes|date',
             'contact_id' => 'sometimes|nullable|exists:client_contacts,id',
+            'statut' => 'sometimes|string|in:'.BonLivraison::STATUT_BROUILLON.','.BonLivraison::STATUT_LIVRE.','.BonLivraison::STATUT_SIGNE,
             'lignes' => 'sometimes|array',
             'lignes.*.id' => 'required|integer|exists:bons_livraison_lignes,id',
             'lignes.*.quantite_livree' => 'required|numeric|min:0',
         ]);
-        if (array_key_exists('notes', $data) || array_key_exists('date_livraison', $data) || array_key_exists('contact_id', $data)) {
-            $u = array_intersect_key($data, array_flip(['notes', 'date_livraison', 'contact_id']));
+        if (array_key_exists('notes', $data) || array_key_exists('date_livraison', $data) || array_key_exists('contact_id', $data) || array_key_exists('statut', $data)) {
+            $u = array_intersect_key($data, array_flip(['notes', 'date_livraison', 'contact_id', 'statut']));
             if ($u !== []) {
                 $bonLivraison->update($u);
             }

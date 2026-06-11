@@ -879,7 +879,13 @@ export const bonsLivraisonApi = {
   get: (id: number) => api<BonLivraison>(`/v1/bons-livraison/${id}`),
   update: (
     id: number,
-    body: { notes?: string; date_livraison?: string; contact_id?: number | null; lignes?: { id: number; quantite_livree: number }[] },
+    body: {
+      notes?: string
+      date_livraison?: string
+      contact_id?: number | null
+      statut?: string
+      lignes?: { id: number; quantite_livree: number }[]
+    },
   ) => api<BonLivraison>(`/v1/bons-livraison/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   valider: (id: number) => api<BonLivraison>(`/v1/bons-livraison/${id}/valider`, { method: 'POST' }),
   delete: (id: number) => api<null>(`/v1/bons-livraison/${id}`, { method: 'DELETE' }),

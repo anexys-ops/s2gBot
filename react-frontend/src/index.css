@@ -7224,6 +7224,22 @@ a.catalogue-tree__link-article:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  align-items: center;
+}
+.bc-fiche__statut-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+.bc-fiche__statut-select-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.bc-fiche__statut-select select {
+  font-size: 0.85rem;
+  min-width: 8.5rem;
 }
 .bc-fiche__summary {
   padding: 1.15rem 1.35rem;

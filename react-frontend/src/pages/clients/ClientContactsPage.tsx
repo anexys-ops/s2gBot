@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { clientContactsApi, clientsApi, type ClientContactRow } from '../../api/client'
 import ListTableToolbar from '../../components/ListTableToolbar'
@@ -56,20 +56,60 @@ function contactPhone(direct?: string | null, mobile?: string | null) {
 
 export default function ClientContactsPage() {
   const qc = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const clientFilterRaw = searchParams.get('client')
+  const clientFilterId =
+    clientFilterRaw && Number.isFinite(Number(clientFilterRaw)) && Number(clientFilterRaw) > 0
+      ? Number(clientFilterRaw)
+      : null
+
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [editing, setEditing] = useState<ClientContactRow | null>(null)
   const [form, setForm] = useState<ContactForm>(emptyForm)
 
-  const { data: contacts = [], isLoading, error } = useQuery({
-    queryKey: ['client-contacts', 'all', debouncedSearch],
-    queryFn: () => clientContactsApi.listAll({ search: debouncedSearch.trim() || undefined }),
+  const { data: contactsRaw = [], isLoading, error } = useQuery({
+    queryKey: ['client-contacts', clientFilterId ? 'client' : 'all', clientFilterId, debouncedSearch],
+    queryFn: () =>
+      clientFilterId
+        ? clientContactsApi.list(clientFilterId)
+        : clientContactsApi.listAll({ search: debouncedSearch.trim() || undefined }),
   })
+
+  const contacts = useMemo(() => {
+    if (!clientFilterId || !debouncedSearch.trim()) return contactsRaw
+    const q = debouncedSearch.trim().toLowerCase()
+    return contactsRaw.filter((c) => {
+      const hay = [
+        c.prenom,
+        c.nom,
+        c.email,
+        c.poste,
+        c.departement,
+        c.telephone_direct,
+        c.telephone_mobile,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return hay.includes(q)
+    })
+  }, [clientFilterId, contactsRaw, debouncedSearch])
+
   const { data: clients = [] } = useQuery({
     queryKey: ['clients', 'contacts-pick'],
     queryFn: () => clientsApi.list(),
   })
+
+  const filteredClientName = useMemo(() => {
+    if (!clientFilterId) return null
+    return (
+      clients.find((c) => c.id === clientFilterId)?.name ??
+      contactsRaw[0]?.client?.name ??
+      `Client #${clientFilterId}`
+    )
+  }, [clientFilterId, clients, contactsRaw])
 
   const createMut = useMutation({
     mutationFn: () => {
@@ -101,7 +141,7 @@ export default function ClientContactsPage() {
 
   const openCreate = () => {
     setEditing(null)
-    setForm(emptyForm)
+    setForm({ ...emptyForm, client_id: clientFilterId ?? '' })
     setModal('create')
   }
 
@@ -131,14 +171,46 @@ export default function ClientContactsPage() {
         { label: 'Contacts' },
       ]}
       moduleBarLabel="Tiers — Contacts"
-      title="Contacts"
-      subtitle={`${contacts.length} contact(s) client affiché(s)`}
+      title="Contacts clients"
+      subtitle={
+        clientFilterId && filteredClientName
+          ? `${contacts.length} contact(s) pour ${filteredClientName}`
+          : `${contacts.length} contact(s) client affiché(s)`
+      }
       actions={
-        <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
-          Nouveau contact
-        </button>
+        <>
+          <Link to="/clients" className="btn btn-secondary btn-sm page-action-back">
+            ← Liste clients
+          </Link>
+          {clientFilterId ? (
+            <Link to="/clients/contacts" className="btn btn-secondary btn-sm">
+              Tous les contacts
+            </Link>
+          ) : null}
+          <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
+            Nouveau contact
+          </button>
+        </>
       }
     >
+      {clientFilterId && filteredClientName ? (
+        <p className="list-table-toolbar__footer-label" style={{ marginBottom: '0.75rem' }}>
+          Filtre client : <strong>{filteredClientName}</strong>
+          {' · '}
+          <Link to={`/clients/${clientFilterId}/fiche`} className="link-inline">
+            Ouvrir la fiche
+          </Link>
+          {' · '}
+          <button
+            type="button"
+            className="link-inline"
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit' }}
+            onClick={() => setSearchParams({})}
+          >
+            Effacer le filtre
+          </button>
+        </p>
+      ) : null}
       <ListTableToolbar
         searchValue={searchInput}
         onSearchChange={setSearchInput}

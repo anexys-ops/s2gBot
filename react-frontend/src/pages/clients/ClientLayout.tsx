@@ -113,6 +113,11 @@ export default function ClientLayout() {
           <Link to="/clients" className="btn btn-secondary btn-sm page-action-back">
             ← Liste clients
           </Link>
+          {isLab && (
+            <Link to={`/clients/contacts?client=${clientId}`} className="btn btn-secondary btn-sm">
+              Contacts
+            </Link>
+          )}
           {isAdmin && (
             <button type="button" className="btn btn-primary btn-sm" onClick={onNew}>
               Nouveau

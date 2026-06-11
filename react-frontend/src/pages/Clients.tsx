@@ -252,6 +252,11 @@ export default function Clients() {
       }
       actions={
         <>
+          {isLab && (
+            <Link to="/clients/contacts" className="btn btn-secondary btn-sm">
+              Contacts clients
+            </Link>
+          )}
           {isAdmin && (
             <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
               Nouveau client

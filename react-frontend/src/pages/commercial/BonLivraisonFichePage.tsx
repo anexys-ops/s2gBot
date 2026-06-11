@@ -232,32 +232,16 @@ export default function BonLivraisonFichePage() {
         </span>
       }
       actions={
-        lab ? (
+        lab && canEdit ? (
           <div className="bc-fiche__header-actions">
-            <label className="bc-fiche__statut-select">
-              <span className="bc-fiche__statut-select-label">Statut</span>
-              <select
-                value={bl.statut}
-                disabled={mutStatut.isPending}
-                onChange={(e) => mutStatut.mutate(e.target.value)}
-              >
-                {BL_STATUT_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {canEdit ? (
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => setConfirmValider(true)}
-                disabled={mutValider.isPending}
-              >
-                Valider le BL
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => setConfirmValider(true)}
+              disabled={mutValider.isPending}
+            >
+              Valider le BL
+            </button>
           </div>
         ) : null
       }
@@ -398,6 +382,49 @@ export default function BonLivraisonFichePage() {
 
           <aside className="bc-fiche__aside">
             {lab ? (
+              <section className="card bc-fiche__aside-panel entity-statut-panel">
+                <h2 className="ds-form-section__title">Statut du bon</h2>
+                <div className="entity-statut-panel__current">
+                  {statutBadge ? (
+                    <StatusBadge variant={statutBadge.variant} size="sm">
+                      {statutBadge.label}
+                    </StatusBadge>
+                  ) : null}
+                  {mutStatut.isPending ? (
+                    <span className="text-muted entity-statut-panel__pending">Mise à jour…</span>
+                  ) : null}
+                </div>
+                <p className="entity-statut-panel__hint text-muted">
+                  {canEdit
+                    ? 'Brouillon : le BL reste modifiable. Validez ou passez à Livré / Signé.'
+                    : 'Repassez en Brouillon pour modifier les quantités et les informations.'}
+                </p>
+                <div className="entity-statut-panel__options" role="group" aria-label="Changer le statut">
+                  {BL_STATUT_OPTIONS.map((opt) => {
+                    const active = bl.statut === opt.value
+                    const st = bonLivraisonStatutBadgeProps(opt.value)
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`entity-statut-panel__option${active ? ' entity-statut-panel__option--active' : ''}`}
+                        disabled={mutStatut.isPending || active}
+                        aria-pressed={active}
+                        onClick={() => mutStatut.mutate(opt.value)}
+                      >
+                        <span
+                          className={`entity-statut-panel__dot entity-statut-panel__dot--${st.variant}`}
+                          aria-hidden
+                        />
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            ) : null}
+
+            {lab ? (
               <section className="card bc-fiche__aside-panel">
                 <h2 className="ds-form-section__title">Contact &amp; date</h2>
                 <ClientContactPicker
@@ -465,15 +492,6 @@ export default function BonLivraisonFichePage() {
                 {mutSaveInfos.isError ? (
                   <p className="error">{(mutSaveInfos.error as Error).message}</p>
                 ) : null}
-              </section>
-            ) : null}
-
-            {!canEdit && lab ? (
-              <section className="card bc-fiche__aside-panel">
-                <p className="text-muted" style={{ margin: 0, fontSize: '0.88rem' }}>
-                  Statut <strong>{statutBadge?.label ?? bl.statut}</strong> — édition verrouillée. Repassez en{' '}
-                  <strong>Brouillon</strong> via le sélecteur de statut en haut pour modifier à nouveau.
-                </p>
               </section>
             ) : null}
 

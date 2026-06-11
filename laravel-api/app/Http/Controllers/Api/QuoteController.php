@@ -10,6 +10,7 @@ use App\Models\Catalogue\Package;
 use App\Models\DevisTache;
 use App\Models\DocumentStatusHistory;
 use App\Models\Dossier;
+use App\Models\MailLog;
 use App\Models\Quote;
 use App\Models\QuoteLine;
 use App\Models\Site;
@@ -363,6 +364,15 @@ class QuoteController extends Controller
             ], 422);
         }
 
+        $mailer = (string) config('mail.default', 'log');
+        if (in_array($mailer, ['log', 'array'], true)) {
+            return response()->json([
+                'message' => 'Envoi email impossible : le serveur SMTP n\'est pas configuré (MAIL_MAILER=smtp et identifiants SMTP dans .env.docker).',
+            ], 503);
+        }
+
+        $subject = "Devis {$quote->number} — " . config('app.name', 'Lab BTP');
+
         try {
             Mail::to($recipientEmail)
                 ->send(new QuoteEmailMailable(
@@ -370,6 +380,15 @@ class QuoteController extends Controller
                     $recipientName,
                     $validated['message'] ?? null,
                 ));
+
+            MailLog::create([
+                'to' => $recipientEmail,
+                'subject' => $subject,
+                'template_name' => 'quote_send',
+                'status' => 'sent',
+                'user_id' => $user->id,
+                'sent_at' => now(),
+            ]);
 
             // Marquer comme envoyé si le devis est encore au statut brouillon
             if ($quote->status === Quote::STATUS_DRAFT) {
@@ -380,8 +399,18 @@ class QuoteController extends Controller
                 'message' => 'Devis envoyé avec succès à ' . $recipientEmail,
                 'quote'   => $this->loadQuoteForResponse($quote->fresh()),
             ]);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Erreur d\'envoi : ' . $e->getMessage()], 500);
+        } catch (\Throwable $e) {
+            MailLog::create([
+                'to' => $recipientEmail,
+                'subject' => $subject,
+                'template_name' => 'quote_send',
+                'status' => 'failed',
+                'error_message' => $e->getMessage(),
+                'user_id' => $user->id,
+                'sent_at' => now(),
+            ]);
+
+            return response()->json(['message' => 'Erreur d\'envoi : ' . $e->getMessage()], 500);
         }
     }
 

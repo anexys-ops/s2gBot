@@ -48,6 +48,13 @@ class MailController extends Controller
             'template_name' => 'nullable|string|max:100',
         ]);
 
+        $mailer = (string) config('mail.default', 'log');
+        if (in_array($mailer, ['log', 'array'], true)) {
+            return response()->json([
+                'message' => 'Envoi email impossible : le serveur SMTP n\'est pas configuré (MAIL_MAILER=smtp et identifiants SMTP dans .env.docker).',
+            ], 503);
+        }
+
         try {
             Mail::raw($validated['body'], function ($message) use ($validated) {
                 $message->to($validated['to'])

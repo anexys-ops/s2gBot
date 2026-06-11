@@ -22,7 +22,7 @@
   <p>{{ $customMessage }}</p>
   @endif
 
-  <p>Veuillez trouver ci-joint notre devis <span class="quote-ref">{{ $quote->number }}</span> d'un montant de <strong>{{ number_format($quote->amount_ttc ?? 0, 2, ',', ' ') }} € TTC</strong>.</p>
+  <p>Veuillez trouver ci-joint notre devis <span class="quote-ref">{{ $quote->number }}</span> d'un montant de <strong>{{ number_format($quote->amount_ttc ?? 0, 2, ',', ' ') }} {{ $currencyLabel ?? 'DH' }} TTC</strong>.</p>
 
   <p>Ce devis est valable jusqu'au {{ $quote->valid_until ? \Carbon\Carbon::parse($quote->valid_until)->format('d/m/Y') : 'date non spécifiée' }}.</p>
 

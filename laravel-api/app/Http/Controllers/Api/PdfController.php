@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\DocumentPdfTemplate;
 use App\Models\Invoice;
-use App\Models\ModuleSetting;
 use App\Models\Order;
 use App\Models\Quote;
+use App\Services\QuotePdfGenerator;
 use App\Services\ReportService;
 use App\Support\AppBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -19,7 +19,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class PdfController extends Controller
 {
     public function __construct(
-        private ReportService $reportService
+        private ReportService $reportService,
+        private QuotePdfGenerator $quotePdfGenerator,
     ) {}
 
     public function templates(Request $request): JsonResponse
@@ -67,31 +68,20 @@ class PdfController extends Controller
         $id = (int) $validated['id'];
 
         if ($type === 'quote') {
-            $quote = Quote::with([
-                'client',
-                'site',
-                'quoteLines.commercialOffering.equipment',
-                'billingAddress',
-                'deliveryAddress',
-                'pdfTemplate',
-            ])->find($id);
+            $quote = Quote::find($id);
             if (! $quote) {
                 return response()->json(['message' => 'Devis introuvable'], 404);
             }
-            $template = $this->resolvePdfTemplate('quote', $validated['template_id'] ?? null, $quote->pdf_template_id);
-            $view = $template?->blade_view ?? 'pdf.quote';
-            $layoutConfig = AppBranding::mergeLayoutConfig($template?->layout_config);
-            $catalogSettings = ModuleSetting::query()->where('module_key', 'commercial_catalog')->value('settings') ?? [];
-            $showEquipmentOnQuotePdf = (bool) ($catalogSettings['show_equipment_on_quote_pdf'] ?? true);
-            $html = view($view, [
-                'quote' => $quote,
-                'template' => $template,
-                'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
-                'layoutConfig' => $layoutConfig,
-                'showEquipmentOnQuotePdf' => $showEquipmentOnQuotePdf,
-            ])->render();
-            $filename = 'devis-'.$quote->number.'.pdf';
-        } elseif ($type === 'invoice') {
+            [$pdfBytes, $filename] = $this->quotePdfGenerator->generate($quote);
+
+            return response()->streamDownload(
+                fn () => print($pdfBytes),
+                $filename,
+                ['Content-Type' => 'application/pdf']
+            );
+        }
+
+        if ($type === 'invoice') {
             $invoice = Invoice::with(['client', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate'])->find($id);
             if (! $invoice) {
                 return response()->json(['message' => 'Facture introuvable'], 404);
@@ -111,14 +101,7 @@ class PdfController extends Controller
             );
         }
 
-        $pdf = Pdf::loadHTML($html);
-        $pdf->getDomPDF()->setPaper('A4', 'portrait');
-
-        return response()->streamDownload(
-            fn () => print($pdf->output()),
-            $filename,
-            ['Content-Type' => 'application/pdf']
-        );
+        return response()->json(['message' => 'Type PDF non pris en charge'], 422);
     }
 
     /**

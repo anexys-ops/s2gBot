@@ -3,8 +3,10 @@
 namespace App\Mail;
 
 use App\Models\Quote;
+use App\Services\QuotePdfGenerator;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -34,7 +36,20 @@ class QuoteEmailMailable extends Mailable
                 'quote'         => $this->quote,
                 'recipientName' => $this->recipientName,
                 'customMessage' => $this->customMessage,
+                'currencyLabel' => config('app.currency_display', 'DH'),
             ],
         );
+    }
+
+    /**
+     * @return array<int, Attachment>
+     */
+    public function attachments(): array
+    {
+        [$bytes, $filename] = app(QuotePdfGenerator::class)->generate($this->quote);
+
+        return [
+            Attachment::fromData(fn () => $bytes, $filename)->withMime('application/pdf'),
+        ];
     }
 }

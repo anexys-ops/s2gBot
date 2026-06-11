@@ -750,6 +750,7 @@ export type BonLivraison = {
   client?: { id: number; name: string }
   clientContact?: ClientContactRow
   dossier?: DossierRow
+  bonCommande?: Pick<BonCommande, 'id' | 'numero'>
 }
 
 export const dossiersApi = {
@@ -866,11 +867,12 @@ export const planningTerrainApi = {
 }
 
 export const bonsLivraisonApi = {
-  list: (params?: { dossier_id?: number; client_id?: number; statut?: string }) => {
+  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string }) => {
     const q = new URLSearchParams()
     if (params?.dossier_id) q.set('dossier_id', String(params.dossier_id))
     if (params?.client_id) q.set('client_id', String(params.client_id))
     if (params?.statut) q.set('statut', params.statut)
+    if (params?.search) q.set('search', params.search)
     const s = q.toString()
     return api<BonLivraison[]>(`/v1/bons-livraison${s ? `?${s}` : ''}`)
   },

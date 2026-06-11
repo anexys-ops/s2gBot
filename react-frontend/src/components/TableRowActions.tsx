@@ -28,7 +28,7 @@ function IconTrash() {
 
 type Props = {
   onEdit: () => void
-  onDelete: () => void
+  onDelete?: () => void
   editLabel?: string
   deleteLabel?: string
 }
@@ -45,15 +45,17 @@ export default function TableRowActions({
       <button type="button" className="ds-icon-btn" title={editLabel} aria-label={editLabel} onClick={onEdit}>
         <IconPencil />
       </button>
-      <button
-        type="button"
-        className="ds-icon-btn ds-icon-btn--danger"
-        title={deleteLabel}
-        aria-label={deleteLabel}
-        onClick={onDelete}
-      >
-        <IconTrash />
-      </button>
+      {onDelete ? (
+        <button
+          type="button"
+          className="ds-icon-btn ds-icon-btn--danger"
+          title={deleteLabel}
+          aria-label={deleteLabel}
+          onClick={onDelete}
+        >
+          <IconTrash />
+        </button>
+      ) : null}
     </div>
   )
 }

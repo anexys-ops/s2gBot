@@ -15,7 +15,7 @@ class BonLivraisonController extends Controller
     public function index(Request $request): JsonResponse
     {
         $q = BonLivraison::query()
-            ->with(['dossier', 'client', 'clientContact', 'lignes'])
+            ->with(['dossier', 'client', 'clientContact', 'lignes', 'bonCommande'])
             ->orderByDesc('date_livraison')
             ->orderByDesc('id');
         if ($request->filled('dossier_id')) {
@@ -26,6 +26,18 @@ class BonLivraisonController extends Controller
         }
         if ($request->filled('statut')) {
             $q->where('statut', (string) $request->query('statut'));
+        }
+        if ($search = trim((string) $request->query('search', ''))) {
+            $like = '%'.$search.'%';
+            $q->where(function ($sub) use ($like) {
+                $sub->where('numero', 'like', $like)
+                    ->orWhereHas('client', fn ($cq) => $cq->where('name', 'like', $like))
+                    ->orWhereHas('dossier', function ($dq) use ($like) {
+                        $dq->where('reference', 'like', $like)
+                            ->orWhere('titre', 'like', $like);
+                    })
+                    ->orWhereHas('bonCommande', fn ($bcq) => $bcq->where('numero', 'like', $like));
+            });
         }
         if ($request->user()->isLab()) {
             return response()->json($q->get());

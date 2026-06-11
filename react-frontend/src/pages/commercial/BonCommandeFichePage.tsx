@@ -9,7 +9,7 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ClientContactPicker from '../../components/clients/ClientContactPicker'
-import { dateInputFromApi, formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import { dateInputFromApi, formatAppDate, formatMoney, formatQuantity, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
 
@@ -358,7 +358,7 @@ export default function BonCommandeFichePage() {
                       {bc.lignes!.map((l) => (
                         <tr key={l.id}>
                           <td>{l.libelle}</td>
-                          <td className="data-table__num">{l.quantite}</td>
+                          <td className="data-table__num">{formatQuantity(l.quantite)}</td>
                           <td className="data-table__num">{formatMoney(Number(l.prix_unitaire_ht))}</td>
                           <td className="data-table__num">{formatMoney(Number(l.montant_ht))}</td>
                         </tr>
@@ -429,7 +429,7 @@ export default function BonCommandeFichePage() {
                       <header className="bc-fiche__ligne-card-header">
                         <h3 className="bc-fiche__ligne-card-title">{l.libelle}</h3>
                         <span className="bc-fiche__ligne-card-meta text-muted">
-                          Qté {l.quantite} — {formatMoney(Number(l.montant_ht))} HT
+                          Qté {formatQuantity(l.quantite)} — {formatMoney(Number(l.montant_ht))} HT
                         </span>
                       </header>
                       <div className="bc-fiche__ligne-card-grid">

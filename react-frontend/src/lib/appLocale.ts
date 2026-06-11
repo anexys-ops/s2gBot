@@ -8,9 +8,20 @@ const moneyFormatter = new Intl.NumberFormat(APP_LOCALE, {
   maximumFractionDigits: 2,
 })
 
+const quantityFormatter = new Intl.NumberFormat(APP_LOCALE, {
+  maximumFractionDigits: 0,
+})
+
 /** Montant avec séparateurs locaux et suffixe DH. */
 export function formatMoney(amount: number): string {
   return `${moneyFormatter.format(amount)} DH`
+}
+
+/** Quantité entière (sans décimales affichées). */
+export function formatQuantity(value: string | number): string {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return String(value)
+  return quantityFormatter.format(Math.round(n))
 }
 
 /** Libellé unité pour en-têtes (ex. colonne « TTC (DH) »). */

@@ -7452,21 +7452,21 @@ a.catalogue-tree__link-article:hover {
 }
 .bc-lignes-table__col-libelle {
   width: auto;
-  min-width: 8rem;
+  min-width: 6rem;
 }
 .bc-lignes-table__col-qty {
-  width: 5.5rem;
+  width: 4rem;
 }
 .bc-lignes-table__col-money {
-  width: 8.5rem;
+  width: 8rem;
 }
 .bc-lignes-table th:first-child,
 .bc-lignes-table td:first-child {
-  padding-right: 0.25rem;
+  padding-right: 0.1rem;
 }
 .bc-lignes-table th.data-table__num,
 .bc-lignes-table td.data-table__num {
-  padding-left: 0.35rem;
+  padding-left: 0.2rem;
 }
 .data-table__foot-label {
   text-align: right;

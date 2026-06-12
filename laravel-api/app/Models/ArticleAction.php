@@ -9,7 +9,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ArticleAction extends Model
 {
-    public const TYPES = ['technicien', 'ingenieur', 'labo'];
+    public const TYPE_TECHNICIEN = 'technicien';
+
+    public const TYPE_INGENIEUR = 'ingenieur';
+
+    public const TYPE_LABO = 'labo';
+
+    public const TYPES = [self::TYPE_TECHNICIEN, self::TYPE_INGENIEUR, self::TYPE_LABO];
 
     protected $table = 'article_actions';
 

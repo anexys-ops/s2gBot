@@ -25,6 +25,7 @@ class SampleReceptionController extends Controller
         'missionOrder:id,unique_number,numero,type',
         'task:id,unique_number,statut',
         'product:id,libelle,code',
+        'bonCommandeLigne:id,libelle,bon_commande_id',
         'collectedBy:id,name,role',
         'receivedBy:id,name,role',
     ];
@@ -169,7 +170,8 @@ class SampleReceptionController extends Controller
             'dossier_id'        => ['nullable', 'integer', 'exists:dossiers,id'],
             'mission_order_id'  => ['nullable', 'integer', 'exists:ordres_mission,id'],
             'task_id'           => ['nullable', 'integer', 'exists:mission_tasks,id'],
-            'product_id'        => ['nullable', 'integer', 'exists:ref_articles,id'],
+            'product_id'            => ['nullable', 'integer', 'exists:ref_articles,id'],
+            'bon_commande_ligne_id' => ['nullable', 'integer', 'exists:bons_commande_lignes,id'],
             'reference'         => ['nullable', 'string', 'max:191'],
             'description'       => ['nullable', 'string'],
             'sample_type'       => [$req, Rule::in(Sample::TYPES)],

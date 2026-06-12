@@ -1528,6 +1528,86 @@ export type SampleWriteBody = {
   depth_bottom_m?: number | null
 }
 
+export type LabReceptionAttendu = {
+  id: number
+  libelle: string
+  quantite_attendue: number
+  quantite_en_transit: number
+  quantite_recue: number
+  quantite_manquante: number
+  reception_complete: boolean
+  article?: { id: number; code: string; libelle: string } | null
+  technicien?: { id: number; name: string } | null
+  bon_commande?: { id: number; numero: string; statut: string; date_commande?: string | null } | null
+  dossier?: { id: number; reference: string; titre: string } | null
+  chantier?: { id: number; name: string } | null
+  client?: { id: number; name: string } | null
+}
+
+export type LabReceptionAttendusResponse = {
+  data: LabReceptionAttendu[]
+  stats: {
+    produits: number
+    produits_en_attente: number
+    produits_complets: number
+    essais_attendus: number
+    essais_recus: number
+    essais_en_transit: number
+  }
+}
+
+export type ReceptionSample = {
+  id: number
+  fold_number?: string | null
+  status: string
+  sample_type?: string | null
+  dossier_id?: number | null
+  bon_commande_ligne_id?: number | null
+  product_id?: number | null
+  collected_at?: string | null
+  received_at?: string | null
+  condition_state?: string | null
+  dossier?: { id: number; reference: string; titre: string } | null
+  product?: { id: number; code: string; libelle: string } | null
+  collectedBy?: { id: number; name: string } | null
+  bonCommandeLigne?: { id: number; libelle: string; bon_commande_id: number } | null
+}
+
+export const labReceptionApi = {
+  attendus: (params?: { search?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    const s = q.toString()
+    return api<LabReceptionAttendusResponse>(`/v1/lab/reception/attendus${s ? `?${s}` : ''}`)
+  },
+  stats: () =>
+    api<{
+      produits_attendus: number
+      produits_en_attente: number
+      essais_attendus: number
+      essais_recus: number
+      en_transit: number
+      receptionne: number
+      en_essai: number
+      receptionnes_today: number
+    }>('/v1/lab/reception/stats'),
+}
+
+export const samplesReceptionApi = {
+  list: (params?: { status?: string; fold?: string; per_page?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.fold) q.set('fold', params.fold)
+    if (params?.per_page) q.set('per_page', String(params.per_page))
+    const s = q.toString()
+    return api<LaravelPaginator<ReceptionSample>>(`/v1/samples${s ? `?${s}` : ''}`)
+  },
+  receive: (
+    id: number,
+    body: { condition_state: 'bon' | 'endommage' | 'insuffisant'; storage_location?: string; notes?: string },
+  ) => api<ReceptionSample>(`/v1/samples/${id}/receive`, { method: 'PATCH', body: JSON.stringify(body) }),
+}
+
 export const samplesApi = {
   get: (id: number) => api<Sample>(`/samples/${id}`),
   create: (body: SampleWriteBody) => api<Sample>('/samples', { method: 'POST', body: JSON.stringify(body) }),

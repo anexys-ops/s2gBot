@@ -52,6 +52,7 @@ class Sample extends Model
         'mission_order_id',
         'task_id',
         'product_id',
+        'bon_commande_ligne_id',
         'description',
         'sample_type',
         'origin_location',
@@ -124,6 +125,11 @@ class Sample extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Article::class, 'product_id');
+    }
+
+    public function bonCommandeLigne(): BelongsTo
+    {
+        return $this->belongsTo(BonCommandeLigne::class, 'bon_commande_ligne_id');
     }
 
     public function collectedBy(): BelongsTo

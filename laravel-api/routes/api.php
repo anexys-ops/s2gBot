@@ -55,6 +55,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReportFormDefinitionController;
 use App\Http\Controllers\Api\ReportPdfTemplateController;
 use App\Http\Controllers\Api\SampleController;
+use App\Http\Controllers\Api\LabReceptionController;
 use App\Http\Controllers\Api\SampleReceptionController;
 use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\StatsController;
@@ -396,6 +397,8 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     // ── v1.2.0 — Menu RÉCEPTION (échantillons FOLD) ──────────────────────────
     Route::prefix('v1')->group(function () {
+        Route::get('lab/reception/attendus', [LabReceptionController::class, 'attendus']);
+        Route::get('lab/reception/stats',    [LabReceptionController::class, 'stats']);
         Route::get('samples',                 [SampleReceptionController::class, 'index']);
         Route::get('samples/stats',           [SampleReceptionController::class, 'stats']);
         Route::get('samples/search',          [SampleReceptionController::class, 'searchByFold']);

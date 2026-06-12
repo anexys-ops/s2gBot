@@ -70,4 +70,9 @@ class BonCommandeLigne extends Model
     {
         return $this->hasMany(BcLignePlanningAffectation::class, 'bon_commande_ligne_id');
     }
+
+    public function samples(): HasMany
+    {
+        return $this->hasMany(Sample::class, 'bon_commande_ligne_id');
+    }
 }

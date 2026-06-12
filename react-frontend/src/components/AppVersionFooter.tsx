@@ -119,11 +119,6 @@ export default function AppVersionFooter({ variant = 'app', dock = false, demoHi
           <span className={dotClass} title={statusText} aria-hidden />
           <div className="app-version-footer__stack">
             <span className="app-version-footer__dock-text">{dockLine}</span>
-            {variant === 'auth' ? (
-              <span className="app-version-footer__detail" title={apiLabel}>
-                {apiLabel}
-              </span>
-            ) : null}
             {variant === 'auth' && demoHint ? (
               <span className="app-version-footer__demo-hint">{demoHint}</span>
             ) : null}

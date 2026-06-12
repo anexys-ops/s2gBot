@@ -1906,6 +1906,16 @@ export interface Quote {
   billing_address?: ClientAddress
   delivery_address?: ClientAddress
   quote_lines?: QuoteLine[]
+  bon_commande?: QuoteBonCommandeChain | null
+  bonCommande?: QuoteBonCommandeChain | null
+}
+
+export type QuoteBonCommandeChain = {
+  id: number
+  numero: string
+  dossier_id?: number
+  bons_livraison_count?: number
+  invoices_count?: number
 }
 
 export const quotesApi = {

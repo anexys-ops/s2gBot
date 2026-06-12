@@ -69,6 +69,10 @@ class QuoteController extends Controller
             'billingAddress',
             'deliveryAddress',
             'pdfTemplate',
+            'bonCommande' => function ($q) {
+                $q->select('id', 'numero', 'quote_id', 'dossier_id')
+                    ->withCount(['bonsLivraison', 'invoices']);
+            },
         ]);
 
         if (! $user->isLab()) {

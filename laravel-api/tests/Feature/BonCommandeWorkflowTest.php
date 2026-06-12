@@ -18,6 +18,56 @@ class BonCommandeWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_quotes_index_includes_document_chain_from_bon_commande(): void
+    {
+        $client = Client::query()->create(['name' => 'Quote Chain Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site QC']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0200',
+            'titre' => 'D chain',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-CHAIN',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 50,
+            'amount_ttc' => 60,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'L chain',
+            'quantity' => 1,
+            'unit_price' => 50,
+            'tva_rate' => 20,
+            'total' => 50,
+        ]);
+
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $bcId = (int) $bc['id'];
+        $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/confirmer")->assertOk();
+
+        $bl = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/transformer-bl")->assertCreated()->json();
+        $this->actingAs($lab, 'sanctum')->postJson('/api/invoices/from-bons-commande', [
+            'bon_commande_ids' => [$bcId],
+        ])->assertCreated();
+
+        $list = $this->actingAs($lab, 'sanctum')->getJson('/api/quotes?search=Q-CHAIN');
+        $list->assertOk();
+        $list->assertJsonPath('data.0.bon_commande.numero', $bc['numero']);
+        $list->assertJsonPath('data.0.bon_commande.bons_livraison_count', 1);
+        $list->assertJsonPath('data.0.bon_commande.invoices_count', 1);
+    }
+
     public function test_lab_transforms_signed_quote_to_bon_commande(): void
     {
         $client = Client::query()->create(['name' => 'BC Test Co']);

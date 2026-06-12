@@ -15,6 +15,14 @@ import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibil
 import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
 import { quoteEmailRecipient } from '../lib/quoteEmailRecipient'
 
+function quoteBonCommande(q: Quote) {
+  return q.bon_commande ?? q.bonCommande ?? null
+}
+
+function chainCount(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
   validated: 'Validé',
@@ -49,6 +57,9 @@ export default function Devis() {
     ttc: true,
     travel: true,
     status: true,
+    bc: true,
+    bl: true,
+    invoices: true,
     pdf: true,
     actions: true,
   })
@@ -180,6 +191,13 @@ export default function Devis() {
           { id: 'ttc', label: 'Montant TTC' },
           { id: 'travel', label: 'Dépl. HT' },
           { id: 'status', label: 'Statut' },
+          ...(isLab
+            ? [
+                { id: 'bc', label: 'BC' },
+                { id: 'bl', label: 'BL' },
+                { id: 'invoices', label: 'Factures' },
+              ]
+            : []),
           ...(isLab ? [{ id: 'pdf', label: 'PDF' }] : []),
           ...(isLab ? [{ id: 'actions', label: 'Actions' }] : []),
         ]}
@@ -234,6 +252,9 @@ export default function Devis() {
                   {visible.ttc !== false && <th>Montant TTC ({MONEY_UNIT_LABEL})</th>}
                   {visible.travel !== false && <th>Dépl. HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.status !== false && <th>Statut</th>}
+                  {isLab && visible.bc !== false && <th>BC</th>}
+                  {isLab && visible.bl !== false && <th className="data-table__num">BL</th>}
+                  {isLab && visible.invoices !== false && <th className="data-table__num">Factures</th>}
                   {isLab && visible.pdf !== false && <th className="data-table__pdf">PDF</th>}
                   {isLab && visible.actions !== false && <QuoteRowActionHeaders />}
                 </tr>
@@ -241,6 +262,9 @@ export default function Devis() {
               <tbody>
                 {quotes.map((q) => {
                   const st = quoteStatutBadgeProps(q.status)
+                  const bc = quoteBonCommande(q)
+                  const blCount = chainCount(bc?.bons_livraison_count)
+                  const invoiceCount = chainCount(bc?.invoices_count)
                   return (
                     <tr key={q.id}>
                       {visible.number !== false && (
@@ -259,6 +283,43 @@ export default function Devis() {
                           <StatusBadge variant={st.variant} size="sm">
                             {st.label}
                           </StatusBadge>
+                        </td>
+                      )}
+                      {isLab && visible.bc !== false && (
+                        <td>
+                          {bc ? (
+                            <Link to={`/bons-commande/${bc.id}`} className="link-inline">
+                              <code className="code-badge">{bc.numero}</code>
+                            </Link>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </td>
+                      )}
+                      {isLab && visible.bl !== false && (
+                        <td className="data-table__num">
+                          {bc && blCount > 0 ? (
+                            bc.dossier_id ? (
+                              <Link to={`/dossiers/${bc.dossier_id}/bc-bl`} className="link-inline">
+                                {blCount}
+                              </Link>
+                            ) : (
+                              blCount
+                            )
+                          ) : (
+                            <span className="text-muted">{bc ? '0' : '—'}</span>
+                          )}
+                        </td>
+                      )}
+                      {isLab && visible.invoices !== false && (
+                        <td className="data-table__num">
+                          {bc && invoiceCount > 0 ? (
+                            <Link to="/factures" className="link-inline">
+                              {invoiceCount}
+                            </Link>
+                          ) : (
+                            <span className="text-muted">{bc ? '0' : '—'}</span>
+                          )}
                         </td>
                       )}
                       {isLab && visible.pdf !== false && (

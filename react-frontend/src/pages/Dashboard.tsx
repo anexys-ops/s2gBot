@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { OutlineIcon } from '../components/OutlineIcons'
+import { OutlineIcon, type HubIconId } from '../components/OutlineIcons'
 import { useAuth } from '../contexts/AuthContext'
 import { statsApi, type DashboardStatsPayload } from '../api/client'
 import { INVOICE_STATUS_LABELS, QUOTE_STATUS_LABELS } from '../lib/commercialStatusLabels'
@@ -30,6 +30,43 @@ const SAMPLE_STATUS_LABELS: Record<string, string> = {
 }
 
 type MetierTab = 'commerce' | 'compta' | 'labo'
+
+const COMMERCIAL_SHORTCUTS: { to: string; label: string; hint: string; icon: HubIconId }[] = [
+  { to: '/bons-commande', label: 'Bons de commande', hint: 'Suivi, planification et livraisons', icon: 'handshake' },
+  { to: '/bons-livraison', label: 'Bons de livraison', hint: 'BLC et quantités livrées', icon: 'check' },
+  { to: '/devis', label: 'Devis', hint: 'Propositions et signatures', icon: 'quote' },
+  { to: '/factures', label: 'Factures', hint: 'Facturation et encaissements', icon: 'invoice' },
+  { to: '/dossiers', label: 'Dossiers', hint: 'Affaires chantier et documents', icon: 'documents' },
+  { to: '/clients', label: 'Clients', hint: 'Annuaire et fiches client', icon: 'users' },
+]
+
+const LAB_SHORTCUTS: { to: string; label: string; hint: string; icon: HubIconId }[] = [
+  { to: '/labo', label: 'Laboratoire', hint: 'Essais, rapports et planning', icon: 'lab' },
+  { to: '/graphiques-essais', label: 'Graphiques essais', hint: 'Courbes granulométriques', icon: 'granulo' },
+  { to: '/catalogue', label: 'Catalogue', hint: 'Articles et prestations', icon: 'catalog' },
+]
+
+function DashboardShortcutLink({
+  to,
+  label,
+  hint,
+  icon,
+}: {
+  to: string
+  label: string
+  hint: string
+  icon: HubIconId
+}) {
+  return (
+    <Link to={to} className="dashboard-shortcut">
+      <span className="dashboard-shortcut__icon" aria-hidden>
+        <OutlineIcon id={icon} />
+      </span>
+      <span className="dashboard-shortcut__label">{label}</span>
+      <span className="dashboard-shortcut__hint">{hint}</span>
+    </Link>
+  )
+}
 
 function statusRows(record: Record<string, number>, labels: Record<string, string>) {
   return Object.entries(record)
@@ -462,6 +499,7 @@ const METIER_TABS: { id: MetierTab; icon: string; label: string; hint: string }[
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const [metier, setMetier] = useState<MetierTab>('commerce')
   const [openKpi, setOpenKpi] = useState<KpiId | null>(null)
 
@@ -786,22 +824,28 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <section className="dashboard-card dashboard-card--shortcuts">
-        <p className="dashboard-shortcuts-title">Accès rapides</p>
-        <div className="dashboard-shortcuts">
-          <Link to="/orders" className="btn btn-secondary">
-            Commandes
-          </Link>
-          <Link to="/back-office" className="btn btn-secondary">
-            Back office
-          </Link>
-          <Link to="/invoices" className="btn btn-secondary">
-            Factures
-          </Link>
-          <Link to="/graphiques-essais" className="btn btn-secondary">
-            Graphiques essais
-          </Link>
+      <section className="dashboard-card dashboard-card--shortcuts" aria-labelledby="dashboard-shortcuts-title">
+        <header className="dashboard-shortcuts-header">
+          <h2 id="dashboard-shortcuts-title" className="dashboard-shortcuts-title">
+            Accès rapides
+          </h2>
+          <p className="dashboard-shortcuts-intro text-muted">Commercial, dossiers et facturation.</p>
+        </header>
+        <div className="dashboard-shortcuts-grid">
+          {COMMERCIAL_SHORTCUTS.map((item) => (
+            <DashboardShortcutLink key={item.to} {...item} />
+          ))}
         </div>
+        {isLab ? (
+          <>
+            <p className="dashboard-shortcuts-subtitle">Laboratoire &amp; outils</p>
+            <div className="dashboard-shortcuts-grid dashboard-shortcuts-grid--secondary">
+              {LAB_SHORTCUTS.map((item) => (
+                <DashboardShortcutLink key={item.to} {...item} />
+              ))}
+            </div>
+          </>
+        ) : null}
       </section>
     </div>
   )

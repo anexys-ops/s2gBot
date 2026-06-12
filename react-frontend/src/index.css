@@ -2989,10 +2989,77 @@ a.ds-icon-btn {
   line-height: 1.45;
 }
 .dashboard-shortcuts-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #64748b;
-  margin-bottom: 0.5rem;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+.dashboard-shortcuts-header {
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.dashboard-shortcuts-intro {
+  margin: 0.35rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+.dashboard-shortcuts-subtitle {
+  margin: 1.15rem 0 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-muted);
+}
+.dashboard-shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  gap: 0.65rem;
+}
+.dashboard-shortcuts-grid--secondary {
+  margin-top: 0;
+}
+.dashboard-shortcut {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-height: 5.25rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  text-decoration: none !important;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+.dashboard-shortcut:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.1);
+  transform: translateY(-1px);
+}
+.dashboard-shortcut__icon {
+  display: flex;
+  width: 1.65rem;
+  height: 1.65rem;
+  margin-bottom: 0.15rem;
+  color: var(--color-text-muted);
+}
+.dashboard-shortcut__icon svg {
+  width: 100%;
+  height: 100%;
+}
+.dashboard-shortcut__label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.25;
+}
+.dashboard-shortcut__hint {
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+  line-height: 1.35;
 }
 .dashboard-shortcuts {
   display: flex;
@@ -3539,12 +3606,18 @@ a.ds-icon-btn {
   margin-bottom: 0;
 }
 
+.dashboard-card--shortcuts .dashboard-shortcuts-header {
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
 .dashboard-card--shortcuts .dashboard-shortcuts-title {
   margin-top: 0;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.65rem;
-  border-bottom: 1px solid var(--color-border);
-  font-size: 0.8rem;
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+  font-size: 0.95rem;
 }
 
 .dashboard-home--v2 .dashboard-hero {
@@ -4902,10 +4975,8 @@ a.ds-icon-btn {
   .dashboard-split {
     grid-template-columns: 1fr;
   }
-  .dashboard-shortcuts .btn {
-    flex: 1 1 auto;
-    text-align: center;
-    justify-content: center;
+  .dashboard-shortcuts-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr));
   }
   .dashboard-metier-tabs {
     flex-direction: row;

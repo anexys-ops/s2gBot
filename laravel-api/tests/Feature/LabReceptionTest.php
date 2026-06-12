@@ -7,10 +7,14 @@ use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
 use App\Models\Catalogue\Article;
 use App\Models\Catalogue\FamilleArticle;
+use App\Models\Agency;
 use App\Models\Client;
 use App\Models\Dossier;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Sample;
 use App\Models\Site;
+use App\Models\TestType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -50,9 +54,12 @@ class LabReceptionTest extends TestCase
 
     public function test_attendus_tracks_sample_counts_per_bc_line(): void
     {
-        [$labLine] = $this->seedBcWithLabAndReportLines();
+        [$labLine, , , $client] = $this->seedBcWithLabAndReportLines();
+        $orderItemId = $this->legacyOrderItemId($client);
 
         Sample::query()->create([
+            'order_item_id' => $orderItemId,
+            'reference' => 'SMP-REC-TRANSIT',
             'bon_commande_ligne_id' => $labLine->id,
             'dossier_id' => $labLine->bonCommande->dossier_id,
             'product_id' => $labLine->ref_article_id,
@@ -60,6 +67,8 @@ class LabReceptionTest extends TestCase
             'status' => Sample::STATUS_EN_TRANSIT,
         ]);
         Sample::query()->create([
+            'order_item_id' => $orderItemId,
+            'reference' => 'SMP-REC-RECEIVED',
             'bon_commande_ligne_id' => $labLine->id,
             'dossier_id' => $labLine->bonCommande->dossier_id,
             'product_id' => $labLine->ref_article_id,
@@ -77,8 +86,34 @@ class LabReceptionTest extends TestCase
         $res->assertJsonPath('data.0.reception_complete', false);
     }
 
+    private function legacyOrderItemId(Client $client): int
+    {
+        $agency = Agency::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Siège réception',
+            'is_headquarters' => true,
+        ]);
+        $testType = TestType::query()->create([
+            'name' => 'Essai réception',
+            'unit_price' => '10.00',
+        ]);
+        $order = Order::query()->create([
+            'reference' => 'ORD-REC-'.uniqid(),
+            'client_id' => $client->id,
+            'agency_id' => $agency->id,
+            'status' => Order::STATUS_IN_PROGRESS,
+            'order_date' => now()->toDateString(),
+        ]);
+
+        return (int) OrderItem::query()->create([
+            'order_id' => $order->id,
+            'test_type_id' => $testType->id,
+            'quantity' => 1,
+        ])->id;
+    }
+
     /**
-     * @return array{0: BonCommandeLigne, 1: BonCommandeLigne, 2: BonCommande}
+     * @return array{0: BonCommandeLigne, 1: BonCommandeLigne, 2: BonCommande, 3: Client}
      */
     private function seedBcWithLabAndReportLines(string $statut = BonCommande::STATUT_CONFIRME): array
     {
@@ -169,6 +204,6 @@ class LabReceptionTest extends TestCase
             'technicien_id' => $technicien->id,
         ]);
 
-        return [$labLine, $reportLine, $bc];
+        return [$labLine, $reportLine, $bc, $client];
     }
 }

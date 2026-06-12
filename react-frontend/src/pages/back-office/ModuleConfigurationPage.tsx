@@ -34,11 +34,10 @@ const FIELD_TYPES: { value: string; label: string }[] = [
   { value: 'select', label: 'Liste déroulante' },
 ]
 
-const ORDER_STATUSES: { value: string; label: string }[] = [
-  { value: 'draft', label: 'Brouillon' },
-  { value: 'submitted', label: 'Soumise' },
-  { value: 'in_progress', label: 'En cours' },
-  { value: 'completed', label: 'Terminée' },
+const BC_INVOICE_STATUSES: { value: string; label: string }[] = [
+  { value: 'confirme', label: 'Confirmé' },
+  { value: 'en_cours', label: 'En cours' },
+  { value: 'livre', label: 'Livré' },
 ]
 
 const MODULE_KEYS = [
@@ -220,7 +219,7 @@ function ModuleListsSection() {
     if (activeKey === 'invoices') {
       setTvaRates(((s.tva_rate_options as number[]) ?? []).join(', '))
       setTravelTva(((s.travel_tva_rate_options as number[]) ?? []).join(', '))
-      setOrderStatuses([...((s.order_picker_statuses as string[]) ?? [])])
+      setOrderStatuses([...((s.bc_picker_statuts as string[]) ?? (s.order_picker_statuses as string[]) ?? [])])
     }
     if (activeKey === 'quotes') {
       setQuotesTva(((s.tva_rate_options as number[]) ?? []).join(', '))
@@ -248,7 +247,7 @@ function ModuleListsSection() {
         return moduleSettingsApi.update('invoices', {
           tva_rate_options,
           travel_tva_rate_options,
-          order_picker_statuses: orderStatuses,
+          bc_picker_statuts: orderStatuses,
         })
       }
       if (activeKey === 'quotes') {
@@ -281,7 +280,7 @@ function ModuleListsSection() {
   return (
     <div>
       <p style={{ color: 'var(--color-muted)', maxWidth: '70ch', lineHeight: 1.5 }}>
-        Valeurs proposées dans les listes déroulantes (TVA, statuts de commandes visibles lors de la création de facture,
+        Valeurs proposées dans les listes déroulantes (TVA, statuts de bons de commande éligibles à la facturation,
         etc.). Séparez les nombres par des virgules.
       </p>
       <div className="module-configuration-page__entity-tabs" style={{ marginBottom: '1rem' }}>
@@ -321,9 +320,9 @@ function ModuleListsSection() {
                 />
               </div>
               <div className="form-group">
-                <label>Statuts de commande proposés pour regrouper en facture</label>
+                <label>Statuts de bon de commande proposés pour la facturation</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  {ORDER_STATUSES.map((s) => (
+                  {BC_INVOICE_STATUSES.map((s) => (
                     <label key={s.value} style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                       <input
                         type="checkbox"

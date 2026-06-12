@@ -186,6 +186,62 @@ class InvoiceController extends Controller
         return response()->json($invoice, 201);
     }
 
+    public function eligibleBonsCommande(Request $request): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $search = trim((string) $request->query('search', ''));
+        $limit = min(100, max(1, (int) $request->query('limit', 100)));
+
+        $items = $this->invoiceService
+            ->eligibleBonsCommandeQuery($search !== '' ? $search : null)
+            ->limit($limit)
+            ->get()
+            ->map(fn ($bc) => [
+                'id' => $bc->id,
+                'numero' => $bc->numero,
+                'statut' => $bc->statut,
+                'date_commande' => $bc->date_commande?->format('Y-m-d'),
+                'montant_ht' => $bc->montant_ht,
+                'montant_ttc' => $bc->montant_ttc,
+                'client' => $bc->client ? ['id' => $bc->client->id, 'name' => $bc->client->name] : null,
+                'dossier' => $bc->dossier ? [
+                    'id' => $bc->dossier->id,
+                    'reference' => $bc->dossier->reference,
+                    'titre' => $bc->dossier->titre,
+                ] : null,
+            ])
+            ->values();
+
+        return response()->json(['data' => $items]);
+    }
+
+    public function fromBonsCommande(Request $request): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $validated = $request->validate([
+            'bon_commande_ids' => 'required|array|min:1',
+            'bon_commande_ids.*' => 'integer|exists:bons_commande,id',
+            'client_id' => 'nullable|exists:clients,id',
+        ]);
+
+        try {
+            $invoice = $this->invoiceService->fromBonsCommande(
+                $validated['bon_commande_ids'],
+                $validated['client_id'] ?? null
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($invoice, 201);
+    }
+
     public function store(Request $request): JsonResponse
     {
         if (! $request->user()->isLabAdmin()) {

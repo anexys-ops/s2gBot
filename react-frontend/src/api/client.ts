@@ -1598,6 +1598,29 @@ export const invoicesApi = {
       method: 'POST',
       body: JSON.stringify({ order_ids: orderIds, client_id: clientId }),
     }),
+  eligibleBonsCommande: (params?: { search?: string; limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    if (params?.limit) q.set('limit', String(params.limit))
+    const s = q.toString()
+    return api<{
+      data: Array<{
+        id: number
+        numero: string
+        statut: string
+        date_commande: string
+        montant_ht: string | number
+        montant_ttc: string | number
+        client?: { id: number; name: string } | null
+        dossier?: { id: number; reference: string; titre: string } | null
+      }>
+    }>(`/invoices/eligible-bons-commande${s ? `?${s}` : ''}`)
+  },
+  fromBonsCommande: (bonCommandeIds: number[], clientId?: number) =>
+    api<Invoice>('/invoices/from-bons-commande', {
+      method: 'POST',
+      body: JSON.stringify({ bon_commande_ids: bonCommandeIds, client_id: clientId }),
+    }),
   update: (id: number, body: Partial<Invoice>) =>
     api<Invoice>(`/invoices/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/invoices/${id}`, { method: 'DELETE' }),

@@ -356,6 +356,27 @@ class BonCommandeWorkflowTest extends TestCase
         $ok->assertJsonPath('lignes.0.quantite_livree', 2);
     }
 
+    public function test_invoice_eligible_bons_commande_and_from_bons_commande(): void
+    {
+        [$lab, $bcId] = array_slice($this->seedBcWithBl(), 0, 2);
+
+        $eligible = $this->actingAs($lab, 'sanctum')->getJson('/api/invoices/eligible-bons-commande');
+        $eligible->assertOk();
+        $eligible->assertJsonFragment(['id' => $bcId]);
+
+        $invoice = $this->actingAs($lab, 'sanctum')->postJson('/api/invoices/from-bons-commande', [
+            'bon_commande_ids' => [$bcId],
+        ]);
+        $invoice->assertCreated();
+        $invoice->assertJsonPath('status', 'draft');
+        $this->assertNotEmpty($invoice->json('invoice_lines'));
+
+        $again = $this->actingAs($lab, 'sanctum')->getJson('/api/invoices/eligible-bons-commande');
+        $again->assertOk();
+        $ids = collect($again->json('data'))->pluck('id')->all();
+        $this->assertNotContains($bcId, $ids);
+    }
+
     public function test_bl_brouillon_quantities_not_counted_as_deja_livree(): void
     {
         [$lab, $bcId, $blId, $blLineId, $bcLineId] = $this->seedBcWithBl();

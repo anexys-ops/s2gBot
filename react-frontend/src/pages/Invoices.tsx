@@ -7,7 +7,6 @@ import {
   documentPdfTemplatesApi,
   invoicesApi,
   moduleSettingsApi,
-  ordersApi,
   pdfApi,
   type EntityMetaPayload,
   type Invoice,
@@ -20,7 +19,16 @@ import Modal from '../components/Modal'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
+import { bonCommandeStatutBadgeProps } from '../components/ds/StatusBadge'
 import { formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
+
+const BC_STATUT_LABELS: Record<string, string> = {
+  brouillon: 'Brouillon',
+  confirme: 'Confirmé',
+  en_cours: 'En cours',
+  livre: 'Livré',
+  annule: 'Annulé',
+}
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
@@ -32,13 +40,6 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const DEFAULT_TVA_OPTIONS = [20, 10, 5.5, 0]
-
-function normalizePickerText(value: string) {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-}
 
 function numList(v: unknown): number[] {
   if (!Array.isArray(v) || v.length === 0) return DEFAULT_TVA_OPTIONS
@@ -52,7 +53,7 @@ export default function Invoices() {
   const isAdmin = user?.role === 'lab_admin'
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
-  const [selectedOrderIds, setSelectedOrderIds] = useState<number[]>([])
+  const [selectedBcIds, setSelectedBcIds] = useState<number[]>([])
   const [editInvoice, setEditInvoice] = useState<Invoice | null>(null)
   const [editForm, setEditForm] = useState({
     status: 'draft',
@@ -101,12 +102,6 @@ export default function Invoices() {
     if (editInvoice && !base.includes(editForm.travel_fee_tva_rate)) base.push(editForm.travel_fee_tva_rate)
     return [...new Set(base)].sort((a, b) => b - a)
   }, [travelTvaOptions, editInvoice, editForm.travel_fee_tva_rate])
-  const orderPickerStatuses = useMemo(() => {
-    const s = modInvoices?.settings?.order_picker_statuses
-    if (Array.isArray(s) && s.length > 0) return s as string[]
-    return ['completed', 'in_progress']
-  }, [modInvoices])
-
   const { data: clientsList = [] } = useQuery({
     queryKey: ['clients', 'invoices-toolbar'],
     queryFn: () => clientsApi.list(),
@@ -138,22 +133,22 @@ export default function Invoices() {
     placeholderData: keepPreviousData,
   })
 
-  const { data: ordersData } = useQuery({
-    queryKey: ['orders', 'invoice-picker', debouncedOrderSearch],
+  const { data: eligibleBcData } = useQuery({
+    queryKey: ['invoices', 'eligible-bons-commande', debouncedOrderSearch],
     queryFn: () =>
-      ordersApi.list({
-        page: 1,
-        per_page: 100,
+      invoicesApi.eligibleBonsCommande({
         search: debouncedOrderSearch.trim() || undefined,
+        limit: 100,
       }),
     enabled: isLab,
   })
 
-  const fromOrdersMutation = useMutation({
-    mutationFn: (orderIds: number[]) => invoicesApi.fromOrders(orderIds),
+  const fromBonsCommandeMutation = useMutation({
+    mutationFn: (bcIds: number[]) => invoicesApi.fromBonsCommande(bcIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      setSelectedOrderIds([])
+      queryClient.invalidateQueries({ queryKey: ['invoices', 'eligible-bons-commande'] })
+      setSelectedBcIds([])
     },
   })
 
@@ -178,25 +173,12 @@ export default function Invoices() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invoices'] }),
   })
 
-  const orders = ordersData?.data ?? []
-  const pickableOrders = useMemo(
-    () => orders.filter((o) => orderPickerStatuses.includes(o.status)),
-    [orders, orderPickerStatuses],
-  )
-  const filteredPickableOrders = useMemo(() => {
-    const term = normalizePickerText(orderSearchInput.trim())
-    if (!term) return pickableOrders
-    return pickableOrders.filter((o) => {
-      const ref = normalizePickerText(o.reference)
-      const clientName = normalizePickerText(o.client?.name ?? '')
-      return ref.startsWith(term) || clientName.startsWith(term) || `${ref} ${clientName}`.includes(term)
-    })
-  }, [orderSearchInput, pickableOrders])
+  const eligibleBonsCommande = eligibleBcData?.data ?? []
   const invoices = data?.data ?? []
   const lastPage = data?.last_page ?? 1
   const statusOptions = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
-  const toggleOrderSelection = (orderId: number) => {
-    setSelectedOrderIds((cur) => (cur.includes(orderId) ? cur.filter((id) => id !== orderId) : [...cur, orderId]))
+  const toggleBcSelection = (bcId: number) => {
+    setSelectedBcIds((cur) => (cur.includes(bcId) ? cur.filter((id) => id !== bcId) : [...cur, bcId]))
   }
 
   const openEdit = useCallback((inv: Invoice) => {
@@ -296,66 +278,75 @@ export default function Invoices() {
       <h1>Factures</h1>
       {isLab && (
         <div className="card" style={{ marginBottom: '1rem' }}>
-          <h3>Créer une facture à partir de commandes</h3>
+          <h3>Créer une facture à partir de bons de commande</h3>
           <p>
-            Sélectionnez une ou plusieurs commandes (même client). Les statuts proposés sont configurables dans le back
-            office → Configuration → Listes par module → Factures.
+            Sélectionnez un ou plusieurs bons de commande non encore facturés (même client). Seuls les statuts éligibles
+            sont listés — configurables dans Configuration → Listes par module → Factures.
           </p>
           <div className="form-group invoice-orders-picker">
             <label className="invoice-orders-picker__label" htmlFor="invoice-order-search">
-              Commandes
+              Bons de commande
             </label>
             <input
               id="invoice-order-search"
               type="search"
               value={orderSearchInput}
               onChange={(e) => setOrderSearchInput(e.target.value)}
-              placeholder="Tapez les premières lettres d’une référence ou d’un client…"
+              placeholder="Numéro BC, client, dossier…"
               autoComplete="off"
             />
             <div className="invoice-orders-picker__list" role="listbox" aria-multiselectable="true">
-              {filteredPickableOrders.map((o) => {
-                const selected = selectedOrderIds.includes(o.id)
+              {eligibleBonsCommande.map((bc) => {
+                const selected = selectedBcIds.includes(bc.id)
+                const st = bonCommandeStatutBadgeProps(bc.statut)
                 return (
                   <button
-                    key={o.id}
+                    key={bc.id}
                     type="button"
                     className={`invoice-orders-picker__option${selected ? ' invoice-orders-picker__option--selected' : ''}`}
                     role="option"
                     aria-selected={selected}
-                    onClick={() => toggleOrderSelection(o.id)}
+                    onClick={() => toggleBcSelection(bc.id)}
                   >
                     <span className="invoice-orders-picker__checkbox" aria-hidden="true">
                       {selected ? '✓' : ''}
                     </span>
                     <span>
-                      <strong>{o.reference}</strong> — {o.client?.name ?? 'Client'}
-                      <span className="invoice-orders-picker__status">({o.status})</span>
+                      <strong>{bc.numero}</strong> — {bc.client?.name ?? 'Client'}
+                      {bc.dossier ? (
+                        <span className="invoice-orders-picker__status">
+                          {' '}
+                          ({bc.dossier.reference})
+                        </span>
+                      ) : null}
+                      <span className="invoice-orders-picker__status">
+                        {' '}
+                        — {BC_STATUT_LABELS[bc.statut] ?? st.label} — {formatMoney(Number(bc.montant_ht))} HT
+                      </span>
                     </span>
                   </button>
                 )
               })}
-              {filteredPickableOrders.length === 0 && (
-                <p className="invoice-orders-picker__empty">Aucune commande ne correspond à cette recherche.</p>
+              {eligibleBonsCommande.length === 0 && (
+                <p className="invoice-orders-picker__empty">
+                  Aucun bon de commande éligible ne correspond à cette recherche.
+                </p>
               )}
             </div>
           </div>
-          {selectedOrderIds.length > 0 && (
-            <p className="invoice-orders-picker__summary">{selectedOrderIds.length} commande(s) sélectionnée(s)</p>
-          )}
-          {pickableOrders.length === 0 && (
-            <p style={{ color: 'var(--color-muted, #64748b)' }}>Aucune commande ne correspond aux statuts configurés.</p>
+          {selectedBcIds.length > 0 && (
+            <p className="invoice-orders-picker__summary">{selectedBcIds.length} bon(s) de commande sélectionné(s)</p>
           )}
           <button
             type="button"
             className="btn btn-primary"
-            disabled={selectedOrderIds.length === 0 || fromOrdersMutation.isPending}
-            onClick={() => fromOrdersMutation.mutate(selectedOrderIds)}
+            disabled={selectedBcIds.length === 0 || fromBonsCommandeMutation.isPending}
+            onClick={() => fromBonsCommandeMutation.mutate(selectedBcIds)}
           >
-            {fromOrdersMutation.isPending ? 'Création...' : 'Créer la facture'}
+            {fromBonsCommandeMutation.isPending ? 'Création...' : 'Créer la facture'}
           </button>
-          {fromOrdersMutation.isError && (
-            <span className="error"> {(fromOrdersMutation.error as Error).message}</span>
+          {fromBonsCommandeMutation.isError && (
+            <span className="error"> {(fromBonsCommandeMutation.error as Error).message}</span>
           )}
         </div>
       )}

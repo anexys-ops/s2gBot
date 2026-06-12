@@ -267,6 +267,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('report-pdf-templates/{report_pdf_template}', [ReportPdfTemplateController::class, 'update']);
     Route::get('report-form-definitions', [ReportFormDefinitionController::class, 'index']);
     Route::post('invoices/from-orders', [InvoiceController::class, 'fromOrders']);
+    Route::get('invoices/eligible-bons-commande', [InvoiceController::class, 'eligibleBonsCommande']);
+    Route::post('invoices/from-bons-commande', [InvoiceController::class, 'fromBonsCommande']);
     Route::get('invoices/unpaid', [InvoiceController::class, 'unpaid']);
     Route::get('invoices/{invoice}/pdf-link', [InvoiceController::class, 'pdfLink']);
     Route::apiResource('invoices', InvoiceController::class);

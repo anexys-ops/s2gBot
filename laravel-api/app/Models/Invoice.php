@@ -118,6 +118,11 @@ class Invoice extends Model
         return $this->belongsToMany(Order::class, 'invoice_orders')->withTimestamps();
     }
 
+    public function bonsCommande(): BelongsToMany
+    {
+        return $this->belongsToMany(BonCommande::class, 'invoice_bon_commande')->withTimestamps();
+    }
+
     public function invoiceLines(): HasMany
     {
         return $this->hasMany(InvoiceLine::class, 'invoice_id');

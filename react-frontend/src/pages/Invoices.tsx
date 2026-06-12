@@ -14,6 +14,7 @@ import {
 import { QuotePdfButton } from '../components/crm/QuoteListTableActions'
 import ConfirmDialog from '../components/ConfirmDialog'
 import StatusBadge, { bonCommandeStatutBadgeProps, invoiceStatutBadgeProps } from '../components/ds/StatusBadge'
+import Toast, { toastErrorMessage, type ToastVariant } from '../components/Toast'
 import EntityMetaCard from '../components/module/EntityMetaCard'
 import ExtrafieldsForm from '../components/module/ExtrafieldsForm'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
@@ -50,7 +51,7 @@ function numList(v: unknown): number[] {
   return out.length ? out : DEFAULT_TVA_OPTIONS
 }
 
-function InvoiceCreateFromBcPanel() {
+function InvoiceCreateFromBcPanel({ onNotify }: { onNotify: (message: string, variant: ToastVariant) => void }) {
   const queryClient = useQueryClient()
   const [selectedBcIds, setSelectedBcIds] = useState<number[]>([])
   const [orderSearchInput, setOrderSearchInput] = useState('')
@@ -72,6 +73,10 @@ function InvoiceCreateFromBcPanel() {
       void queryClient.invalidateQueries({ queryKey: ['invoices', 'eligible-bons-commande'] })
       setSelectedBcIds([])
       setOrderSearchInput('')
+      onNotify('Facture créée en brouillon.', 'success')
+    },
+    onError: (err) => {
+      onNotify(toastErrorMessage(err, 'Échec de la création de la facture.'), 'error')
     },
   })
 
@@ -228,6 +233,7 @@ export default function Invoices() {
   const queryClient = useQueryClient()
   const [editInvoice, setEditInvoice] = useState<Invoice | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null)
+  const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
   const [editForm, setEditForm] = useState({
     status: 'draft',
     invoice_date: '',
@@ -265,6 +271,10 @@ export default function Invoices() {
     moduleBarLabel: 'Commercial — Factures',
     title: 'Factures',
     subtitle: 'Facturation client : création depuis les bons de commande, suivi des montants et des statuts.',
+  }
+
+  const showToast = (message: string, variant: ToastVariant) => {
+    setToast({ message, variant })
   }
 
   const { data: modInvoices } = useQuery({
@@ -322,6 +332,10 @@ export default function Invoices() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       setEditInvoice(null)
+      showToast('Facture enregistrée.', 'success')
+    },
+    onError: (err) => {
+      showToast(toastErrorMessage(err, 'Échec de l’enregistrement de la facture.'), 'error')
     },
   })
 
@@ -330,6 +344,10 @@ export default function Invoices() {
     onSuccess: (updated, variables) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       setEditInvoice((prev) => (prev && prev.id === variables.id ? updated : prev))
+      showToast('Métadonnées enregistrées.', 'success')
+    },
+    onError: (err) => {
+      showToast(toastErrorMessage(err, 'Échec de l’enregistrement des métadonnées.'), 'error')
     },
   })
 
@@ -338,6 +356,10 @@ export default function Invoices() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       setDeleteTarget(null)
+      showToast('Facture supprimée.', 'success')
+    },
+    onError: (err) => {
+      showToast(toastErrorMessage(err, 'Échec de la suppression de la facture.'), 'error')
     },
   })
 
@@ -454,7 +476,7 @@ export default function Invoices() {
         ) : null
       }
     >
-      {isLab ? <InvoiceCreateFromBcPanel /> : null}
+      {isLab ? <InvoiceCreateFromBcPanel onNotify={showToast} /> : null}
 
       <ListTableToolbar
         searchValue={searchInput}
@@ -813,6 +835,10 @@ export default function Invoices() {
           </>
         </Modal>
       )}
+
+      {toast ? (
+        <Toast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} />
+      ) : null}
     </ModuleEntityShell>
   )
 }

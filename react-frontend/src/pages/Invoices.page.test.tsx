@@ -39,7 +39,7 @@ describe('Invoices', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /factures/i })).toBeInTheDocument()
     })
-    expect(await screen.findByText(/aucune facture/i)).toBeInTheDocument()
+    expect(await screen.findByText(/aucune facture ne correspond aux filtres/i)).toBeInTheDocument()
   })
 
   it('passe le filtre statut envoyée à list()', async () => {

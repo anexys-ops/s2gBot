@@ -190,6 +190,14 @@ input, select, textarea, button { font: inherit; }
   border-radius: var(--radius-md, 8px);
   border: 1px solid var(--color-border, #e2e8f0);
 }
+button.link-inline.invoice-number-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
 .invoice-orders-picker {
   display: block;
   max-width: 42rem;

@@ -96,6 +96,21 @@ export function bonCommandeStatutBadgeProps(
   return { variant: m.variant, children: m.label, label: m.label }
 }
 
+export function invoiceStatutBadgeProps(
+  status: string,
+): Pick<StatusBadgeProps, 'variant' | 'children'> & { label: string } {
+  const map: Record<string, { label: string; variant: StatusBadgeVariant }> = {
+    draft: { label: 'Brouillon', variant: 'neutral' },
+    validated: { label: 'Validée', variant: 'info' },
+    signed: { label: 'Signée', variant: 'info' },
+    sent: { label: 'Envoyée', variant: 'warning' },
+    relanced: { label: 'Relancée', variant: 'warning' },
+    paid: { label: 'Encaissée', variant: 'success' },
+  }
+  const m = map[status] ?? { label: status, variant: 'neutral' as const }
+  return { variant: m.variant, children: m.label, label: m.label }
+}
+
 export function bonLivraisonStatutBadgeProps(
   statut: string,
 ): Pick<StatusBadgeProps, 'variant' | 'children'> & { label: string } {

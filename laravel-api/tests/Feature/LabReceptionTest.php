@@ -144,6 +144,7 @@ class LabReceptionTest extends TestCase
             'montant_ht' => 800,
             'montant_ttc' => 960,
             'tva_rate' => 20,
+            'created_by' => $technicien->id,
         ]);
 
         $labLine = BonCommandeLigne::query()->create([

@@ -187,6 +187,7 @@ function AppRoutes() {
         <Route path="orders/:id" element={<OrderDetail />} />
         <Route path="catalog" element={<Navigate to="/catalogue" replace />} />
         <Route path="graphiques-essais" element={<GraphiquesEssais />} />
+        <Route path="factures" element={<Invoices />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="devis/nouveau" element={<QuoteEditorPage />} />
         <Route path="devis/:quoteId/editer" element={<QuoteEditorPage />} />

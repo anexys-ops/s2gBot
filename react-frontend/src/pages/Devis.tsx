@@ -298,27 +298,19 @@ export default function Devis() {
                       )}
                       {isLab && visible.bl !== false && (
                         <td className="data-table__num">
-                          {bc && blCount > 0 ? (
-                            bc.dossier_id ? (
-                              <Link to={`/dossiers/${bc.dossier_id}/bc-bl`} className="link-inline">
-                                {blCount}
-                              </Link>
-                            ) : (
-                              blCount
-                            )
+                          {bc ? (
+                            blCount
                           ) : (
-                            <span className="text-muted">{bc ? '0' : '—'}</span>
+                            <span className="text-muted">—</span>
                           )}
                         </td>
                       )}
                       {isLab && visible.invoices !== false && (
                         <td className="data-table__num">
-                          {bc && invoiceCount > 0 ? (
-                            <Link to="/factures" className="link-inline">
-                              {invoiceCount}
-                            </Link>
+                          {bc ? (
+                            invoiceCount
                           ) : (
-                            <span className="text-muted">{bc ? '0' : '—'}</span>
+                            <span className="text-muted">—</span>
                           )}
                         </td>
                       )}

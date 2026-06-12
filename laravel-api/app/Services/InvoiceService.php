@@ -131,9 +131,7 @@ class InvoiceService
             ->with(['client', 'dossier'])
             ->whereIn('statut', $this->bcPickerStatuts())
             ->whereHas('lignes')
-            ->whereDoesntHave('invoices', function (Builder $inv) {
-                $inv->where('status', '!=', Invoice::STATUS_DRAFT);
-            })
+            ->whereDoesntHave('invoices')
             ->orderByDesc('date_commande')
             ->orderByDesc('id');
 
@@ -233,9 +231,7 @@ class InvoiceService
     {
         return BonCommande::query()
             ->whereKey($bcId)
-            ->whereHas('invoices', function (Builder $inv) {
-                $inv->where('status', '!=', Invoice::STATUS_DRAFT);
-            })
+            ->whereHas('invoices')
             ->exists();
     }
 

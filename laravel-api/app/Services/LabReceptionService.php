@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\ArticleAction;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
 use App\Models\Sample;
@@ -14,11 +13,10 @@ use Illuminate\Support\Collection;
  *
  * Un produit est éligible lorsque :
  *  - le BC est confirmé ou en cours ;
- *  - la ligne a un technicien terrain affecté (visite chantier) ;
- *  - l'article catalogue déclenche un essai labo (triggers_odm_labo ou action type labo).
+ *  - le dossier est lié à un chantier ;
+ *  - la ligne a un technicien terrain affecté.
  *
- * Les BC « rapport seul » (sans essai labo au catalogue) sont exclus — pas de filtre
- * sur les frais de transport du devis, qui sont un montant global et peu fiables.
+ * Toutes les lignes sont incluses (essais labo, rapports, texte libre, etc.).
  */
 class LabReceptionService
 {
@@ -35,16 +33,11 @@ class LabReceptionService
             ->whereHas('bonCommande', function (Builder $q) {
                 $q->whereIn('statut', self::BC_STATUTS_ELIGIBLES);
             })
+            ->whereHas('bonCommande', function (Builder $q) {
+                $q->whereNotNull('dossier_id');
+            })
             ->whereHas('bonCommande.dossier', function (Builder $q) {
                 $q->whereNotNull('site_id');
-            })
-            ->whereHas('article', function (Builder $q) {
-                $q->where(function (Builder $inner) {
-                    $inner->where('triggers_odm_labo', true)
-                        ->orWhereHas('actions', function (Builder $aq) {
-                            $aq->where('type', ArticleAction::TYPE_LABO);
-                        });
-                });
             });
     }
 
@@ -52,7 +45,7 @@ class LabReceptionService
     public function listAttendus(?string $search = null): Collection
     {
         $q = $this->eligibleLinesQuery()->with([
-            'article:id,code,libelle,triggers_odm_labo',
+            'article:id,code,libelle',
             'technicien:id,name',
             'bonCommande:id,numero,dossier_id,client_id,statut,date_commande',
             'bonCommande.dossier:id,reference,titre,site_id,client_id',
@@ -165,7 +158,7 @@ class LabReceptionService
 
     public function isLineEligible(BonCommandeLigne $ligne): bool
     {
-        $ligne->loadMissing(['bonCommande.dossier', 'article.actions']);
+        $ligne->loadMissing(['bonCommande.dossier']);
 
         if (! $ligne->technicien_id) {
             return false;
@@ -176,19 +169,6 @@ class LabReceptionService
             return false;
         }
 
-        if (! $bc->dossier?->site_id) {
-            return false;
-        }
-
-        $article = $ligne->article;
-        if (! $article) {
-            return false;
-        }
-
-        if ($article->triggers_odm_labo) {
-            return true;
-        }
-
-        return $article->actions->contains(fn (ArticleAction $a) => $a->type === ArticleAction::TYPE_LABO);
+        return $bc->dossier_id !== null && $bc->dossier?->site_id !== null;
     }
 }

@@ -117,12 +117,11 @@ export default function LaboReceptionPage() {
       ]}
       moduleBarLabel="Laboratoire — Réception"
       title="Réception Laboratoire"
-      subtitle="Produits à recevoir depuis les bons de commande confirmés (essais terrain → analyse labo)"
+      subtitle="Lignes de BC confirmés prêtes pour la réception terrain"
     >
       <p className="text-muted" style={{ marginBottom: '1.25rem', maxWidth: 720, lineHeight: 1.5 }}>
-        Sont listés les produits issus d'un BC confirmé, liés à un chantier et un dossier, avec un technicien
-        terrain affecté et un essai laboratoire au catalogue — les rapports ou prestations sans analyse labo sont
-        exclus automatiquement.
+        Toutes les lignes d'un BC confirmé (ou en cours) liées à un dossier et un chantier, avec un technicien
+        terrain affecté — essais, rapports, lignes catalogue ou texte libre.
       </p>
 
       {stats && (

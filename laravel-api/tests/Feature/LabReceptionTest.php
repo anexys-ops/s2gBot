@@ -23,7 +23,7 @@ class LabReceptionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_attendus_lists_confirmed_bc_lab_lines_with_technician(): void
+    public function test_attendus_lists_all_bc_lines_with_technician_including_report(): void
     {
         [$labLine, $reportLine, $bc] = $this->seedBcWithLabAndReportLines();
 
@@ -31,14 +31,43 @@ class LabReceptionTest extends TestCase
 
         $res = $this->actingAs($lab, 'sanctum')->getJson('/api/v1/lab/reception/attendus');
         $res->assertOk();
-        $res->assertJsonPath('stats.produits', 1);
-        $res->assertJsonPath('data.0.id', $labLine->id);
-        $res->assertJsonPath('data.0.quantite_attendue', 3);
-        $res->assertJsonPath('data.0.bon_commande.numero', $bc->numero);
-        $res->assertJsonPath('data.0.chantier.name', 'Chantier Réception');
-        $res->assertJsonCount(1, 'data');
+        $res->assertJsonPath('stats.produits', 2);
+        $res->assertJsonCount(2, 'data');
 
-        $this->assertNotContains($reportLine->id, collect($res->json('data'))->pluck('id')->all());
+        $ids = collect($res->json('data'))->pluck('id')->all();
+        $this->assertContains($labLine->id, $ids);
+        $this->assertContains($reportLine->id, $ids);
+
+        $labRow = collect($res->json('data'))->firstWhere('id', $labLine->id);
+        $this->assertSame(3, $labRow['quantite_attendue']);
+        $this->assertSame($bc->numero, $labRow['bon_commande']['numero']);
+        $this->assertSame('Chantier Réception', $labRow['chantier']['name']);
+    }
+
+    public function test_attendus_includes_free_text_line_without_catalogue_article(): void
+    {
+        [, , $bc, , $technicien] = $this->seedBcWithLabAndReportLines();
+
+        $freeTextLine = BonCommandeLigne::query()->create([
+            'bon_commande_id' => $bc->id,
+            'ref_article_id' => null,
+            'libelle' => 'Ligne texte libre chantier',
+            'quantite' => 2,
+            'prix_unitaire_ht' => 50,
+            'tva_rate' => 20,
+            'montant_ht' => 100,
+            'technicien_id' => $technicien->id,
+        ]);
+
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $res = $this->actingAs($lab, 'sanctum')->getJson('/api/v1/lab/reception/attendus');
+        $res->assertOk();
+        $res->assertJsonPath('stats.produits', 3);
+
+        $row = collect($res->json('data'))->firstWhere('id', $freeTextLine->id);
+        $this->assertNotNull($row);
+        $this->assertSame('Ligne texte libre chantier', $row['libelle']);
+        $this->assertNull($row['article']);
     }
 
     public function test_attendus_excludes_brouillon_bc_and_lines_without_technician(): void
@@ -80,10 +109,12 @@ class LabReceptionTest extends TestCase
         $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
         $res = $this->actingAs($lab, 'sanctum')->getJson('/api/v1/lab/reception/attendus');
         $res->assertOk();
-        $res->assertJsonPath('data.0.quantite_en_transit', 1);
-        $res->assertJsonPath('data.0.quantite_recue', 1);
-        $res->assertJsonPath('data.0.quantite_manquante', 1);
-        $res->assertJsonPath('data.0.reception_complete', false);
+        $row = collect($res->json('data'))->firstWhere('id', $labLine->id);
+        $this->assertNotNull($row);
+        $this->assertSame(1, $row['quantite_en_transit']);
+        $this->assertSame(1, $row['quantite_recue']);
+        $this->assertSame(1, $row['quantite_manquante']);
+        $this->assertFalse($row['reception_complete']);
     }
 
     private function legacyOrderItemId(Client $client): int
@@ -113,7 +144,7 @@ class LabReceptionTest extends TestCase
     }
 
     /**
-     * @return array{0: BonCommandeLigne, 1: BonCommandeLigne, 2: BonCommande, 3: Client}
+     * @return array{0: BonCommandeLigne, 1: BonCommandeLigne, 2: BonCommande, 3: Client, 4: User}
      */
     private function seedBcWithLabAndReportLines(string $statut = BonCommande::STATUT_CONFIRME): array
     {
@@ -204,6 +235,6 @@ class LabReceptionTest extends TestCase
             'technicien_id' => $technicien->id,
         ]);
 
-        return [$labLine, $reportLine, $bc, $client];
+        return [$labLine, $reportLine, $bc, $client, $technicien];
     }
 }

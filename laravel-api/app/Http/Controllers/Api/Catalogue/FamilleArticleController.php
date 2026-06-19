@@ -16,6 +16,14 @@ class FamilleArticleController extends Controller
         if (! $request->boolean('with_inactif')) {
             $q->actif();
         }
+        if (Article::hasS2gCatalogue() && ! $request->boolean('with_legacy')) {
+            $q->whereHas('articles', function ($a) use ($request): void {
+                if (! $request->boolean('with_inactif')) {
+                    $a->actif();
+                }
+                $a->catalogueS2g();
+            });
+        }
 
         return response()->json($q->ordonne()->get());
     }
@@ -27,7 +35,7 @@ class FamilleArticleController extends Controller
             $q->actif();
         }
         if (! $request->boolean('with_legacy')) {
-            $q->catalogueS2g();
+            $q->forCatalogueListing();
         }
 
         $articles = $q->ordonne()

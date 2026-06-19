@@ -35,7 +35,7 @@ class ArticleController extends Controller
                 ->whereHas('qualificationTags', fn ($b) => $b->where('code', $tagCode));
         }
         if (! $request->boolean('with_legacy')) {
-            $q->catalogueS2g();
+            $q->forCatalogueListing();
         }
         if ($search = trim((string) $request->query('q', ''))) {
             $q->where(function ($b) use ($search) {

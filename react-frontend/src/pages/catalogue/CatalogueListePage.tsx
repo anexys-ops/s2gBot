@@ -112,10 +112,10 @@ export default function CatalogueListePage() {
       shellClassName="module-shell--crm"
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'Catalogue PROLAB' },
+        { label: 'Catalogue' },
       ]}
-      moduleBarLabel="Catalogue — PROLAB"
-      title="Catalogue produits & essais"
+      moduleBarLabel="Catalogue — S2G"
+      title="Catalogue jalons & produits"
       subtitle={viewSubtitle}
       actions={
         isAdmin ? (
@@ -189,7 +189,7 @@ export default function CatalogueListePage() {
                   <option value="">Tous types</option>
                   <option value="jalon">Jalons</option>
                   <option value="product">Produits</option>
-                  <option value="legacy">Legacy PROLAB</option>
+                  <option value="legacy">Ancien PROLAB</option>
                 </select>
               </label>
               <label className="catalogue-liste__famille-field">
@@ -355,7 +355,19 @@ export default function CatalogueListePage() {
         />
 
         {viewMode === 'table' && (
-          <CatalogueProlabTable articles={articlesFlat} isLoading={loadingFlat} visibleColumns={visible} />
+          <>
+            {!loadingFlat && articlesFlat.length === 0 && (
+              <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
+                <p style={{ margin: 0 }}>
+                  Aucun article S2G dans le catalogue.
+                  {qualificationTags.length === 0
+                    ? ' L’import n’a pas encore été exécuté sur ce serveur — lancez `php artisan catalogue:import-s2g --force` (Docker : voir doc S2G).'
+                    : ' Essayez d’effacer les filtres actifs.'}
+                </p>
+              </div>
+            )}
+            <CatalogueProlabTable articles={articlesFlat} isLoading={loadingFlat} visibleColumns={visible} />
+          </>
         )}
 
         {viewMode === 'list' && (
@@ -363,25 +375,12 @@ export default function CatalogueListePage() {
         )}
 
         {viewMode === 'tree' && (
-          <>
-            <p className="catalogue-liste__legend" role="note">
-              <span className="catalogue-liste__legend-item" title="Béton">
-                🧱 Béton
-              </span>
-              <span className="catalogue-liste__legend-item" title="Sols / compactage">
-                ⚙️ Sols / compactage
-              </span>
-              <span className="catalogue-liste__legend-item" title="Produits manufacturés">
-                📐 Produits manufacturés
-              </span>
-            </p>
-            <ArbreCatalogue
-              withInactif={withInactif}
-              familleIdFilter={familleId === '' ? undefined : familleId}
-              searchQuery={search}
-              linkToArticleFiche
-            />
-          </>
+          <ArbreCatalogue
+            withInactif={withInactif}
+            familleIdFilter={familleId === '' ? undefined : familleId}
+            searchQuery={search}
+            linkToArticleFiche
+          />
         )}
       </div>
 

@@ -145,6 +145,25 @@ class Article extends Model
         return $query->whereIn('kind', [self::KIND_JALON, self::KIND_PRODUCT]);
     }
 
+    /** True une fois le jeu S2G importé (au moins un jalon ou produit). */
+    public static function hasS2gCatalogue(): bool
+    {
+        return static::query()->catalogueS2g()->exists();
+    }
+
+    /**
+     * Filtre liste catalogue : S2G uniquement si importé, sinon legacy visible
+     * (évite une liste vide avant `catalogue:import-s2g`).
+     */
+    public function scopeForCatalogueListing(Builder $query, bool $withLegacy = false): Builder
+    {
+        if ($withLegacy || ! static::hasS2gCatalogue()) {
+            return $query;
+        }
+
+        return $query->catalogueS2g();
+    }
+
     // ── Compositions (v1.2.0) ────────────────────────────────────────────────
 
     public function compositions(): HasMany

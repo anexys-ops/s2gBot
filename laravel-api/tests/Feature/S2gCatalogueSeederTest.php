@@ -68,7 +68,7 @@ class S2gCatalogueSeederTest extends TestCase
         $this->assertIsArray($payload['qualification_tags']);
     }
 
-    public function test_articles_index_hides_legacy_until_s2g_import(): void
+    public function test_articles_index_shows_legacy_until_s2g_imported(): void
     {
         $this->seed(CatalogueProLabSeeder::class);
 
@@ -78,19 +78,24 @@ class S2gCatalogueSeederTest extends TestCase
             'site_id' => null,
         ]);
 
-        $hidden = $this->actingAs($lab, 'sanctum')
+        $before = $this->actingAs($lab, 'sanctum')
             ->getJson('/api/v1/catalogue/articles')
             ->assertOk()
             ->json();
 
-        $this->assertCount(0, $hidden);
+        $this->assertGreaterThan(0, count($before));
 
-        $legacy = $this->actingAs($lab, 'sanctum')
-            ->getJson('/api/v1/catalogue/articles?with_legacy=1')
+        $this->seed(S2gCatalogueSeeder::class);
+
+        $after = $this->actingAs($lab, 'sanctum')
+            ->getJson('/api/v1/catalogue/articles')
             ->assertOk()
             ->json();
 
-        $this->assertGreaterThan(0, count($legacy));
+        $this->assertCount(1074, $after);
+        foreach ($after as $row) {
+            $this->assertContains($row['kind'], ['jalon', 'product']);
+        }
     }
 
     public function test_articles_index_filters_by_kind(): void

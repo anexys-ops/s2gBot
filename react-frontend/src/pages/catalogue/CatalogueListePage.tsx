@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { catalogueApi, type RefArticleKind, type RefFamilleArticleRow } from '../../api/client'
+import { catalogueApi, type RefArticleKind } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import ArbreCatalogue from '../../components/Catalogue/ArbreCatalogue'
 import CatalogueProlabListe from '../../components/Catalogue/CatalogueProlabListe'

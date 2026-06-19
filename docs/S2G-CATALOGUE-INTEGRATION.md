@@ -161,6 +161,8 @@ php artisan catalogue:import-s2g --force
 # ou : php artisan db:seed --class=S2gCatalogueSeeder --force
 ```
 
-**Deploy Docker (one-shot)** : dans `.env.docker` sur le serveur, `RUN_S2G_CATALOGUE_SEED=1`, puis `./scripts/docker-prod-refresh.sh` (ou push → CI). Le flag repasse à `0` automatiquement après import.
+**Deploy Docker** : chaque `docker-prod-refresh.sh` (ou boot conteneur `app`) exécute automatiquement `catalogue:import-s2g --if-empty` si aucun jalon/produit S2G n’existe encore.
+
+Forcer un ré-import complet : `RUN_S2G_CATALOGUE_SEED=1` dans `.env.docker`, puis refresh deploy.
 
 Re-running the seeder is idempotent: purge + full re-import.

@@ -98,6 +98,18 @@ class S2gCatalogueSeederTest extends TestCase
         }
     }
 
+    public function test_import_s2g_if_empty_skips_when_catalogue_present(): void
+    {
+        $this->seed(S2gCatalogueSeeder::class);
+        $before = Article::query()->catalogueS2g()->count();
+
+        $this->artisan('catalogue:import-s2g', ['--if-empty' => true, '--force' => true])
+            ->expectsOutputToContain('import ignoré')
+            ->assertSuccessful();
+
+        $this->assertSame($before, Article::query()->catalogueS2g()->count());
+    }
+
     public function test_articles_index_filters_by_kind(): void
     {
         $this->seed(S2gCatalogueSeeder::class);

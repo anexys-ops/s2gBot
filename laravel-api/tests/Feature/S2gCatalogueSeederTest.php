@@ -45,6 +45,10 @@ class S2gCatalogueSeederTest extends TestCase
         $this->assertTrue(
             Article::query()->whereIn('kind', [Article::KIND_JALON, Article::KIND_PRODUCT])->whereNotNull('tags')->count() === 0
         );
+
+        $longLabel = Article::query()->where('code', 'D00455')->first();
+        $this->assertNotNull($longLabel);
+        $this->assertGreaterThan(255, strlen($longLabel->libelle));
     }
 
     public function test_article_show_exposes_jalon_products_and_qualification_tags(): void

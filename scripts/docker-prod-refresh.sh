@@ -73,7 +73,9 @@ for _ in $(seq 1 30); do
 done
 "${DC[@]}" exec -T app php artisan migrate --force
 echo "=== 5b/6 Import catalogue S2G (automatique si aucun jalon/produit) ==="
-"${DC[@]}" exec -T app php artisan catalogue:import-s2g --if-empty --force
+if ! "${DC[@]}" exec -T app php artisan catalogue:import-s2g --if-empty --force; then
+  echo "⚠ Import catalogue S2G échoué — vérifier les logs (migrate à jour ?). Déploiement poursuivi."
+fi
 if grep -qE '^RUN_S2G_CATALOGUE_SEED=1' "$ENV_FILE" 2>/dev/null; then
   echo "=== 5c/6 Ré-import forcé catalogue S2G (RUN_S2G_CATALOGUE_SEED=1) ==="
   "${DC[@]}" exec -T app php artisan catalogue:import-s2g --force

@@ -49,20 +49,28 @@ function MultiPicker({ items, selectedIds, onChange, filter, onFilterChange, emp
         placeholder="Filtrer…"
         className="catalogue-article-new-form__picker-filter"
       />
-      <div className="catalogue-article-new-form__picker-list">
+      <div className="catalogue-article-new-form__picker-list" role="listbox" aria-multiselectable="true">
         {filtered.length === 0 ? (
           <p className="catalogue-article-new-form__picker-empty">{emptyLabel}</p>
         ) : (
-          filtered.map((item) => (
-            <label key={item.id} className="catalogue-article-new-form__checkbox">
-              <input
-                type="checkbox"
-                checked={selectedIds.includes(item.id)}
-                onChange={() => onChange(toggleId(selectedIds, item.id))}
-              />
-              <span>{item.label}</span>
-            </label>
-          ))
+          filtered.map((item) => {
+            const checked = selectedIds.includes(item.id)
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="option"
+                aria-selected={checked}
+                className={`catalogue-article-new-form__picker-row${checked ? ' catalogue-article-new-form__picker-row--selected' : ''}`}
+                onClick={() => onChange(toggleId(selectedIds, item.id))}
+              >
+                <span className="catalogue-article-new-form__picker-check" aria-hidden="true">
+                  {checked ? '✓' : ''}
+                </span>
+                <span className="catalogue-article-new-form__picker-label">{item.label}</span>
+              </button>
+            )
+          })
         )}
       </div>
       {selectedIds.length > 0 && (
@@ -259,8 +267,8 @@ export default function CatalogueArticleCreateModal({
           <section className="catalogue-article-new-form__section">
             <h3 className="catalogue-article-new-form__section-title">Qualification & produits liés</h3>
             <div className="catalogue-article-new-form__grid">
-              <label className="catalogue-article-new-form__col-6">
-                Tags de qualification (0 ou plusieurs)
+              <div className="catalogue-article-new-form__col-6 catalogue-article-new-form__field">
+                <span className="catalogue-article-new-form__field-label">Tags de qualification (0 ou plusieurs)</span>
                 <MultiPicker
                   items={tagItems}
                   selectedIds={qualificationTagIds}
@@ -269,9 +277,9 @@ export default function CatalogueArticleCreateModal({
                   onFilterChange={setTagFilter}
                   emptyLabel="Aucun tag ne correspond au filtre."
                 />
-              </label>
-              <label className="catalogue-article-new-form__col-6">
-                Produits rattachés (0 ou plusieurs)
+              </div>
+              <div className="catalogue-article-new-form__col-6 catalogue-article-new-form__field">
+                <span className="catalogue-article-new-form__field-label">Produits rattachés (0 ou plusieurs)</span>
                 <MultiPicker
                   items={productItems}
                   selectedIds={productArticleIds}
@@ -280,7 +288,7 @@ export default function CatalogueArticleCreateModal({
                   onFilterChange={setProductFilter}
                   emptyLabel="Aucun produit ne correspond au filtre."
                 />
-              </label>
+              </div>
             </div>
           </section>
         )}
@@ -289,8 +297,8 @@ export default function CatalogueArticleCreateModal({
           <section className="catalogue-article-new-form__section">
             <h3 className="catalogue-article-new-form__section-title">Jalons liés</h3>
             <div className="catalogue-article-new-form__grid">
-              <label className="catalogue-article-new-form__col-12">
-                Jalons (0 ou plusieurs)
+              <div className="catalogue-article-new-form__col-12 catalogue-article-new-form__field">
+                <span className="catalogue-article-new-form__field-label">Jalons (0 ou plusieurs)</span>
                 <MultiPicker
                   items={jalonItems}
                   selectedIds={jalonArticleIds}
@@ -299,7 +307,7 @@ export default function CatalogueArticleCreateModal({
                   onFilterChange={setJalonFilter}
                   emptyLabel="Aucun jalon ne correspond au filtre."
                 />
-              </label>
+              </div>
             </div>
           </section>
         )}

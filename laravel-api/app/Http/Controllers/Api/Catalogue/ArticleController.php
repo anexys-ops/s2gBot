@@ -16,7 +16,11 @@ class ArticleController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $q = Article::query()->with(['famille', 'articleLie:id,code,libelle']);
+        $q = Article::query()->with([
+            'famille',
+            'articleLie:id,code,libelle',
+            'qualificationTags' => fn ($t) => $t->orderBy('groupe')->orderBy('code'),
+        ]);
         if (! $request->boolean('with_inactif')) {
             $q->actif();
         }
@@ -42,7 +46,47 @@ class ArticleController extends Controller
             });
         }
 
-        return response()->json($q->ordonne()->get());
+        return response()->json(
+            $q->ordonne()->get()->map(fn (Article $article) => [
+                'id' => $article->id,
+                'ref_famille_article_id' => $article->ref_famille_article_id,
+                'ref_article_lie_id' => $article->ref_article_lie_id,
+                'code' => $article->code,
+                'code_interne' => $article->code_interne,
+                'sku' => $article->sku,
+                'libelle' => $article->libelle,
+                'description' => $article->description,
+                'description_commerciale' => $article->description_commerciale,
+                'description_technique' => $article->description_technique,
+                'tags' => $article->isJalon() || $article->isProduct() ? null : $article->tags,
+                'unite' => $article->unite,
+                'hfsql_unite' => $article->hfsql_unite,
+                'prix_unitaire_ht' => $article->prix_unitaire_ht,
+                'prix_revient_ht' => $article->prix_revient_ht,
+                'prix_unitaire_ht_formate' => $article->prix_unitaire_ht_formate,
+                'tva_rate' => $article->tva_rate,
+                'duree_estimee' => $article->duree_estimee,
+                'normes' => $article->normes,
+                'actif' => $article->actif,
+                'kind' => $article->kind ?? Article::KIND_LEGACY,
+                'famille_label' => $article->famille_label,
+                'famille' => $article->famille,
+                'article_lie' => $article->articleLie ? [
+                    'id' => $article->articleLie->id,
+                    'code' => $article->articleLie->code,
+                    'libelle' => $article->articleLie->libelle,
+                ] : null,
+                'qualification_tags' => $article->isJalon()
+                    ? $article->qualificationTags->map(fn ($tag) => [
+                        'id' => $tag->id,
+                        'code' => $tag->code,
+                        'label' => $tag->label,
+                        'display_label' => $tag->displayLabel(),
+                        'groupe' => $tag->groupe,
+                    ])->values()
+                    : [],
+            ])
+        );
     }
 
     public function show(Article $article): JsonResponse

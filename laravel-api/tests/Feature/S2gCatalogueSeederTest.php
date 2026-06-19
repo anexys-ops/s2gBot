@@ -22,6 +22,9 @@ class S2gCatalogueSeederTest extends TestCase
         $legacyCount = Article::query()->count();
         $this->assertGreaterThan(0, $legacyCount);
 
+        $legacy = Article::query()->first();
+        $legacy?->update(['tags' => ['béton', 'essai', 'catalogue']]);
+
         $this->seed(S2gCatalogueSeeder::class);
 
         $this->assertSame(17, QualificationTag::query()->count());
@@ -39,6 +42,9 @@ class S2gCatalogueSeederTest extends TestCase
 
         $this->assertSame(0, Article::onlyTrashed()->count());
         $this->assertSame(0, Article::query()->where('code', 'BETON-FC28')->count());
+        $this->assertTrue(
+            Article::query()->whereIn('kind', [Article::KIND_JALON, Article::KIND_PRODUCT])->whereNotNull('tags')->count() === 0
+        );
     }
 
     public function test_article_show_exposes_jalon_products_and_qualification_tags(): void

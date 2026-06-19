@@ -49,7 +49,7 @@ class S2gCatalogueSeeder extends Seeder
 
         $existingCount = Article::withTrashed()->count();
         $this->command?->warn(sprintf(
-            'S2G catalogue : suppression de %d article(s) existant(s), puis import du jeu S2G.',
+            'S2G catalogue : suppression de %d article(s), étiquettes PROLAB et qualification_tags existants, puis import.',
             $existingCount
         ));
 
@@ -88,6 +88,8 @@ class S2gCatalogueSeeder extends Seeder
             QualificationTag::query()->delete();
         }
 
+        $this->purgeLegacyArticleTags();
+
         if (! Schema::hasTable('ref_articles')) {
             return;
         }
@@ -111,6 +113,24 @@ class S2gCatalogueSeeder extends Seeder
         $remaining = Article::withTrashed()->count();
         if ($remaining > 0) {
             throw new \RuntimeException("Échec purge catalogue : {$remaining} article(s) encore présents.");
+        }
+    }
+
+    /** Supprime les étiquettes PROLAB (JSON + pivot polymorphe) liées aux articles. */
+    private function purgeLegacyArticleTags(): void
+    {
+        if (Schema::hasTable('taggables')) {
+            DB::table('taggables')
+                ->where(function ($q): void {
+                    $q->where('taggable_type', Article::class)
+                        ->orWhere('taggable_type', 'like', '%Catalogue\\\\Article%')
+                        ->orWhere('taggable_type', 'like', '%ref_articles%');
+                })
+                ->delete();
+        }
+
+        if (Schema::hasTable('ref_articles') && Schema::hasColumn('ref_articles', 'tags')) {
+            DB::table('ref_articles')->update(['tags' => null]);
         }
     }
 
@@ -169,6 +189,7 @@ class S2gCatalogueSeeder extends Seeder
                 'ref_famille_article_id' => $this->resolveFamilleId($familleLabel, $kind),
                 'code' => $code,
                 'libelle' => (string) ($row['label'] ?? $code),
+                'tags' => null,
                 'unite' => (string) ($row['unite'] ?? 'U') ?: 'U',
                 'prix_unitaire_ht' => 0,
                 'tva_rate' => $this->parseTvaRate($tva),

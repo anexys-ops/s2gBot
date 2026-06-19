@@ -45,12 +45,13 @@ export default function CatalogueProlabListe({ articles, isLoading }: Props) {
   return (
     <div className="catalogue-prolab-liste">
       <p className="catalogue-prolab-liste__hint text-muted" role="note">
-        Chaque produit est repliable : codes, unités (s2g + réf. HFSQL), prix public / revient, textes, lien de
-        regroupement, tags.
+        Chaque article est repliable : codes, unités, prix, qualifications S2G (jalons) ou détails legacy.
       </p>
       <ul className="catalogue-prolab-liste__ul">
         {sorted.map((a) => {
-          const tags = a.tags?.filter((t) => t.trim()) ?? []
+          const legacyTags =
+            a.kind !== 'jalon' && a.kind !== 'product' ? (a.tags?.filter((t) => t.trim()) ?? []) : []
+          const qualificationTags = a.kind === 'jalon' ? (a.qualification_tags ?? []) : []
           const pxVente = formatRefArticlePrice(a)
           const pr = a.prix_revient_ht
           const prNum = pr != null && String(pr).trim() !== '' ? num(pr) : null
@@ -70,7 +71,16 @@ export default function CatalogueProlabListe({ articles, isLoading }: Props) {
                       )}
                     </span>
                     {!a.actif && <span className="status-pill status-pill--muted">Inactif</span>}
-                    {tags.map((t, i) => (
+                    {qualificationTags.map((tag) => (
+                      <span
+                        key={`${a.id}-qt-${tag.id}`}
+                        className="catalogue-prolab-tag catalogue-prolab-tag--b"
+                        title={tag.label}
+                      >
+                        {tag.display_label}
+                      </span>
+                    ))}
+                    {legacyTags.map((t, i) => (
                       <span key={`${a.id}-t-${i}`} className={`catalogue-prolab-tag ${tagTone(i)}`}>
                         {t}
                       </span>

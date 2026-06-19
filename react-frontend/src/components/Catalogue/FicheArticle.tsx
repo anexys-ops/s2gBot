@@ -24,7 +24,7 @@ export default function FicheArticle({ article, section = 'all', showBackLink = 
     <div className="fiche-article">
       {showOverview && <div className="fiche-article__summary card">
         <h2 className="fiche-article__summary-title">Caractéristiques</h2>
-        {article.tags && article.tags.length > 0 && (
+        {article.tags && article.tags.length > 0 && article.kind !== 'jalon' && article.kind !== 'product' && (
           <div className="fiche-article__tags">
             {article.tags.map((t, i) => (
               <span key={i} className="catalogue-prolab-tag catalogue-prolab-tag--a">

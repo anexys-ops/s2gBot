@@ -24,7 +24,7 @@ class ArticleResource extends JsonResource
             'description' => $this->description,
             'description_commerciale' => $this->description_commerciale,
             'description_technique' => $this->description_technique,
-            'tags' => $this->tags,
+            'tags' => ($this->resource->isJalon() || $this->resource->isProduct()) ? null : $this->tags,
             'unite' => $this->unite,
             'hfsql_unite' => $this->hfsql_unite,
             'prix_unitaire_ht' => $this->prix_unitaire_ht,

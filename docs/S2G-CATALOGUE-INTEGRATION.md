@@ -152,6 +152,7 @@ What is preserved vs cleared:
 |----------|-----------------|
 | Clients, dossiers, devis, BC, BL, factures | Liens `ref_article_id` sur lignes commerciales → `null` |
 | OdM, échantillons, rapports labo | Liens catalogue sur échantillons / sections rapport → `null` |
+| Tags CRM (`tags` / `taggables` sur clients, devis, etc.) | Étiquettes PROLAB sur articles (`ref_articles.tags` JSON) |
 | Familles PROLAB (`ref_famille_articles`) | Packages, paramètres essai, résultats, actions article (cascade) |
 
 ```bash

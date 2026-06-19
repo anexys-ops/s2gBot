@@ -37,7 +37,7 @@ class S2gCatalogueSeederTest extends TestCase
         $this->assertSame(Article::KIND_JALON, $jalon->kind);
         $this->assertGreaterThan(0, $jalon->jalonProductLinks()->count());
 
-        $this->assertSame(0, Article::withTrashed()->count());
+        $this->assertSame(0, Article::onlyTrashed()->count());
         $this->assertSame(0, Article::query()->where('code', 'BETON-FC28')->count());
     }
 

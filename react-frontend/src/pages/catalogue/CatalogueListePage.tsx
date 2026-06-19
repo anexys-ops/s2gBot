@@ -207,20 +207,6 @@ export default function CatalogueListePage() {
                   ))}
                 </select>
               </label>
-              <label className="catalogue-liste__famille-field">
-                <span className="filter-label">Famille</span>
-                <select
-                  value={familleId === '' ? '' : String(familleId)}
-                  onChange={(e) => setFamilleId(e.target.value === '' ? '' : Number(e.target.value))}
-                >
-                  <option value="">Toutes les familles</option>
-                  {familleOptions.map((f: RefFamilleArticleRow) => (
-                    <option key={f.id} value={f.id}>
-                      {f.code} — {f.libelle}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <label className="catalogue-liste__inactif-field">
                 <span className="filter-label">Affichage</span>
                 <span className="catalogue-liste__inactif-control">

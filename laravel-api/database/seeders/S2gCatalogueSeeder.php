@@ -59,6 +59,7 @@ class S2gCatalogueSeeder extends Seeder
             $this->seedArticles($payload['articles'] ?? []);
             $this->seedTagJalons($payload['tag_jalons'] ?? []);
             $this->seedJalonProducts($payload['jalon_products'] ?? []);
+            $this->syncFamilleActivation();
         });
 
         $this->command?->info(sprintf(
@@ -96,13 +97,42 @@ class S2gCatalogueSeeder extends Seeder
             DB::table('ref_articles')->update(['ref_article_lie_id' => null]);
         }
 
-        Article::withTrashed()
-            ->orderBy('id')
-            ->chunkById(200, function ($articles): void {
-                foreach ($articles as $article) {
-                    $article->forceDelete();
-                }
-            });
+        do {
+            $batch = Article::withTrashed()
+                ->orderBy('id')
+                ->limit(250)
+                ->get();
+
+            foreach ($batch as $article) {
+                $article->forceDelete();
+            }
+        } while ($batch->isNotEmpty());
+
+        $remaining = Article::withTrashed()->count();
+        if ($remaining > 0) {
+            throw new \RuntimeException("Échec purge catalogue : {$remaining} article(s) encore présents.");
+        }
+    }
+
+    /** Désactive les familles PROLAB / géo sans article S2G actif. */
+    private function syncFamilleActivation(): void
+    {
+        if (! Schema::hasTable('ref_famille_articles')) {
+            return;
+        }
+
+        $activeFamilleIds = Article::query()
+            ->whereIn('kind', [Article::KIND_JALON, Article::KIND_PRODUCT])
+            ->distinct()
+            ->pluck('ref_famille_article_id');
+
+        FamilleArticle::query()->update(['actif' => false]);
+
+        if ($activeFamilleIds->isNotEmpty()) {
+            FamilleArticle::query()
+                ->whereIn('id', $activeFamilleIds)
+                ->update(['actif' => true]);
+        }
     }
 
     /**

@@ -30,6 +30,9 @@ class ArticleController extends Controller
             $q->where('kind', Article::KIND_JALON)
                 ->whereHas('qualificationTags', fn ($b) => $b->where('code', $tagCode));
         }
+        if (! $request->boolean('with_legacy')) {
+            $q->catalogueS2g();
+        }
         if ($search = trim((string) $request->query('q', ''))) {
             $q->where(function ($b) use ($search) {
                 $b->where('code', 'like', '%'.$search.'%')

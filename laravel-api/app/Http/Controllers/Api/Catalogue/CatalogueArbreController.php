@@ -22,6 +22,9 @@ class CatalogueArbreController extends Controller
                     if (! $request->boolean('with_inactif')) {
                         $a->actif();
                     }
+                    if (! $request->boolean('with_legacy')) {
+                        $a->catalogueS2g();
+                    }
                     $a->ordonne()
                         ->with([
                             'famillePackages' => function ($fp) use ($request) {

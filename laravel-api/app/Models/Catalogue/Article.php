@@ -139,6 +139,12 @@ class Article extends Model
         return $query->orderBy('code');
     }
 
+    /** Articles du nouveau catalogue S2G (hors legacy PROLAB / géo). */
+    public function scopeCatalogueS2g(Builder $query): Builder
+    {
+        return $query->whereIn('kind', [self::KIND_JALON, self::KIND_PRODUCT]);
+    }
+
     // ── Compositions (v1.2.0) ────────────────────────────────────────────────
 
     public function compositions(): HasMany

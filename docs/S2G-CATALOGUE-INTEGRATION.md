@@ -156,7 +156,10 @@ What is preserved vs cleared:
 
 ```bash
 php artisan migrate
-php artisan db:seed --class=S2gCatalogueSeeder --force
+php artisan catalogue:import-s2g --force
+# ou : php artisan db:seed --class=S2gCatalogueSeeder --force
 ```
+
+**Deploy Docker (one-shot)** : dans `.env.docker` sur le serveur, `RUN_S2G_CATALOGUE_SEED=1`, puis `./scripts/docker-prod-refresh.sh` (ou push → CI). Le flag repasse à `0` automatiquement après import.
 
 Re-running the seeder is idempotent: purge + full re-import.

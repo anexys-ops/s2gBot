@@ -37,6 +37,7 @@ class S2gCatalogueSeederTest extends TestCase
         $this->assertSame(Article::KIND_JALON, $jalon->kind);
         $this->assertGreaterThan(0, $jalon->jalonProductLinks()->count());
 
+        $this->assertSame(0, Article::withTrashed()->count());
         $this->assertSame(0, Article::query()->where('code', 'BETON-FC28')->count());
     }
 
@@ -59,6 +60,31 @@ class S2gCatalogueSeederTest extends TestCase
         $this->assertSame('jalon', $payload['kind']);
         $this->assertIsArray($payload['jalon_products']);
         $this->assertIsArray($payload['qualification_tags']);
+    }
+
+    public function test_articles_index_hides_legacy_until_s2g_import(): void
+    {
+        $this->seed(CatalogueProLabSeeder::class);
+
+        $lab = User::factory()->create([
+            'role' => User::ROLE_LAB_ADMIN,
+            'client_id' => null,
+            'site_id' => null,
+        ]);
+
+        $hidden = $this->actingAs($lab, 'sanctum')
+            ->getJson('/api/v1/catalogue/articles')
+            ->assertOk()
+            ->json();
+
+        $this->assertCount(0, $hidden);
+
+        $legacy = $this->actingAs($lab, 'sanctum')
+            ->getJson('/api/v1/catalogue/articles?with_legacy=1')
+            ->assertOk()
+            ->json();
+
+        $this->assertGreaterThan(0, count($legacy));
     }
 
     public function test_articles_index_filters_by_kind(): void

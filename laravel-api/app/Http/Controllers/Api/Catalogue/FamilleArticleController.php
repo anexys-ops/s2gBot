@@ -26,6 +26,9 @@ class FamilleArticleController extends Controller
         if (! $request->boolean('with_inactif')) {
             $q->actif();
         }
+        if (! $request->boolean('with_legacy')) {
+            $q->catalogueS2g();
+        }
 
         $articles = $q->ordonne()
             ->with(['famillePackages' => fn ($x) => $x->ordonne()->with(['packages' => fn ($p) => $p->ordonne()])])

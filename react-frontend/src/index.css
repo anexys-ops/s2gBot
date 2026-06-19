@@ -6507,6 +6507,36 @@ a.catalogue-tree__link-article:hover {
 .catalogue-article-new-form__checkbox input {
   margin: 0;
 }
+.catalogue-article-new-form__picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+.catalogue-article-new-form__picker-filter {
+  width: 100%;
+}
+.catalogue-article-new-form__picker-list {
+  max-height: 12rem;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: #f8fafc;
+}
+.catalogue-article-new-form__picker-empty {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+.catalogue-article-new-form__picker-count {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
 .catalogue-article-new-form__actions {
   margin-top: 1rem;
   padding-top: 0.75rem;

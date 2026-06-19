@@ -591,6 +591,16 @@ export interface RefFamilleArticleRow {
   articles?: RefArticleRow[]
 }
 
+export type RefArticleCreateInput = Partial<RefArticleRow> & {
+  ref_famille_article_id: number
+  code: string
+  libelle: string
+  kind: 'jalon' | 'product'
+  qualification_tag_ids?: number[]
+  product_article_ids?: number[]
+  jalon_article_ids?: number[]
+}
+
 export const catalogueApi = {
   familles: (params?: { with_inactif?: boolean }) => {
     const q = new URLSearchParams()
@@ -637,7 +647,7 @@ export const catalogueApi = {
   },
   article: (id: number) =>
     api<RefArticleRow | { data: RefArticleRow }>(`/v1/catalogue/articles/${id}`).then(unwrapCatalogueArticle),
-  createArticle: (body: Partial<RefArticleRow> & { ref_famille_article_id: number; code: string; libelle: string }) =>
+  createArticle: (body: RefArticleCreateInput) =>
     api<RefArticleRow | { data: RefArticleRow }>('/v1/catalogue/articles', {
       method: 'POST',
       body: JSON.stringify(body),

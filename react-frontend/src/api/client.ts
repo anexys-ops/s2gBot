@@ -511,6 +511,27 @@ export interface RefParametreEssaiRow {
   ordre: number
 }
 
+export interface RefQualificationTagRow {
+  id: number
+  code: string
+  label: string
+  display_label: string
+  groupe: string
+}
+
+export interface RefArticleJalonProductRow {
+  id: number
+  ordre: number
+  tache_code?: string | null
+  tache_label?: string | null
+  product?: Pick<
+    RefArticleRow,
+    'id' | 'code' | 'libelle' | 'unite' | 'prix_unitaire_ht' | 'tva_rate' | 'kind' | 'actif'
+  > | null
+}
+
+export type RefArticleKind = 'jalon' | 'product' | 'legacy'
+
 export interface RefArticleRow {
   id: number
   ref_famille_article_id: number
@@ -534,12 +555,18 @@ export interface RefArticleRow {
   duree_estimee: number
   normes?: string | null
   actif: boolean
+  /** S2G : jalon (regroupement) | product (descriptif) | legacy (PROLAB / hors jeu). */
+  kind?: RefArticleKind
+  /** Libellé famille legacy S2G (jalons). */
+  famille_label?: string | null
   famille?: RefFamilleArticleRow
   /** Article lié pour regroupement (PROLAB) */
   article_lie?: { id: number; code: string; libelle: string } | null
   famille_packages?: RefFamillePackageRow[]
   parametres_essai?: RefParametreEssaiRow[]
   resultats?: RefResultatRow[]
+  qualification_tags?: RefQualificationTagRow[]
+  jalon_products?: RefArticleJalonProductRow[]
 }
 
 /** Laravel ArticleResource renvoie parfois { data: article }. */
@@ -583,14 +610,23 @@ export const catalogueApi = {
     const s = q.toString()
     return api<RefArticleRow[]>(`/v1/catalogue/familles/${familleId}/articles${s ? `?${s}` : ''}`)
   },
-  articles: (params?: { ref_famille_article_id?: number; with_inactif?: boolean; q?: string }) => {
+  articles: (params?: {
+    ref_famille_article_id?: number
+    with_inactif?: boolean
+    q?: string
+    kind?: RefArticleKind
+    qualification_tag_code?: string
+  }) => {
     const q = new URLSearchParams()
     if (params?.ref_famille_article_id) q.set('ref_famille_article_id', String(params.ref_famille_article_id))
     if (params?.with_inactif) q.set('with_inactif', '1')
     if (params?.q?.trim()) q.set('q', params.q.trim())
+    if (params?.kind) q.set('kind', params.kind)
+    if (params?.qualification_tag_code?.trim()) q.set('qualification_tag_code', params.qualification_tag_code.trim())
     const s = q.toString()
     return api<RefArticleRow[]>(`/v1/catalogue/articles${s ? `?${s}` : ''}`)
   },
+  qualificationTags: () => api<RefQualificationTagRow[]>('/v1/catalogue/qualification-tags'),
   packages: (params?: { ref_article_id?: number; ref_famille_package_id?: number; with_inactif?: boolean }) => {
     const q = new URLSearchParams()
     if (params?.ref_article_id) q.set('ref_article_id', String(params.ref_article_id))

@@ -23,6 +23,13 @@ class ArticleController extends Controller
         if ($request->filled('ref_famille_article_id')) {
             $q->where('ref_famille_article_id', (int) $request->query('ref_famille_article_id'));
         }
+        if ($kind = trim((string) $request->query('kind', ''))) {
+            $q->where('kind', $kind);
+        }
+        if ($tagCode = trim((string) $request->query('qualification_tag_code', ''))) {
+            $q->where('kind', Article::KIND_JALON)
+                ->whereHas('qualificationTags', fn ($b) => $b->where('code', $tagCode));
+        }
         if ($search = trim((string) $request->query('q', ''))) {
             $q->where(function ($b) use ($search) {
                 $b->where('code', 'like', '%'.$search.'%')
@@ -37,13 +44,22 @@ class ArticleController extends Controller
 
     public function show(Article $article): JsonResponse
     {
-        $article->load([
+        $loads = [
             'famille',
             'articleLie:id,code,libelle',
             'parametresEssai' => fn ($p) => $p->ordonne(),
             'resultats' => fn ($r) => $r->orderBy('code'),
             'famillePackages' => fn ($f) => $f->ordonne()->with(['packages' => fn ($x) => $x->ordonne()]),
-        ]);
+        ];
+
+        if ($article->isJalon()) {
+            $loads['qualificationTags'] = fn ($t) => $t->orderBy('groupe')->orderBy('code');
+            $loads['jalonProductLinks'] = fn ($jp) => $jp->with([
+                'product:id,code,libelle,unite,prix_unitaire_ht,tva_rate,kind,actif',
+            ]);
+        }
+
+        $article->load($loads);
 
         return (new ArticleResource($article))->response();
     }

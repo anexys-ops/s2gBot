@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { catalogueApi, type RefFamilleArticleRow } from '../../api/client'
+import { catalogueApi, type RefArticleKind, type RefFamilleArticleRow } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import ArbreCatalogue from '../../components/Catalogue/ArbreCatalogue'
 import CatalogueProlabListe from '../../components/Catalogue/CatalogueProlabListe'
@@ -30,11 +30,14 @@ export default function CatalogueListePage() {
   const [searchParams] = useSearchParams()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [familleId, setFamilleId] = useState<number | ''>('')
+  const [articleKind, setArticleKind] = useState<RefArticleKind | ''>('')
+  const [qualificationTagCode, setQualificationTagCode] = useState('')
   const [search, setSearch] = useState('')
   const [withInactif, setWithInactif] = useState(false)
   const [viewMode, setViewMode] = useState<CatalogueViewMode>(() => parseViewMode(searchParams.get('vue')))
 
   const { visible, toggle } = usePersistedColumnVisibility('catalogue-articles', {
+    kind: true,
     code: true,
     libelle: true,
     famille: true,
@@ -59,23 +62,37 @@ export default function CatalogueListePage() {
 
   const needsFlatArticles = viewMode === 'table' || viewMode === 'list'
 
+  const { data: qualificationTags = [] } = useQuery({
+    queryKey: ['catalogue-qualification-tags'],
+    queryFn: () => catalogueApi.qualificationTags(),
+  })
+
   const { data: articlesFlat = [], isLoading: loadingFlat } = useQuery({
-    queryKey: ['catalogue-articles-flat', familleId, withInactif, search],
+    queryKey: ['catalogue-articles-flat', familleId, withInactif, search, articleKind, qualificationTagCode],
     queryFn: () =>
       catalogueApi.articles({
         ref_famille_article_id: familleId === '' ? undefined : familleId,
         with_inactif: withInactif,
         q: search.trim() || undefined,
+        kind: articleKind === '' ? undefined : articleKind,
+        qualification_tag_code: qualificationTagCode.trim() || undefined,
       }),
     enabled: needsFlatArticles,
   })
 
-  const hasActiveFilters = search.trim() !== '' || familleId !== '' || withInactif
+  const hasActiveFilters =
+    search.trim() !== '' ||
+    familleId !== '' ||
+    withInactif ||
+    articleKind !== '' ||
+    qualificationTagCode.trim() !== ''
 
   const clearAllFilters = () => {
     setSearch('')
     setFamilleId('')
     setWithInactif(false)
+    setArticleKind('')
+    setQualificationTagCode('')
   }
 
   const viewSubtitle = (() => {
@@ -147,6 +164,7 @@ export default function CatalogueListePage() {
           columns={
             viewMode === 'table'
               ? [
+                  { id: 'kind', label: 'Type' },
                   { id: 'code', label: 'Code' },
                   { id: 'libelle', label: 'Libellé' },
                   { id: 'famille', label: 'Famille' },
@@ -162,6 +180,33 @@ export default function CatalogueListePage() {
           onToggleColumn={viewMode === 'table' ? toggle : undefined}
           extra={
             <>
+              <label className="catalogue-liste__famille-field">
+                <span className="filter-label">Type S2G</span>
+                <select
+                  value={articleKind}
+                  onChange={(e) => setArticleKind((e.target.value || '') as RefArticleKind | '')}
+                >
+                  <option value="">Tous types</option>
+                  <option value="jalon">Jalons</option>
+                  <option value="product">Produits</option>
+                  <option value="legacy">Legacy PROLAB</option>
+                </select>
+              </label>
+              <label className="catalogue-liste__famille-field">
+                <span className="filter-label">Qualification</span>
+                <select
+                  value={qualificationTagCode}
+                  onChange={(e) => setQualificationTagCode(e.target.value)}
+                  disabled={articleKind === 'product' || articleKind === 'legacy'}
+                >
+                  <option value="">Toutes qualifications</option>
+                  {qualificationTags.map((tag) => (
+                    <option key={tag.id} value={tag.code}>
+                      {tag.display_label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="catalogue-liste__famille-field">
                 <span className="filter-label">Famille</span>
                 <select
@@ -250,6 +295,38 @@ export default function CatalogueListePage() {
                         className="list-table-toolbar__chip-remove"
                         onClick={() => setFamilleId('')}
                         aria-label="Retirer le filtre famille"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  {articleKind !== '' && (
+                    <span className="list-table-toolbar__chip">
+                      <span className="list-table-toolbar__chip-text">
+                        Type : {articleKind === 'jalon' ? 'Jalons' : articleKind === 'product' ? 'Produits' : 'Legacy'}
+                      </span>
+                      <button
+                        type="button"
+                        className="list-table-toolbar__chip-remove"
+                        onClick={() => setArticleKind('')}
+                        aria-label="Retirer le filtre type"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  {qualificationTagCode.trim() !== '' && (
+                    <span className="list-table-toolbar__chip">
+                      <span className="list-table-toolbar__chip-text">
+                        Qualification :{' '}
+                        {qualificationTags.find((t) => t.code === qualificationTagCode)?.display_label ??
+                          qualificationTagCode}
+                      </span>
+                      <button
+                        type="button"
+                        className="list-table-toolbar__chip-remove"
+                        onClick={() => setQualificationTagCode('')}
+                        aria-label="Retirer le filtre qualification"
                       >
                         ×
                       </button>

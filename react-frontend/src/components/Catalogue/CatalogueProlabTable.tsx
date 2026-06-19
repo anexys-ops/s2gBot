@@ -10,6 +10,18 @@ type Props = {
   visibleColumns: Record<string, boolean>
 }
 
+function articleKindLabel(kind?: RefArticleRow['kind']): string {
+  if (kind === 'jalon') return 'Jalon'
+  if (kind === 'product') return 'Produit'
+  return 'Legacy'
+}
+
+function articleKindVariant(kind?: RefArticleRow['kind']): 'info' | 'neutral' | 'warning' {
+  if (kind === 'jalon') return 'info'
+  if (kind === 'product') return 'neutral'
+  return 'warning'
+}
+
 function sortArticles(articles: RefArticleRow[]): RefArticleRow[] {
   return [...articles].sort((a, b) => {
     const oa = a.famille?.ordre ?? 999
@@ -39,6 +51,7 @@ export default function CatalogueProlabTable({ articles, isLoading, visibleColum
         <table className="data-table data-table--compact">
           <thead>
             <tr>
+              {visibleColumns.kind !== false && <th>Type</th>}
               {visibleColumns.code !== false && <th>Code</th>}
               {visibleColumns.libelle !== false && <th>Libellé</th>}
               {visibleColumns.famille !== false && <th>Famille</th>}
@@ -60,6 +73,13 @@ export default function CatalogueProlabTable({ articles, isLoading, visibleColum
                   navigate(`/catalogue/articles/${a.id}`)
                 }}
               >
+                {visibleColumns.kind !== false && (
+                  <td className="data-table__status">
+                    <StatusBadge variant={articleKindVariant(a.kind)} size="sm">
+                      {articleKindLabel(a.kind)}
+                    </StatusBadge>
+                  </td>
+                )}
                 {visibleColumns.code !== false && (
                   <td>
                     <Link to={`/catalogue/articles/${a.id}`} onClick={(e) => e.stopPropagation()}>

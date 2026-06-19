@@ -4,16 +4,25 @@ namespace App\Models\Catalogue;
 
 use App\Models\ArticleAction;
 use App\Models\ArticleEquipmentRequirement;
+use App\Models\JalonProduct;
+use App\Models\QualificationTag;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Article extends Model
 {
     use SoftDeletes;
+
+    public const KIND_JALON = 'jalon';
+
+    public const KIND_PRODUCT = 'product';
+
+    public const KIND_LEGACY = 'legacy';
 
     protected $table = 'ref_articles';
 
@@ -36,6 +45,8 @@ class Article extends Model
         'duree_estimee',
         'normes',
         'actif',
+        'kind',
+        'famille_label',
         // v1.2.0 — déclencheurs workflow & ressources
         'triggers_odm_terrain',
         'triggers_odm_labo',
@@ -138,5 +149,40 @@ class Article extends Model
     public function composedIn(): HasMany
     {
         return $this->hasMany(ArticleComposition::class, 'child_article_id');
+    }
+
+    public function qualificationTags(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            QualificationTag::class,
+            'qualification_tag_jalon',
+            'jalon_article_id',
+            'qualification_tag_id'
+        );
+    }
+
+    public function jalonProductLinks(): HasMany
+    {
+        return $this->hasMany(JalonProduct::class, 'jalon_article_id')->orderBy('ordre');
+    }
+
+    public function jalonProducts(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            self::class,
+            'jalon_products',
+            'jalon_article_id',
+            'product_article_id'
+        )->withPivot(['ordre', 'tache_code', 'tache_label'])->orderByPivot('ordre');
+    }
+
+    public function isJalon(): bool
+    {
+        return $this->kind === self::KIND_JALON;
+    }
+
+    public function isProduct(): bool
+    {
+        return $this->kind === self::KIND_PRODUCT;
     }
 }

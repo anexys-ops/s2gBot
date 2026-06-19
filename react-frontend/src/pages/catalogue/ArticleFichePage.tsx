@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ArticleActionsPanel from '../../components/Catalogue/ArticleActionsPanel'
 import ArticleCompositionEditor from '../../components/Catalogue/ArticleCompositionEditor'
+import JalonProductsPanel from '../../components/Catalogue/JalonProductsPanel'
 import ArticleProlabEditor from '../../components/Catalogue/ArticleProlabEditor'
 
 export default function ArticleFichePage() {
@@ -76,6 +77,11 @@ export default function ArticleFichePage() {
       subtitle={
         <div className="article-fiche__title-row">
           <code className="code-badge">{article.code}</code>
+          {article.kind === 'jalon' ? (
+            <span className="status-pill status-pill--info">Jalon S2G</span>
+          ) : article.kind === 'product' ? (
+            <span className="status-pill status-pill--muted">Produit S2G</span>
+          ) : null}
           {article.actif ? <span className="status-pill status-pill--ok">Actif</span> : <span className="status-pill status-pill--muted">Inactif</span>}
         </div>
       }
@@ -105,7 +111,16 @@ export default function ArticleFichePage() {
         ))}
       </div>
 
-      {tab === 'overview' && <FicheArticle article={article} section="overview" showBackLink={false} />}
+      {tab === 'overview' && (
+        <>
+          <FicheArticle article={article} section="overview" showBackLink={false} />
+          {article.kind === 'jalon' && article.jalon_products && (
+            <div style={{ marginTop: '1rem' }}>
+              <JalonProductsPanel products={article.jalon_products} />
+            </div>
+          )}
+        </>
+      )}
       {tab === 'descriptions' && <FicheArticle article={article} section="descriptions" showBackLink={false} />}
       {tab === 'tables' && <FicheArticle article={article} section="tables" showBackLink={false} />}
       {tab === 'composition' && (

@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\Catalogue\ArticleController;
 use App\Http\Controllers\Api\Catalogue\CatalogueArbreController;
 use App\Http\Controllers\Api\Catalogue\FamilleArticleController;
 use App\Http\Controllers\Api\Catalogue\PackageController;
+use App\Http\Controllers\Api\Catalogue\QualificationTagController;
 use App\Http\Controllers\Api\Catalogue\TacheController;
 use App\Http\Controllers\Api\ClientAddressController;
 use App\Http\Controllers\Api\ClientCommercialController;
@@ -99,6 +100,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('catalogue/articles/{article}', [ArticleController::class, 'destroy'])
             ->whereNumber('article');
         Route::get('catalogue/arbre', CatalogueArbreController::class);
+        Route::get('catalogue/qualification-tags', [QualificationTagController::class, 'index']);
         Route::get('catalogue/taches', [TacheController::class, 'index']);
 
         Route::get('dossiers', [DossierController::class, 'index']);

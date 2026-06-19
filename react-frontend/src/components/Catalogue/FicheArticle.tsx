@@ -35,6 +35,36 @@ export default function FicheArticle({ article, section = 'all', showBackLink = 
         )}
         <dl className="module-fiche-grid fiche-article__dl">
           <div>
+            <dt>Type catalogue</dt>
+            <dd>
+              {article.kind === 'jalon'
+                ? 'Jalon (regroupement S2G)'
+                : article.kind === 'product'
+                  ? 'Produit / descriptif S2G'
+                  : 'Legacy PROLAB'}
+            </dd>
+          </div>
+          {article.famille_label?.trim() ? (
+            <div>
+              <dt>Famille S2G</dt>
+              <dd>{article.famille_label}</dd>
+            </div>
+          ) : null}
+          {article.qualification_tags && article.qualification_tags.length > 0 ? (
+            <div className="fiche-article__tags-row">
+              <dt>Qualifications</dt>
+              <dd>
+                <div className="fiche-article__tags">
+                  {article.qualification_tags.map((tag) => (
+                    <span key={tag.id} className="catalogue-prolab-tag catalogue-prolab-tag--b" title={tag.label}>
+                      {tag.display_label}
+                    </span>
+                  ))}
+                </div>
+              </dd>
+            </div>
+          ) : null}
+          <div>
             <dt>Code article</dt>
             <dd>
               <code className="fiche-article__code">{article.code}</code>

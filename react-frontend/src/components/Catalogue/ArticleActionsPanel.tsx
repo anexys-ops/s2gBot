@@ -430,7 +430,7 @@ export default function ArticleActionsPanel({
         <h2 className="ds-form-section__title">Actions &amp; matériel</h2>
         <p className="dossier-tab-panel__intro">
           {isS2g
-            ? 'Répartissez les produits S2G par profil pour les devis (terrain, ingénieur, laboratoire), puis définissez les actions, mesures et le matériel requis.'
+            ? 'Répartissez les produits S2G par profil (terrain, ingénieur, laboratoire) et définissez le matériel requis.'
             : 'Définissez les actions par profil (terrain, ingénieur, laboratoire), les champs de mesure associés et le matériel requis pour réaliser la prestation.'}
         </p>
       </section>
@@ -448,58 +448,62 @@ export default function ArticleActionsPanel({
             <div className="article-actions-section__header">
               <span className={`article-actions-type-dot ${meta.dotClass}`} aria-hidden />
               <h3 className="ds-form-section__title">{meta.label}</h3>
-              <span className="badge">
-                {typeActions.length} action{typeActions.length !== 1 ? 's' : ''}
-              </span>
+              {!isS2g ? (
+                <span className="badge">
+                  {typeActions.length} action{typeActions.length !== 1 ? 's' : ''}
+                </span>
+              ) : null}
             </div>
 
             {isS2g ? (
               <ArticleS2gSectionProducts article={article} sectionType={type} canEdit={canEdit} />
-            ) : null}
+            ) : (
+              <>
+                <NewActionForm articleId={articleId} type={type} nextOrdre={nextOrdre} />
 
-            <NewActionForm articleId={articleId} type={type} nextOrdre={nextOrdre} />
-
-            <div className="card dossier-tab-panel dossier-tab-panel--table article-actions-section__table">
-              <div className="dossier-tab-panel__header">
-                <h4 className="article-actions-add__title">Actions enregistrées</h4>
-              </div>
-              {typeActions.length > 0 ? (
-                <div className="table-wrap">
-                  <table className="data-table data-table--compact">
-                    <thead>
-                      <tr>
-                        <th>Libellé</th>
-                        <th>Description</th>
-                        <th className="article-actions-cell-amount">Durée</th>
-                        <th className="article-actions-cell-amount">Ordre</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {typeActions.map((action) => (
-                        <ActionRow
-                          key={action.id}
-                          action={action}
-                          articleId={articleId}
-                          onDeleteRequest={() => setDeleteActionTarget(action)}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="card dossier-tab-panel dossier-tab-panel--table article-actions-section__table">
+                  <div className="dossier-tab-panel__header">
+                    <h4 className="article-actions-add__title">Actions enregistrées</h4>
+                  </div>
+                  {typeActions.length > 0 ? (
+                    <div className="table-wrap">
+                      <table className="data-table data-table--compact">
+                        <thead>
+                          <tr>
+                            <th>Libellé</th>
+                            <th>Description</th>
+                            <th className="article-actions-cell-amount">Durée</th>
+                            <th className="article-actions-cell-amount">Ordre</th>
+                            <th />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {typeActions.map((action) => (
+                            <ActionRow
+                              key={action.id}
+                              action={action}
+                              articleId={articleId}
+                              onDeleteRequest={() => setDeleteActionTarget(action)}
+                            />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="dossier-tab-empty">Aucune action définie pour ce type.</p>
+                  )}
                 </div>
-              ) : (
-                <p className="dossier-tab-empty">Aucune action définie pour ce type.</p>
-              )}
-            </div>
 
-            {typeActions.map((action) => (
-              <ActionMeasureConfigPanel
-                key={action.id}
-                articleId={articleId}
-                actionId={action.id}
-                actionLabel={action.libelle}
-              />
-            ))}
+                {typeActions.map((action) => (
+                  <ActionMeasureConfigPanel
+                    key={action.id}
+                    articleId={articleId}
+                    actionId={action.id}
+                    actionLabel={action.libelle}
+                  />
+                ))}
+              </>
+            )}
           </section>
         )
       })}

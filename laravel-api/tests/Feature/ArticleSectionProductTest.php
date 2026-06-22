@@ -47,10 +47,41 @@ class ArticleSectionProductTest extends TestCase
             'section_type' => ArticleSectionProduct::SECTION_LABO,
             'product_article_ids' => [$products[0]],
         ])->assertOk()
-            ->assertJsonCount(2, 'technicien')
+            ->assertJsonCount(1, 'technicien')
             ->assertJsonCount(1, 'labo');
 
-        $this->assertSame(3, ArticleSectionProduct::query()->where('ref_article_id', $jalon->id)->count());
+        $this->assertSame(2, ArticleSectionProduct::query()->where('ref_article_id', $jalon->id)->count());
+    }
+
+    public function test_jalon_product_cannot_be_assigned_to_two_sections(): void
+    {
+        $this->seed(S2gCatalogueSeeder::class);
+
+        $jalon = Article::query()
+            ->where('kind', Article::KIND_JALON)
+            ->get()
+            ->first(fn (Article $j) => $j->jalonProductLinks()->pluck('product_article_id')->unique()->count() >= 2);
+
+        $this->assertNotNull($jalon);
+        $products = $jalon->jalonProductLinks()->pluck('product_article_id')->unique()->values()->all();
+
+        $lab = User::factory()->create([
+            'role' => User::ROLE_LAB_ADMIN,
+            'client_id' => null,
+            'site_id' => null,
+        ]);
+
+        $this->actingAs($lab, 'sanctum')->putJson("/api/articles/{$jalon->id}/section-products", [
+            'section_type' => ArticleSectionProduct::SECTION_TECHNICIEN,
+            'product_article_ids' => [$products[0]],
+        ])->assertOk();
+
+        $this->actingAs($lab, 'sanctum')->putJson("/api/articles/{$jalon->id}/section-products", [
+            'section_type' => ArticleSectionProduct::SECTION_INGENIEUR,
+            'product_article_ids' => [$products[0]],
+        ])->assertOk()
+            ->assertJsonCount(0, 'technicien')
+            ->assertJsonCount(1, 'ingenieur');
     }
 
     public function test_product_can_be_assigned_to_single_section(): void

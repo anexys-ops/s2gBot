@@ -77,6 +77,14 @@ class ArticleSectionProductService
         $this->assertValidProductIds($article, $productArticleIds);
 
         return DB::transaction(function () use ($article, $sectionType, $productArticleIds) {
+            if ($productArticleIds !== []) {
+                ArticleSectionProduct::query()
+                    ->where('ref_article_id', $article->id)
+                    ->whereIn('product_article_id', $productArticleIds)
+                    ->where('section_type', '!=', $sectionType)
+                    ->delete();
+            }
+
             if ($article->isProduct() && $productArticleIds !== []) {
                 ArticleSectionProduct::query()
                     ->where('ref_article_id', $article->id)

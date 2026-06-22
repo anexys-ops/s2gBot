@@ -58,13 +58,14 @@ class QuotePdfPresentationService
                     if ($jalon === null) {
                         continue;
                     }
+                    $rows[] = $this->formatJalonHeaderRow($jalon);
                     foreach ($jalon['product_ref_article_ids'] ?? [] as $refId) {
                         $entry = $this->findLineByRefId($lines, (int) $refId, $seenLineIds);
                         if ($entry === null) {
                             continue;
                         }
                         $mask = ($maskPrices[$entry['index']] ?? false) === true;
-                        $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask);
+                        $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, true);
                         $seenLineIds[$entry['line']->id] = true;
                     }
 
@@ -77,19 +78,20 @@ class QuotePdfPresentationService
                         continue;
                     }
                     $mask = ($maskPrices[$entry['index']] ?? false) === true;
-                    $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask);
+                    $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, false);
                     $seenLineIds[$entry['line']->id] = true;
                 }
             }
         } elseif ($jalons !== []) {
             foreach ($jalons as $jalon) {
+                $rows[] = $this->formatJalonHeaderRow($jalon);
                 foreach ($jalon['product_ref_article_ids'] ?? [] as $refId) {
                     $entry = $this->findLineByRefId($lines, (int) $refId, $seenLineIds);
                     if ($entry === null) {
                         continue;
                     }
                     $mask = ($maskPrices[$entry['index']] ?? false) === true;
-                    $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask);
+                    $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, true);
                     $seenLineIds[$entry['line']->id] = true;
                 }
             }
@@ -100,7 +102,7 @@ class QuotePdfPresentationService
                 continue;
             }
             $mask = ($maskPrices[$index] ?? false) === true;
-            $rows[] = $this->formatProductRow($line, ++$itemNum, $mask);
+            $rows[] = $this->formatProductRow($line, ++$itemNum, $mask, false);
             $seenLineIds[$line->id] = true;
         }
 
@@ -154,6 +156,19 @@ class QuotePdfPresentationService
     }
 
     /**
+     * @param  array<string, mixed>  $jalon
+     * @return array<string, mixed>
+     */
+    private function formatJalonHeaderRow(array $jalon): array
+    {
+        return [
+            'type' => 'jalon_header',
+            'label' => trim((string) ($jalon['libelle'] ?? '')),
+            'code' => $jalon['s2g_code'] ?? null,
+        ];
+    }
+
+    /**
      * @param  array<int, true>  $seenLineIds
      * @return array{line: QuoteLine, index: int}|null
      */
@@ -172,8 +187,6 @@ class QuotePdfPresentationService
     }
 
     /**
-     * Produit seul (hors jalon) — ordre des lignes du devis.
-     *
      * @param  array<int, true>  $childRefIds
      * @param  array<int, true>  $seenLineIds
      * @return array{line: QuoteLine, index: int}|null
@@ -198,7 +211,7 @@ class QuotePdfPresentationService
     /**
      * @return array<string, mixed>
      */
-    private function formatProductRow(QuoteLine $line, int $num, bool $maskPrice): array
+    private function formatProductRow(QuoteLine $line, int $num, bool $maskPrice, bool $nested): array
     {
         $article = $line->refArticle;
         $details = $this->detailLinesFor(
@@ -208,6 +221,7 @@ class QuotePdfPresentationService
 
         return [
             'type' => 'product',
+            'nested' => $nested,
             'num' => (string) $num,
             'label' => trim((string) $line->description),
             'unite' => $article?->unite ?? 'U',

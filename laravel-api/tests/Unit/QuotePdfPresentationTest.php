@@ -88,15 +88,19 @@ class QuotePdfPresentationTest extends TestCase
         $service = new QuotePdfPresentationService;
         $rows = $service->buildItemRows($quote);
 
-        $this->assertCount(2, $rows);
-        $this->assertSame('product', $rows[0]['type']);
-        $this->assertSame('1', $rows[0]['num']);
-        $this->assertSame('Contrôle de béton', $rows[0]['label']);
-        $this->assertCount(2, $rows[0]['details']);
+        $this->assertCount(3, $rows);
+        $this->assertSame('jalon_header', $rows[0]['type']);
+        $this->assertSame('Lot essais', $rows[0]['label']);
         $this->assertSame('product', $rows[1]['type']);
-        $this->assertSame('2', $rows[1]['num']);
-        $this->assertSame('Essai proctor', $rows[1]['label']);
-        $this->assertSame([], $rows[1]['details']);
+        $this->assertTrue($rows[1]['nested']);
+        $this->assertSame('1', $rows[1]['num']);
+        $this->assertSame('Contrôle de béton', $rows[1]['label']);
+        $this->assertCount(2, $rows[1]['details']);
+        $this->assertSame('product', $rows[2]['type']);
+        $this->assertFalse($rows[2]['nested']);
+        $this->assertSame('2', $rows[2]['num']);
+        $this->assertSame('Essai proctor', $rows[2]['label']);
+        $this->assertSame([], $rows[2]['details']);
     }
 
     public function test_quote_pdf_generator_renders_s2g_template(): void

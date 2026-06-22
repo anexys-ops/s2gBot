@@ -91,21 +91,38 @@
         </thead>
         <tbody>
             @foreach($rows as $row)
-                @if(($row['type'] ?? '') === 'product')
+                @if(($row['type'] ?? '') === 'jalon_header')
                     <tr>
-                        <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;">{{ $row['num'] }}. {{ $row['label'] }}</td>
-                        <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:center;">{{ $row['unite'] }}</td>
-                        <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:center;">{{ $row['qte'] }}</td>
-                        <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:right;">
+                        <td colspan="5" style="padding:7px 8px;border:1px solid #bbf7d0;background:#f0fdf4;">
+                            <span style="display:inline-block;background:#166534;color:#fff;font-size:7pt;font-weight:bold;padding:2px 6px;border-radius:3px;margin-right:6px;">JALON</span>
+                            <strong style="color:#166534;font-size:9.5pt;">{{ $row['label'] }}</strong>
+                            @if(!empty($row['code']))
+                                <span style="color:#666;font-size:8.5pt;margin-left:6px;">{{ $row['code'] }}</span>
+                            @endif
+                        </td>
+                    </tr>
+                @elseif(($row['type'] ?? '') === 'product')
+                    @php
+                        $nested = !empty($row['nested']);
+                        $rowBg = $nested ? '#ffffff' : $LGRAY;
+                        $labelWeight = $nested ? 'normal' : 'bold';
+                        $labelPad = $nested ? 'padding:4px 6px 4px 22px;' : 'padding:4px 6px;';
+                        $detailPad = $nested ? 'padding:2px 6px 2px 28px;' : 'padding:2px 6px 2px 14px;';
+                    @endphp
+                    <tr>
+                        <td style="{{ $labelPad }}border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};">{{ $row['num'] }}. {{ $row['label'] }}</td>
+                        <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:center;">{{ $row['unite'] }}</td>
+                        <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:center;">{{ $row['qte'] }}</td>
+                        <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:right;">
                             @if($row['pu'] !== null){{ $fmt($row['pu']) }}@else—@endif
                         </td>
-                        <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:right;">
+                        <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:right;">
                             @if($row['pt'] !== null){{ $fmt($row['pt']) }}@else—@endif
                         </td>
                     </tr>
                     @foreach($row['details'] ?? [] as $detail)
                     <tr>
-                        <td colspan="5" style="padding:2px 6px 2px 14px;border:1px solid #e0e0e0;font-size:8.5pt;color:#222;">- {{ $detail }}</td>
+                        <td colspan="5" style="{{ $detailPad }}border:1px solid #e0e0e0;font-size:8.5pt;color:#222;">- {{ $detail }}</td>
                     </tr>
                     @endforeach
                 @endif

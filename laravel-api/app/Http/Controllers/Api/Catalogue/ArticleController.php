@@ -111,6 +111,12 @@ class ArticleController extends Controller
             ]);
         }
 
+        if ($article->isProduct()) {
+            $loads['productJalonLinks'] = fn ($jp) => $jp->with([
+                'jalon:id,code,libelle,famille_label,kind,actif',
+            ]);
+        }
+
         $article->load($loads);
 
         return (new ArticleResource($article))->response();
@@ -128,6 +134,12 @@ class ArticleController extends Controller
             $loads['qualificationTags'] = fn ($t) => $t->orderBy('groupe')->orderBy('code');
             $loads['jalonProductLinks'] = fn ($jp) => $jp->with([
                 'product:id,code,libelle,unite,prix_unitaire_ht,tva_rate,kind,actif',
+            ]);
+        }
+
+        if ($article->isProduct()) {
+            $loads['productJalonLinks'] = fn ($jp) => $jp->with([
+                'jalon:id,code,libelle,famille_label,kind,actif',
             ]);
         }
 
@@ -180,6 +192,12 @@ class ArticleController extends Controller
             $loads['qualificationTags'] = fn ($t) => $t->orderBy('groupe')->orderBy('code');
             $loads['jalonProductLinks'] = fn ($jp) => $jp->with([
                 'product:id,code,libelle,unite,prix_unitaire_ht,tva_rate,kind,actif',
+            ]);
+        }
+
+        if ($fresh->isProduct()) {
+            $loads['productJalonLinks'] = fn ($jp) => $jp->with([
+                'jalon:id,code,libelle,famille_label,kind,actif',
             ]);
         }
 

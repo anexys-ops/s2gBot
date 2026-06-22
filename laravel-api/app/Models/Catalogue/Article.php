@@ -201,6 +201,11 @@ class Article extends Model
         )->withPivot(['ordre', 'tache_code', 'tache_label'])->orderByPivot('ordre');
     }
 
+    public function productJalonLinks(): HasMany
+    {
+        return $this->hasMany(JalonProduct::class, 'product_article_id')->orderBy('ordre');
+    }
+
     public function isJalon(): bool
     {
         return $this->kind === self::KIND_JALON;

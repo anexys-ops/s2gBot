@@ -6,6 +6,7 @@ import {
   type RefFamilleArticleRow,
   type RefQualificationTagRow,
 } from '../../api/client'
+import CatalogueMultiPicker, { shortCatalogueOptionLabel } from './CatalogueMultiPicker'
 import Modal from '../Modal'
 
 type Props = {
@@ -13,71 +14,6 @@ type Props = {
   defaultFamilleId?: number | ''
   onClose: () => void
   onCreated: (article: RefArticleRow) => void
-}
-
-function shortOptionLabel(code: string, label: string, max = 72) {
-  const text = `${code} — ${label}`
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text
-}
-
-function toggleId(ids: number[], id: number): number[] {
-  return ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]
-}
-
-type MultiPickerProps = {
-  items: { id: number; label: string }[]
-  selectedIds: number[]
-  onChange: (ids: number[]) => void
-  filter: string
-  onFilterChange: (value: string) => void
-  emptyLabel: string
-}
-
-function MultiPicker({ items, selectedIds, onChange, filter, onFilterChange, emptyLabel }: MultiPickerProps) {
-  const filtered = useMemo(() => {
-    const q = filter.trim().toLowerCase()
-    if (!q) return items
-    return items.filter((item) => item.label.toLowerCase().includes(q))
-  }, [filter, items])
-
-  return (
-    <div className="catalogue-article-new-form__picker">
-      <input
-        type="search"
-        value={filter}
-        onChange={(e) => onFilterChange(e.target.value)}
-        placeholder="Filtrer…"
-        className="catalogue-article-new-form__picker-filter"
-      />
-      <div className="catalogue-article-new-form__picker-list" role="listbox" aria-multiselectable="true">
-        {filtered.length === 0 ? (
-          <p className="catalogue-article-new-form__picker-empty">{emptyLabel}</p>
-        ) : (
-          filtered.map((item) => {
-            const checked = selectedIds.includes(item.id)
-            return (
-              <button
-                key={item.id}
-                type="button"
-                role="option"
-                aria-selected={checked}
-                className={`catalogue-article-new-form__picker-row${checked ? ' catalogue-article-new-form__picker-row--selected' : ''}`}
-                onClick={() => onChange(toggleId(selectedIds, item.id))}
-              >
-                <span className="catalogue-article-new-form__picker-check" aria-hidden="true">
-                  {checked ? '✓' : ''}
-                </span>
-                <span className="catalogue-article-new-form__picker-label">{item.label}</span>
-              </button>
-            )
-          })
-        )}
-      </div>
-      {selectedIds.length > 0 && (
-        <p className="catalogue-article-new-form__picker-count">{selectedIds.length} sélectionné(s)</p>
-      )}
-    </div>
-  )
 }
 
 export default function CatalogueArticleCreateModal({
@@ -139,7 +75,7 @@ export default function CatalogueArticleCreateModal({
     () =>
       [...productArticles]
         .sort((a, b) => a.code.localeCompare(b.code, 'fr'))
-        .map((a) => ({ id: a.id, label: shortOptionLabel(a.code, a.libelle) })),
+        .map((a) => ({ id: a.id, label: shortCatalogueOptionLabel(a.code, a.libelle) })),
     [productArticles],
   )
 
@@ -147,7 +83,7 @@ export default function CatalogueArticleCreateModal({
     () =>
       [...jalonArticles]
         .sort((a, b) => a.code.localeCompare(b.code, 'fr'))
-        .map((a) => ({ id: a.id, label: shortOptionLabel(a.code, a.libelle) })),
+        .map((a) => ({ id: a.id, label: shortCatalogueOptionLabel(a.code, a.libelle) })),
     [jalonArticles],
   )
 
@@ -269,7 +205,7 @@ export default function CatalogueArticleCreateModal({
             <div className="catalogue-article-new-form__grid">
               <div className="catalogue-article-new-form__col-6 catalogue-article-new-form__field">
                 <span className="catalogue-article-new-form__field-label">Tags de qualification (0 ou plusieurs)</span>
-                <MultiPicker
+                <CatalogueMultiPicker
                   items={tagItems}
                   selectedIds={qualificationTagIds}
                   onChange={setQualificationTagIds}
@@ -280,7 +216,7 @@ export default function CatalogueArticleCreateModal({
               </div>
               <div className="catalogue-article-new-form__col-6 catalogue-article-new-form__field">
                 <span className="catalogue-article-new-form__field-label">Produits rattachés (0 ou plusieurs)</span>
-                <MultiPicker
+                <CatalogueMultiPicker
                   items={productItems}
                   selectedIds={productArticleIds}
                   onChange={setProductArticleIds}
@@ -299,7 +235,7 @@ export default function CatalogueArticleCreateModal({
             <div className="catalogue-article-new-form__grid">
               <div className="catalogue-article-new-form__col-12 catalogue-article-new-form__field">
                 <span className="catalogue-article-new-form__field-label">Jalons (0 ou plusieurs)</span>
-                <MultiPicker
+                <CatalogueMultiPicker
                   items={jalonItems}
                   selectedIds={jalonArticleIds}
                   onChange={setJalonArticleIds}

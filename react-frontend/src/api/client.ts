@@ -530,6 +530,15 @@ export interface RefArticleJalonProductRow {
   > | null
 }
 
+export interface RefArticleProductJalonRow {
+  id: number
+  ordre: number
+  jalon?: Pick<
+    RefArticleRow,
+    'id' | 'code' | 'libelle' | 'famille_label' | 'kind' | 'actif'
+  > | null
+}
+
 export type RefArticleKind = 'jalon' | 'product' | 'legacy'
 
 export interface RefArticleRow {
@@ -567,6 +576,7 @@ export interface RefArticleRow {
   resultats?: RefResultatRow[]
   qualification_tags?: RefQualificationTagRow[]
   jalon_products?: RefArticleJalonProductRow[]
+  product_jalons?: RefArticleProductJalonRow[]
 }
 
 /** Laravel ArticleResource renvoie parfois { data: article }. */
@@ -596,6 +606,12 @@ export type RefArticleCreateInput = Partial<RefArticleRow> & {
   code: string
   libelle: string
   kind: 'jalon' | 'product'
+  qualification_tag_ids?: number[]
+  product_article_ids?: number[]
+  jalon_article_ids?: number[]
+}
+
+export type RefArticleUpdateInput = Partial<RefArticleRow> & {
   qualification_tag_ids?: number[]
   product_article_ids?: number[]
   jalon_article_ids?: number[]
@@ -652,7 +668,7 @@ export const catalogueApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }).then(unwrapCatalogueArticle),
-  updateArticle: (id: number, body: Partial<RefArticleRow>) =>
+  updateArticle: (id: number, body: RefArticleUpdateInput) =>
     api<RefArticleRow | { data: RefArticleRow }>(`/v1/catalogue/articles/${id}`, {
       method: 'PUT',
       body: JSON.stringify(body),

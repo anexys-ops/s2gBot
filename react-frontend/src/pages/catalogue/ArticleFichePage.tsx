@@ -9,7 +9,9 @@ import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ArticleActionsPanel from '../../components/Catalogue/ArticleActionsPanel'
 import ArticleCompositionEditor from '../../components/Catalogue/ArticleCompositionEditor'
 import JalonProductsPanel from '../../components/Catalogue/JalonProductsPanel'
+import ProductJalonsPanel from '../../components/Catalogue/ProductJalonsPanel'
 import ArticleProlabEditor from '../../components/Catalogue/ArticleProlabEditor'
+import ArticleS2gEditor from '../../components/Catalogue/ArticleS2gEditor'
 
 export default function ArticleFichePage() {
   const { id } = useParams<{ id: string }>()
@@ -119,6 +121,11 @@ export default function ArticleFichePage() {
               <JalonProductsPanel products={article.jalon_products} />
             </div>
           )}
+          {article.kind === 'product' && article.product_jalons && (
+            <div style={{ marginTop: '1rem' }}>
+              <ProductJalonsPanel jalons={article.product_jalons} />
+            </div>
+          )}
         </>
       )}
       {tab === 'descriptions' && <FicheArticle article={article} section="descriptions" showBackLink={false} />}
@@ -130,16 +137,29 @@ export default function ArticleFichePage() {
         <ArticleActionsPanel articleId={articleId} />
       )}
       {tab === 'edit' && isLab && (
-        <ArticleProlabEditor
-          article={article}
-          onUpdated={() => {
-            void queryClient.invalidateQueries({ queryKey: ['catalogue-article', articleId] })
-            void queryClient.invalidateQueries({ queryKey: ['catalogue'] })
-            void queryClient.invalidateQueries({ queryKey: ['catalogue-arbre'] })
-            void queryClient.invalidateQueries({ queryKey: ['catalogue-articles'] })
-            void queryClient.invalidateQueries({ queryKey: ['catalogue-articles-flat'] })
-          }}
-        />
+        article.kind === 'jalon' || article.kind === 'product' ? (
+          <ArticleS2gEditor
+            article={article}
+            onUpdated={() => {
+              void queryClient.invalidateQueries({ queryKey: ['catalogue-article', articleId] })
+              void queryClient.invalidateQueries({ queryKey: ['catalogue'] })
+              void queryClient.invalidateQueries({ queryKey: ['catalogue-arbre'] })
+              void queryClient.invalidateQueries({ queryKey: ['catalogue-articles'] })
+              void queryClient.invalidateQueries({ queryKey: ['catalogue-articles-flat'] })
+            }}
+          />
+        ) : (
+          <ArticleProlabEditor
+            article={article}
+            onUpdated={() => {
+              void queryClient.invalidateQueries({ queryKey: ['catalogue-article', articleId] })
+              void queryClient.invalidateQueries({ queryKey: ['catalogue'] })
+              void queryClient.invalidateQueries({ queryKey: ['catalogue-arbre'] })
+              void queryClient.invalidateQueries({ queryKey: ['catalogue-articles'] })
+              void queryClient.invalidateQueries({ queryKey: ['catalogue-articles-flat'] })
+            }}
+          />
+        )
       )}
       {tab === 'extrafields' && isLab && (
         <ExtrafieldsForm entityType="article" entityId={article.id} canEdit title="Champs personnalisés article" />

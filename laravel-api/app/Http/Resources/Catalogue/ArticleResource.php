@@ -84,6 +84,18 @@ class ArticleResource extends JsonResource
                     'actif' => $link->product->actif,
                 ] : null,
             ])),
+            'product_jalons' => $this->whenLoaded('productJalonLinks', fn () => $this->productJalonLinks->map(fn ($link) => [
+                'id' => $link->id,
+                'ordre' => $link->ordre,
+                'jalon' => $link->jalon ? [
+                    'id' => $link->jalon->id,
+                    'code' => $link->jalon->code,
+                    'libelle' => $link->jalon->libelle,
+                    'famille_label' => $link->jalon->famille_label,
+                    'kind' => $link->jalon->kind,
+                    'actif' => $link->jalon->actif,
+                ] : null,
+            ])),
         ];
     }
 }

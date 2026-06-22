@@ -117,4 +117,85 @@ class S2gArticleCreateTest extends TestCase
             'actif' => true,
         ])->assertUnprocessable();
     }
+
+    public function test_article_show_exposes_product_jalons_for_products(): void
+    {
+        $this->seed(S2gCatalogueSeeder::class);
+
+        $product = Article::query()
+            ->where('kind', Article::KIND_PRODUCT)
+            ->whereHas('productJalonLinks')
+            ->firstOrFail();
+
+        $lab = User::factory()->create([
+            'role' => User::ROLE_LAB_ADMIN,
+            'client_id' => null,
+            'site_id' => null,
+        ]);
+
+        $response = $this->actingAs($lab, 'sanctum')
+            ->getJson('/api/v1/catalogue/articles/'.$product->id);
+
+        $response->assertOk();
+        $payload = $response->json('data') ?? $response->json();
+        $this->assertSame('product', $payload['kind']);
+        $this->assertIsArray($payload['product_jalons']);
+        $this->assertGreaterThan(0, count($payload['product_jalons']));
+    }
+
+    public function test_lab_admin_can_update_product_jalon_links(): void
+    {
+        $this->seed(S2gCatalogueSeeder::class);
+
+        $product = Article::query()->where('kind', Article::KIND_PRODUCT)->firstOrFail();
+        $jalons = Article::query()->where('kind', Article::KIND_JALON)->limit(2)->pluck('id')->all();
+
+        $lab = User::factory()->create([
+            'role' => User::ROLE_LAB_ADMIN,
+            'client_id' => null,
+            'site_id' => null,
+        ]);
+
+        $response = $this->actingAs($lab, 'sanctum')->putJson('/api/v1/catalogue/articles/'.$product->id, [
+            'libelle' => $product->libelle,
+            'jalon_article_ids' => $jalons,
+        ]);
+
+        $response->assertOk();
+        $payload = $response->json('data') ?? $response->json();
+        $this->assertIsArray($payload['product_jalons']);
+        $this->assertSame(
+            $jalons,
+            collect($payload['product_jalons'])->pluck('jalon.id')->filter()->values()->all()
+        );
+    }
+
+    public function test_lab_admin_can_update_jalon_tags_and_products(): void
+    {
+        $this->seed(S2gCatalogueSeeder::class);
+
+        $jalon = Article::query()->where('kind', Article::KIND_JALON)->firstOrFail();
+        $products = Article::query()->where('kind', Article::KIND_PRODUCT)->limit(1)->pluck('id')->all();
+        $tags = QualificationTag::query()->limit(1)->pluck('id')->all();
+
+        $lab = User::factory()->create([
+            'role' => User::ROLE_LAB_ADMIN,
+            'client_id' => null,
+            'site_id' => null,
+        ]);
+
+        $response = $this->actingAs($lab, 'sanctum')->putJson('/api/v1/catalogue/articles/'.$jalon->id, [
+            'libelle' => 'Jalon modifié en test',
+            'famille_label' => 'Famille modifiée',
+            'qualification_tag_ids' => $tags,
+            'product_article_ids' => $products,
+        ]);
+
+        $response->assertOk();
+        $payload = $response->json('data') ?? $response->json();
+        $this->assertSame('Jalon modifié en test', $payload['libelle']);
+        $this->assertSame('Famille modifiée', $payload['famille_label']);
+        $this->assertCount(1, $payload['qualification_tags']);
+        $this->assertCount(1, $payload['jalon_products']);
+    }
 }

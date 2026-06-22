@@ -93,12 +93,8 @@
             @foreach($rows as $row)
                 @if(($row['type'] ?? '') === 'jalon_header')
                     <tr>
-                        <td colspan="5" style="padding:7px 8px;border:1px solid #bbf7d0;background:#f0fdf4;">
-                            <span style="display:inline-block;background:#166534;color:#fff;font-size:7pt;font-weight:bold;padding:2px 6px;border-radius:3px;margin-right:6px;">JALON</span>
-                            <strong style="color:#166534;font-size:9.5pt;">{{ $row['label'] }}</strong>
-                            @if(!empty($row['code']))
-                                <span style="color:#666;font-size:8.5pt;margin-left:6px;">{{ $row['code'] }}</span>
-                            @endif
+                        <td colspan="5" style="padding:5px 8px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;color:{{ $NAVY }};font-size:9.5pt;">
+                            @if(!empty($row['code'])){{ $row['code'] }} — @endif{{ $row['label'] }}
                         </td>
                     </tr>
                 @elseif(($row['type'] ?? '') === 'product')

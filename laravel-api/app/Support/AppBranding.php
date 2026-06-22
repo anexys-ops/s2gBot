@@ -46,7 +46,33 @@ class AppBranding
      */
     public static function logoDataUriForPdf(): ?string
     {
-        $rel = self::logoPublicPath();
+        return self::fileToDataUri(self::logoPublicPath());
+    }
+
+    /** En-tête pleine largeur pour PDF devis S2G (priorité sur le logo compact). */
+    public static function devisLetterheadDataUriForPdf(): ?string
+    {
+        $settings = self::settings();
+        $rel = $settings['devis_letterhead_public_path'] ?? null;
+        if (is_string($rel) && $rel !== '') {
+            $uri = self::fileToDataUri($rel);
+            if ($uri !== null) {
+                return $uri;
+            }
+        }
+
+        foreach (['branding/s2g-devis-letterhead.jpg', 'branding/devis-letterhead.jpg'] as $fallback) {
+            $uri = self::fileToDataUri($fallback);
+            if ($uri !== null) {
+                return $uri;
+            }
+        }
+
+        return self::logoDataUriForPdf();
+    }
+
+    private static function fileToDataUri(?string $rel): ?string
+    {
         if ($rel === null || ! Storage::disk('public')->exists($rel)) {
             return null;
         }

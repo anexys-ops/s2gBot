@@ -3,13 +3,17 @@
 namespace App\Services;
 
 use App\Models\DocumentPdfTemplate;
-use App\Models\ModuleSetting;
 use App\Models\Quote;
 use App\Support\AppBranding;
+use App\Support\FrenchAmountInWords;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class QuotePdfGenerator
 {
+    public function __construct(
+        private readonly QuotePdfPresentationService $presentation,
+    ) {}
+
     /**
      * @return array{0: string, 1: string} PDF binary and download filename
      */
@@ -18,6 +22,8 @@ class QuotePdfGenerator
         $quote->loadMissing([
             'client',
             'site',
+            'dossier',
+            'quoteLines.refArticle',
             'quoteLines.commercialOffering.equipment',
             'billingAddress',
             'deliveryAddress',
@@ -27,15 +33,20 @@ class QuotePdfGenerator
         $template = $this->resolvePdfTemplate('quote', null, $quote->pdf_template_id);
         $view = $template?->blade_view ?? 'pdf.quote';
         $layoutConfig = AppBranding::mergeLayoutConfig($template?->layout_config);
-        $catalogSettings = ModuleSetting::query()->where('module_key', 'commercial_catalog')->value('settings') ?? [];
-        $showEquipmentOnQuotePdf = (bool) ($catalogSettings['show_equipment_on_quote_pdf'] ?? true);
+        $pdfContext = $this->presentation->buildContext($quote);
+        $itemRows = $this->presentation->buildItemRows($quote);
+        $amountInWords = FrenchAmountInWords::format($pdfContext['total_ttc']);
 
         $html = view($view, [
             'quote' => $quote,
             'template' => $template,
             'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
+            'letterheadDataUri' => AppBranding::devisLetterheadDataUriForPdf(),
             'layoutConfig' => $layoutConfig,
-            'showEquipmentOnQuotePdf' => $showEquipmentOnQuotePdf,
+            'pdfContext' => $pdfContext,
+            'itemRows' => $itemRows,
+            'amountInWords' => $amountInWords,
+            'currencyLabel' => 'DH',
         ])->render();
 
         $pdf = Pdf::loadHTML($html);

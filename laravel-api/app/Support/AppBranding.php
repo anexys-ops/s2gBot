@@ -61,7 +61,17 @@ class AppBranding
             }
         }
 
-        foreach (['branding/s2g-devis-letterhead.jpg', 'branding/devis-letterhead.jpg'] as $fallback) {
+        foreach ([
+            public_path('branding/s2g-devis-letterhead.png'),
+            public_path('branding/s2g-devis-letterhead.jpg'),
+        ] as $abs) {
+            $uri = self::absolutePathToDataUri($abs);
+            if ($uri !== null) {
+                return $uri;
+            }
+        }
+
+        foreach (['branding/s2g-devis-letterhead.png', 'branding/s2g-devis-letterhead.jpg', 'branding/devis-letterhead.jpg'] as $fallback) {
             $uri = self::fileToDataUri($fallback);
             if ($uri !== null) {
                 return $uri;
@@ -69,6 +79,20 @@ class AppBranding
         }
 
         return self::logoDataUriForPdf();
+    }
+
+    private static function absolutePathToDataUri(string $abs): ?string
+    {
+        if (! is_readable($abs)) {
+            return null;
+        }
+        $bin = @file_get_contents($abs);
+        if ($bin === false) {
+            return null;
+        }
+        $mime = mime_content_type($abs) ?: 'image/png';
+
+        return 'data:'.$mime.';base64,'.base64_encode($bin);
     }
 
     private static function fileToDataUri(?string $rel): ?string

@@ -4,9 +4,23 @@ namespace App\Services;
 
 use App\Models\Quote;
 use App\Models\QuoteLine;
+use Illuminate\Support\Collection;
 
 class QuotePdfPresentationService
 {
+    /** @var list<string> */
+    private const DETAIL_SKIP = [
+        'description commerciale',
+        'description technique',
+        '..',
+        '…',
+        '-',
+        '—',
+        'n/a',
+        'na',
+        'null',
+    ];
+
     /**
      * @return list<array<string, mixed>>
      */
@@ -14,12 +28,21 @@ class QuotePdfPresentationService
     {
         $meta = is_array($quote->meta) ? $quote->meta : [];
         $jalons = $meta['devis_jalons'] ?? [];
+        $parcours = $meta['devis_parcours'] ?? [];
         $maskPrices = $meta['ligne_masque_prix_pdf'] ?? [];
 
-        $linesByArticleId = [];
-        foreach ($quote->quoteLines as $index => $line) {
-            if ($line->ref_article_id) {
-                $linesByArticleId[(int) $line->ref_article_id] = ['line' => $line, 'index' => $index];
+        /** @var Collection<int, QuoteLine> $lines */
+        $lines = $quote->quoteLines->values();
+
+        $jalonById = [];
+        $childRefIds = [];
+        foreach ($jalons as $jalon) {
+            $id = $jalon['id'] ?? null;
+            if (is_string($id) && $id !== '') {
+                $jalonById[$id] = $jalon;
+            }
+            foreach ($jalon['product_ref_article_ids'] ?? [] as $refId) {
+                $childRefIds[(int) $refId] = true;
             }
         }
 
@@ -27,39 +50,58 @@ class QuotePdfPresentationService
         $seenLineIds = [];
         $itemNum = 0;
 
-        foreach ($jalons as $jalon) {
-            $label = trim((string) ($jalon['libelle'] ?? ''));
-            if ($label !== '') {
-                $rows[] = [
-                    'type' => 'jalon_header',
-                    'label' => $label,
-                    'code' => $jalon['s2g_code'] ?? null,
-                ];
-            }
+        if ($parcours !== []) {
+            foreach ($parcours as $item) {
+                $kind = $item['kind'] ?? null;
+                if ($kind === 'jalon') {
+                    $jalon = $jalonById[$item['id'] ?? ''] ?? null;
+                    if ($jalon === null) {
+                        continue;
+                    }
+                    foreach ($jalon['product_ref_article_ids'] ?? [] as $refId) {
+                        $entry = $this->findLineByRefId($lines, (int) $refId, $seenLineIds);
+                        if ($entry === null) {
+                            continue;
+                        }
+                        $mask = ($maskPrices[$entry['index']] ?? false) === true;
+                        $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask);
+                        $seenLineIds[$entry['line']->id] = true;
+                    }
 
-            $refIds = $jalon['product_ref_article_ids'] ?? [];
-            foreach ($refIds as $refId) {
-                $entry = $linesByArticleId[(int) $refId] ?? null;
-                if (! $entry) {
                     continue;
                 }
-                /** @var QuoteLine $line */
-                $line = $entry['line'];
-                if (isset($seenLineIds[$line->id])) {
-                    continue;
+
+                if ($kind === 'ligne') {
+                    $entry = $this->nextStandaloneLine($lines, $seenLineIds, $childRefIds);
+                    if ($entry === null) {
+                        continue;
+                    }
+                    $mask = ($maskPrices[$entry['index']] ?? false) === true;
+                    $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask);
+                    $seenLineIds[$entry['line']->id] = true;
                 }
-                $mask = ($maskPrices[$entry['index']] ?? false) === true;
-                $rows[] = $this->formatProductRow($line, ++$itemNum, $mask);
-                $seenLineIds[$line->id] = true;
+            }
+        } elseif ($jalons !== []) {
+            foreach ($jalons as $jalon) {
+                foreach ($jalon['product_ref_article_ids'] ?? [] as $refId) {
+                    $entry = $this->findLineByRefId($lines, (int) $refId, $seenLineIds);
+                    if ($entry === null) {
+                        continue;
+                    }
+                    $mask = ($maskPrices[$entry['index']] ?? false) === true;
+                    $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask);
+                    $seenLineIds[$entry['line']->id] = true;
+                }
             }
         }
 
-        foreach ($quote->quoteLines as $index => $line) {
+        foreach ($lines as $index => $line) {
             if (isset($seenLineIds[$line->id])) {
                 continue;
             }
             $mask = ($maskPrices[$index] ?? false) === true;
             $rows[] = $this->formatProductRow($line, ++$itemNum, $mask);
+            $seenLineIds[$line->id] = true;
         }
 
         return $rows;
@@ -112,12 +154,57 @@ class QuotePdfPresentationService
     }
 
     /**
+     * @param  array<int, true>  $seenLineIds
+     * @return array{line: QuoteLine, index: int}|null
+     */
+    private function findLineByRefId(Collection $lines, int $refId, array $seenLineIds): ?array
+    {
+        foreach ($lines as $index => $line) {
+            if (isset($seenLineIds[$line->id])) {
+                continue;
+            }
+            if ((int) $line->ref_article_id === $refId) {
+                return ['line' => $line, 'index' => $index];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Produit seul (hors jalon) — ordre des lignes du devis.
+     *
+     * @param  array<int, true>  $childRefIds
+     * @param  array<int, true>  $seenLineIds
+     * @return array{line: QuoteLine, index: int}|null
+     */
+    private function nextStandaloneLine(Collection $lines, array $seenLineIds, array $childRefIds): ?array
+    {
+        foreach ($lines as $index => $line) {
+            if (isset($seenLineIds[$line->id])) {
+                continue;
+            }
+            $refId = (int) ($line->ref_article_id ?? 0);
+            if ($refId > 0 && isset($childRefIds[$refId])) {
+                continue;
+            }
+
+            return ['line' => $line, 'index' => $index];
+        }
+
+        return null;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function formatProductRow(QuoteLine $line, int $num, bool $maskPrice): array
     {
         $article = $line->refArticle;
-        $details = $this->detailLinesFor($line, $article?->description_commerciale ?? $article?->description ?? null);
+        $details = $this->detailLinesFor(
+            $line,
+            $article?->description_commerciale ?? $article?->description ?? null,
+        );
 
         return [
             'type' => 'product',
@@ -137,14 +224,25 @@ class QuotePdfPresentationService
     private function detailLinesFor(QuoteLine $line, ?string $extraDescription): array
     {
         $chunks = [];
-        $main = trim((string) $line->description);
-        if ($extraDescription) {
-            foreach (preg_split('/\r?\n/', (string) $extraDescription) ?: [] as $part) {
-                $part = trim($part);
-                if ($part !== '' && $part !== $main) {
-                    $chunks[] = $part;
-                }
+        $main = mb_strtolower(trim((string) $line->description));
+        if (! $extraDescription) {
+            return [];
+        }
+
+        foreach (preg_split('/\r?\n/', (string) $extraDescription) ?: [] as $part) {
+            $part = trim($part);
+            if ($part === '') {
+                continue;
             }
+            $normalized = mb_strtolower(trim($part, " \t\n\r\0\x0B.-"));
+            if ($normalized === $main || in_array($normalized, self::DETAIL_SKIP, true)) {
+                continue;
+            }
+            if (str_starts_with($normalized, 'description commerciale')
+                || str_starts_with($normalized, 'description technique')) {
+                continue;
+            }
+            $chunks[] = $part;
         }
 
         return array_values(array_unique($chunks));

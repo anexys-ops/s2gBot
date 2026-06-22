@@ -22,13 +22,21 @@ class QuotePdfPresentationTest extends TestCase
         $this->assertStringContainsString('DIRHAMS', $words);
     }
 
-    public function test_build_item_rows_groups_jalon_products(): void
+    public function test_build_item_rows_orders_jalon_children_then_standalone_products(): void
     {
         $client = Client::query()->create(['name' => 'JET-CONTRACTORS']);
-        $article = Article::query()->create([
+        $child = Article::query()->create([
             'code' => 'ART-1',
             'libelle' => 'Contrôle de béton',
-            'description_commerciale' => "Déplacement de technicien\nEssai d'affaissement",
+            'description_commerciale' => "Déplacement de technicien\nDescription commerciale\nEssai d'affaissement",
+            'unite' => 'U',
+            'actif' => true,
+            'kind' => Article::KIND_PRODUCT,
+        ]);
+        $standalone = Article::query()->create([
+            'code' => 'ART-2',
+            'libelle' => 'Essai proctor',
+            'description_commerciale' => 'Description commerciale',
             'unite' => 'U',
             'actif' => true,
             'kind' => Article::KIND_PRODUCT,
@@ -38,8 +46,8 @@ class QuotePdfPresentationTest extends TestCase
             'client_id' => $client->id,
             'number' => 'DV0948/MO-26',
             'quote_date' => '2026-06-16',
-            'amount_ht' => 1400,
-            'amount_ttc' => 1680,
+            'amount_ht' => 2000,
+            'amount_ttc' => 2400,
             'tva_rate' => 20,
             'status' => Quote::STATUS_DRAFT,
             'meta' => [
@@ -48,30 +56,47 @@ class QuotePdfPresentationTest extends TestCase
                         'id' => 'j1',
                         'libelle' => 'Lot essais',
                         's2g_code' => 'J-01',
-                        'product_ref_article_ids' => [$article->id],
+                        'product_ref_article_ids' => [$child->id],
                     ],
+                ],
+                'devis_parcours' => [
+                    ['kind' => 'jalon', 'id' => 'j1'],
+                    ['kind' => 'ligne', 'id' => 'child-key'],
+                    ['kind' => 'ligne', 'id' => 'standalone-key'],
                 ],
             ],
         ]);
 
         QuoteLine::query()->create([
             'quote_id' => $quote->id,
-            'ref_article_id' => $article->id,
+            'ref_article_id' => $child->id,
             'description' => 'Contrôle de béton',
             'quantity' => 2,
             'unit_price' => 700,
             'total' => 1400,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $quote->id,
+            'ref_article_id' => $standalone->id,
+            'description' => 'Essai proctor',
+            'quantity' => 3,
+            'unit_price' => 200,
+            'total' => 600,
         ]);
 
         $quote->load('quoteLines.refArticle');
         $service = new QuotePdfPresentationService;
         $rows = $service->buildItemRows($quote);
 
-        $this->assertSame('jalon_header', $rows[0]['type']);
-        $this->assertSame('Lot essais', $rows[0]['label']);
+        $this->assertCount(2, $rows);
+        $this->assertSame('product', $rows[0]['type']);
+        $this->assertSame('1', $rows[0]['num']);
+        $this->assertSame('Contrôle de béton', $rows[0]['label']);
+        $this->assertCount(2, $rows[0]['details']);
         $this->assertSame('product', $rows[1]['type']);
-        $this->assertSame('1', $rows[1]['num']);
-        $this->assertCount(2, $rows[1]['details']);
+        $this->assertSame('2', $rows[1]['num']);
+        $this->assertSame('Essai proctor', $rows[1]['label']);
+        $this->assertSame([], $rows[1]['details']);
     }
 
     public function test_quote_pdf_generator_renders_s2g_template(): void

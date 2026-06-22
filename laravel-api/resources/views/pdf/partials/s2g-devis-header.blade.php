@@ -5,7 +5,7 @@
     <tr>
         <td style="vertical-align:middle;padding-bottom:6px;">
             @if($letterhead)
-                <img src="{{ $letterhead }}" alt="S2G" style="width:100%;max-height:72px;display:block;"/>
+                <img src="{{ $letterhead }}" alt="S2G" style="width:100%;max-height:90px;display:block;"/>
             @else
                 <strong style="font-size:14pt;color:#1c3a6e;">S2G Laboratoire</strong>
             @endif

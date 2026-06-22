@@ -80,16 +80,7 @@
         </thead>
         <tbody>
             @foreach($rows as $row)
-                @if(($row['type'] ?? '') === 'jalon_header')
-                    <tr>
-                        <td colspan="5" style="padding:6px 8px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;font-size:9.5pt;">
-                            @if(!empty($row['code']))
-                                <span style="color:{{ $NAVY }};">{{ $row['code'] }}</span> —
-                            @endif
-                            {{ $row['label'] }}
-                        </td>
-                    </tr>
-                @elseif(($row['type'] ?? '') === 'product')
+                @if(($row['type'] ?? '') === 'product')
                     <tr>
                         <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;">{{ $row['num'] }}. {{ $row['label'] }}</td>
                         <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:center;">{{ $row['unite'] }}</td>
@@ -166,44 +157,45 @@
 </div>
 
 {{-- ── Page 2 ── --}}
-<div>
-    @include('pdf.partials.s2g-devis-header', [
-        'letterheadDataUri' => $letterheadDataUri ?? null,
-        'brandingLogoDataUri' => $brandingLogoDataUri ?? null,
-    ])
+<table style="width:100%;height:265mm;border-collapse:collapse;page-break-before:always;">
+    <tr>
+        <td style="vertical-align:top;padding:0;">
+            @include('pdf.partials.s2g-devis-header', [
+                'letterheadDataUri' => $letterheadDataUri ?? null,
+                'brandingLogoDataUri' => $brandingLogoDataUri ?? null,
+            ])
 
-    <table style="width:100%;border:1px solid {{ $BORDER }};">
-        <tr>
-            <td style="padding:10px 14px;vertical-align:top;width:50%;border-right:1px solid {{ $BORDER }};">
-                <p style="font-weight:bold;margin:0 0 5px;">Conditions de règlement :</p>
-                <p style="margin:0;">{{ $ctx['reglement'] ?? '100% PAR CHEQUE A TRENTE JOURS DE FACTURE' }}</p>
-            </td>
-            <td style="padding:10px 14px;vertical-align:top;">
-                <p style="font-weight:bold;margin:0 0 5px;">Coordonnées bancaires :</p>
-                <p style="margin:0;">
-                    @foreach($bankLines as $i => $line)
-                        @if($i > 0)<br/>@endif{{ $line }}
-                    @endforeach
-                </p>
-            </td>
-        </tr>
-    </table>
+            <table style="width:100%;border:1px solid {{ $BORDER }};">
+                <tr>
+                    <td style="padding:10px 14px;vertical-align:top;width:50%;border-right:1px solid {{ $BORDER }};">
+                        <p style="font-weight:bold;margin:0 0 5px;">Conditions de règlement :</p>
+                        <p style="margin:0;">{{ $ctx['reglement'] ?? '100% PAR CHEQUE A TRENTE JOURS DE FACTURE' }}</p>
+                    </td>
+                    <td style="padding:10px 14px;vertical-align:top;">
+                        <p style="font-weight:bold;margin:0 0 5px;">Coordonnées bancaires :</p>
+                        <p style="margin:0;">
+                            @foreach($bankLines as $i => $line)
+                                @if($i > 0)<br/>@endif{{ $line }}
+                            @endforeach
+                        </p>
+                    </td>
+                </tr>
+            </table>
 
-    <div style="text-align:center;margin-top:24px;">
-        <p style="margin:0 0 4px;">{{ $signatureTitle }}</p>
-        <p style="margin:0 0 14px;font-weight:bold;font-size:11pt;">{{ $signatureName }}</p>
-        <div style="width:130px;height:65px;border:1px solid {{ $BORDER }};border-radius:3px;margin:0 auto;text-align:center;color:#bbb;font-size:8pt;background:#fafafa;line-height:65px;">
-            Cachet / Signature
-        </div>
-    </div>
-
-    <div style="margin-top:80px;padding-top:10px;border-top:1px solid {{ $NAVY }};text-align:center;font-size:7pt;color:#333;line-height:1.55;">
-        <strong>S2G - S.A.R.L. au capital de 12 000 000 DH</strong><br/>
-        RC : 3131&nbsp;&nbsp;Patente : 39563875&nbsp;&nbsp;IF : 3303347&nbsp;&nbsp;CNSS : 6189676&nbsp;&nbsp;ICE : 001535880000001<br/>
-        Lot N°276, Zone industrielle Sud-ouest – Mohammedia – Maroc<br/>
-        Tél : (+212) 5.23.31.50.46&nbsp;&nbsp;|&nbsp;&nbsp;Fax : (+212) 5.23.31.71.49&nbsp;&nbsp;|&nbsp;&nbsp;WhatsApp de réclamation : (+212) 6.61.41.04.23<br/>
-        E-mail : contact@s2g.ma&nbsp;&nbsp;|&nbsp;&nbsp;Site web : www.s2g.ma
-    </div>
-</div>
+            <div style="text-align:center;margin-top:24px;">
+                <p style="margin:0 0 4px;">{{ $signatureTitle }}</p>
+                <p style="margin:0 0 14px;font-weight:bold;font-size:11pt;">{{ $signatureName }}</p>
+                <div style="width:130px;height:65px;border:1px solid {{ $BORDER }};border-radius:3px;margin:0 auto;text-align:center;color:#bbb;font-size:8pt;background:#fafafa;line-height:65px;">
+                    Cachet / Signature
+                </div>
+            </div>
+        </td>
+    </tr>
+    <tr>
+        <td style="vertical-align:bottom;padding:0;height:100%;">
+            @include('pdf.partials.s2g-devis-footer', ['NAVY' => $NAVY])
+        </td>
+    </tr>
+</table>
 </body>
 </html>

@@ -106,8 +106,8 @@ class EquipmentMaintenanceAndAffectationTest extends TestCase
 
         $this->actingAs($admin, 'sanctum');
 
-        $dateDebut = '2026-06-17';
-        $dateFin = '2026-06-20';
+        $dateDebut = now()->toDateString();
+        $dateFin = now()->addDays(3)->toDateString();
 
         $create = $this->postJson("/api/equipments/{$equipment->id}/affectations", [
             'user_id' => $technician->id,

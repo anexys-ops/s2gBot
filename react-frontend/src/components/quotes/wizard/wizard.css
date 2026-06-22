@@ -37,8 +37,7 @@
 .qw-shell {
   display: flex;
   flex-direction: column;
-  max-height: min(760px, calc(100dvh - 13rem));
-  min-height: min(480px, calc(100dvh - 13rem));
+  min-height: 0;
   padding: 0 1rem 0.75rem;
   box-sizing: border-box;
 }
@@ -47,7 +46,7 @@
   overflow-y: auto;
   min-height: 0;
   overscroll-behavior: contain;
-  padding: 0 0.5rem 2rem;
+  padding: 0 0.5rem 1rem;
 }
 
 /* Step content */
@@ -93,18 +92,15 @@
 .qw-mode-btn { padding: .5rem 1.1rem; border-radius: 8px; border: 2px solid #e5e7eb; background: #fff; font-weight: 600; font-size: .85rem; cursor: pointer; transition: all .15s; }
 .qw-mode-btn--active { border-color: var(--color-primary, #2563eb); background: #eff6ff; color: var(--color-primary, #2563eb); }
 
-/* Nav buttons — fixed dock at bottom of wizard */
-.qw-nav { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e5e7eb; }
+/* Nav buttons — dock at bottom of wizard (fixed on quote editor page via index.css) */
+.qw-nav { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; }
 .qw-nav--dock {
   flex-shrink: 0;
   margin-top: auto;
-  padding: 1.35rem 2rem 2rem;
+  padding: 0.65rem 1.25rem 0.85rem;
   background: var(--color-surface, #fff);
   border-top: 1px solid #e5e7eb;
-  box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.06);
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
+  box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.05);
   margin-left: -1rem;
   margin-right: -1rem;
   margin-bottom: -0.75rem;
@@ -116,8 +112,8 @@
   gap: 0.75rem;
   margin-left: auto;
 }
-.qw-nav__back { padding: .6rem 1.4rem; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #374151; font-weight: 600; cursor: pointer; }
-.qw-nav__next { padding: .6rem 1.4rem; border-radius: 8px; background: var(--color-primary, #2563eb); color: #fff; font-weight: 700; border: none; cursor: pointer; font-size: .95rem; }
+.qw-nav__back { padding: .45rem 1.1rem; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #374151; font-weight: 600; font-size: .88rem; cursor: pointer; }
+.qw-nav__next { padding: .45rem 1.1rem; border-radius: 8px; background: var(--color-primary, #2563eb); color: #fff; font-weight: 700; border: none; cursor: pointer; font-size: .88rem; }
 .qw-step-fieldset {
   border: none;
   margin: 0;
@@ -126,7 +122,7 @@
 }
 
 .qw-nav__next:disabled { background: #d1d5db; cursor: not-allowed; }
-.qw-nav__submit { padding: .7rem 2rem; border-radius: 8px; background: #16a34a; color: #fff; font-weight: 700; border: none; cursor: pointer; font-size: 1rem; }
+.qw-nav__submit { padding: .5rem 1.5rem; border-radius: 8px; background: #16a34a; color: #fff; font-weight: 700; border: none; cursor: pointer; font-size: .9rem; }
 .qw-nav__submit:disabled { background: #d1d5db; cursor: not-allowed; }
 
 /* Totals summary step 5 */

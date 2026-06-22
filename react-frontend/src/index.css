@@ -5134,7 +5134,27 @@ a.ds-icon-btn {
   background: var(--color-surface);
 }
 .quote-editor-page__form {
-  padding-bottom: calc(var(--layout-footer-dock-reserve, 3.5rem) + 6rem);
+  padding-bottom: calc(var(--layout-footer-dock-reserve, 3.5rem) + 4.25rem);
+}
+/* Wizard nav — fixed above app version footer, frees vertical space for step content */
+.quote-editor-page .qw-nav--dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--layout-footer-dock-reserve, 3.5rem);
+  z-index: 1015;
+  margin: 0;
+  padding: 0.5rem max(var(--layout-padding-x, 1rem), 0.75rem) calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  border-radius: 0;
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.08);
+  background: color-mix(in srgb, var(--color-surface, #fff) 96%, #f0ede8);
+}
+@media (min-width: 900px) {
+  .quote-editor-page .qw-nav--dock {
+    left: max(0px, calc(50% - var(--layout-max-width, 1200px) / 2));
+    right: max(0px, calc(50% - var(--layout-max-width, 1200px) / 2));
+    max-width: var(--layout-max-width, 1200px);
+  }
 }
 .quote-editor-page__success {
   margin: 0 0 1rem;
@@ -5194,7 +5214,7 @@ a.ds-icon-btn {
 }
 @media (max-width: 640px) {
   .quote-editor-page__form {
-    padding-bottom: calc(var(--layout-footer-dock-reserve, 3.5rem) + 12.5rem);
+    padding-bottom: calc(var(--layout-footer-dock-reserve, 3.5rem) + 4.5rem);
   }
   .quote-editor-sticky-footer__actions,
   .quote-editor-sticky-footer__actions .btn {

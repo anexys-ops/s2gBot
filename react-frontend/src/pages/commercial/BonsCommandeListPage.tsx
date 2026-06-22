@@ -145,7 +145,7 @@ function BonCommandeCreateFromDevisPanel() {
                 <div>
                   <dt>Numéro</dt>
                   <dd>
-                    <Link to={`/devis/${selectedQuote.id}`} className="link-inline">
+                    <Link to={`/devis/${selectedQuote.id}/editer`} className="link-inline">
                       <code className="code-badge">{selectedQuote.number}</code>
                     </Link>
                   </dd>

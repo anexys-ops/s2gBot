@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet, useParams } from 'react-router-dom'
 import DossiersListPage from './pages/dossiers/DossiersListPage'
 import DossierFichePage from './pages/dossiers/DossierFichePage'
 import DossierInfosTab from './pages/dossiers/tabs/DossierInfosTab'
@@ -108,6 +108,13 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+/** Ancienne URL /devis/:id → éditeur */
+function QuoteIdRedirect() {
+  const { quoteId } = useParams<{ quoteId: string }>()
+  if (!quoteId || quoteId === 'nouveau') return <Navigate to="/devis/nouveau" replace />
+  return <Navigate to={`/devis/${quoteId}/editer`} replace />
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -191,6 +198,7 @@ function AppRoutes() {
         <Route path="invoices" element={<Invoices />} />
         <Route path="devis/nouveau" element={<QuoteEditorPage />} />
         <Route path="devis/:quoteId/editer" element={<QuoteEditorPage />} />
+        <Route path="devis/:quoteId" element={<QuoteIdRedirect />} />
         <Route path="devis" element={<Devis />} />
         <Route path="back-office" element={<Outlet />}>
           <Route path="equipements" element={<BackOfficeEquipementsListRedirect />} />

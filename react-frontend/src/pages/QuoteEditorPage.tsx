@@ -34,15 +34,14 @@ import {
   lineKeyForRow,
   filterDevisParcoursRemoveLigne,
   filterDevisParcoursRemoveJalon,
-  normalizeDevisParcoursInMeta,
 } from '../lib/devisParcours'
+import { buildQuoteApiBody } from '../lib/quoteFormApi'
 import {
   collectSectionProducts,
   lineFromS2gProduct,
   newDevisJalonId,
   newDevisLineRowKey,
   restoreS2gJalonLineLinks,
-  syncJalonProductKeysBeforeSave,
 } from '../lib/s2gDevisCatalogue'
 
 function newLineRowKey() {
@@ -90,63 +89,6 @@ function emptyForm(): QuoteFormState {
 function inferContextMode(quote: { dossier_id?: number | null; site_id?: number | null }): ContextMode {
   if (quote.dossier_id) return 'dossier'
   return 'client'
-}
-
-function toApiBody(form: QuoteFormState): QuoteCreateBody {
-  const defaultTva = form.tva_rate ?? 20
-  const lines = form.lines
-    .filter((l) => (l.description ?? '').trim().length > 0 && l.quantity > 0)
-    .map((l) => {
-      const row: QuoteCreateBody['lines'][number] = {
-        description: (l.description ?? '').trim(),
-        quantity: Math.max(1, Math.round(Number(l.quantity))),
-        unit_price: Number(l.unit_price) || 0,
-        tva_rate: l.tva_rate ?? defaultTva,
-        discount_percent: l.discount_percent ?? 0,
-      }
-      if (l.commercial_offering_id) row.commercial_offering_id = l.commercial_offering_id
-      if (l.ref_article_id) row.ref_article_id = l.ref_article_id
-      if (l.ref_package_id) row.ref_package_id = l.ref_package_id
-      if (l.commercial_offering_id || l.ref_article_id || l.ref_package_id) {
-        row.type_ligne = 'catalogue'
-      }
-      return row
-    })
-
-  const meta: EntityMetaPayload = { ...form.meta }
-  syncJalonProductKeysBeforeSave(form.lines, meta)
-  if (meta.devis_jalons && meta.devis_jalons.length === 0) delete meta.devis_jalons
-  if (meta.tarif_global_hors_lignes_ht == null) delete meta.tarif_global_hors_lignes_ht
-  if (meta.frais_supplementaires && meta.frais_supplementaires.length === 0) delete meta.frais_supplementaires
-  if (meta.ligne_masque_prix_pdf && !meta.ligne_masque_prix_pdf.some(Boolean)) delete meta.ligne_masque_prix_pdf
-  normalizeDevisParcoursInMeta(form.lines, meta.devis_jalons, meta)
-  if (meta.devis_parcours && meta.devis_parcours.length === 0) delete meta.devis_parcours
-  const hasMeta = Object.keys(meta).length > 0
-
-  return {
-    client_id: form.client_id,
-    contact_id: form.contact_id,
-    site_id: form.site_id,
-    dossier_id: form.dossier_id,
-    quote_date: form.quote_date,
-    order_date: form.order_date || undefined,
-    site_delivery_date: form.site_delivery_date || undefined,
-    valid_until: form.valid_until || undefined,
-    tva_rate: form.tva_rate,
-    discount_percent: form.discount_percent,
-    discount_amount: form.discount_amount,
-    shipping_amount_ht: form.shipping_amount_ht,
-    shipping_tva_rate: form.shipping_tva_rate,
-    travel_fee_ht: form.travel_fee_ht,
-    travel_fee_tva_rate: form.travel_fee_tva_rate,
-    apply_site_travel: form.apply_site_travel,
-    billing_address_id: form.billing_address_id,
-    delivery_address_id: form.delivery_address_id,
-    pdf_template_id: form.pdf_template_id,
-    notes: form.notes,
-    lines,
-    meta: hasMeta ? meta : undefined,
-  }
 }
 
 export default function QuoteEditorPage() {
@@ -320,8 +262,15 @@ export default function QuoteEditorPage() {
   const createMutation = useMutation({
     mutationFn: (body: QuoteCreateBody) => quotesApi.create(body),
     onSuccess: (created) => {
+      if (!created?.id) {
+        setSubmitError('Réponse serveur inattendue après création du devis.')
+        return
+      }
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
-      navigate(`/devis/${created.id}`, { replace: true, state: { quoteCreated: created.number } })
+      navigate(`/devis/${created.id}/editer`, {
+        replace: true,
+        state: { quoteCreated: created.number },
+      })
     },
   })
 
@@ -623,7 +572,7 @@ export default function QuoteEditorPage() {
       setSubmitError('Sélectionnez un client avant d’enregistrer le devis.')
       return
     }
-    const body = toApiBody(form)
+    const body = buildQuoteApiBody(form)
     const hasForfait =
       body.meta?.mode_devis === 'forfait' && (body.meta?.tarif_global_hors_lignes_ht ?? 0) > 0
     const hasJalons = (body.meta?.devis_jalons ?? []).length > 0
@@ -632,34 +581,9 @@ export default function QuoteEditorPage() {
       return
     }
     if (isCreate) {
-      createMutation.mutate({
-        ...body,
-        valid_until: form.valid_until || undefined,
-        order_date: form.order_date || undefined,
-        site_delivery_date: form.site_delivery_date || undefined,
-        site_id: form.site_id || undefined,
-        dossier_id: form.dossier_id,
-        billing_address_id: form.billing_address_id || undefined,
-        delivery_address_id: form.delivery_address_id || undefined,
-        pdf_template_id: form.pdf_template_id || undefined,
-        apply_site_travel: form.apply_site_travel || undefined,
-      })
+      createMutation.mutate(body)
     } else if (editingNumericId) {
-      updateMutation.mutate({
-        id: editingNumericId,
-        body: {
-          ...body,
-          valid_until: form.valid_until || undefined,
-          order_date: form.order_date || undefined,
-          site_delivery_date: form.site_delivery_date || undefined,
-          site_id: form.site_id || undefined,
-          dossier_id: form.dossier_id,
-          billing_address_id: form.billing_address_id || undefined,
-          delivery_address_id: form.delivery_address_id || undefined,
-          pdf_template_id: form.pdf_template_id || undefined,
-          apply_site_travel: form.apply_site_travel || undefined,
-        },
-      })
+      updateMutation.mutate({ id: editingNumericId, body })
     }
   }
 

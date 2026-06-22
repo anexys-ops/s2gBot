@@ -13,7 +13,18 @@
             padding: 0;
         }
         table { border-collapse: collapse; }
-        .page-break { page-break-after: always; }
+        .page-2 {
+            page-break-before: always;
+            position: relative;
+            height: 250mm;
+            width: 100%;
+        }
+        .page-2__footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
     </style>
 </head>
 <body>
@@ -34,7 +45,7 @@
 @endphp
 
 {{-- ── Page 1 ── --}}
-<div class="page-break">
+<div>
     @include('pdf.partials.s2g-devis-header', [
         'letterheadDataUri' => $letterheadDataUri ?? null,
         'brandingLogoDataUri' => $brandingLogoDataUri ?? null,
@@ -157,45 +168,40 @@
 </div>
 
 {{-- ── Page 2 ── --}}
-<table style="width:100%;height:265mm;border-collapse:collapse;page-break-before:always;">
-    <tr>
-        <td style="vertical-align:top;padding:0;">
-            @include('pdf.partials.s2g-devis-header', [
-                'letterheadDataUri' => $letterheadDataUri ?? null,
-                'brandingLogoDataUri' => $brandingLogoDataUri ?? null,
-            ])
+<div class="page-2">
+    @include('pdf.partials.s2g-devis-header', [
+        'letterheadDataUri' => $letterheadDataUri ?? null,
+        'brandingLogoDataUri' => $brandingLogoDataUri ?? null,
+    ])
 
-            <table style="width:100%;border:1px solid {{ $BORDER }};">
-                <tr>
-                    <td style="padding:10px 14px;vertical-align:top;width:50%;border-right:1px solid {{ $BORDER }};">
-                        <p style="font-weight:bold;margin:0 0 5px;">Conditions de règlement :</p>
-                        <p style="margin:0;">{{ $ctx['reglement'] ?? '100% PAR CHEQUE A TRENTE JOURS DE FACTURE' }}</p>
-                    </td>
-                    <td style="padding:10px 14px;vertical-align:top;">
-                        <p style="font-weight:bold;margin:0 0 5px;">Coordonnées bancaires :</p>
-                        <p style="margin:0;">
-                            @foreach($bankLines as $i => $line)
-                                @if($i > 0)<br/>@endif{{ $line }}
-                            @endforeach
-                        </p>
-                    </td>
-                </tr>
-            </table>
+    <table style="width:100%;border:1px solid {{ $BORDER }};">
+        <tr>
+            <td style="padding:10px 14px;vertical-align:top;width:50%;border-right:1px solid {{ $BORDER }};">
+                <p style="font-weight:bold;margin:0 0 5px;">Conditions de règlement :</p>
+                <p style="margin:0;">{{ $ctx['reglement'] ?? '100% PAR CHEQUE A TRENTE JOURS DE FACTURE' }}</p>
+            </td>
+            <td style="padding:10px 14px;vertical-align:top;">
+                <p style="font-weight:bold;margin:0 0 5px;">Coordonnées bancaires :</p>
+                <p style="margin:0;">
+                    @foreach($bankLines as $i => $line)
+                        @if($i > 0)<br/>@endif{{ $line }}
+                    @endforeach
+                </p>
+            </td>
+        </tr>
+    </table>
 
-            <div style="text-align:center;margin-top:24px;">
-                <p style="margin:0 0 4px;">{{ $signatureTitle }}</p>
-                <p style="margin:0 0 14px;font-weight:bold;font-size:11pt;">{{ $signatureName }}</p>
-                <div style="width:130px;height:65px;border:1px solid {{ $BORDER }};border-radius:3px;margin:0 auto;text-align:center;color:#bbb;font-size:8pt;background:#fafafa;line-height:65px;">
-                    Cachet / Signature
-                </div>
-            </div>
-        </td>
-    </tr>
-    <tr>
-        <td style="vertical-align:bottom;padding:0;height:100%;">
-            @include('pdf.partials.s2g-devis-footer', ['NAVY' => $NAVY])
-        </td>
-    </tr>
-</table>
+    <div style="text-align:center;margin-top:24px;">
+        <p style="margin:0 0 4px;">{{ $signatureTitle }}</p>
+        <p style="margin:0 0 14px;font-weight:bold;font-size:11pt;">{{ $signatureName }}</p>
+        <div style="width:130px;height:65px;border:1px solid {{ $BORDER }};border-radius:3px;margin:0 auto;text-align:center;color:#bbb;font-size:8pt;background:#fafafa;line-height:65px;">
+            Cachet / Signature
+        </div>
+    </div>
+
+    <div class="page-2__footer">
+        @include('pdf.partials.s2g-devis-footer', ['NAVY' => $NAVY])
+    </div>
+</div>
 </body>
 </html>

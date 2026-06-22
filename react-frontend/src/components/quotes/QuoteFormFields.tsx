@@ -23,6 +23,8 @@ export type QuoteLineDraft = {
   discount_percent: number
   /** Produit lié à un forfait / package catalogue (sélection ultérieure côté API) */
   part_of_package?: boolean
+  /** Ligne produit rattachée à un jalon S2G (id meta devis_jalons). */
+  parent_jalon_id?: string | null
 }
 
 export type ContextMode = 'client' | 'chantier' | 'dossier'

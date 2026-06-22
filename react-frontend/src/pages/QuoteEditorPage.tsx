@@ -5,6 +5,7 @@ import PageBackNav from '../components/PageBackNav'
 import Modal from '../components/Modal'
 import { type QuoteFormState, type QuoteLineDraft, type ContextMode } from '../components/quotes/QuoteFormFields'
 import QuoteWizard from '../components/quotes/wizard/QuoteWizard'
+import S2gCataloguePickerModal from '../components/quotes/S2gCataloguePickerModal'
 import {
   quotesApi,
   clientsApi,
@@ -15,6 +16,7 @@ import {
   commercialOfferingsApi,
   catalogueApi,
   dossiersApi,
+  articleSectionProductsApi,
   type QuoteCreateBody,
   type EntityMetaPayload,
   type CommercialOffering,
@@ -31,11 +33,19 @@ import {
   buildDefaultDevisParcours,
   lineKeyForRow,
   filterDevisParcoursRemoveLigne,
+  filterDevisParcoursRemoveJalon,
   normalizeDevisParcoursInMeta,
 } from '../lib/devisParcours'
+import {
+  attachParentJalonIdsFromMeta,
+  collectSectionProducts,
+  lineFromS2gProduct,
+  newDevisJalonId,
+  newDevisLineRowKey,
+} from '../lib/s2gDevisCatalogue'
 
 function newLineRowKey() {
-  return `L-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+  return newDevisLineRowKey()
 }
 
 function emptyLine(defaultTva: number): QuoteLineDraft {
@@ -153,6 +163,7 @@ export default function QuoteEditorPage() {
   type LineOrJalon = { target: 'line'; index: number } | { target: 'jalon'; jalonIndex: number }
   const [catalogPick, setCatalogPick] = useState<LineOrJalon | null>(null)
   const [prolabPick, setProlabPick] = useState<LineOrJalon | null>(null)
+  const [s2gPickOpen, setS2gPickOpen] = useState(false)
   const [catalogSearch, setCatalogSearch] = useState('')
   const [prolabFamilleId, setProlabFamilleId] = useState<number | ''>('')
   const catalogDebounced = useDebouncedValue(catalogSearch, 250)
@@ -247,18 +258,6 @@ export default function QuoteEditorPage() {
     if (!quote || isCreate) return
     const ql = quote.quote_lines ?? []
     const defaultTva = Number(quote.tva_rate ?? 20)
-    const lines: QuoteLineDraft[] = ql.map((l) => ({
-      row_key: l.id != null ? `line-${l.id}` : newLineRowKey(),
-      commercial_offering_id: l.commercial_offering_id ?? undefined,
-      ref_article_id: l.ref_article_id ?? undefined,
-      ref_package_id: l.ref_package_id ?? undefined,
-      description: l.description,
-      quantity: l.quantity,
-      unit_price: Number(l.unit_price),
-      tva_rate: Number(l.tva_rate ?? quote.tva_rate ?? 20),
-      discount_percent: Number(l.discount_percent ?? 0),
-      part_of_package: false,
-    }))
     const baseMeta: EntityMetaPayload = { ...((quote.meta as EntityMetaPayload) ?? {}) }
     const devisJalons = (baseMeta.devis_jalons ?? []).map((j, i) => ({
       ...j,
@@ -266,6 +265,21 @@ export default function QuoteEditorPage() {
       ref_article_id: j.ref_article_id ?? null,
       commercial_offering_id: j.commercial_offering_id ?? null,
     }))
+    const lines: QuoteLineDraft[] = attachParentJalonIdsFromMeta(
+      ql.map((l) => ({
+        row_key: l.id != null ? `line-${l.id}` : newLineRowKey(),
+        commercial_offering_id: l.commercial_offering_id ?? undefined,
+        ref_article_id: l.ref_article_id ?? undefined,
+        ref_package_id: l.ref_package_id ?? undefined,
+        description: l.description,
+        quantity: l.quantity,
+        unit_price: Number(l.unit_price),
+        tva_rate: Number(l.tva_rate ?? quote.tva_rate ?? 20),
+        discount_percent: Number(l.discount_percent ?? 0),
+        part_of_package: false,
+      })),
+      devisJalons,
+    )
     baseMeta.devis_jalons = devisJalons
     if (!baseMeta.devis_parcours || baseMeta.devis_parcours.length === 0) {
       baseMeta.devis_parcours = buildDefaultDevisParcours(lines, devisJalons)
@@ -407,9 +421,114 @@ export default function QuoteEditorPage() {
         } else {
           delete meta.devis_parcours
         }
+        if (meta.devis_jalons?.length) {
+          meta.devis_jalons = meta.devis_jalons.map((j) => ({
+            ...j,
+            product_line_keys: (j.product_line_keys ?? []).filter((k) => k !== lineKey),
+          }))
+        }
       }
       return { ...f, lines: nextLines, meta }
     })
+  }
+
+  const removeJalon = (jalonId: string) => {
+    setForm((f) => {
+      const jalon = (f.meta.devis_jalons ?? []).find((j) => j.id === jalonId)
+      const childKeys = new Set(jalon?.product_line_keys ?? [])
+      const keysToRemove = new Set<string>(childKeys)
+      const nextLines = f.lines.filter((l, i) => {
+        const key = lineKeyForRow(l, i)
+        if (l.parent_jalon_id === jalonId) {
+          keysToRemove.add(key)
+          return false
+        }
+        if (childKeys.has(key)) return false
+        return true
+      })
+      const prevM = f.meta.ligne_masque_prix_pdf
+      const keptIndices: number[] = []
+      f.lines.forEach((l, i) => {
+        const key = lineKeyForRow(l, i)
+        if (!keysToRemove.has(key) && l.parent_jalon_id !== jalonId) keptIndices.push(i)
+      })
+      const nextM = prevM ? keptIndices.map((i) => prevM[i] ?? false) : undefined
+      const meta: EntityMetaPayload = {
+        ...f.meta,
+        devis_jalons: (f.meta.devis_jalons ?? []).filter((j) => j.id !== jalonId),
+      }
+      if (nextM && nextM.length > 0) {
+        if (nextM.some(Boolean)) meta.ligne_masque_prix_pdf = nextM
+        else delete meta.ligne_masque_prix_pdf
+      }
+      const p = f.meta.devis_parcours ?? getEffectiveDevisParcours(f.lines, f.meta)
+      let nextP = filterDevisParcoursRemoveJalon(p, jalonId)
+      for (const key of keysToRemove) {
+        nextP = filterDevisParcoursRemoveLigne(nextP, key)
+      }
+      if (nextP.length > 0) meta.devis_parcours = nextP
+      else delete meta.devis_parcours
+      if (meta.devis_jalons?.length === 0) delete meta.devis_jalons
+      return { ...f, lines: nextLines, meta }
+    })
+  }
+
+  async function applyS2gArticle(art: RefArticleRow) {
+    const defaultTva = form.tva_rate ?? 20
+    if (art.kind === 'jalon') {
+      const grouped = await articleSectionProductsApi.list(art.id)
+      const assignments = collectSectionProducts(grouped)
+      const jalonId = newDevisJalonId()
+      const childLines: QuoteLineDraft[] = assignments
+        .filter((a) => a.product)
+        .map((a) => lineFromS2gProduct(a.product!, jalonId, defaultTva))
+      const productLineKeys = childLines.map((l) => l.row_key!).filter(Boolean)
+      setForm((f) => {
+        const newJalon = {
+          id: jalonId,
+          libelle: art.libelle,
+          ref_article_id: art.id,
+          commercial_offering_id: null,
+          s2g_code: art.code,
+          product_line_keys: productLineKeys,
+        }
+        const nextLines = [...f.lines, ...childLines]
+        const base =
+          f.meta.devis_parcours && f.meta.devis_parcours.length > 0
+            ? f.meta.devis_parcours
+            : getEffectiveDevisParcours(f.lines, f.meta)
+        const nextParcours = [
+          ...base,
+          { kind: 'jalon' as const, id: jalonId },
+          ...childLines.map((l) => ({ kind: 'ligne' as const, id: l.row_key! })),
+        ]
+        return {
+          ...f,
+          lines: nextLines,
+          meta: {
+            ...f.meta,
+            devis_jalons: [...(f.meta.devis_jalons ?? []), newJalon],
+            devis_parcours: nextParcours,
+          },
+        }
+      })
+    } else if (art.kind === 'product') {
+      setForm((f) => {
+        const newLine = lineFromS2gProduct(art, null, defaultTva)
+        const key = newLine.row_key!
+        const nextLines = [...f.lines, newLine]
+        const base =
+          f.meta.devis_parcours && f.meta.devis_parcours.length > 0
+            ? f.meta.devis_parcours
+            : getEffectiveDevisParcours(f.lines, f.meta)
+        return {
+          ...f,
+          lines: nextLines,
+          meta: { ...f.meta, devis_parcours: [...base, { kind: 'ligne' as const, id: key }] },
+        }
+      })
+    }
+    setS2gPickOpen(false)
   }
 
   function applyOfferingToLine(index: number, o: CommercialOffering) {
@@ -617,6 +736,8 @@ export default function QuoteEditorPage() {
             setProlabPick({ target: 'line', index: i })
             setProlabFamilleId('')
           }}
+          onOpenS2gCatalog={isReadOnly ? undefined : () => setS2gPickOpen(true)}
+          onRemoveJalon={removeJalon}
           onAddFromCommercialCatalog={isReadOnly ? undefined : addLineFromCommercialCatalog}
           onAddFromProlabCatalog={isReadOnly ? undefined : addLineFromProlabCatalog}
           wizardStep={wizardStep}
@@ -627,6 +748,15 @@ export default function QuoteEditorPage() {
           <p className="error" style={{ marginTop: '1rem' }}>{((createMutation.error ?? updateMutation.error) as Error).message}</p>
         )}
       </form>
+
+      {s2gPickOpen && (
+        <S2gCataloguePickerModal
+          onClose={() => setS2gPickOpen(false)}
+          onPick={(art) => {
+            void applyS2gArticle(art)
+          }}
+        />
+      )}
 
       {catalogPick !== null && (
         <Modal

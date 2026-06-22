@@ -1890,6 +1890,10 @@ export type EntityMetaPayload = {
     montant_ht?: number
     ref_article_id?: number | null
     commercial_offering_id?: number | null
+    /** Clés row_key des lignes produit rattachées (catalogue S2G). */
+    product_line_keys?: string[]
+    /** Code article S2G (affichage). */
+    s2g_code?: string | null
   }>
   /** Tarif forfaitaire lorsqu’il n’y a pas de lignes article (optionnel) */
   tarif_global_hors_lignes_ht?: number

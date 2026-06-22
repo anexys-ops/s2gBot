@@ -29,8 +29,10 @@ type Props = {
   addLine: () => void
   updateLine: (index: number, field: keyof QuoteLineDraft, value: string | number | null | boolean) => void
   removeLine: (index: number) => void
-  onOpenCommercialCatalog: (lineIndex: number) => void
-  onOpenProlabCatalog: (lineIndex: number) => void
+  onOpenCommercialCatalog?: (lineIndex: number) => void
+  onOpenProlabCatalog?: (lineIndex: number) => void
+  onOpenS2gCatalog?: () => void
+  onRemoveJalon: (jalonId: string) => void
   onAddFromCommercialCatalog?: () => void
   onAddFromProlabCatalog?: () => void
   totals: DocumentTotalsResult
@@ -61,7 +63,8 @@ function isStepValid(step: number, form: QuoteFormState): boolean {
         form.meta?.mode_devis === 'forfait' &&
         (form.meta?.tarif_global_hors_lignes_ht ?? 0) > 0
       const hasLines = form.lines.length > 0
-      return hasForfait || hasLines
+      const hasJalons = (form.meta?.devis_jalons ?? []).length > 0
+      return hasForfait || hasLines || hasJalons
     }
     case 5:
       return true
@@ -79,13 +82,10 @@ export default function QuoteWizard({
   dossiers,
   addresses,
   quoteTemplates,
-  addLine,
   updateLine,
   removeLine,
-  onOpenCommercialCatalog,
-  onOpenProlabCatalog,
-  onAddFromCommercialCatalog,
-  onAddFromProlabCatalog,
+  onOpenS2gCatalog,
+  onRemoveJalon,
   totals,
   metaFraisTtc,
   isCreate,
@@ -192,13 +192,10 @@ export default function QuoteWizard({
           <WizardStep4Lines
             form={form}
             setForm={setForm}
-            addLine={addLine}
             updateLine={updateLine}
             removeLine={removeLine}
-            onOpenCommercialCatalog={onOpenCommercialCatalog}
-            onOpenProlabCatalog={onOpenProlabCatalog}
-            onAddFromCommercialCatalog={onAddFromCommercialCatalog}
-            onAddFromProlabCatalog={onAddFromProlabCatalog}
+            onOpenS2gCatalog={onOpenS2gCatalog ?? (() => {})}
+            onRemoveJalon={onRemoveJalon}
           />
         </fieldset>
       )}

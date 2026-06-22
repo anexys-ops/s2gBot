@@ -1894,6 +1894,8 @@ export type EntityMetaPayload = {
     product_line_keys?: string[]
     /** Code article S2G (affichage). */
     s2g_code?: string | null
+    /** IDs catalogue des produits rattachés (persistant après enregistrement). */
+    product_ref_article_ids?: number[]
   }>
   /** Tarif forfaitaire lorsqu’il n’y a pas de lignes article (optionnel) */
   tarif_global_hors_lignes_ht?: number

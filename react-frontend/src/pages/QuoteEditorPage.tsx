@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import PageBackNav from '../components/PageBackNav'
 import Modal from '../components/Modal'
@@ -37,11 +37,12 @@ import {
   normalizeDevisParcoursInMeta,
 } from '../lib/devisParcours'
 import {
-  attachParentJalonIdsFromMeta,
   collectSectionProducts,
   lineFromS2gProduct,
   newDevisJalonId,
   newDevisLineRowKey,
+  restoreS2gJalonLineLinks,
+  syncJalonProductKeysBeforeSave,
 } from '../lib/s2gDevisCatalogue'
 
 function newLineRowKey() {
@@ -94,12 +95,12 @@ function inferContextMode(quote: { dossier_id?: number | null; site_id?: number 
 function toApiBody(form: QuoteFormState): QuoteCreateBody {
   const defaultTva = form.tva_rate ?? 20
   const lines = form.lines
-    .filter((l) => l.description.trim().length > 0 && l.quantity > 0)
+    .filter((l) => (l.description ?? '').trim().length > 0 && l.quantity > 0)
     .map((l) => {
       const row: QuoteCreateBody['lines'][number] = {
-        description: l.description.trim(),
-        quantity: l.quantity,
-        unit_price: l.unit_price,
+        description: (l.description ?? '').trim(),
+        quantity: Math.max(1, Math.round(Number(l.quantity))),
+        unit_price: Number(l.unit_price) || 0,
         tva_rate: l.tva_rate ?? defaultTva,
         discount_percent: l.discount_percent ?? 0,
       }
@@ -113,6 +114,7 @@ function toApiBody(form: QuoteFormState): QuoteCreateBody {
     })
 
   const meta: EntityMetaPayload = { ...form.meta }
+  syncJalonProductKeysBeforeSave(form.lines, meta)
   if (meta.devis_jalons && meta.devis_jalons.length === 0) delete meta.devis_jalons
   if (meta.tarif_global_hors_lignes_ht == null) delete meta.tarif_global_hors_lignes_ht
   if (meta.frais_supplementaires && meta.frais_supplementaires.length === 0) delete meta.frais_supplementaires
@@ -151,6 +153,8 @@ export default function QuoteEditorPage() {
   const { quoteId } = useParams<{ quoteId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const justCreatedNumber = (location.state as { quoteCreated?: string } | null)?.quoteCreated ?? null
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
@@ -158,12 +162,12 @@ export default function QuoteEditorPage() {
   const isCreate = editingNumericId === null || Number.isNaN(editingNumericId)
 
   const [form, setForm] = useState<QuoteFormState>(emptyForm)
-  const [createdQuote, setCreatedQuote] = useState<{ id: number; number: string } | null>(null)
   const [wizardStep, setWizardStep] = useState<number | null>(null)
   type LineOrJalon = { target: 'line'; index: number } | { target: 'jalon'; jalonIndex: number }
   const [catalogPick, setCatalogPick] = useState<LineOrJalon | null>(null)
   const [prolabPick, setProlabPick] = useState<LineOrJalon | null>(null)
   const [s2gPickOpen, setS2gPickOpen] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [catalogSearch, setCatalogSearch] = useState('')
   const [prolabFamilleId, setProlabFamilleId] = useState<number | ''>('')
   const catalogDebounced = useDebouncedValue(catalogSearch, 250)
@@ -265,25 +269,25 @@ export default function QuoteEditorPage() {
       ref_article_id: j.ref_article_id ?? null,
       commercial_offering_id: j.commercial_offering_id ?? null,
     }))
-    const lines: QuoteLineDraft[] = attachParentJalonIdsFromMeta(
-      ql.map((l) => ({
-        row_key: l.id != null ? `line-${l.id}` : newLineRowKey(),
-        commercial_offering_id: l.commercial_offering_id ?? undefined,
-        ref_article_id: l.ref_article_id ?? undefined,
-        ref_package_id: l.ref_package_id ?? undefined,
-        description: l.description,
-        quantity: l.quantity,
-        unit_price: Number(l.unit_price),
-        tva_rate: Number(l.tva_rate ?? quote.tva_rate ?? 20),
-        discount_percent: Number(l.discount_percent ?? 0),
-        part_of_package: false,
-      })),
-      devisJalons,
-    )
+    const rawLines: QuoteLineDraft[] = ql.map((l) => ({
+      row_key: l.id != null ? `line-${l.id}` : newLineRowKey(),
+      commercial_offering_id: l.commercial_offering_id ?? undefined,
+      ref_article_id: l.ref_article_id ?? undefined,
+      ref_package_id: l.ref_package_id ?? undefined,
+      description: l.description,
+      quantity: l.quantity,
+      unit_price: Number(l.unit_price),
+      tva_rate: Number(l.tva_rate ?? quote.tva_rate ?? 20),
+      discount_percent: Number(l.discount_percent ?? 0),
+      part_of_package: false,
+    }))
     baseMeta.devis_jalons = devisJalons
     if (!baseMeta.devis_parcours || baseMeta.devis_parcours.length === 0) {
-      baseMeta.devis_parcours = buildDefaultDevisParcours(lines, devisJalons)
+      baseMeta.devis_parcours = buildDefaultDevisParcours(rawLines, devisJalons)
     }
+    const restored = restoreS2gJalonLineLinks(rawLines, baseMeta)
+    const lines = restored.lines
+    baseMeta.devis_jalons = restored.meta.devis_jalons
     setForm({
       contextMode: inferContextMode(quote),
       client_id: quote.client_id,
@@ -315,10 +319,9 @@ export default function QuoteEditorPage() {
 
   const createMutation = useMutation({
     mutationFn: (body: QuoteCreateBody) => quotesApi.create(body),
-    onSuccess: (quote) => {
+    onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
-      setCreatedQuote({ id: quote.id, number: quote.number })
-      setWizardStep(6)
+      navigate(`/devis/${created.id}`, { replace: true, state: { quoteCreated: created.number } })
     },
   })
 
@@ -475,58 +478,67 @@ export default function QuoteEditorPage() {
 
   async function applyS2gArticle(art: RefArticleRow) {
     const defaultTva = form.tva_rate ?? 20
-    if (art.kind === 'jalon') {
-      const grouped = await articleSectionProductsApi.list(art.id)
-      const assignments = collectSectionProducts(grouped)
-      const jalonId = newDevisJalonId()
-      const childLines: QuoteLineDraft[] = assignments
-        .filter((a) => a.product)
-        .map((a) => lineFromS2gProduct(a.product!, jalonId, defaultTva))
-      const productLineKeys = childLines.map((l) => l.row_key!).filter(Boolean)
-      setForm((f) => {
-        const newJalon = {
-          id: jalonId,
-          libelle: art.libelle,
-          ref_article_id: art.id,
-          commercial_offering_id: null,
-          s2g_code: art.code,
-          product_line_keys: productLineKeys,
-        }
-        const nextLines = [...f.lines, ...childLines]
-        const base =
-          f.meta.devis_parcours && f.meta.devis_parcours.length > 0
-            ? f.meta.devis_parcours
-            : getEffectiveDevisParcours(f.lines, f.meta)
-        const nextParcours = [
-          ...base,
-          { kind: 'jalon' as const, id: jalonId },
-          ...childLines.map((l) => ({ kind: 'ligne' as const, id: l.row_key! })),
-        ]
-        return {
-          ...f,
-          lines: nextLines,
-          meta: {
-            ...f.meta,
-            devis_jalons: [...(f.meta.devis_jalons ?? []), newJalon],
-            devis_parcours: nextParcours,
-          },
-        }
-      })
-    } else if (art.kind === 'product') {
-      setForm((f) => {
-        const newLine = lineFromS2gProduct(art, null, defaultTva)
-        const key = newLine.row_key!
-        const nextLines = [...f.lines, newLine]
-        const base =
-          f.meta.devis_parcours && f.meta.devis_parcours.length > 0
-            ? f.meta.devis_parcours
-            : getEffectiveDevisParcours(f.lines, f.meta)
-        return {
-          ...f,
-          lines: nextLines,
-          meta: { ...f.meta, devis_parcours: [...base, { kind: 'ligne' as const, id: key }] },
-        }
-      })
+    try {
+      if (art.kind === 'jalon') {
+        const grouped = await articleSectionProductsApi.list(art.id)
+        const assignments = collectSectionProducts(grouped)
+        const jalonId = newDevisJalonId()
+        const childLines: QuoteLineDraft[] = assignments
+          .filter((a) => a.product)
+          .map((a) => lineFromS2gProduct(a.product!, jalonId, defaultTva))
+        const productLineKeys = childLines.map((l) => l.row_key!).filter(Boolean)
+        const productRefIds = childLines
+          .map((l) => l.ref_article_id)
+          .filter((id): id is number => id != null)
+        setForm((f) => {
+          const newJalon = {
+            id: jalonId,
+            libelle: art.libelle,
+            ref_article_id: art.id,
+            commercial_offering_id: null,
+            s2g_code: art.code,
+            product_line_keys: productLineKeys,
+            product_ref_article_ids: productRefIds,
+          }
+          const nextLines = [...f.lines, ...childLines]
+          const base =
+            f.meta.devis_parcours && f.meta.devis_parcours.length > 0
+              ? f.meta.devis_parcours
+              : getEffectiveDevisParcours(f.lines, f.meta)
+          const nextParcours = [
+            ...base,
+            { kind: 'jalon' as const, id: jalonId },
+            ...childLines.map((l) => ({ kind: 'ligne' as const, id: l.row_key! })),
+          ]
+          return {
+            ...f,
+            lines: nextLines,
+            meta: {
+              ...f.meta,
+              devis_jalons: [...(f.meta.devis_jalons ?? []), newJalon],
+              devis_parcours: nextParcours,
+            },
+          }
+        })
+      } else if (art.kind === 'product') {
+        setForm((f) => {
+          const newLine = lineFromS2gProduct(art, null, defaultTva)
+          const key = newLine.row_key!
+          const nextLines = [...f.lines, newLine]
+          const base =
+            f.meta.devis_parcours && f.meta.devis_parcours.length > 0
+              ? f.meta.devis_parcours
+              : getEffectiveDevisParcours(f.lines, f.meta)
+          return {
+            ...f,
+            lines: nextLines,
+            meta: { ...f.meta, devis_parcours: [...base, { kind: 'ligne' as const, id: key }] },
+          }
+        })
+      }
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Impossible de charger le catalogue S2G.')
+      return
     }
     setS2gPickOpen(false)
   }
@@ -606,8 +618,19 @@ export default function QuoteEditorPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (isReadOnly) return
-    if (form.client_id <= 0) return
+    setSubmitError(null)
+    if (form.client_id <= 0) {
+      setSubmitError('Sélectionnez un client avant d’enregistrer le devis.')
+      return
+    }
     const body = toApiBody(form)
+    const hasForfait =
+      body.meta?.mode_devis === 'forfait' && (body.meta?.tarif_global_hors_lignes_ht ?? 0) > 0
+    const hasJalons = (body.meta?.devis_jalons ?? []).length > 0
+    if (body.lines.length === 0 && !hasForfait && !hasJalons) {
+      setSubmitError('Ajoutez au moins un jalon ou un produit S2G (étape Lignes).')
+      return
+    }
     if (isCreate) {
       createMutation.mutate({
         ...body,
@@ -682,6 +705,12 @@ export default function QuoteEditorPage() {
   return (
     <div className="container quote-editor-page">
       <PageBackNav back={{ to: '/devis', label: 'Liste des devis' }} />
+      {justCreatedNumber && !isCreate ? (
+        <p className="quote-editor-page__success" role="status">
+          Devis <strong>{justCreatedNumber}</strong> créé avec succès. Vous pouvez le modifier ou l’envoyer depuis la
+          liste.
+        </p>
+      ) : null}
       <h1>
         {isCreate
           ? 'Nouveau devis'
@@ -694,11 +723,13 @@ export default function QuoteEditorPage() {
           Devis <strong>{QUOTE_STATUS_LABELS[quote?.status ?? ''] ?? quote?.status}</strong> — consultation seule. Pour
           modifier les lignes et le tarif, repassez le devis en <strong>brouillon</strong> depuis la liste.
         </p>
+      ) : isCreate ? (
+        <p className="text-muted" style={{ maxWidth: '48rem' }}>
+          Assistant en 5 étapes : contexte, dates, informations, lignes catalogue S2G, puis tarif et enregistrement.
+        </p>
       ) : (
         <p className="text-muted" style={{ maxWidth: '48rem' }}>
-          Aucune ligne d’article au départ. Le <strong>contexte</strong> (client, chantier, dates, contact, modèle PDF) est
-          en tête. Les onglets <strong>Lignes, Frais, Tarif & conditions, Aperçu</strong> regroupent l’édition. Les totaux
-          (alignés recalcul serveur) et l’enregistrement restent en barre basse.
+          Modifiez le devis brouillon via l’assistant (lignes S2G, tarif, conditions).
         </p>
       )}
 
@@ -725,7 +756,7 @@ export default function QuoteEditorPage() {
           submitLabel={isCreate ? 'Créer le devis' : 'Enregistrer'}
           readOnly={isReadOnly}
           onCancel={() => navigate('/devis')}
-          createdQuote={createdQuote}
+          createdQuote={null}
           onOpenCommercialCatalog={(i) => {
             if (isReadOnly) return
             setCatalogPick({ target: 'line', index: i })
@@ -744,8 +775,10 @@ export default function QuoteEditorPage() {
           onWizardStepChange={setWizardStep}
         />
 
-        {(createMutation.isError || updateMutation.isError) && (
-          <p className="error" style={{ marginTop: '1rem' }}>{((createMutation.error ?? updateMutation.error) as Error).message}</p>
+        {(submitError || createMutation.isError || updateMutation.isError) && (
+          <p className="error" style={{ marginTop: '1rem' }}>
+            {submitError ?? ((createMutation.error ?? updateMutation.error) as Error).message}
+          </p>
         )}
       </form>
 

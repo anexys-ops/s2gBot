@@ -45,7 +45,7 @@ class FrenchAmountInWords
             return $n === 100 ? 'cent' : 'cent '.self::intToWords($n - 100);
         }
         if ($n < 1000) {
-            $ hundreds = (int) floor($n / 100);
+            $hundreds = (int) floor($n / 100);
             $rest = $n % 100;
 
             return ($hundreds === 1 ? 'cent' : self::UNITS[$hundreds].' cent'.($rest === 0 ? 's' : ''))
@@ -55,13 +55,13 @@ class FrenchAmountInWords
             return 'mille'.($n === 1000 ? '' : ' '.self::intToWords($n - 1000));
         }
         if ($n < 1000000) {
-            $ thousands = (int) floor($n / 1000);
+            $thousands = (int) floor($n / 1000);
             $rest = $n % 1000;
 
             return self::intToWords($thousands).' mille'.($rest > 0 ? ' '.self::intToWords($rest) : '');
         }
 
-        $ millions = (int) floor($n / 1000000);
+        $millions = (int) floor($n / 1000000);
         $rest = $n % 1000000;
 
         return self::intToWords($millions).' million'.($millions > 1 ? 's' : '')

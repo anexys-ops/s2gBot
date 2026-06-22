@@ -53,12 +53,23 @@ echo "=== 2/6 Arrêt et suppression des conteneurs app et web uniquement (db int
 "${DC[@]}" stop app web 2>/dev/null || true
 "${DC[@]}" rm -f app web 2>/dev/null || true
 
-echo "=== 3/6 Build images app + web (--pull ; --no-cache si NO_CACHE=1) ==="
-BUILD_OPTS=(--pull)
+echo "=== 3/6 Build images app + web (--pull uniquement si NO_CACHE=1) ==="
+BUILD_OPTS=()
 if [[ "$NO_CACHE" == "1" ]]; then
-  BUILD_OPTS+=(--no-cache)
+  BUILD_OPTS+=(--no-cache --pull)
 fi
-"${DC[@]}" build "${BUILD_OPTS[@]}" app web
+build_attempts=3
+for attempt in $(seq 1 "$build_attempts"); do
+  if "${DC[@]}" build "${BUILD_OPTS[@]}" app web; then
+    break
+  fi
+  if [[ "$attempt" -eq "$build_attempts" ]]; then
+    echo "❌ Build Docker échoué après ${build_attempts} tentatives."
+    exit 1
+  fi
+  echo "⚠ Build échoué (tentative ${attempt}/${build_attempts}), nouvel essai dans 15s…"
+  sleep 15
+done
 
 echo "=== 4/6 Démarrage app + web ==="
 "${DC[@]}" up -d app web

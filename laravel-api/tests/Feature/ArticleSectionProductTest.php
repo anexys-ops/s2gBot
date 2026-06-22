@@ -17,8 +17,18 @@ class ArticleSectionProductTest extends TestCase
     {
         $this->seed(S2gCatalogueSeeder::class);
 
-        $jalon = Article::query()->where('kind', Article::KIND_JALON)->firstOrFail();
-        $products = $jalon->jalonProductLinks()->limit(3)->pluck('product_article_id')->all();
+        $jalon = Article::query()
+            ->where('kind', Article::KIND_JALON)
+            ->get()
+            ->first(fn (Article $j) => $j->jalonProductLinks()->pluck('product_article_id')->unique()->count() >= 2);
+
+        $this->assertNotNull($jalon, 'Aucun jalon avec au moins 2 produits distincts dans le jeu S2G.');
+
+        $products = $jalon->jalonProductLinks()
+            ->pluck('product_article_id')
+            ->unique()
+            ->values()
+            ->all();
         $this->assertGreaterThanOrEqual(2, count($products));
 
         $lab = User::factory()->create([

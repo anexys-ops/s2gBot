@@ -4,6 +4,7 @@ namespace App\Models\Catalogue;
 
 use App\Models\ArticleAction;
 use App\Models\ArticleEquipmentRequirement;
+use App\Models\ArticleSectionProduct;
 use App\Models\JalonProduct;
 use App\Models\QualificationTag;
 use Illuminate\Database\Eloquent\Builder;
@@ -132,6 +133,11 @@ class Article extends Model
     public function equipmentRequirements(): HasMany
     {
         return $this->hasMany(ArticleEquipmentRequirement::class, 'ref_article_id');
+    }
+
+    public function sectionProducts(): HasMany
+    {
+        return $this->hasMany(ArticleSectionProduct::class, 'ref_article_id')->orderBy('ordre');
     }
 
     public function scopeOrdonne(Builder $query): Builder

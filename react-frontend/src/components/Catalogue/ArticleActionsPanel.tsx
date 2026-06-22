@@ -12,6 +12,8 @@ import {
 } from '../../api/client'
 import ConfirmDialog from '../ConfirmDialog'
 import ActionMeasureConfigPanel from './ActionMeasureConfigPanel'
+import ArticleS2gSectionProducts from './ArticleS2gSectionProducts'
+import type { RefArticleRow } from '../../api/client'
 
 const TYPE_META: Record<string, { label: string; dotClass: string }> = {
   technicien: { label: 'Terrain / Technicien', dotClass: 'article-actions-type-dot--technicien' },
@@ -373,7 +375,15 @@ function NewEquipmentForm({
   )
 }
 
-export default function ArticleActionsPanel({ articleId }: { articleId: number }) {
+export default function ArticleActionsPanel({
+  article,
+  canEdit = false,
+}: {
+  article: RefArticleRow
+  canEdit?: boolean
+}) {
+  const articleId = article.id
+  const isS2g = article.kind === 'jalon' || article.kind === 'product'
   const qc = useQueryClient()
   const [deleteActionTarget, setDeleteActionTarget] = useState<ArticleAction | null>(null)
   const [deleteEquipmentTarget, setDeleteEquipmentTarget] = useState<ArticleEquipmentRequirement | null>(null)
@@ -419,8 +429,9 @@ export default function ArticleActionsPanel({ articleId }: { articleId: number }
       <section className="card dossier-tab-panel">
         <h2 className="ds-form-section__title">Actions &amp; matériel</h2>
         <p className="dossier-tab-panel__intro">
-          Définissez les actions par profil (terrain, ingénieur, laboratoire), les champs de mesure associés et le
-          matériel requis pour réaliser la prestation.
+          {isS2g
+            ? 'Répartissez les produits S2G par profil pour les devis (terrain, ingénieur, laboratoire), puis définissez les actions, mesures et le matériel requis.'
+            : 'Définissez les actions par profil (terrain, ingénieur, laboratoire), les champs de mesure associés et le matériel requis pour réaliser la prestation.'}
         </p>
       </section>
 
@@ -441,6 +452,10 @@ export default function ArticleActionsPanel({ articleId }: { articleId: number }
                 {typeActions.length} action{typeActions.length !== 1 ? 's' : ''}
               </span>
             </div>
+
+            {isS2g ? (
+              <ArticleS2gSectionProducts article={article} sectionType={type} canEdit={canEdit} />
+            ) : null}
 
             <NewActionForm articleId={articleId} type={type} nextOrdre={nextOrdre} />
 

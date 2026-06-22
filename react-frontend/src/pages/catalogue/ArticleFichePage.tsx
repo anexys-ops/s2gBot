@@ -134,7 +134,10 @@ export default function ArticleFichePage() {
         <ArticleCompositionEditor articleId={articleId} canEdit={isLab} />
       )}
       {tab === 'actions' && isLab && (
-        <ArticleActionsPanel articleId={articleId} />
+        <ArticleActionsPanel
+          article={article}
+          canEdit={user?.role === 'lab_admin'}
+        />
       )}
       {tab === 'edit' && isLab && (
         article.kind === 'jalon' || article.kind === 'product' ? (

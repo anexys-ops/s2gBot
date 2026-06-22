@@ -2647,6 +2647,31 @@ export interface FraisDeplacement {
   user?: { id: number; name: string } | null
 }
 
+export interface ArticleSectionProductAssignment {
+  id: number
+  ordre: number
+  product_article_id: number
+  product?: Pick<RefArticleRow, 'id' | 'code' | 'libelle' | 'unite' | 'prix_unitaire_ht' | 'kind' | 'actif'> | null
+}
+
+export type ArticleSectionProductsGrouped = {
+  technicien: ArticleSectionProductAssignment[]
+  ingenieur: ArticleSectionProductAssignment[]
+  labo: ArticleSectionProductAssignment[]
+}
+
+export const articleSectionProductsApi = {
+  list: (articleId: number) => api<ArticleSectionProductsGrouped>(`/articles/${articleId}/section-products`),
+  sync: (
+    articleId: number,
+    body: { section_type: 'technicien' | 'ingenieur' | 'labo'; product_article_ids: number[] },
+  ) =>
+    api<ArticleSectionProductsGrouped>(`/articles/${articleId}/section-products`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+}
+
 export const articleActionsApi = {
   list: (articleId: number) =>
     api<ArticleAction[]>(`/articles/${articleId}/actions`),

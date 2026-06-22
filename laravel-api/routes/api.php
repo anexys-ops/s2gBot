@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AccessGroupController;
 use App\Http\Controllers\Api\ActionMeasureConfigController;
 use App\Http\Controllers\Api\ExpenseReportController;
 use App\Http\Controllers\Api\ArticleActionController;
+use App\Http\Controllers\Api\ArticleSectionProductController;
 use App\Http\Controllers\Api\MissionTaskController;
 use App\Http\Controllers\Api\OrdreMissionController;
 use App\Http\Controllers\Api\PlanningController;
@@ -327,6 +328,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('articles/{article}/equipment-requirements', [ArticleActionController::class, 'equipmentIndex']);
     Route::post('articles/{article}/equipment-requirements', [ArticleActionController::class, 'equipmentStore']);
     Route::delete('articles/{article}/equipment-requirements/{requirement}', [ArticleActionController::class, 'equipmentDestroy']);
+    Route::get('articles/{article}/section-products', [ArticleSectionProductController::class, 'index']);
+    Route::put('articles/{article}/section-products', [ArticleSectionProductController::class, 'sync']);
 
     // ── Configuration des mesures par action ─────────────────────────────────
     Route::get('articles/{article}/actions/{action}/measures', [ActionMeasureConfigController::class, 'index']);

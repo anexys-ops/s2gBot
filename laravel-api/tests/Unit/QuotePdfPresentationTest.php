@@ -103,6 +103,36 @@ class QuotePdfPresentationTest extends TestCase
         $this->assertSame([], $rows[2]['details']);
     }
 
+    public function test_build_context_includes_frais_supplementaires_in_total_ttc(): void
+    {
+        $client = Client::query()->create(['name' => 'Client frais']);
+        $quote = Quote::query()->create([
+            'client_id' => $client->id,
+            'number' => 'DV-FS-1',
+            'quote_date' => '2026-06-16',
+            'amount_ht' => 161.04,
+            'amount_ttc' => 193.25,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_DRAFT,
+            'meta' => [
+                'frais_supplementaires' => [
+                    [
+                        'description' => 'Déplacement',
+                        'montant_ht' => 33,
+                        'tva_rate' => 20,
+                    ],
+                ],
+            ],
+        ]);
+
+        $ctx = (new QuotePdfPresentationService)->buildContext($quote);
+
+        $this->assertSame(161.04, $ctx['total_ht']);
+        $this->assertSame(32.21, $ctx['total_tva']);
+        $this->assertSame(39.6, $ctx['frais_supplementaires_ttc']);
+        $this->assertSame(232.85, $ctx['total_ttc']);
+    }
+
     public function test_quote_pdf_generator_renders_s2g_template(): void
     {
         $client = Client::query()->create(['name' => 'Client PDF']);

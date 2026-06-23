@@ -131,7 +131,9 @@
             ? (float) $ctx['forfait_ht']
             : (float) ($ctx['total_ht'] ?? $quote->amount_ht);
         $totalTva = (float) ($ctx['total_tva'] ?? max(0, $quote->amount_ttc - $quote->amount_ht));
-        $totalTtc = (float) ($ctx['total_ttc'] ?? $quote->amount_ttc);
+        $fraisSuppTtc = (float) ($ctx['frais_supplementaires_ttc'] ?? 0);
+        $documentTtc = (float) $quote->amount_ttc;
+        $totalTtc = (float) ($ctx['total_ttc'] ?? $documentTtc);
     @endphp
 
     <table style="width:100%;margin-bottom:14px;">
@@ -148,8 +150,20 @@
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;">&nbsp;</td>
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;">{{ $fmt($totalHt) }}</td>
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;">{{ $fmt($totalTva) }}</td>
+                <td style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;">{{ $fmt($fraisSuppTtc > 0 ? $documentTtc : $totalTtc) }}</td>
+            </tr>
+            @if($fraisSuppTtc > 0)
+            <tr>
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;font-size:8.5pt;">+ Frais suppl. TTC</td>
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;" colspan="2">&nbsp;</td>
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;text-align:center;font-size:8.5pt;">{{ $fmt($fraisSuppTtc) }}</td>
+            </tr>
+            <tr>
+                <td style="border:1px solid {{ $BORDER }};padding:5px 8px;font-weight:bold;">Total TTC</td>
+                <td style="border:1px solid {{ $BORDER }};padding:5px 8px;" colspan="2">&nbsp;</td>
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;">{{ $fmt($totalTtc) }}</td>
             </tr>
+            @endif
         </tbody>
     </table>
 

@@ -115,7 +115,6 @@ class QuotePdfPresentationService
     public function buildContext(Quote $quote): array
     {
         $meta = is_array($quote->meta) ? $quote->meta : [];
-        $tvaAmount = max(0, (float) $quote->amount_ttc - (float) $quote->amount_ht);
 
         $affaireParts = array_filter([
             $quote->site?->name,
@@ -143,15 +142,78 @@ class QuotePdfPresentationService
             $reglement = '100% PAR CHEQUE A TRENTE JOURS DE FACTURE';
         }
 
+        $fraisSupp = $this->sumFraisSupplementaires($meta);
+        $totalHt = (float) $quote->amount_ht;
+        $totalTva = max(0, (float) $quote->amount_ttc - (float) $quote->amount_ht);
+        $totalTtc = round((float) $quote->amount_ttc + $fraisSupp['total_ttc'], 2);
+
+        if (! empty($meta['mode_devis']) && $meta['mode_devis'] === 'forfait') {
+            $forfaitHt = (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0);
+            if ($forfaitHt > 0) {
+                $totalHt = $forfaitHt;
+            }
+        }
+
         return [
             'affaire' => $affaire,
             'validite_label' => $validite,
             'reglement' => $reglement,
-            'total_ht' => (float) $quote->amount_ht,
-            'total_tva' => $tvaAmount,
-            'total_ttc' => (float) $quote->amount_ttc,
+            'total_ht' => $totalHt,
+            'total_tva' => $totalTva,
+            'total_ttc' => $totalTtc,
+            'frais_supplementaires_ttc' => $fraisSupp['total_ttc'],
+            'frais_supplementaires' => $fraisSupp['items'],
             'is_forfait' => ($meta['mode_devis'] ?? '') === 'forfait',
             'forfait_ht' => (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return array{items: list<array<string, mixed>>, total_ht: float, total_tva: float, total_ttc: float}
+     */
+    private function sumFraisSupplementaires(array $meta): array
+    {
+        $rows = $meta['frais_supplementaires'] ?? [];
+        if (! is_array($rows)) {
+            return ['items' => [], 'total_ht' => 0.0, 'total_tva' => 0.0, 'total_ttc' => 0.0];
+        }
+
+        $items = [];
+        $totalHt = 0.0;
+        $totalTva = 0.0;
+        $totalTtc = 0.0;
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $lineHt = max(0, (float) ($row['montant_ht'] ?? 0));
+            $rate = max(0, min(100, (float) ($row['tva_rate'] ?? 0)));
+            $lineTva = round($lineHt * ($rate / 100), 2);
+            $lineTtc = round($lineHt + $lineTva, 2);
+            $description = trim((string) ($row['description'] ?? ''));
+
+            if ($lineTtc <= 0 && $description === '') {
+                continue;
+            }
+
+            $totalHt += $lineHt;
+            $totalTva += $lineTva;
+            $totalTtc += $lineTtc;
+            $items[] = [
+                'description' => $description !== '' ? $description : 'Frais supplémentaire',
+                'montant_ht' => $lineHt,
+                'tva' => $lineTva,
+                'montant_ttc' => $lineTtc,
+            ];
+        }
+
+        return [
+            'items' => $items,
+            'total_ht' => round($totalHt, 2),
+            'total_tva' => round($totalTva, 2),
+            'total_ttc' => round($totalTtc, 2),
         ];
     }
 

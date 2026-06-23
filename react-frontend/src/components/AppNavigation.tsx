@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { brandingApi } from '../api/client'
-import { DEFAULT_APP_LOGO_ALT, DEFAULT_APP_LOGO_SRC } from '../lib/appBranding'
+import { DEFAULT_APP_LOGO_ALT, DEFAULT_APP_LOGO_SRC, resolveAppLogoSrc } from '../lib/appBranding'
 import GlobalSearch from './GlobalSearch'
 
 type SubItem = { to: string; label: string; labOnly?: boolean }
@@ -99,9 +99,14 @@ export default function AppNavigation() {
     queryFn: () => brandingApi.get(),
     enabled: Boolean(user),
     staleTime: 120_000,
+    placeholderData: (previous) => previous,
   })
-  const brandLogoSrc =
-    branding?.logo_url && branding.logo_url.trim() !== '' ? branding.logo_url : DEFAULT_APP_LOGO_SRC
+  const brandLogoSrc = resolveAppLogoSrc(branding)
+  const [logoSrc, setLogoSrc] = useState(brandLogoSrc)
+
+  useEffect(() => {
+    setLogoSrc(brandLogoSrc)
+  }, [brandLogoSrc])
   const location = useLocation()
   const pathname = location.pathname
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -228,12 +233,13 @@ export default function AppNavigation() {
       <div className="app-header-inner">
         <NavLink to="/" end className="app-brand app-brand--logo" onClick={closeAll} aria-label={`Accueil — ${DEFAULT_APP_LOGO_ALT}`}>
           <img
-            src={brandLogoSrc}
+            src={logoSrc}
             alt={DEFAULT_APP_LOGO_ALT}
             width={220}
             height={54}
             decoding="async"
             className="app-brand__logo"
+            onError={() => setLogoSrc(DEFAULT_APP_LOGO_SRC)}
           />
         </NavLink>
 

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { brandingApi } from '../../api/client'
-import { DEFAULT_APP_LOGO_ALT, DEFAULT_APP_LOGO_SRC } from '../../lib/appBranding'
+import { DEFAULT_APP_LOGO_ALT, resolveAppLogoSrc } from '../../lib/appBranding'
 import { useAuth } from '../../contexts/AuthContext'
 import { canManageAppConfig } from '../../lib/settingsAccess'
 
@@ -31,7 +31,7 @@ export default function SettingsBrandingPage() {
   if (isLoading) return <p>Chargement…</p>
   if (error) return <p className="error">{(error as Error).message}</p>
 
-  const logoUrl = data?.logo_url?.trim() || DEFAULT_APP_LOGO_SRC
+  const logoUrl = resolveAppLogoSrc(data)
 
   return (
     <div className="card" style={{ maxWidth: '52rem' }}>

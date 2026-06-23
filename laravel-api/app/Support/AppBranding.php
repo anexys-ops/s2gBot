@@ -91,6 +91,21 @@ class AppBranding
         return null;
     }
 
+    /** Chemin absolu de l'en-tête devis (email / PDF), ou null. */
+    public static function devisLetterheadAbsolutePath(): ?string
+    {
+        foreach (['branding/s2g-devis-letterhead.png', 'branding/s2g-devis-letterhead.jpg'] as $rel) {
+            $abs = public_path($rel);
+            if (is_readable($abs)) {
+                return $abs;
+            }
+        }
+
+        $default = self::defaultLogoPublicPath();
+
+        return $default !== null ? public_path($default) : null;
+    }
+
     /** En-tête pleine largeur pour PDF devis S2G (priorité sur le logo compact). */
     public static function devisLetterheadDataUriForPdf(): ?string
     {

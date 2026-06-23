@@ -407,6 +407,7 @@ class QuoteController extends Controller
                     $quote,
                     $recipientName,
                     $validated['message'] ?? null,
+                    $user->name,
                 ));
 
             MailLog::create([

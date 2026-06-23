@@ -9,6 +9,7 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ClientContactPicker from '../../components/clients/ClientContactPicker'
+import { buildBcLigneDisplayRows } from '../../lib/bcLigneDisplay'
 import { dateInputFromApi, formatAppDate, formatMoney, formatQuantity, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
@@ -152,6 +153,10 @@ export default function BonCommandeFichePage() {
   })
 
   const ligneCount = bc?.lignes?.length ?? 0
+  const ligneDisplayRows = useMemo(
+    () => buildBcLigneDisplayRows(bc?.lignes ?? [], bc?.quote?.meta),
+    [bc?.lignes, bc?.quote?.meta],
+  )
   const bls = bc?.bons_livraison ?? []
   const statutBadge = useMemo(
     () => (bc ? bonCommandeStatutBadgeProps(bc.statut) : null),
@@ -355,14 +360,35 @@ export default function BonCommandeFichePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {bc.lignes!.map((l) => (
-                        <tr key={l.id}>
-                          <td>{l.libelle}</td>
-                          <td className="data-table__num">{formatQuantity(l.quantite)}</td>
-                          <td className="data-table__num">{formatMoney(Number(l.prix_unitaire_ht))}</td>
-                          <td className="data-table__num">{formatMoney(Number(l.montant_ht))}</td>
-                        </tr>
-                      ))}
+                      {ligneDisplayRows.map((row) => {
+                        if (row.type === 'jalon_header') {
+                          return (
+                            <tr key={row.key} className="bc-lignes-table__jalon">
+                              <td colSpan={4}>
+                                {row.code ? (
+                                  <>
+                                    <span className="bc-lignes-table__jalon-code">{row.code}</span>
+                                    {' — '}
+                                  </>
+                                ) : null}
+                                {row.label}
+                              </td>
+                            </tr>
+                          )
+                        }
+                        const l = row.ligne
+                        return (
+                          <tr
+                            key={row.key}
+                            className={row.nested ? 'bc-lignes-table__product--nested' : undefined}
+                          >
+                            <td>{l.libelle}</td>
+                            <td className="data-table__num">{formatQuantity(l.quantite)}</td>
+                            <td className="data-table__num">{formatMoney(Number(l.prix_unitaire_ht))}</td>
+                            <td className="data-table__num">{formatMoney(Number(l.montant_ht))}</td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                     <tfoot>
                       <tr>

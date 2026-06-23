@@ -754,6 +754,7 @@ export type BcLignePlanningAffectation = {
 export type BonCommandeLigne = {
   id: number
   libelle: string
+  ordre?: number
   quantite: string | number
   prix_unitaire_ht: string | number
   tva_rate: string | number
@@ -786,7 +787,7 @@ export type BonCommande = {
   client?: { id: number; name: string }
   clientContact?: ClientContactRow
   dossier?: DossierRow
-  quote?: Pick<Quote, 'id' | 'number' | 'status'>
+  quote?: Pick<Quote, 'id' | 'number' | 'status'> & { meta?: EntityMetaPayload }
   bons_livraison?: Array<Pick<BonLivraison, 'id' | 'numero' | 'statut' | 'date_livraison'>>
 }
 

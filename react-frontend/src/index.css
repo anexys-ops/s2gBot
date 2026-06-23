@@ -7778,6 +7778,20 @@ a.catalogue-tree__link-article:hover {
 .bc-lignes-table td.data-table__num {
   padding-left: 0.2rem;
 }
+.bc-lignes-table__jalon td {
+  background: #f2f2f2;
+  color: #1c3a6e;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+}
+.bc-lignes-table__jalon-code {
+  font-variant-numeric: tabular-nums;
+}
+.bc-lignes-table__product--nested td:first-child {
+  padding-left: 1.75rem;
+}
 .data-table__foot-label {
   text-align: right;
   font-weight: 600;

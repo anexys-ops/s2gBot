@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ClientContactPicker, { formatClientContactLabel } from '../../components/clients/ClientContactPicker'
 import { dateInputFromApi, formatAppDate, formatQuantity } from '../../lib/appLocale'
+import { buildBcLigneDisplayRows } from '../../lib/bcLigneDisplay'
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
 
@@ -98,6 +99,11 @@ export default function BonLivraisonFichePage() {
   }, [bl?.lignes, ligneQty])
 
   const hasOverLimit = useMemo(() => Object.values(ligneOverLimit).some(Boolean), [ligneOverLimit])
+
+  const ligneDisplayRows = useMemo(
+    () => buildBcLigneDisplayRows(bl?.lignes ?? [], bl?.bonCommande?.quote?.meta),
+    [bl?.lignes, bl?.bonCommande?.quote?.meta],
+  )
 
   const mutSaveLignes = useMutation({
     mutationFn: (qty: Record<number, string>) => {
@@ -408,11 +414,30 @@ export default function BonLivraisonFichePage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {bl.lignes!.map((l) => {
+                        {ligneDisplayRows.map((row) => {
+                          if (row.type === 'jalon_header') {
+                            return (
+                              <tr key={row.key} className="bc-lignes-table__jalon">
+                                <td colSpan={5}>
+                                  {row.code ? (
+                                    <>
+                                      <span className="bc-lignes-table__jalon-code">{row.code}</span>
+                                      {' — '}
+                                    </>
+                                  ) : null}
+                                  {row.label}
+                                </td>
+                              </tr>
+                            )
+                          }
+                          const l = row.ligne
                           const reste = qtyNum(l.quantite_restante)
                           const over = ligneOverLimit[l.id]
                           return (
-                            <tr key={l.id}>
+                            <tr
+                              key={row.key}
+                              className={row.nested ? 'bc-lignes-table__product--nested' : undefined}
+                            >
                               <td>{l.libelle}</td>
                               <td className="data-table__num">{formatQuantity(l.quantite_commandee ?? 0)}</td>
                               <td className="data-table__num">{formatQuantity(l.quantite_deja_livree ?? 0)}</td>

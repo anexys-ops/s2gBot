@@ -47,6 +47,7 @@ class BonLivraisonDeliveryService
                 $arr['quantite_commandee'] = $commandee;
                 $arr['quantite_deja_livree'] = $dejaLivree;
                 $arr['quantite_restante'] = $restante;
+                $arr['ordre'] = $ligne->bonCommandeLigne?->ordre ?? 0;
 
                 return $arr;
             })
@@ -123,7 +124,7 @@ class BonLivraisonDeliveryService
     /**
      * @return array<string, mixed>
      */
-    public function formatBonLivraison(BonLivraison $bl, array $relations = ['lignes', 'dossier', 'client', 'clientContact', 'bonCommande']): array
+    public function formatBonLivraison(BonLivraison $bl, array $relations = ['lignes', 'dossier', 'client', 'clientContact', 'bonCommande.quote']): array
     {
         $bl->loadMissing($relations);
         $payload = $bl->toArray();

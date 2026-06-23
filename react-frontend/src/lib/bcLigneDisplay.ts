@@ -1,18 +1,24 @@
 import type { BonCommandeLigne, EntityMetaPayload } from '../api/client'
 
-export type BcLigneDisplayRow =
-  | { type: 'jalon_header'; key: string; label: string; code?: string | null }
-  | { type: 'product'; key: string; ligne: BonCommandeLigne; nested: boolean }
+export type GroupableLigne = {
+  id: number
+  ref_article_id?: number | null
+  ordre?: number
+}
 
-function sortLignes(lignes: BonCommandeLigne[]): BonCommandeLigne[] {
+export type BcLigneDisplayRow<T extends GroupableLigne = BonCommandeLigne> =
+  | { type: 'jalon_header'; key: string; label: string; code?: string | null }
+  | { type: 'product'; key: string; ligne: T; nested: boolean }
+
+function sortLignes<T extends GroupableLigne>(lignes: T[]): T[] {
   return [...lignes].sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0) || a.id - b.id)
 }
 
-/** Ordre d’affichage BC : jalons + produits rattachés, puis produits seuls (comme le PDF devis). */
-export function buildBcLigneDisplayRows(
-  lignes: BonCommandeLigne[],
+/** Ordre d’affichage BC/BL : jalons + produits rattachés, puis produits seuls (comme le PDF devis). */
+export function buildBcLigneDisplayRows<T extends GroupableLigne>(
+  lignes: T[],
   meta?: EntityMetaPayload | null,
-): BcLigneDisplayRow[] {
+): BcLigneDisplayRow<T>[] {
   const sorted = sortLignes(lignes)
   if (sorted.length === 0) return []
 
@@ -32,9 +38,9 @@ export function buildBcLigneDisplayRows(
     jalons.filter((j) => j.id).map((j) => [j.id as string, j]),
   )
   const usedIds = new Set<number>()
-  const rows: BcLigneDisplayRow[] = []
+  const rows: BcLigneDisplayRow<T>[] = []
 
-  const findByRefId = (refId: number): BonCommandeLigne | undefined => {
+  const findByRefId = (refId: number): T | undefined => {
     for (const l of sorted) {
       if (usedIds.has(l.id)) continue
       if (l.ref_article_id === refId) return l
@@ -42,7 +48,7 @@ export function buildBcLigneDisplayRows(
     return undefined
   }
 
-  const nextStandalone = (): BonCommandeLigne | undefined => {
+  const nextStandalone = (): T | undefined => {
     for (const l of sorted) {
       if (usedIds.has(l.id)) continue
       const refId = l.ref_article_id
@@ -52,7 +58,7 @@ export function buildBcLigneDisplayRows(
     return undefined
   }
 
-  const emitProduct = (ligne: BonCommandeLigne, nested: boolean) => {
+  const emitProduct = (ligne: T, nested: boolean) => {
     if (usedIds.has(ligne.id)) return
     usedIds.add(ligne.id)
     rows.push({ type: 'product', key: `l-${ligne.id}`, ligne, nested })

@@ -800,6 +800,7 @@ export type BonLivraisonLigne = {
   quantite_commandee?: string | number
   quantite_deja_livree?: string | number
   quantite_restante?: string | number
+  ordre?: number
 }
 
 export type BonLivraison = {
@@ -816,7 +817,9 @@ export type BonLivraison = {
   client?: { id: number; name: string }
   clientContact?: ClientContactRow
   dossier?: DossierRow
-  bonCommande?: Pick<BonCommande, 'id' | 'numero'>
+  bonCommande?: Pick<BonCommande, 'id' | 'numero'> & {
+    quote?: Pick<Quote, 'id' | 'number' | 'status'> & { meta?: EntityMetaPayload }
+  }
   autres_bons_livraison?: Array<Pick<BonLivraison, 'id' | 'numero' | 'statut' | 'date_livraison'>>
 }
 

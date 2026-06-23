@@ -6,6 +6,7 @@ use App\Models\DocumentPdfTemplate;
 use App\Models\Quote;
 use App\Support\AppBranding;
 use App\Support\FrenchAmountInWords;
+use App\Support\S2gDevisPdfFooter;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class QuotePdfGenerator
@@ -50,7 +51,18 @@ class QuotePdfGenerator
         ])->render();
 
         $pdf = Pdf::loadHTML($html);
-        $pdf->getDomPDF()->setPaper('A4', 'portrait');
+        $pdf->setPaper('A4', 'portrait');
+        $pdf->setCallbacks([
+            [
+                'event' => 'end_document',
+                'f' => function (int $pageNumber, int $pageCount, $canvas, $fontMetrics): void {
+                    if ($pageNumber !== $pageCount) {
+                        return;
+                    }
+                    S2gDevisPdfFooter::render($canvas, $fontMetrics);
+                },
+            ],
+        ]);
 
         return [$pdf->output(), 'devis-' . $quote->number . '.pdf'];
     }

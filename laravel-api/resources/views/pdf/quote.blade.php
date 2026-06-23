@@ -13,18 +13,6 @@
             padding: 0;
         }
         table { border-collapse: collapse; }
-        .page-2 {
-            page-break-before: always;
-            position: relative;
-            height: 250mm;
-            width: 100%;
-        }
-        .page-2__footer {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-        }
     </style>
 </head>
 <body>
@@ -195,7 +183,7 @@
 </div>
 
 {{-- ── Page 2 ── --}}
-<div class="page-2">
+<div style="page-break-before: always; padding-bottom: 90pt;">
     @include('pdf.partials.s2g-devis-header', [
         'letterheadDataUri' => $letterheadDataUri ?? null,
         'brandingLogoDataUri' => $brandingLogoDataUri ?? null,
@@ -224,10 +212,6 @@
         <div style="width:130px;height:65px;border:1px solid {{ $BORDER }};border-radius:3px;margin:0 auto;text-align:center;color:#bbb;font-size:8pt;background:#fafafa;line-height:65px;">
             Cachet / Signature
         </div>
-    </div>
-
-    <div class="page-2__footer">
-        @include('pdf.partials.s2g-devis-footer', ['NAVY' => $NAVY])
     </div>
 </div>
 </body>

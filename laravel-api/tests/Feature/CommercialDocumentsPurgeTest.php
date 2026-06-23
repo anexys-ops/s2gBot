@@ -2,17 +2,22 @@
 
 namespace Tests\Feature;
 
+use App\Models\Agency;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
 use App\Models\BonLivraison;
+use App\Models\Catalogue\Tache;
 use App\Models\Client;
 use App\Models\DevisTache;
 use App\Models\Dossier;
 use App\Models\Invoice;
 use App\Models\OrdreMission;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Quote;
 use App\Models\Sample;
 use App\Models\Site;
+use App\Models\TestType;
 use App\Models\User;
 use App\Services\CommercialDocumentsPurgeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -97,6 +102,7 @@ class CommercialDocumentsPurgeTest extends TestCase
         ]);
 
         Sample::query()->create([
+            'order_item_id' => $this->legacyOrderItemId($client),
             'reference' => 'FOLD-PURGE-001',
             'fold_number' => 'FOLD-PURGE-001',
             'bon_commande_ligne_id' => $bcLine->id,
@@ -107,7 +113,12 @@ class CommercialDocumentsPurgeTest extends TestCase
 
         DevisTache::query()->create([
             'quote_id' => $quote->id,
+            'ref_tache_id' => Tache::query()->create([
+                'code' => 'T-PURGE-1',
+                'libelle' => 'Tâche devis',
+            ])->id,
             'libelle' => 'Tâche devis',
+            'prix_unitaire_ht' => 50,
             'statut' => DevisTache::STATUT_A_FAIRE,
         ]);
 
@@ -127,5 +138,31 @@ class CommercialDocumentsPurgeTest extends TestCase
 
         $this->assertDatabaseHas('clients', ['id' => $client->id]);
         $this->assertDatabaseHas('dossiers', ['id' => $dossier->id]);
+    }
+
+    private function legacyOrderItemId(Client $client): int
+    {
+        $agency = Agency::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Siège purge',
+            'is_headquarters' => true,
+        ]);
+        $testType = TestType::query()->create([
+            'name' => 'Essai purge',
+            'unit_price' => '10.00',
+        ]);
+        $order = Order::query()->create([
+            'reference' => 'ORD-PURGE-'.uniqid(),
+            'client_id' => $client->id,
+            'agency_id' => $agency->id,
+            'status' => Order::STATUS_IN_PROGRESS,
+            'order_date' => now()->toDateString(),
+        ]);
+
+        return (int) OrderItem::query()->create([
+            'order_id' => $order->id,
+            'test_type_id' => $testType->id,
+            'quantity' => 1,
+        ])->id;
     }
 }

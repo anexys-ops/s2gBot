@@ -21,7 +21,7 @@ class BonCommandeController extends Controller
     public function index(Request $request): JsonResponse
     {
         $q = BonCommande::query()
-            ->with(['dossier', 'client', 'clientContact', 'lignes'])
+            ->with(['dossier', 'client', 'clientContact', 'lignes', 'quote'])
             ->orderByDesc('date_commande')
             ->orderByDesc('id');
         if ($request->filled('dossier_id')) {
@@ -41,7 +41,8 @@ class BonCommandeController extends Controller
                     ->orWhereHas('dossier', function ($dq) use ($like) {
                         $dq->where('reference', 'like', $like)
                             ->orWhere('titre', 'like', $like);
-                    });
+                    })
+                    ->orWhereHas('quote', fn ($qq) => $qq->where('number', 'like', $like));
             });
         }
         if ($request->user()->isLab()) {

@@ -220,6 +220,7 @@ export default function BonsCommandeListPage() {
 
   const { visible, toggle } = usePersistedColumnVisibility('bons-commande', {
     number: true,
+    devis: true,
     dossier: true,
     client: true,
     date: true,
@@ -286,12 +287,13 @@ export default function BonsCommandeListPage() {
       <ListTableToolbar
         searchValue={searchInput}
         onSearchChange={setSearchInput}
-        searchPlaceholder="N° BC, client, référence ou titre dossier…"
+        searchPlaceholder="N° BC, devis, client, référence ou titre dossier…"
         statusValue={statutFilter}
         onStatusChange={setStatutFilter}
         statusOptions={statusOptions}
         columns={[
           { id: 'number', label: 'Numéro' },
+          { id: 'devis', label: 'Devis' },
           { id: 'dossier', label: 'Dossier' },
           { id: 'client', label: 'Client' },
           { id: 'date', label: 'Date commande' },
@@ -346,6 +348,7 @@ export default function BonsCommandeListPage() {
               <thead>
                 <tr>
                   {visible.number !== false && <th>Numéro</th>}
+                  {visible.devis !== false && <th>Devis</th>}
                   {visible.dossier !== false && <th>Dossier</th>}
                   {visible.client !== false && <th>Client</th>}
                   {visible.date !== false && <th>Date</th>}
@@ -377,6 +380,21 @@ export default function BonsCommandeListPage() {
                           >
                             <code className="code-badge">{bc.numero}</code>
                           </Link>
+                        </td>
+                      )}
+                      {visible.devis !== false && (
+                        <td>
+                          {bc.quote_id && bc.quote?.number ? (
+                            <Link
+                              to={`/devis/${bc.quote_id}/editer`}
+                              className="link-inline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <code className="code-badge">{bc.quote.number}</code>
+                            </Link>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
                         </td>
                       )}
                       {visible.dossier !== false && (

@@ -15,27 +15,27 @@
 <title>Devis {{ $quote->number }}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#eef1f5;font-family:Arial,Helvetica,sans-serif;color:#111;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eef1f5;padding:28px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eef1f5;padding:36px 20px;">
   <tr>
     <td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background-color:#ffffff;border:1px solid #d8dee6;border-radius:4px;overflow:hidden;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background-color:#ffffff;border:1px solid #d8dee6;">
 
         {{-- Logo S2G (même en-tête que le PDF) --}}
         @if(!empty($letterheadPath) && is_readable($letterheadPath))
         <tr>
-          <td style="padding:0 20px 10px;border-bottom:2px solid {{ $NAVY }};">
+          <td style="padding:28px 32px 18px;border-bottom:2px solid {{ $NAVY }};">
             <img
               src="{{ $message->embed($letterheadPath) }}"
               alt="S2G Laboratoire"
-              width="560"
-              style="display:block;width:100%;max-width:560px;height:auto;border:0;margin:0 auto;"
+              width="536"
+              style="display:block;width:100%;max-width:536px;height:auto;border:0;margin:0 auto;"
             />
           </td>
         </tr>
         @endif
 
         <tr>
-          <td style="padding:20px 24px 8px;">
+          <td style="padding:28px 32px 12px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td style="border:1.5px solid {{ $NAVY }};text-align:center;padding:12px 16px;">
@@ -48,7 +48,7 @@
         </tr>
 
         <tr>
-          <td style="padding:8px 24px 24px;">
+          <td style="padding:12px 32px 28px;">
             <p style="margin:0 0 18px;font-size:15px;line-height:1.65;color:#222;">
               Bonjour <strong>{{ $recipientName }}</strong>,
             </p>
@@ -58,11 +58,11 @@
             @endif
 
             <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#374151;">
-              Veuillez trouver ci-joint notre devis détaillé. Ci-dessous un récapitulatif de l'offre&nbsp;:
+              Veuillez trouver ci-joint notre devis détaillé au format PDF. Récapitulatif de l'offre&nbsp;:
             </p>
 
             {{-- Récapitulatif (aligné visuellement sur le PDF) --}}
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:22px;border:1px solid {{ $BORDER }};border-collapse:collapse;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;border:1px solid {{ $BORDER }};border-collapse:collapse;">
               @if($quote->client?->name)
               <tr>
                 <td style="padding:10px 14px;width:34%;font-size:13px;font-weight:bold;color:#111;border-bottom:1px solid {{ $BORDER }};background:{{ $LGRAY }};">Client</td>
@@ -89,14 +89,6 @@
               </tr>
             </table>
 
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:22px;background:#f8fafc;border:1px solid #dbe3ec;border-radius:4px;">
-              <tr>
-                <td style="padding:14px 16px;font-size:14px;line-height:1.55;color:#374151;">
-                  <strong style="color:{{ $NAVY }};">Pièce jointe</strong> — Le devis complet au format PDF est joint à cet email.
-                </td>
-              </tr>
-            </table>
-
             <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#374151;">
               Pour toute question ou pour valider cette offre, vous pouvez répondre à cet email ou nous contacter aux coordonnées ci-dessous.
             </p>
@@ -110,7 +102,7 @@
         </tr>
 
         <tr>
-          <td style="padding:0 24px 24px;">
+          <td style="padding:8px 32px 32px;">
             @include('emails.partials.s2g-email-footer', ['NAVY' => $NAVY])
           </td>
         </tr>

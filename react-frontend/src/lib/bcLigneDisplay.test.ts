@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildBcLigneDisplayRows } from './bcLigneDisplay'
+import { buildBcLigneDisplayRows, resolveDevisDisplayMeta } from './bcLigneDisplay'
 import type { BonCommandeLigne } from '../api/client'
 
 const line = (id: number, ref: number | null, ordre: number): BonCommandeLigne => ({
@@ -11,6 +11,22 @@ const line = (id: number, ref: number | null, ordre: number): BonCommandeLigne =
   montant_ht: 100,
   ref_article_id: ref,
   ordre,
+})
+
+describe('resolveDevisDisplayMeta', () => {
+  const meta = { devis_jalons: [{ id: 'j1', libelle: 'Lot', product_ref_article_ids: [] }] }
+
+  it('prefers devis_display_meta on BL payload', () => {
+    expect(resolveDevisDisplayMeta({ devis_display_meta: meta })).toEqual(meta)
+  })
+
+  it('falls back to snake_case bon_commande.quote.meta', () => {
+    expect(
+      resolveDevisDisplayMeta({
+        bon_commande: { quote: { meta } },
+      }),
+    ).toEqual(meta)
+  })
 })
 
 describe('buildBcLigneDisplayRows', () => {

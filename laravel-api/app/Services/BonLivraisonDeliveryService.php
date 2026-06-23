@@ -48,6 +48,7 @@ class BonLivraisonDeliveryService
                 $arr['quantite_deja_livree'] = $dejaLivree;
                 $arr['quantite_restante'] = $restante;
                 $arr['ordre'] = $ligne->bonCommandeLigne?->ordre ?? 0;
+                $arr['ref_article_id'] = $ligne->ref_article_id ?? $ligne->bonCommandeLigne?->ref_article_id;
 
                 return $arr;
             })
@@ -130,8 +131,19 @@ class BonLivraisonDeliveryService
         $payload = $bl->toArray();
         $payload['lignes'] = $this->enrichLignes($bl);
         $payload['autres_bons_livraison'] = $this->siblingBonsLivraison($bl);
+        $payload['devis_display_meta'] = $this->resolveDevisDisplayMeta($bl);
 
         return $payload;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function resolveDevisDisplayMeta(BonLivraison $bl): ?array
+    {
+        $meta = $bl->bonCommande?->quote?->meta;
+
+        return is_array($meta) ? $meta : null;
     }
 
     private function formatQty(float $qty): string

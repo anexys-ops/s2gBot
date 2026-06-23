@@ -6,6 +6,26 @@ export type GroupableLigne = {
   ordre?: number
 }
 
+/** Meta devis pour grouper les lignes BC/BL (quote directe ou via bon de commande). */
+export function resolveDevisDisplayMeta(
+  source:
+    | {
+        devis_display_meta?: EntityMetaPayload | null
+        quote?: { meta?: EntityMetaPayload | null } | null
+        bonCommande?: { quote?: { meta?: EntityMetaPayload | null } | null } | null
+        bon_commande?: { quote?: { meta?: EntityMetaPayload | null } | null } | null
+      }
+    | null
+    | undefined,
+): EntityMetaPayload | null | undefined {
+  return (
+    source?.devis_display_meta ??
+    source?.quote?.meta ??
+    source?.bonCommande?.quote?.meta ??
+    source?.bon_commande?.quote?.meta
+  )
+}
+
 export type BcLigneDisplayRow<T extends GroupableLigne = BonCommandeLigne> =
   | { type: 'jalon_header'; key: string; label: string; code?: string | null }
   | { type: 'product'; key: string; ligne: T; nested: boolean }

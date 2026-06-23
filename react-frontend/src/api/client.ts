@@ -814,6 +814,8 @@ export type BonLivraison = {
   date_livraison: string
   notes?: string | null
   lignes?: BonLivraisonLigne[]
+  /** Structure devis (jalons / parcours) pour l’affichage groupé des lignes. */
+  devis_display_meta?: EntityMetaPayload | null
   client?: { id: number; name: string }
   clientContact?: ClientContactRow
   dossier?: DossierRow

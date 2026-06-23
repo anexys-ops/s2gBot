@@ -106,7 +106,7 @@ class BonLivraisonController extends Controller
             }
         }
 
-        return response()->json($this->deliveryService->formatBonLivraison($bonLivraison->fresh(), ['lignes', 'clientContact', 'bonCommande']));
+        return response()->json($this->deliveryService->formatBonLivraison($bonLivraison->fresh(), ['lignes', 'clientContact', 'bonCommande.quote']));
     }
 
     public function destroy(Request $request, BonLivraison $bonLivraison): JsonResponse
@@ -152,6 +152,6 @@ class BonLivraisonController extends Controller
         }
         $bonLivraison->update(['statut' => BonLivraison::STATUT_LIVRE]);
 
-        return response()->json($this->deliveryService->formatBonLivraison($bonLivraison->fresh(), ['lignes', 'clientContact', 'bonCommande']));
+        return response()->json($this->deliveryService->formatBonLivraison($bonLivraison->fresh(), ['lignes', 'clientContact', 'bonCommande.quote']));
     }
 }

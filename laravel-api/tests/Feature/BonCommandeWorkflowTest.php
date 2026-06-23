@@ -379,6 +379,34 @@ class BonCommandeWorkflowTest extends TestCase
         $show2->assertJsonPath('autres_bons_livraison.0.id', $blId);
     }
 
+    public function test_bl_show_includes_devis_display_meta_from_quote(): void
+    {
+        [$lab, $bcId, $blId] = array_slice($this->seedBcWithBl(), 0, 3);
+
+        $bc = BonCommande::query()->findOrFail($bcId);
+        $quote = Quote::query()->findOrFail((int) $bc->quote_id);
+        $quote->update([
+            'meta' => [
+                'devis_jalons' => [
+                    [
+                        'id' => 'j-bl-1',
+                        'libelle' => 'Lot livraison',
+                        's2g_code' => 'J-BL-01',
+                        'product_ref_article_ids' => [],
+                    ],
+                ],
+                'devis_parcours' => [
+                    ['kind' => 'jalon', 'id' => 'j-bl-1'],
+                ],
+            ],
+        ]);
+
+        $show = $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-livraison/{$blId}");
+        $show->assertOk();
+        $show->assertJsonPath('devis_display_meta.devis_jalons.0.libelle', 'Lot livraison');
+        $show->assertJsonPath('bon_commande.quote.meta.devis_jalons.0.libelle', 'Lot livraison');
+    }
+
     public function test_bl_rejects_quantity_over_remaining(): void
     {
         [$lab, $bcId, $blId, $blLineId, $bcLineId] = $this->seedBcWithBl();

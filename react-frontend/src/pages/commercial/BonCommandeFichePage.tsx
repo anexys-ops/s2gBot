@@ -9,7 +9,7 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ClientContactPicker from '../../components/clients/ClientContactPicker'
-import { buildBcLigneDisplayRows } from '../../lib/bcLigneDisplay'
+import { buildBcLigneDisplayRows, resolveDevisDisplayMeta } from '../../lib/bcLigneDisplay'
 import { dateInputFromApi, formatAppDate, formatMoney, formatQuantity, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
@@ -154,8 +154,8 @@ export default function BonCommandeFichePage() {
 
   const ligneCount = bc?.lignes?.length ?? 0
   const ligneDisplayRows = useMemo(
-    () => buildBcLigneDisplayRows(bc?.lignes ?? [], bc?.quote?.meta),
-    [bc?.lignes, bc?.quote?.meta],
+    () => buildBcLigneDisplayRows(bc?.lignes ?? [], resolveDevisDisplayMeta(bc)),
+    [bc],
   )
   const bls = bc?.bons_livraison ?? []
   const statutBadge = useMemo(

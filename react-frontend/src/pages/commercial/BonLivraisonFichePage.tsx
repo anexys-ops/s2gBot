@@ -10,7 +10,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ClientContactPicker, { formatClientContactLabel } from '../../components/clients/ClientContactPicker'
 import { dateInputFromApi, formatAppDate, formatQuantity } from '../../lib/appLocale'
-import { buildBcLigneDisplayRows } from '../../lib/bcLigneDisplay'
+import { buildBcLigneDisplayRows, resolveDevisDisplayMeta } from '../../lib/bcLigneDisplay'
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
 
@@ -101,8 +101,8 @@ export default function BonLivraisonFichePage() {
   const hasOverLimit = useMemo(() => Object.values(ligneOverLimit).some(Boolean), [ligneOverLimit])
 
   const ligneDisplayRows = useMemo(
-    () => buildBcLigneDisplayRows(bl?.lignes ?? [], bl?.bonCommande?.quote?.meta),
-    [bl?.lignes, bl?.bonCommande?.quote?.meta],
+    () => buildBcLigneDisplayRows(bl?.lignes ?? [], resolveDevisDisplayMeta(bl)),
+    [bl],
   )
 
   const mutSaveLignes = useMutation({

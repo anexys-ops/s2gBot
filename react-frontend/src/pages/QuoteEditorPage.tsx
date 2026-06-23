@@ -30,10 +30,10 @@ import { QUOTE_STATUS_LABELS } from '../lib/commercialStatusLabels'
 import { computeQuoteFormDocumentTotals, sumFraisSupplementairesTtc } from '../lib/quoteTotals'
 import {
   getEffectiveDevisParcours,
-  buildDefaultDevisParcours,
   lineKeyForRow,
   filterDevisParcoursRemoveLigne,
   filterDevisParcoursRemoveJalon,
+  reconcileDevisParcoursOnLoad,
 } from '../lib/devisParcours'
 import { buildQuoteApiBody } from '../lib/quoteFormApi'
 import {
@@ -224,12 +224,10 @@ export default function QuoteEditorPage() {
       part_of_package: false,
     }))
     baseMeta.devis_jalons = devisJalons
-    if (!baseMeta.devis_parcours || baseMeta.devis_parcours.length === 0) {
-      baseMeta.devis_parcours = buildDefaultDevisParcours(rawLines, devisJalons)
-    }
-    const restored = restoreS2gJalonLineLinks(rawLines, baseMeta)
+    const withParcours = reconcileDevisParcoursOnLoad(rawLines, baseMeta)
+    const restored = restoreS2gJalonLineLinks(rawLines, withParcours)
     const lines = restored.lines
-    baseMeta.devis_jalons = restored.meta.devis_jalons
+    const meta = restored.meta
     setForm({
       contextMode: inferContextMode(quote),
       client_id: quote.client_id,
@@ -253,7 +251,7 @@ export default function QuoteEditorPage() {
       pdf_template_id: quote.pdf_template_id,
       notes: quote.notes ?? '',
       lines,
-      meta: baseMeta,
+      meta,
     })
   }, [quote, isCreate])
 

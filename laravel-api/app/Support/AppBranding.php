@@ -13,6 +13,12 @@ class AppBranding
 {
     public const MODULE_KEY = 'app_branding';
 
+    /** @var list<string> */
+    private const DEFAULT_LOGO_PUBLIC_FILES = [
+        'branding/s2g-app-logo.png',
+        'branding/s2g-devis-letterhead.png',
+    ];
+
     public static function settings(): array
     {
         $row = ModuleSetting::query()->where('module_key', self::MODULE_KEY)->first();
@@ -28,17 +34,29 @@ class AppBranding
         return is_string($path) && $path !== '' ? $path : null;
     }
 
+    public static function hasCustomLogo(): bool
+    {
+        $rel = self::logoPublicPath();
+
+        return $rel !== null && Storage::disk('public')->exists($rel);
+    }
+
     /**
      * URL absolue du logo pour le navigateur (header app).
      */
     public static function logoHttpUrl(Request $request): ?string
     {
         $rel = self::logoPublicPath();
-        if ($rel === null) {
-            return null;
+        if ($rel !== null && Storage::disk('public')->exists($rel)) {
+            return $request->getSchemeAndHttpHost().Storage::disk('public')->url($rel);
         }
 
-        return $request->getSchemeAndHttpHost().Storage::disk('public')->url($rel);
+        $default = self::defaultLogoPublicPath();
+        if ($default !== null) {
+            return $request->getSchemeAndHttpHost().'/'.ltrim($default, '/');
+        }
+
+        return null;
     }
 
     /**
@@ -46,7 +64,31 @@ class AppBranding
      */
     public static function logoDataUriForPdf(): ?string
     {
-        return self::fileToDataUri(self::logoPublicPath());
+        $uri = self::fileToDataUri(self::logoPublicPath());
+        if ($uri !== null) {
+            return $uri;
+        }
+
+        foreach (self::DEFAULT_LOGO_PUBLIC_FILES as $rel) {
+            $uri = self::absolutePathToDataUri(public_path($rel));
+            if ($uri !== null) {
+                return $uri;
+            }
+        }
+
+        return null;
+    }
+
+    /** Chemin relatif sous public/ pour le logo S2G embarqué, ou null. */
+    public static function defaultLogoPublicPath(): ?string
+    {
+        foreach (self::DEFAULT_LOGO_PUBLIC_FILES as $rel) {
+            if (is_readable(public_path($rel))) {
+                return $rel;
+            }
+        }
+
+        return null;
     }
 
     /** En-tête pleine largeur pour PDF devis S2G (priorité sur le logo compact). */

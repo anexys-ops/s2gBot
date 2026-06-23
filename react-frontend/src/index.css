@@ -1949,7 +1949,7 @@ a.ds-icon-btn {
 .app-brand__logo {
   height: clamp(28px, 4.2vw, 36px);
   width: auto;
-  max-width: min(200px, 42vw);
+  max-width: min(280px, 52vw);
   object-fit: contain;
   display: block;
   filter: drop-shadow(0 1px 1px rgba(15, 23, 42, 0.12));

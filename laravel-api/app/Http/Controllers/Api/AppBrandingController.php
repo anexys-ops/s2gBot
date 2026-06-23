@@ -17,6 +17,7 @@ class AppBrandingController extends Controller
     {
         return response()->json([
             'logo_url' => AppBranding::logoHttpUrl($request),
+            'logo_is_custom' => AppBranding::hasCustomLogo(),
         ]);
     }
 
@@ -48,6 +49,7 @@ class AppBrandingController extends Controller
 
         return response()->json([
             'logo_url' => AppBranding::logoHttpUrl($request),
+            'logo_is_custom' => true,
             'logo_public_path' => $path,
         ]);
     }
@@ -72,6 +74,9 @@ class AppBrandingController extends Controller
             $row->save();
         }
 
-        return response()->json(['logo_url' => null]);
+        return response()->json([
+            'logo_url' => AppBranding::logoHttpUrl($request),
+            'logo_is_custom' => false,
+        ]);
     }
 }

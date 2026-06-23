@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import AppVersionFooter from '../components/AppVersionFooter'
+import { DEFAULT_APP_LOGO_ALT, DEFAULT_APP_LOGO_SRC } from '../lib/appBranding'
 
 const DEMO_HINT = 'Compte démo : admin@lab.local — mot de passe : password'
 
@@ -39,9 +40,9 @@ export default function Login() {
       <main className="login-screen-main">
         <div className="login-card">
           <div className="login-card-brand">
-            <img src="/logo-vertical.svg" alt="Lab BTP" />
+            <img src={DEFAULT_APP_LOGO_SRC} alt={DEFAULT_APP_LOGO_ALT} />
             <div className="login-card-brand-text">
-              <p className="login-card-kicker">Plateforme Lab BTP</p>
+              <p className="login-card-kicker">Plateforme S2G</p>
             </div>
           </div>
 

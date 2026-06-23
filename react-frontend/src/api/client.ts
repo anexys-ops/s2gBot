@@ -1066,8 +1066,8 @@ export const comptaV1Api = {
 }
 
 export const brandingApi = {
-  get: () => api<{ logo_url: string | null }>('/branding'),
-  async uploadLogo(file: File): Promise<{ logo_url: string | null; logo_public_path?: string }> {
+  get: () => api<{ logo_url: string | null; logo_is_custom?: boolean }>('/branding'),
+  async uploadLogo(file: File): Promise<{ logo_url: string | null; logo_is_custom?: boolean; logo_public_path?: string }> {
     const token = getToken()
     const fd = new FormData()
     fd.append('logo', file)
@@ -1095,7 +1095,7 @@ export const brandingApi = {
     }
     return data as { logo_url: string | null; logo_public_path?: string }
   },
-  deleteLogo: () => api<{ logo_url: null }>('/branding/logo', { method: 'DELETE' }),
+  deleteLogo: () => api<{ logo_url: string | null; logo_is_custom?: boolean }>('/branding/logo', { method: 'DELETE' }),
 }
 
 export interface ReportPdfTemplateRow {

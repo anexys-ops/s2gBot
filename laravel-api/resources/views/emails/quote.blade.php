@@ -14,11 +14,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Devis {{ $quote->number }}</title>
 </head>
-<body style="margin:0;padding:0;background-color:#eef1f5;font-family:Arial,Helvetica,sans-serif;color:#111;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eef1f5;padding:36px 20px;">
+<body style="margin:0;padding:0;background-color:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#111;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="background-color:#ffffff;">
   <tr>
-    <td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background-color:#ffffff;border:1px solid #d8dee6;">
+    <td align="center" style="padding:24px 16px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #d8dee6;">
 
         {{-- Logo S2G (même en-tête que le PDF) --}}
         @if(!empty($letterheadPath) && is_readable($letterheadPath))
@@ -89,11 +89,7 @@
               </tr>
             </table>
 
-            <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#374151;">
-              Pour toute question ou pour valider cette offre, vous pouvez répondre à cet email ou nous contacter aux coordonnées ci-dessous.
-            </p>
-
-            <p style="margin:0;font-size:15px;line-height:1.65;color:#374151;">
+            <p style="margin:24px 0 0;font-size:15px;line-height:1.65;color:#374151;">
               Cordialement,<br/>
               <strong style="color:#111;">{{ $senderName ?? ($brandName ?? 'S2G') }}</strong><br/>
               <span style="font-size:13px;color:#6b7280;">{{ $brandName ?? 'S2G Laboratoire' }}</span>
@@ -108,7 +104,7 @@
         </tr>
       </table>
 
-      <p style="margin:16px 0 0;font-size:11px;line-height:1.5;color:#9ca3af;text-align:center;max-width:600px;">
+      <p style="margin:12px 0 0;font-size:11px;line-height:1.5;color:#9ca3af;text-align:center;width:100%;max-width:600px;">
         Message envoyé automatiquement — merci de ne pas répondre à une adresse noreply si indiquée par votre messagerie.
       </p>
     </td>

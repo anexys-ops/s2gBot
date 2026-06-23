@@ -33,19 +33,16 @@
 .qw-step__line { flex: 1; height: 2px; background: #e5e7eb; margin: 0 .5rem; }
 .qw-step--done .qw-step__line { background: var(--color-primary, #2563eb); }
 
-/* Wizard shell — scrollable step body, nav pinned at bottom */
+/* Wizard shell — single page scroll (no nested wheel traps) */
 .qw-shell {
   display: flex;
   flex-direction: column;
-  min-height: 0;
   padding: 0 1rem 0.75rem;
   box-sizing: border-box;
 }
 .qw-shell__body {
   flex: 1 1 auto;
-  overflow-y: auto;
-  min-height: 0;
-  overscroll-behavior: contain;
+  min-width: 0;
   padding: 0 0.5rem 1rem;
 }
 
@@ -69,10 +66,9 @@
 /* Client/Site tiles */
 .qw-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .75rem; margin-top: 1rem; }
 .qw-tiles--scroll {
-  max-height: min(320px, 42vh);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: .2rem;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
   align-content: start;
 }
 .qw-picker-meta {
@@ -176,8 +172,6 @@
   color: #111827;
 }
 .qw-lines-step__table-wrap {
-  max-height: min(420px, 50vh);
-  overflow: auto;
   margin: 0.85rem 0 1.5rem;
 }
 .qw-lines-step__catalog-btns {

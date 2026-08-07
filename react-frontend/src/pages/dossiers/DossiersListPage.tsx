@@ -404,9 +404,9 @@ export default function DossiersListPage() {
                     {isLab && visible.actions !== false && (
                       <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
                         <TableRowActions
-                          editLabel="Ouvrir le dossier"
+                          editLabel="Modifier le dossier"
                           deleteLabel="Supprimer le dossier"
-                          onEdit={() => navigate(`/dossiers/${d.id}`)}
+                          onEdit={() => navigate(`/dossiers/${d.id}/editer`)}
                           onDelete={() => setDossierToDelete(d)}
                         />
                       </td>

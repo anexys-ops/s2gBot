@@ -150,6 +150,7 @@ function AppRoutes() {
         <Route path="catalogue/services" element={<CommercialCatalogPage />} />
         <Route path="catalogue/articles/:id" element={<ArticleFichePage />} />
         <Route path="dossiers/new" element={<DossierNewPage />} />
+        <Route path="dossiers/:id/editer" element={<DossierNewPage />} />
         <Route path="dossiers" element={<DossiersListPage />} />
         <Route path="dossiers/:id" element={<DossierFichePage />}>
           <Route index element={<Navigate to="infos" replace />} />

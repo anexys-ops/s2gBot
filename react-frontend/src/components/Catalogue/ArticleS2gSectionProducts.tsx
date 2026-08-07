@@ -137,8 +137,6 @@ export default function ArticleS2gSectionProducts({ article, sectionType, canEdi
       <div className="article-section-products__list">
         {candidates.map((product) => {
           const checked = selectedIds.includes(product.id)
-          const inputType = isProduct ? 'radio' : 'checkbox'
-          const inputName = isProduct ? `section-product-${article.id}` : undefined
 
           return (
             <label
@@ -146,8 +144,7 @@ export default function ArticleS2gSectionProducts({ article, sectionType, canEdi
               className={`article-section-products__row${checked ? ' article-section-products__row--selected' : ''}`}
             >
               <input
-                type={inputType}
-                name={inputName}
+                type="checkbox"
                 checked={checked}
                 disabled={!canEdit || syncMut.isPending}
                 onChange={(e) => toggleProduct(product.id, e.target.checked)}

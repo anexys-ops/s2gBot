@@ -189,7 +189,6 @@ export default function CatalogueListePage() {
                   <option value="">Tous types</option>
                   <option value="jalon">Jalons</option>
                   <option value="product">Produits</option>
-                  <option value="legacy">Ancien PROLAB</option>
                 </select>
               </label>
               <label className="catalogue-liste__famille-field">
@@ -197,7 +196,7 @@ export default function CatalogueListePage() {
                 <select
                   value={qualificationTagCode}
                   onChange={(e) => setQualificationTagCode(e.target.value)}
-                  disabled={articleKind === 'product' || articleKind === 'legacy'}
+                  disabled={articleKind === 'product'}
                 >
                   <option value="">Toutes qualifications</option>
                   {qualificationTags.map((tag) => (

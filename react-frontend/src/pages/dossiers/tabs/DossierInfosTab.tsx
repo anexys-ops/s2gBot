@@ -1,10 +1,5 @@
-import { useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { dossiersApi } from '../../../api/client'
 import type { DossierFicheOutletContext } from '../DossierFichePage'
-import ClientContactPicker from '../../../components/clients/ClientContactPicker'
-import { useAuth } from '../../../contexts/AuthContext'
 import StatusBadge, { dossierStatutBadgeProps } from '../../../components/ds/StatusBadge'
 
 function formatDateFr(value?: string | null): string {
@@ -14,21 +9,8 @@ function formatDateFr(value?: string | null): string {
 }
 
 export default function DossierInfosTab() {
-  const { dossier, dossierId } = useOutletContext<DossierFicheOutletContext>()
-  const { user } = useAuth()
-  const isAdmin = user?.role === 'lab_admin'
-  const qc = useQueryClient()
+  const { dossier } = useOutletContext<DossierFicheOutletContext>()
   const st = dossierStatutBadgeProps(dossier.statut)
-
-  const [contactId, setContactId] = useState<number | null>(dossier.contact_id ?? null)
-
-  const mutContact = useMutation({
-    mutationFn: (id: number | null) => dossiersApi.update(dossierId, { contact_id: id }),
-    onSuccess: (updated) => {
-      qc.setQueryData(['dossier', dossierId], updated)
-      void qc.invalidateQueries({ queryKey: ['dossiers'] })
-    },
-  })
 
   return (
     <div className="dossier-infos-tab">
@@ -92,16 +74,6 @@ export default function DossierInfosTab() {
                   : '—'}
               </dd>
             </div>
-            <div className="dossier-infos-grid__col-6">
-              <dt>Contact technique client</dt>
-              <dd>
-                {dossier.clientContact
-                  ? `${dossier.clientContact.prenom} ${dossier.clientContact.nom}${
-                      dossier.clientContact.poste ? ` — ${dossier.clientContact.poste}` : ''
-                    }`
-                  : '—'}
-              </dd>
-            </div>
           </dl>
         </section>
 
@@ -133,29 +105,6 @@ export default function DossierInfosTab() {
           </dl>
         </section>
       </div>
-
-      {isAdmin && (
-        <div className="card dossier-infos-panel">
-          <section className="ds-form-section" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 'none' }}>
-            <h2 className="ds-form-section__title">Contact technique client</h2>
-            <div className="dossier-infos-grid">
-              <div className="dossier-infos-grid__col-6">
-                <ClientContactPicker
-                  clientId={dossier.client_id}
-                  value={contactId}
-                  onChange={(id) => {
-                    setContactId(id)
-                    mutContact.mutate(id)
-                  }}
-                  label="Contact technique"
-                  contactType="technique"
-                />
-              </div>
-            </div>
-            {mutContact.isError && <p className="error">{(mutContact.error as Error).message}</p>}
-          </section>
-        </div>
-      )}
 
       {dossier.contacts && dossier.contacts.length > 0 && (
         <div className="card dossier-infos-panel" style={{ padding: 0, overflow: 'hidden' }}>

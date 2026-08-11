@@ -295,8 +295,9 @@ export default function WizardStep4Lines({
     <div className="qw-body qw-lines-step">
       <p className="qw-section-title">Lignes du devis</p>
       <p className="qw-section-sub">
-        Ajoutez des jalons ou des produits depuis le catalogue S2G. Les produits assignés dans Actions &amp; matériel
-        apparaissent sous chaque jalon.
+        Ajoutez des jalons depuis le catalogue S2G en suivant le parcours{' '}
+        <strong>Qualification → Jalon → Articles</strong>. Seuls les articles sélectionnés apparaissent sous chaque
+        jalon.
       </p>
 
       <div className="qw-lines-step__mode">
@@ -374,7 +375,7 @@ export default function WizardStep4Lines({
         <div className="qw-lines-step__empty card">
           <p className="qw-lines-step__empty-title">Aucun élément pour l’instant</p>
           <p className="text-muted" style={{ margin: '0 0 1rem', fontSize: '0.9rem' }}>
-            Ajoutez un jalon (avec ses produits Actions &amp; matériel) ou un produit seul depuis le catalogue S2G.
+            Ajoutez un jalon avec les articles souhaités via le parcours Qualification → Jalon → Articles.
           </p>
           <button type="button" className="btn btn-primary btn-sm" onClick={onOpenS2gCatalog}>
             Catalogue S2G

@@ -16,7 +16,6 @@ import {
   commercialOfferingsApi,
   catalogueApi,
   dossiersApi,
-  articleSectionProductsApi,
   type QuoteCreateBody,
   type EntityMetaPayload,
   type CommercialOffering,
@@ -37,7 +36,6 @@ import {
 } from '../lib/devisParcours'
 import { buildQuoteApiBody } from '../lib/quoteFormApi'
 import {
-  collectSectionProducts,
   lineFromS2gProduct,
   newDevisJalonId,
   newDevisLineRowKey,
@@ -423,71 +421,52 @@ export default function QuoteEditorPage() {
     })
   }
 
-  async function applyS2gArticle(art: RefArticleRow) {
-    const defaultTva = form.tva_rate ?? 20
-    try {
-      if (art.kind === 'jalon') {
-        const grouped = await articleSectionProductsApi.list(art.id)
-        const assignments = collectSectionProducts(grouped)
-        const jalonId = newDevisJalonId()
-        const childLines: QuoteLineDraft[] = assignments
-          .filter((a) => a.product)
-          .map((a) => lineFromS2gProduct(a.product!, jalonId, defaultTva))
-        const productLineKeys = childLines.map((l) => l.row_key!).filter(Boolean)
-        const productRefIds = childLines
-          .map((l) => l.ref_article_id)
-          .filter((id): id is number => id != null)
-        setForm((f) => {
-          const newJalon = {
-            id: jalonId,
-            libelle: art.libelle,
-            ref_article_id: art.id,
-            commercial_offering_id: null,
-            s2g_code: art.code,
-            product_line_keys: productLineKeys,
-            product_ref_article_ids: productRefIds,
-          }
-          const nextLines = [...f.lines, ...childLines]
-          const base =
-            f.meta.devis_parcours && f.meta.devis_parcours.length > 0
-              ? f.meta.devis_parcours
-              : getEffectiveDevisParcours(f.lines, f.meta)
-          const nextParcours = [
-            ...base,
-            { kind: 'jalon' as const, id: jalonId },
-            ...childLines.map((l) => ({ kind: 'ligne' as const, id: l.row_key! })),
-          ]
-          return {
-            ...f,
-            lines: nextLines,
-            meta: {
-              ...f.meta,
-              devis_jalons: [...(f.meta.devis_jalons ?? []), newJalon],
-              devis_parcours: nextParcours,
-            },
-          }
-        })
-      } else if (art.kind === 'product') {
-        setForm((f) => {
-          const newLine = lineFromS2gProduct(art, null, defaultTva)
-          const key = newLine.row_key!
-          const nextLines = [...f.lines, newLine]
-          const base =
-            f.meta.devis_parcours && f.meta.devis_parcours.length > 0
-              ? f.meta.devis_parcours
-              : getEffectiveDevisParcours(f.lines, f.meta)
-          return {
-            ...f,
-            lines: nextLines,
-            meta: { ...f.meta, devis_parcours: [...base, { kind: 'ligne' as const, id: key }] },
-          }
-        })
-      }
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Impossible de charger le catalogue S2G.')
-      return
+  async function applyS2gCataloguePick(result: {
+    jalon: RefArticleRow
+    products: Array<Pick<RefArticleRow, 'id' | 'code' | 'libelle' | 'prix_unitaire_ht' | 'tva_rate'>>
+  }) {
+    const { jalon: art, products } = result
+    if (!products.length) {
+      throw new Error('Sélectionnez au moins un article.')
     }
-    setS2gPickOpen(false)
+    const defaultTva = form.tva_rate ?? 20
+    const jalonId = newDevisJalonId()
+    const childLines: QuoteLineDraft[] = products.map((p) => lineFromS2gProduct(p, jalonId, defaultTva))
+    const productLineKeys = childLines.map((l) => l.row_key!).filter(Boolean)
+    const productRefIds = childLines
+      .map((l) => l.ref_article_id)
+      .filter((id): id is number => id != null)
+
+    setForm((f) => {
+      const newJalon = {
+        id: jalonId,
+        libelle: art.libelle,
+        ref_article_id: art.id,
+        commercial_offering_id: null,
+        s2g_code: art.code,
+        product_line_keys: productLineKeys,
+        product_ref_article_ids: productRefIds,
+      }
+      const nextLines = [...f.lines, ...childLines]
+      const base =
+        f.meta.devis_parcours && f.meta.devis_parcours.length > 0
+          ? f.meta.devis_parcours
+          : getEffectiveDevisParcours(f.lines, f.meta)
+      const nextParcours = [
+        ...base,
+        { kind: 'jalon' as const, id: jalonId },
+        ...childLines.map((l) => ({ kind: 'ligne' as const, id: l.row_key! })),
+      ]
+      return {
+        ...f,
+        lines: nextLines,
+        meta: {
+          ...f.meta,
+          devis_jalons: [...(f.meta.devis_jalons ?? []), newJalon],
+          devis_parcours: nextParcours,
+        },
+      }
+    })
   }
 
   function applyOfferingToLine(index: number, o: CommercialOffering) {
@@ -707,8 +686,14 @@ export default function QuoteEditorPage() {
       {s2gPickOpen && (
         <S2gCataloguePickerModal
           onClose={() => setS2gPickOpen(false)}
-          onPick={(art) => {
-            void applyS2gArticle(art)
+          onPick={async (result) => {
+            try {
+              await applyS2gCataloguePick(result)
+              setSubmitError(null)
+            } catch (err) {
+              setSubmitError(err instanceof Error ? err.message : 'Impossible d’ajouter depuis le catalogue S2G.')
+              throw err
+            }
           }}
         />
       )}

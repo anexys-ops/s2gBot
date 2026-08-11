@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\BcLignePlanningAffectation;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
+use App\Services\BonLivraisonDeliveryService;
+use App\Services\CommercialDocumentTotalsService;
 use App\Services\CommercialDocumentWorkflowService;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
@@ -15,7 +17,8 @@ use Illuminate\Http\Request;
 class BonCommandeController extends Controller
 {
     public function __construct(
-        private readonly CommercialDocumentWorkflowService $workflow
+        private readonly CommercialDocumentWorkflowService $workflow,
+        private readonly BonLivraisonDeliveryService $delivery,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -136,12 +139,17 @@ class BonCommandeController extends Controller
             return response()->json(['message' => 'Ligne introuvable pour ce bon de commande.'], 404);
         }
 
+        if ($bonCommande->statut === BonCommande::STATUT_ANNULE) {
+            return response()->json(['message' => 'Impossible de modifier un bon de commande annulé.'], 422);
+        }
+
         $data = $request->validate([
             'date_debut_prevue' => 'sometimes|nullable|date',
             'date_fin_prevue' => 'sometimes|nullable|date',
             'technicien_id' => 'sometimes|nullable|integer|exists:users,id',
             'date_livraison' => 'sometimes|nullable|date',
             'notes_ligne' => 'sometimes|nullable|string|max:500',
+            'quantite' => 'sometimes|numeric|min:0',
         ]);
         if ($data === []) {
             $ligne->load(['planningAffectations.user', 'technicien']);
@@ -163,6 +171,25 @@ class BonCommandeController extends Controller
         if (array_key_exists('notes_ligne', $data)) {
             $ligne->notes_ligne = $data['notes_ligne'];
         }
+        $qtyChanged = false;
+        if (array_key_exists('quantite', $data)) {
+            $qty = round((float) $data['quantite'], 3);
+            $dejaLivree = $this->delivery->deliveredQtyForBcLigne((int) $ligne->id);
+            if ($qty + 1e-9 < $dejaLivree) {
+                $minLabel = $this->formatQtyLabel($dejaLivree);
+
+                return response()->json([
+                    'message' => "La quantité ne peut pas être inférieure à la quantité déjà livrée ({$minLabel}).",
+                ], 422);
+            }
+            $ligne->quantite = $qty;
+            $ligne->montant_ht = CommercialDocumentTotalsService::lineHt(
+                $qty,
+                (float) $ligne->prix_unitaire_ht,
+                0,
+            );
+            $qtyChanged = true;
+        }
         if ($ligne->date_debut_prevue && $ligne->date_fin_prevue
             && $ligne->date_debut_prevue->format('Y-m-d') > $ligne->date_fin_prevue->format('Y-m-d')
         ) {
@@ -170,10 +197,39 @@ class BonCommandeController extends Controller
         }
 
         $ligne->save();
+        if ($qtyChanged) {
+            $this->recalculateBonCommandeTotals($bonCommande);
+        }
         $this->syncTerrainPlanningAffectation($ligne, (int) $request->user()->id);
         $ligne->load(['planningAffectations.user', 'technicien']);
 
         return response()->json($ligne);
+    }
+
+    private function recalculateBonCommandeTotals(BonCommande $bonCommande): void
+    {
+        $bonCommande->load('lignes');
+        $rows = [];
+        foreach ($bonCommande->lignes as $l) {
+            $rows[] = [
+                'ht' => (float) $l->montant_ht,
+                'tva_rate' => (float) $l->tva_rate,
+            ];
+        }
+        $totals = CommercialDocumentTotalsService::computeTotals($rows, 0, 0, 0, 0);
+        $bonCommande->update([
+            'montant_ht' => $totals['amount_ht'],
+            'montant_ttc' => $totals['amount_ttc'],
+        ]);
+    }
+
+    private function formatQtyLabel(float $qty): string
+    {
+        if (abs($qty - round($qty)) < 1e-9) {
+            return (string) (int) round($qty);
+        }
+
+        return rtrim(rtrim(number_format($qty, 3, '.', ''), '0'), '.');
     }
 
     private function syncTerrainPlanningAffectation(BonCommandeLigne $ligne, int $actorId): void

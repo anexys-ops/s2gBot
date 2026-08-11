@@ -163,6 +163,111 @@ class BonCommandeWorkflowTest extends TestCase
         $this->assertSame('Accès chantier nord', $ligne->notes_ligne);
     }
 
+    public function test_update_bc_ligne_quantity_recalculates_line_and_totals(): void
+    {
+        $client = Client::query()->create(['name' => 'BC Qty Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site Qty']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0012',
+            'titre' => 'D12',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-12-QTY',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 100,
+            'amount_ttc' => 120,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai qty',
+            'quantity' => 2,
+            'unit_price' => 50,
+            'tva_rate' => 20,
+            'total' => 100,
+        ]);
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $bcId = (int) $bc['id'];
+        $ligneId = (int) $bc['lignes'][0]['id'];
+
+        $r = $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-commande/{$bcId}/lignes/{$ligneId}", [
+            'quantite' => 5,
+        ]);
+        $r->assertOk();
+        $r->assertJsonPath('quantite', 5);
+        $r->assertJsonPath('montant_ht', 250);
+
+        $bcFresh = BonCommande::query()->findOrFail($bcId);
+        $this->assertEquals(250.0, (float) $bcFresh->montant_ht);
+        $this->assertEquals(300.0, (float) $bcFresh->montant_ttc);
+
+        $ligne = BonCommandeLigne::query()->findOrFail($ligneId);
+        $this->assertEquals(5.0, (float) $ligne->quantite);
+        $this->assertEquals(250.0, (float) $ligne->montant_ht);
+    }
+
+    public function test_update_bc_ligne_quantity_rejects_below_delivered(): void
+    {
+        $client = Client::query()->create(['name' => 'BC Qty Floor Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site Qty2']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0013',
+            'titre' => 'D13',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-13-QTY',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 100,
+            'amount_ttc' => 120,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai floor',
+            'quantity' => 5,
+            'unit_price' => 20,
+            'tva_rate' => 20,
+            'total' => 100,
+        ]);
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $bcId = (int) $bc['id'];
+        $ligneId = (int) $bc['lignes'][0]['id'];
+        $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/confirmer")->assertOk();
+        $bl = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/transformer-bl")->assertCreated()->json();
+        $blId = (int) $bl['id'];
+        $blLineId = (int) $bl['lignes'][0]['id'];
+        $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-livraison/{$blId}", [
+            'lignes' => [['id' => $blLineId, 'quantite_livree' => 3]],
+        ])->assertOk();
+        $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-livraison/{$blId}/valider")->assertOk();
+
+        $r = $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-commande/{$bcId}/lignes/{$ligneId}", [
+            'quantite' => 2,
+        ]);
+        $r->assertStatus(422);
+        $r->assertJsonFragment(['message' => 'La quantité ne peut pas être inférieure à la quantité déjà livrée (3).']);
+    }
+
     public function test_update_bc_ligne_syncs_terrain_planning_affectation(): void
     {
         $client = Client::query()->create(['name' => 'BC Sync Co']);

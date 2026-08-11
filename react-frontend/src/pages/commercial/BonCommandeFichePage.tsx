@@ -17,6 +17,14 @@ const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technicia
 type LignePeriodeEdit = { debut: string; fin: string }
 type LigneExtraEdit = { technicien_id: number | null; date_livraison: string; notes_ligne: string }
 
+function qtyInputFromApi(q: string | number | null | undefined): string {
+  if (q == null || q === '') return '0'
+  const n = Number(q)
+  if (!Number.isFinite(n)) return '0'
+  if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n))
+  return String(n)
+}
+
 export default function BonCommandeFichePage() {
   const { id } = useParams<{ id: string }>()
   const bcId = Number(id)
@@ -29,6 +37,7 @@ export default function BonCommandeFichePage() {
   const [contactId, setContactId] = useState<number | null>(null)
   const [ligneEdits, setLigneEdits] = useState<Record<number, LignePeriodeEdit>>({})
   const [ligneExtraEdits, setLigneExtraEdits] = useState<Record<number, LigneExtraEdit>>({})
+  const [qtyEdits, setQtyEdits] = useState<Record<number, string>>({})
   const [confirmAction, setConfirmAction] = useState<'confirmer' | 'bl' | null>(null)
   const [planningToast, setPlanningToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
 
@@ -57,6 +66,7 @@ export default function BonCommandeFichePage() {
         .map((l) =>
           [
             l.id,
+            qtyInputFromApi(l.quantite),
             dateInputFromApi(l.date_debut_prevue),
             dateInputFromApi(l.date_fin_prevue),
             l.technicien_id ?? '',
@@ -72,10 +82,12 @@ export default function BonCommandeFichePage() {
     if (!bc?.lignes?.length) {
       setLigneEdits({})
       setLigneExtraEdits({})
+      setQtyEdits({})
       return
     }
     const next: Record<number, LignePeriodeEdit> = {}
     const nextExtra: Record<number, LigneExtraEdit> = {}
+    const nextQty: Record<number, string> = {}
     for (const l of bc.lignes) {
       const dl = l as BonCommandeLigne
       next[l.id] = {
@@ -87,9 +99,11 @@ export default function BonCommandeFichePage() {
         date_livraison: dateInputFromApi(dl.date_livraison),
         notes_ligne: dl.notes_ligne ?? '',
       }
+      nextQty[l.id] = qtyInputFromApi(dl.quantite)
     }
     setLigneEdits(next)
     setLigneExtraEdits(nextExtra)
+    setQtyEdits(nextQty)
   }, [bc?.id, serverLignesKey])
 
   const mutUpdate = useMutation({
@@ -104,6 +118,33 @@ export default function BonCommandeFichePage() {
     onSuccess: () => {
       setConfirmAction(null)
       void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
+    },
+  })
+
+  const mutQuantites = useMutation({
+    mutationFn: async (edits: Record<number, string>) => {
+      if (!bc?.lignes?.length) return
+      for (const l of bc.lignes) {
+        const raw = edits[l.id]
+        if (raw === undefined) continue
+        const qty = Number(String(raw).replace(',', '.'))
+        if (!Number.isFinite(qty) || qty < 0) {
+          throw new Error(`Quantité invalide pour « ${l.libelle} ».`)
+        }
+        if (Math.abs(qty - Number(l.quantite)) < 1e-9) continue
+        await bonsCommandeApi.updateLigne(bcId, l.id, { quantite: qty })
+      }
+    },
+    onSuccess: () => {
+      setPlanningToast({ message: 'Quantités enregistrées.', variant: 'success' })
+      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+    },
+    onError: (err) => {
+      setPlanningToast({
+        message: toastErrorMessage(err, 'Échec de l’enregistrement des quantités.'),
+        variant: 'error',
+      })
     },
   })
 
@@ -157,6 +198,36 @@ export default function BonCommandeFichePage() {
     () => buildBcLigneDisplayRows(bc?.lignes ?? [], resolveDevisDisplayMeta(bc)),
     [bc],
   )
+  const qtyDirty = useMemo(() => {
+    if (!bc?.lignes?.length) return false
+    return bc.lignes.some((l) => {
+      const raw = qtyEdits[l.id]
+      if (raw === undefined) return false
+      const n = Number(String(raw).replace(',', '.'))
+      if (!Number.isFinite(n)) return true
+      return Math.abs(n - Number(l.quantite)) >= 1e-9
+    })
+  }, [bc?.lignes, qtyEdits])
+  const previewTotals = useMemo(() => {
+    if (!bc?.lignes?.length) return null
+    let ht = 0
+    let tva = 0
+    for (const l of bc.lignes) {
+      const raw = qtyEdits[l.id]
+      const qty =
+        raw !== undefined && Number.isFinite(Number(String(raw).replace(',', '.')))
+          ? Number(String(raw).replace(',', '.'))
+          : Number(l.quantite)
+      const lineHt = Math.round(qty * Number(l.prix_unitaire_ht) * 100) / 100
+      const rate = Number(l.tva_rate) || 0
+      ht += lineHt
+      tva += Math.round(lineHt * (rate / 100) * 100) / 100
+    }
+    return {
+      ht: Math.round(ht * 100) / 100,
+      ttc: Math.round((ht + tva) * 100) / 100,
+    }
+  }, [bc?.lignes, qtyEdits])
   const bls = bc?.bons_livraison ?? []
   const statutBadge = useMemo(
     () => (bc ? bonCommandeStatutBadgeProps(bc.statut) : null),
@@ -328,10 +399,31 @@ export default function BonCommandeFichePage() {
           <div className="bc-fiche__main">
             <section className="card dossier-tab-panel dossier-tab-panel--table">
               <div className="dossier-tab-panel__header">
-                <h2 className="ds-form-section__title">Lignes de commande</h2>
-                <p className="dossier-tab-panel__intro">
-                  Prestations et articles repris du devis source ({MONEY_UNIT_LABEL}).
-                </p>
+                <div className="bc-fiche__lines-header">
+                  <div>
+                    <h2 className="ds-form-section__title">Lignes de commande</h2>
+                    <p className="dossier-tab-panel__intro">
+                      Prestations et articles repris du devis source ({MONEY_UNIT_LABEL}).
+                      {lab && bc.statut !== 'annule'
+                        ? ' Vous pouvez ajuster les quantités demandées par le client, puis enregistrer.'
+                        : null}
+                    </p>
+                  </div>
+                  {lab && ligneCount > 0 && bc.statut !== 'annule' ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => {
+                        setPlanningToast(null)
+                        mutQuantites.reset()
+                        mutQuantites.mutate(qtyEdits)
+                      }}
+                      disabled={mutQuantites.isPending || !qtyDirty}
+                    >
+                      {mutQuantites.isPending ? 'Enregistrement…' : 'Enregistrer les quantités'}
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               {ligneCount === 0 ? (
@@ -377,15 +469,40 @@ export default function BonCommandeFichePage() {
                           )
                         }
                         const l = row.ligne
+                        const canEditQty = lab && bc.statut !== 'annule'
+                        const rawQty = qtyEdits[l.id] ?? qtyInputFromApi(l.quantite)
+                        const previewQty = Number(String(rawQty).replace(',', '.'))
+                        const lineHt =
+                          Number.isFinite(previewQty) && previewQty >= 0
+                            ? Math.round(previewQty * Number(l.prix_unitaire_ht) * 100) / 100
+                            : Number(l.montant_ht)
                         return (
                           <tr
                             key={row.key}
                             className={row.nested ? 'bc-lignes-table__product--nested' : undefined}
                           >
                             <td>{l.libelle}</td>
-                            <td className="data-table__num">{formatQuantity(l.quantite)}</td>
+                            <td className="data-table__num">
+                              {canEditQty ? (
+                                <input
+                                  type="number"
+                                  className="bc-lignes-table__qty-input"
+                                  min={0}
+                                  step="any"
+                                  inputMode="decimal"
+                                  value={rawQty}
+                                  onChange={(e) => {
+                                    mutQuantites.reset()
+                                    setQtyEdits((s) => ({ ...s, [l.id]: e.target.value }))
+                                  }}
+                                  aria-label={`Quantité pour ${l.libelle}`}
+                                />
+                              ) : (
+                                formatQuantity(l.quantite)
+                              )}
+                            </td>
                             <td className="data-table__num">{formatMoney(Number(l.prix_unitaire_ht))}</td>
-                            <td className="data-table__num">{formatMoney(Number(l.montant_ht))}</td>
+                            <td className="data-table__num">{formatMoney(lineHt)}</td>
                           </tr>
                         )
                       })}
@@ -393,24 +510,27 @@ export default function BonCommandeFichePage() {
                     <tfoot>
                       <tr>
                         <td colSpan={3} className="data-table__foot-label">
-                          Total HT
+                          Total HT{qtyDirty ? ' (aperçu)' : ''}
                         </td>
                         <td className="data-table__num data-table__foot-value">
-                          {formatMoney(Number(bc.montant_ht))}
+                          {formatMoney(previewTotals?.ht ?? Number(bc.montant_ht))}
                         </td>
                       </tr>
                       <tr>
                         <td colSpan={3} className="data-table__foot-label">
-                          Total TTC
+                          Total TTC{qtyDirty ? ' (aperçu)' : ''}
                         </td>
                         <td className="data-table__num data-table__foot-value">
-                          {formatMoney(Number(bc.montant_ttc))}
+                          {formatMoney(previewTotals?.ttc ?? Number(bc.montant_ttc))}
                         </td>
                       </tr>
                     </tfoot>
                   </table>
                 </div>
               )}
+              {mutQuantites.isError ? (
+                <p className="error bc-fiche__qty-error">{(mutQuantites.error as Error).message}</p>
+              ) : null}
             </section>
 
             {lab && ligneCount > 0 ? (

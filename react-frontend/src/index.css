@@ -7848,6 +7848,32 @@ a.catalogue-tree__link-article:hover {
 .bc-lignes-table__col-qty {
   width: 4rem;
 }
+.bc-lignes-table__qty-input {
+  width: 5.25rem;
+  max-width: 100%;
+  padding: 0.25rem 0.35rem;
+  text-align: right;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 6px;
+  background: #fff;
+}
+.bc-lignes-table__qty-input:focus {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
+  border-color: #60a5fa;
+}
+.bc-fiche__lines-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+.bc-fiche__qty-error {
+  margin: 0.75rem 1.25rem 1rem;
+}
 .bc-lignes-table__col-money {
   width: 8rem;
 }

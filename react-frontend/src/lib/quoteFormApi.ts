@@ -26,9 +26,10 @@ export function buildQuoteApiBody(form: QuoteFormState): QuoteCreateBody {
   const lines = form.lines
     .filter((l) => trimLineDescription(l.description).length > 0 && l.quantity > 0)
     .map((l) => {
+      const isForfait = form.meta?.mode_devis === 'forfait'
       const row: QuoteCreateBody['lines'][number] = {
         description: trimLineDescription(l.description),
-        quantity: Math.max(1, Math.round(finiteNum(l.quantity, 1))),
+        quantity: isForfait ? 1 : Math.max(1, Math.round(finiteNum(l.quantity, 1))),
         unit_price: Math.max(0, finiteNum(l.unit_price, 0)),
         tva_rate: finiteNum(l.tva_rate, defaultTva),
         discount_percent: Math.min(100, Math.max(0, finiteNum(l.discount_percent, 0))),
@@ -46,9 +47,18 @@ export function buildQuoteApiBody(form: QuoteFormState): QuoteCreateBody {
   const meta = { ...form.meta }
   syncJalonProductKeysBeforeSave(form.lines, meta)
   if (meta.devis_jalons && meta.devis_jalons.length === 0) delete meta.devis_jalons
-  if (meta.tarif_global_hors_lignes_ht == null) delete meta.tarif_global_hors_lignes_ht
+  if (meta.mode_devis === 'forfait') {
+    meta.tarif_global_hors_lignes_ht = lines.reduce((sum, l) => {
+      const base = Math.round(l.quantity * l.unit_price * 100) / 100
+      const p = Math.min(100, Math.max(0, l.discount_percent ?? 0))
+      return sum + Math.round(base * (1 - p / 100) * 100) / 100
+    }, 0)
+  } else if (meta.tarif_global_hors_lignes_ht == null) {
+    delete meta.tarif_global_hors_lignes_ht
+  }
   if (meta.frais_supplementaires && meta.frais_supplementaires.length === 0) delete meta.frais_supplementaires
   if (meta.ligne_masque_prix_pdf && !meta.ligne_masque_prix_pdf.some(Boolean)) delete meta.ligne_masque_prix_pdf
+  if (meta.mode_devis === 'forfait') delete meta.ligne_masque_prix_pdf
   normalizeDevisParcoursInMeta(form.lines, meta.devis_jalons, meta)
   if (meta.devis_parcours && meta.devis_parcours.length === 0) delete meta.devis_parcours
   const hasMeta = Object.keys(meta).length > 0

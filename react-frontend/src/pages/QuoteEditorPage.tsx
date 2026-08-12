@@ -26,7 +26,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { formatMoney } from '../lib/appLocale'
 import { QUOTE_STATUS_LABELS } from '../lib/commercialStatusLabels'
-import { computeQuoteFormDocumentTotals, sumFraisSupplementairesTtc } from '../lib/quoteTotals'
+import { computeQuoteFormDocumentTotals, lineHt, sumFraisSupplementairesTtc } from '../lib/quoteTotals'
 import {
   getEffectiveDevisParcours,
   lineKeyForRow,
@@ -343,10 +343,22 @@ export default function QuoteEditorPage() {
   }
 
   const updateLine = (index: number, field: keyof QuoteLineDraft, value: string | number | null | boolean) => {
-    setForm((f) => ({
-      ...f,
-      lines: f.lines.map((l, i) => (i === index ? { ...l, [field]: value } : l)),
-    }))
+    setForm((f) => {
+      const isForfait = f.meta?.mode_devis === 'forfait'
+      let nextValue = value
+      if (field === 'quantity' && isForfait) {
+        nextValue = 1
+      }
+      const nextLines = f.lines.map((l, i) => (i === index ? { ...l, [field]: nextValue } : l))
+      const meta = { ...f.meta }
+      if (isForfait) {
+        meta.tarif_global_hors_lignes_ht = nextLines.reduce(
+          (sum, line) => sum + lineHt(1, line.unit_price, line.discount_percent ?? 0),
+          0,
+        )
+      }
+      return { ...f, lines: nextLines, meta }
+    })
   }
 
   const removeLine = (index: number) => {
@@ -438,6 +450,7 @@ export default function QuoteEditorPage() {
       .filter((id): id is number => id != null)
 
     setForm((f) => {
+      const isForfait = f.meta?.mode_devis === 'forfait'
       const newJalon = {
         id: jalonId,
         libelle: art.libelle,
@@ -447,7 +460,10 @@ export default function QuoteEditorPage() {
         product_line_keys: productLineKeys,
         product_ref_article_ids: productRefIds,
       }
-      const nextLines = [...f.lines, ...childLines]
+      const addedLines = isForfait
+        ? childLines.map((l) => (l.quantity === 1 ? l : { ...l, quantity: 1 }))
+        : childLines
+      const nextLines = [...f.lines, ...addedLines]
       const base =
         f.meta.devis_parcours && f.meta.devis_parcours.length > 0
           ? f.meta.devis_parcours
@@ -455,16 +471,23 @@ export default function QuoteEditorPage() {
       const nextParcours = [
         ...base,
         { kind: 'jalon' as const, id: jalonId },
-        ...childLines.map((l) => ({ kind: 'ligne' as const, id: l.row_key! })),
+        ...addedLines.map((l) => ({ kind: 'ligne' as const, id: l.row_key! })),
       ]
+      const meta = {
+        ...f.meta,
+        devis_jalons: [...(f.meta.devis_jalons ?? []), newJalon],
+        devis_parcours: nextParcours,
+      }
+      if (isForfait) {
+        meta.tarif_global_hors_lignes_ht = nextLines.reduce(
+          (sum, line) => sum + lineHt(1, line.unit_price, line.discount_percent ?? 0),
+          0,
+        )
+      }
       return {
         ...f,
         lines: nextLines,
-        meta: {
-          ...f.meta,
-          devis_jalons: [...(f.meta.devis_jalons ?? []), newJalon],
-          devis_parcours: nextParcours,
-        },
+        meta,
       }
     })
   }
@@ -550,10 +573,8 @@ export default function QuoteEditorPage() {
       return
     }
     const body = buildQuoteApiBody(form)
-    const hasForfait =
-      body.meta?.mode_devis === 'forfait' && (body.meta?.tarif_global_hors_lignes_ht ?? 0) > 0
     const hasJalons = (body.meta?.devis_jalons ?? []).length > 0
-    if (body.lines.length === 0 && !hasForfait && !hasJalons) {
+    if (body.lines.length === 0 && !hasJalons) {
       setSubmitError('Ajoutez au moins un jalon ou un produit S2G (étape Lignes).')
       return
     }

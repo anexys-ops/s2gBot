@@ -30,6 +30,7 @@ class QuotePdfPresentationService
         $jalons = $meta['devis_jalons'] ?? [];
         $parcours = $meta['devis_parcours'] ?? [];
         $maskPrices = $meta['ligne_masque_prix_pdf'] ?? [];
+        $isForfait = ($meta['mode_devis'] ?? '') === 'forfait';
 
         /** @var Collection<int, QuoteLine> $lines */
         $lines = $quote->quoteLines->values();
@@ -64,8 +65,8 @@ class QuotePdfPresentationService
                         if ($entry === null) {
                             continue;
                         }
-                        $mask = ($maskPrices[$entry['index']] ?? false) === true;
-                        $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, true);
+                        $mask = $isForfait || ($maskPrices[$entry['index']] ?? false) === true;
+                        $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, true, $isForfait);
                         $seenLineIds[$entry['line']->id] = true;
                     }
 
@@ -77,8 +78,8 @@ class QuotePdfPresentationService
                     if ($entry === null) {
                         continue;
                     }
-                    $mask = ($maskPrices[$entry['index']] ?? false) === true;
-                    $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, false);
+                    $mask = $isForfait || ($maskPrices[$entry['index']] ?? false) === true;
+                    $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, false, $isForfait);
                     $seenLineIds[$entry['line']->id] = true;
                 }
             }
@@ -90,8 +91,8 @@ class QuotePdfPresentationService
                     if ($entry === null) {
                         continue;
                     }
-                    $mask = ($maskPrices[$entry['index']] ?? false) === true;
-                    $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, true);
+                    $mask = $isForfait || ($maskPrices[$entry['index']] ?? false) === true;
+                    $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, true, $isForfait);
                     $seenLineIds[$entry['line']->id] = true;
                 }
             }
@@ -101,9 +102,21 @@ class QuotePdfPresentationService
             if (isset($seenLineIds[$line->id])) {
                 continue;
             }
-            $mask = ($maskPrices[$index] ?? false) === true;
-            $rows[] = $this->formatProductRow($line, ++$itemNum, $mask, false);
+            $mask = $isForfait || ($maskPrices[$index] ?? false) === true;
+            $rows[] = $this->formatProductRow($line, ++$itemNum, $mask, false, $isForfait);
             $seenLineIds[$line->id] = true;
+        }
+
+        if ($isForfait) {
+            $forfaitHt = $this->resolveForfaitHt($quote, $meta, $lines);
+            array_unshift($rows, [
+                'type' => 'forfait_total',
+                'label' => 'Prestation forfaitaire',
+                'unite' => 'F',
+                'qte' => 1,
+                'pu' => $forfaitHt,
+                'pt' => $forfaitHt,
+            ]);
         }
 
         return $rows;
@@ -144,11 +157,11 @@ class QuotePdfPresentationService
 
         $fraisSupp = $this->sumFraisSupplementaires($meta);
         $totalHt = (float) $quote->amount_ht;
-        $totalTva = max(0, (float) $quote->amount_ttc - (float) $quote->amount_ht);
+        $totalTva = round(max(0, (float) $quote->amount_ttc - (float) $quote->amount_ht), 2);
         $totalTtc = round((float) $quote->amount_ttc + $fraisSupp['total_ttc'], 2);
 
         if (! empty($meta['mode_devis']) && $meta['mode_devis'] === 'forfait') {
-            $forfaitHt = (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0);
+            $forfaitHt = $this->resolveForfaitHt($quote, $meta, $quote->quoteLines);
             if ($forfaitHt > 0) {
                 $totalHt = $forfaitHt;
             }
@@ -164,8 +177,30 @@ class QuotePdfPresentationService
             'frais_supplementaires_ttc' => $fraisSupp['total_ttc'],
             'frais_supplementaires' => $fraisSupp['items'],
             'is_forfait' => ($meta['mode_devis'] ?? '') === 'forfait',
-            'forfait_ht' => (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0),
+            'forfait_ht' => $this->resolveForfaitHt($quote, $meta, $quote->quoteLines),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @param  Collection<int, QuoteLine>|iterable<int, QuoteLine>  $lines
+     */
+    private function resolveForfaitHt(Quote $quote, array $meta, iterable $lines): float
+    {
+        $fromMeta = (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0);
+        if ($fromMeta > 0) {
+            return round($fromMeta, 2);
+        }
+
+        $sum = 0.0;
+        foreach ($lines as $line) {
+            $sum += (float) $line->total;
+        }
+        if ($sum > 0) {
+            return round($sum, 2);
+        }
+
+        return round((float) $quote->amount_ht, 2);
     }
 
     /**
@@ -273,7 +308,7 @@ class QuotePdfPresentationService
     /**
      * @return array<string, mixed>
      */
-    private function formatProductRow(QuoteLine $line, int $num, bool $maskPrice, bool $nested): array
+    private function formatProductRow(QuoteLine $line, int $num, bool $maskPrice, bool $nested, bool $isForfait = false): array
     {
         $article = $line->refArticle;
         $details = $this->detailLinesFor(
@@ -286,10 +321,10 @@ class QuotePdfPresentationService
             'nested' => $nested,
             'num' => (string) $num,
             'label' => trim((string) $line->description),
-            'unite' => $article?->unite ?? 'U',
-            'qte' => (int) $line->quantity,
-            'pu' => $maskPrice ? null : (float) $line->unit_price,
-            'pt' => $maskPrice ? null : (float) $line->total,
+            'unite' => $isForfait ? '' : ($article?->unite ?? 'U'),
+            'qte' => $isForfait ? null : (int) $line->quantity,
+            'pu' => ($maskPrice || $isForfait) ? null : (float) $line->unit_price,
+            'pt' => ($maskPrice || $isForfait) ? null : (float) $line->total,
             'details' => $details,
         ];
     }

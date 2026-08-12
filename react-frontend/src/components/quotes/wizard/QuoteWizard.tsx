@@ -59,12 +59,9 @@ function isStepValid(step: number, form: QuoteFormState): boolean {
     case 3:
       return true
     case 4: {
-      const hasForfait =
-        form.meta?.mode_devis === 'forfait' &&
-        (form.meta?.tarif_global_hors_lignes_ht ?? 0) > 0
       const hasLines = form.lines.length > 0
       const hasJalons = (form.meta?.devis_jalons ?? []).length > 0
-      return hasForfait || hasLines || hasJalons
+      return hasLines || hasJalons
     }
     case 5:
       return true

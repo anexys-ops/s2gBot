@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\Catalogue\Article;
+use App\Models\Catalogue\FamilleArticle;
 use App\Models\Client;
 use App\Models\Quote;
 use App\Models\QuoteLine;
@@ -25,7 +26,13 @@ class QuotePdfPresentationTest extends TestCase
     public function test_build_item_rows_orders_jalon_children_then_standalone_products(): void
     {
         $client = Client::query()->create(['name' => 'JET-CONTRACTORS']);
+        $famille = FamilleArticle::query()->create([
+            'code' => 'FAM-PDF',
+            'libelle' => 'Famille PDF',
+            'actif' => true,
+        ]);
         $child = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
             'code' => 'ART-1',
             'libelle' => 'Contrôle de béton',
             'description_commerciale' => "Déplacement de technicien\nDescription commerciale\nEssai d'affaissement",
@@ -34,6 +41,7 @@ class QuotePdfPresentationTest extends TestCase
             'kind' => Article::KIND_PRODUCT,
         ]);
         $standalone = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
             'code' => 'ART-2',
             'libelle' => 'Essai proctor',
             'description_commerciale' => 'Description commerciale',
@@ -103,6 +111,74 @@ class QuotePdfPresentationTest extends TestCase
         $this->assertSame([], $rows[2]['details']);
     }
 
+    public function test_forfait_pdf_rows_hide_line_prices_and_prepend_total(): void
+    {
+        $client = Client::query()->create(['name' => 'Client forfait']);
+        $famille = FamilleArticle::query()->create([
+            'code' => 'FAM-F',
+            'libelle' => 'Famille forfait',
+            'actif' => true,
+        ]);
+        $child = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
+            'code' => 'ART-F1',
+            'libelle' => 'Contrôle forfait',
+            'unite' => 'U',
+            'actif' => true,
+            'kind' => Article::KIND_PRODUCT,
+        ]);
+
+        $quote = Quote::query()->create([
+            'client_id' => $client->id,
+            'number' => 'DV-FORFAIT-1',
+            'quote_date' => '2026-06-16',
+            'amount_ht' => 1500,
+            'amount_ttc' => 1800,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_DRAFT,
+            'meta' => [
+                'mode_devis' => 'forfait',
+                'tarif_global_hors_lignes_ht' => 1500,
+                'devis_jalons' => [
+                    [
+                        'id' => 'j1',
+                        'libelle' => 'Lot forfait',
+                        's2g_code' => 'J-F',
+                        'product_ref_article_ids' => [$child->id],
+                    ],
+                ],
+                'devis_parcours' => [
+                    ['kind' => 'jalon', 'id' => 'j1'],
+                    ['kind' => 'ligne', 'id' => 'child-key'],
+                ],
+            ],
+        ]);
+
+        QuoteLine::query()->create([
+            'quote_id' => $quote->id,
+            'ref_article_id' => $child->id,
+            'description' => 'Contrôle forfait',
+            'quantity' => 1,
+            'unit_price' => 1500,
+            'total' => 1500,
+        ]);
+
+        $quote->load('quoteLines.refArticle');
+        $rows = (new QuotePdfPresentationService)->buildItemRows($quote);
+
+        $this->assertSame('forfait_total', $rows[0]['type']);
+        $this->assertSame('F', $rows[0]['unite']);
+        $this->assertSame(1, $rows[0]['qte']);
+        $this->assertSame(1500.0, $rows[0]['pu']);
+        $this->assertSame(1500.0, $rows[0]['pt']);
+        $this->assertSame('jalon_header', $rows[1]['type']);
+        $this->assertSame('product', $rows[2]['type']);
+        $this->assertSame('', $rows[2]['unite']);
+        $this->assertNull($rows[2]['qte']);
+        $this->assertNull($rows[2]['pu']);
+        $this->assertNull($rows[2]['pt']);
+    }
+
     public function test_build_context_includes_frais_supplementaires_in_total_ttc(): void
     {
         $client = Client::query()->create(['name' => 'Client frais']);
@@ -127,10 +203,10 @@ class QuotePdfPresentationTest extends TestCase
 
         $ctx = (new QuotePdfPresentationService)->buildContext($quote);
 
-        $this->assertSame(161.04, $ctx['total_ht']);
-        $this->assertSame(32.21, $ctx['total_tva']);
-        $this->assertSame(39.6, $ctx['frais_supplementaires_ttc']);
-        $this->assertSame(232.85, $ctx['total_ttc']);
+        $this->assertEqualsWithDelta(161.04, $ctx['total_ht'], 0.001);
+        $this->assertEqualsWithDelta(32.21, $ctx['total_tva'], 0.001);
+        $this->assertEqualsWithDelta(39.6, $ctx['frais_supplementaires_ttc'], 0.001);
+        $this->assertEqualsWithDelta(232.85, $ctx['total_ttc'], 0.001);
     }
 
     public function test_quote_pdf_generator_renders_s2g_template(): void

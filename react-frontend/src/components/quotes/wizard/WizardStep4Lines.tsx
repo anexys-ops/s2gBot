@@ -299,33 +299,20 @@ export default function WizardStep4Lines({
         </div>
       </div>
 
-      {isForfait ? (
-        <div className="qw-forfait-box">
-          <p className="qw-forfait-box__hint" style={{ margin: 0 }}>
-            Mode forfait : quantité fixée à <strong>1</strong> (non modifiable). Ajustez uniquement les prix unitaires.
-            Sur le PDF, les quantités et prix des jalons/articles restent vides&nbsp;; une ligne totale apparaît en tête
-            (Unité <strong>F</strong>, Qté <strong>1</strong>).
-          </p>
-          {form.lines.length > 0 ? (
-            <p className="qw-lines-step__summary" style={{ margin: '0.65rem 0 0' }}>
-              Total forfaitaire HT : <strong>{formatMoney(linesTotalHt)}</strong>
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-
       <div className="quote-lines-toolbar qw-lines-step__toolbar">
         <div>
           <h4 className="qw-lines-step__toolbar-title">Catalogue S2G</h4>
           {form.lines.length > 0 ? (
             <p className="qw-lines-step__summary">
               {form.lines.length} ligne{form.lines.length !== 1 ? 's' : ''}
-              {jalons.length > 0 ? ` · ${jalons.length} jalon${jalons.length !== 1 ? 's' : ''}` : ''} · Total HT{' '}
+              {jalons.length > 0 ? ` · ${jalons.length} jalon${jalons.length !== 1 ? 's' : ''}` : ''}
+              {isForfait ? ' · Forfait (qté 1)' : ''} · Total HT{' '}
               <strong>{formatMoney(linesTotalHt)}</strong>
             </p>
           ) : jalons.length > 0 ? (
             <p className="qw-lines-step__summary">
               {jalons.length} jalon{jalons.length !== 1 ? 's' : ''}
+              {isForfait ? ' · Forfait (qté 1)' : ''}
             </p>
           ) : null}
         </div>
@@ -353,7 +340,7 @@ export default function WizardStep4Lines({
               <tr>
                 <th>Origine</th>
                 <th>Désignation</th>
-                <th>Qté{isForfait ? ' (F)' : ''}</th>
+                <th>Qté</th>
                 <th>PU HT</th>
                 <th>Rem. %</th>
                 <th>TVA %</th>

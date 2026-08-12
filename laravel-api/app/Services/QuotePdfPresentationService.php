@@ -187,17 +187,17 @@ class QuotePdfPresentationService
      */
     private function resolveForfaitHt(Quote $quote, array $meta, iterable $lines): float
     {
-        $fromMeta = (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0);
-        if ($fromMeta > 0) {
-            return round($fromMeta, 2);
-        }
-
         $sum = 0.0;
         foreach ($lines as $line) {
             $sum += (float) $line->total;
         }
         if ($sum > 0) {
             return round($sum, 2);
+        }
+
+        $fromMeta = (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0);
+        if ($fromMeta > 0) {
+            return round($fromMeta, 2);
         }
 
         return round((float) $quote->amount_ht, 2);

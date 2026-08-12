@@ -179,6 +179,44 @@ class QuotePdfPresentationTest extends TestCase
         $this->assertNull($rows[2]['pt']);
     }
 
+    public function test_forfait_pdf_total_prefers_sum_of_line_totals(): void
+    {
+        $client = Client::query()->create(['name' => 'Client forfait sum']);
+        $quote = Quote::query()->create([
+            'client_id' => $client->id,
+            'number' => 'DV-FORFAIT-2',
+            'quote_date' => '2026-06-16',
+            'amount_ht' => 999,
+            'amount_ttc' => 1198.8,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_DRAFT,
+            'meta' => [
+                'mode_devis' => 'forfait',
+                'tarif_global_hors_lignes_ht' => 999,
+            ],
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $quote->id,
+            'description' => 'A',
+            'quantity' => 1,
+            'unit_price' => 400,
+            'total' => 400,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $quote->id,
+            'description' => 'B',
+            'quantity' => 1,
+            'unit_price' => 600,
+            'total' => 600,
+        ]);
+
+        $quote->load('quoteLines.refArticle');
+        $rows = (new QuotePdfPresentationService)->buildItemRows($quote);
+        $this->assertSame('forfait_total', $rows[0]['type']);
+        $this->assertSame(1000.0, $rows[0]['pu']);
+        $this->assertSame(1000.0, $rows[0]['pt']);
+    }
+
     public function test_build_context_includes_frais_supplementaires_in_total_ttc(): void
     {
         $client = Client::query()->create(['name' => 'Client frais']);

@@ -224,8 +224,16 @@ export default function QuoteEditorPage() {
     baseMeta.devis_jalons = devisJalons
     const withParcours = reconcileDevisParcoursOnLoad(rawLines, baseMeta)
     const restored = restoreS2gJalonLineLinks(rawLines, withParcours)
-    const lines = restored.lines
+    let lines = restored.lines
     const meta = restored.meta
+    if (meta.mode_devis === 'forfait') {
+      lines = lines.map((l) => (l.quantity === 1 ? l : { ...l, quantity: 1 }))
+      meta.tarif_global_hors_lignes_ht = lines.reduce(
+        (sum, line) => sum + lineHt(1, line.unit_price, line.discount_percent ?? 0),
+        0,
+      )
+      delete meta.ligne_masque_prix_pdf
+    }
     setForm({
       contextMode: inferContextMode(quote),
       client_id: quote.client_id,

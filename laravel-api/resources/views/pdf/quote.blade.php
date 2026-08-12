@@ -32,7 +32,7 @@
     $NAVY = '#1c3a6e';
     $LGRAY = '#f2f2f2';
     $BORDER = '#c0c0c0';
-    $fmt = fn ($n) => number_format((float) $n, 2, ',', ' ');
+    $fmt = fn ($n) => number_format((float) $n, 2, ',', "\xc2\xa0");
     $ctx = $pdfContext ?? [];
     $rows = $itemRows ?? [];
     $currency = $currencyLabel ?? 'DH';
@@ -74,11 +74,11 @@
 
     <table style="width:100%;margin-bottom:10px;">
         <colgroup>
-            <col style="width:55%;"/>
-            <col style="width:7%;"/>
-            <col style="width:10%;"/>
-            <col style="width:13%;"/>
-            <col style="width:15%;"/>
+            <col style="width:48%;"/>
+            <col style="width:6%;"/>
+            <col style="width:8%;"/>
+            <col style="width:19%;"/>
+            <col style="width:19%;"/>
         </colgroup>
         <thead>
             <tr>
@@ -96,8 +96,8 @@
                         <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;">{{ $row['label'] }}</td>
                         <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:center;">{{ $row['unite'] ?? 'F' }}</td>
                         <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:center;">{{ $row['qte'] ?? 1 }}</td>
-                        <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:right;">{{ $fmt($row['pu'] ?? 0) }}</td>
-                        <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:right;">{{ $fmt($row['pt'] ?? 0) }}</td>
+                        <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:right;white-space:nowrap;">{{ $fmt($row['pu'] ?? 0) }}</td>
+                        <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:right;white-space:nowrap;">{{ $fmt($row['pt'] ?? 0) }}</td>
                     </tr>
                 @elseif(($row['type'] ?? '') === 'jalon_header')
                     <tr>
@@ -119,10 +119,10 @@
                         <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:center;">
                             @if($row['qte'] !== null && $row['qte'] !== ''){{ $row['qte'] }}@endif
                         </td>
-                        <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:right;">
+                        <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:right;white-space:nowrap;">
                             @if($row['pu'] !== null){{ $fmt($row['pu']) }}@endif
                         </td>
-                        <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:right;">
+                        <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:right;white-space:nowrap;">
                             @if($row['pt'] !== null){{ $fmt($row['pt']) }}@endif
                         </td>
                     </tr>

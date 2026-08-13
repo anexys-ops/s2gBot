@@ -101,12 +101,13 @@ class SyncDescriptifArticleCsv extends Command
                 if ($jalon === null || $product === null) {
                     // dry-run sans IDs réels : on simule le lien
                     if ($dry) {
-                        $exists = JalonProduct::query()
+                        $existsQuery = JalonProduct::query()
                             ->whereHas('jalon', fn ($q) => $q->where('code', $jalonCode))
-                            ->whereHas('product', fn ($q) => $q->where('code', $productCode))
-                            ->where('tache_code', $row['tache_code'])
-                            ->exists();
-                        if ($exists) {
+                            ->whereHas('product', fn ($q) => $q->where('code', $productCode));
+                        if ($row['tache_code'] !== '') {
+                            $existsQuery->where('tache_code', $row['tache_code']);
+                        }
+                        if ($existsQuery->exists()) {
                             $skippedLinks++;
                         } else {
                             $createdLinks++;
@@ -116,11 +117,17 @@ class SyncDescriptifArticleCsv extends Command
                     continue;
                 }
 
-                $existing = JalonProduct::query()
+                $existingQuery = JalonProduct::query()
                     ->where('jalon_article_id', $jalon->id)
-                    ->where('product_article_id', $product->id)
-                    ->where('tache_code', $row['tache_code'])
-                    ->first();
+                    ->where('product_article_id', $product->id);
+
+                // CSV sans colonne tâche : ne pas recréer un lien si le couple jalon↔produit existe déjà
+                // (même avec une tâche renseignée depuis un autre import).
+                if ($row['tache_code'] === '') {
+                    $existing = $existingQuery->first();
+                } else {
+                    $existing = $existingQuery->where('tache_code', $row['tache_code'])->first();
+                }
 
                 if ($existing) {
                     $skippedLinks++;

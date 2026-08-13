@@ -36,9 +36,12 @@ jobs:
           set -euo pipefail
           SSH=(ssh -i ~/.ssh/deploy_key -p 167 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30)
           CSV="database/seeders/data/article_descriptif_links.csv"
-          echo "=== DRY-RUN ==="
+          echo "=== CLEANUP empty-tache duplicates ==="
+          "${SSH[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && ./scripts/docker-artisan.sh catalogue:cleanup-empty-tache-links --dry-run"
+          "${SSH[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && ./scripts/docker-artisan.sh catalogue:cleanup-empty-tache-links"
+          echo "=== DRY-RUN sync ==="
           "${SSH[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && ./scripts/docker-artisan.sh catalogue:sync-descriptif-article '$CSV' --dry-run"
-          echo "=== APPLY ==="
+          echo "=== APPLY sync ==="
           "${SSH[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && ./scripts/docker-artisan.sh catalogue:sync-descriptif-article '$CSV'"
           echo "=== COUNTS ==="
           "${SSH[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && ./scripts/docker-artisan.sh tinker --execute=\"echo 'jalons=' . App\\\\Models\\\\Catalogue\\\\Article::where('kind','jalon')->count() . ' products=' . App\\\\Models\\\\Catalogue\\\\Article::where('kind','product')->count() . ' links=' . App\\\\Models\\\\JalonProduct::count();\""

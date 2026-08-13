@@ -48,11 +48,7 @@ export function buildQuoteApiBody(form: QuoteFormState): QuoteCreateBody {
   syncJalonProductKeysBeforeSave(form.lines, meta)
   if (meta.devis_jalons && meta.devis_jalons.length === 0) delete meta.devis_jalons
   if (meta.mode_devis === 'forfait') {
-    meta.tarif_global_hors_lignes_ht = lines.reduce((sum, l) => {
-      const base = Math.round(l.quantity * l.unit_price * 100) / 100
-      const p = Math.min(100, Math.max(0, l.discount_percent ?? 0))
-      return sum + Math.round(base * (1 - p / 100) * 100) / 100
-    }, 0)
+    meta.tarif_global_hors_lignes_ht = Math.max(0, finiteNum(meta.tarif_global_hors_lignes_ht, 0))
   } else if (meta.tarif_global_hors_lignes_ht == null) {
     delete meta.tarif_global_hors_lignes_ht
   }

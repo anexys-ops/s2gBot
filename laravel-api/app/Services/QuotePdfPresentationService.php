@@ -160,13 +160,6 @@ class QuotePdfPresentationService
         $totalTva = round(max(0, (float) $quote->amount_ttc - (float) $quote->amount_ht), 2);
         $totalTtc = round((float) $quote->amount_ttc + $fraisSupp['total_ttc'], 2);
 
-        if (! empty($meta['mode_devis']) && $meta['mode_devis'] === 'forfait') {
-            $forfaitHt = $this->resolveForfaitHt($quote, $meta, $quote->quoteLines);
-            if ($forfaitHt > 0) {
-                $totalHt = $forfaitHt;
-            }
-        }
-
         return [
             'affaire' => $affaire,
             'validite_label' => $validite,
@@ -187,17 +180,17 @@ class QuotePdfPresentationService
      */
     private function resolveForfaitHt(Quote $quote, array $meta, iterable $lines): float
     {
+        $fromMeta = (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0);
+        if ($fromMeta > 0) {
+            return round($fromMeta, 2);
+        }
+
         $sum = 0.0;
         foreach ($lines as $line) {
             $sum += (float) $line->total;
         }
         if ($sum > 0) {
             return round($sum, 2);
-        }
-
-        $fromMeta = (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0);
-        if ($fromMeta > 0) {
-            return round($fromMeta, 2);
         }
 
         return round((float) $quote->amount_ht, 2);

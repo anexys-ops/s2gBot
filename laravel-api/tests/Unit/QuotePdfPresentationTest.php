@@ -179,20 +179,20 @@ class QuotePdfPresentationTest extends TestCase
         $this->assertNull($rows[2]['pt']);
     }
 
-    public function test_forfait_pdf_total_prefers_sum_of_line_totals(): void
+    public function test_forfait_pdf_total_prefers_meta_tarif(): void
     {
-        $client = Client::query()->create(['name' => 'Client forfait sum']);
+        $client = Client::query()->create(['name' => 'Client forfait meta']);
         $quote = Quote::query()->create([
             'client_id' => $client->id,
             'number' => 'DV-FORFAIT-2',
             'quote_date' => '2026-06-16',
-            'amount_ht' => 999,
-            'amount_ttc' => 1198.8,
+            'amount_ht' => 2500,
+            'amount_ttc' => 3000,
             'tva_rate' => 20,
             'status' => Quote::STATUS_DRAFT,
             'meta' => [
                 'mode_devis' => 'forfait',
-                'tarif_global_hors_lignes_ht' => 999,
+                'tarif_global_hors_lignes_ht' => 2500,
             ],
         ]);
         QuoteLine::query()->create([
@@ -213,8 +213,8 @@ class QuotePdfPresentationTest extends TestCase
         $quote->load('quoteLines.refArticle');
         $rows = (new QuotePdfPresentationService)->buildItemRows($quote);
         $this->assertSame('forfait_total', $rows[0]['type']);
-        $this->assertSame(1000.0, $rows[0]['pu']);
-        $this->assertSame(1000.0, $rows[0]['pt']);
+        $this->assertSame(2500.0, $rows[0]['pu']);
+        $this->assertSame(2500.0, $rows[0]['pt']);
     }
 
     public function test_build_context_includes_frais_supplementaires_in_total_ttc(): void

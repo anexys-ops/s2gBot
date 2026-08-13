@@ -137,9 +137,7 @@
     </table>
 
     @php
-        $totalHt = !empty($ctx['is_forfait']) && ($ctx['forfait_ht'] ?? 0) > 0
-            ? (float) $ctx['forfait_ht']
-            : (float) ($ctx['total_ht'] ?? $quote->amount_ht);
+        $totalHt = (float) ($ctx['total_ht'] ?? $quote->amount_ht);
         $totalTva = (float) ($ctx['total_tva'] ?? max(0, $quote->amount_ttc - $quote->amount_ht));
         $fraisSuppTtc = (float) ($ctx['frais_supplementaires_ttc'] ?? 0);
         $documentTtc = (float) $quote->amount_ttc;

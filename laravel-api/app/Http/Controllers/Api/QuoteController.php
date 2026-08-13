@@ -598,12 +598,25 @@ class QuoteController extends Controller
     private function recalculateQuoteTotals(Quote $quote): void
     {
         $quote->load('quoteLines');
-        $lines = [];
-        foreach ($quote->quoteLines as $ql) {
-            $lines[] = [
-                'ht' => (float) $ql->total,
-                'tva_rate' => (float) $ql->tva_rate,
+        $meta = is_array($quote->meta) ? $quote->meta : [];
+        $isForfait = ($meta['mode_devis'] ?? '') === 'forfait';
+        $forfaitHt = (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0);
+
+        if ($isForfait && $forfaitHt > 0) {
+            $lines = [
+                [
+                    'ht' => round($forfaitHt, 2),
+                    'tva_rate' => (float) $quote->tva_rate,
+                ],
             ];
+        } else {
+            $lines = [];
+            foreach ($quote->quoteLines as $ql) {
+                $lines[] = [
+                    'ht' => (float) $ql->total,
+                    'tva_rate' => (float) $ql->tva_rate,
+                ];
+            }
         }
 
         $totals = CommercialDocumentTotalsService::computeTotals(

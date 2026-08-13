@@ -228,10 +228,13 @@ export default function QuoteEditorPage() {
     const meta = restored.meta
     if (meta.mode_devis === 'forfait') {
       lines = lines.map((l) => (l.quantity === 1 ? l : { ...l, quantity: 1 }))
-      meta.tarif_global_hors_lignes_ht = lines.reduce(
-        (sum, line) => sum + lineHt(1, line.unit_price, line.discount_percent ?? 0),
-        0,
-      )
+      const existingTarif = Number(meta.tarif_global_hors_lignes_ht)
+      if (!Number.isFinite(existingTarif) || existingTarif <= 0) {
+        meta.tarif_global_hors_lignes_ht = lines.reduce(
+          (sum, line) => sum + lineHt(1, line.unit_price, line.discount_percent ?? 0),
+          0,
+        )
+      }
       delete meta.ligne_masque_prix_pdf
     }
     setForm({
@@ -304,29 +307,35 @@ export default function QuoteEditorPage() {
     return { ht: form.travel_fee_ht ?? 0, tva: form.travel_fee_tva_rate ?? 20 }
   }, [allSites, form.apply_site_travel, form.site_id, form.travel_fee_ht, form.travel_fee_tva_rate])
 
-  const documentTotals = useMemo(
-    () =>
-      computeQuoteFormDocumentTotals(
-        form.lines,
-        form.tva_rate ?? 20,
-        form.discount_percent ?? 0,
-        form.discount_amount ?? 0,
-        form.shipping_amount_ht ?? 0,
-        form.shipping_tva_rate ?? 20,
-        travelForTotals.ht,
-        travelForTotals.tva,
-      ),
-    [
-      form.lines,
-      form.tva_rate,
-      form.discount_percent,
-      form.discount_amount,
-      form.shipping_amount_ht,
-      form.shipping_tva_rate,
+  const documentTotals = useMemo(() => {
+    const defaultTva = form.tva_rate ?? 20
+    const isForfait = form.meta?.mode_devis === 'forfait'
+    const forfaitHt = Math.max(0, Number(form.meta?.tarif_global_hors_lignes_ht ?? 0))
+    const linesForTotals = isForfait
+      ? [{ quantity: 1, unit_price: forfaitHt, discount_percent: 0, tva_rate: defaultTva }]
+      : form.lines
+    return computeQuoteFormDocumentTotals(
+      linesForTotals,
+      defaultTva,
+      form.discount_percent ?? 0,
+      form.discount_amount ?? 0,
+      form.shipping_amount_ht ?? 0,
+      form.shipping_tva_rate ?? 20,
       travelForTotals.ht,
       travelForTotals.tva,
-    ],
-  )
+    )
+  }, [
+    form.lines,
+    form.meta?.mode_devis,
+    form.meta?.tarif_global_hors_lignes_ht,
+    form.tva_rate,
+    form.discount_percent,
+    form.discount_amount,
+    form.shipping_amount_ht,
+    form.shipping_tva_rate,
+    travelForTotals.ht,
+    travelForTotals.tva,
+  ])
 
   const metaFraisTtc = useMemo(
     () => sumFraisSupplementairesTtc(form.meta.frais_supplementaires),
@@ -353,19 +362,15 @@ export default function QuoteEditorPage() {
   const updateLine = (index: number, field: keyof QuoteLineDraft, value: string | number | null | boolean) => {
     setForm((f) => {
       const isForfait = f.meta?.mode_devis === 'forfait'
+      if (isForfait && (field === 'quantity' || field === 'unit_price' || field === 'discount_percent' || field === 'tva_rate')) {
+        return f
+      }
       let nextValue = value
       if (field === 'quantity' && isForfait) {
         nextValue = 1
       }
       const nextLines = f.lines.map((l, i) => (i === index ? { ...l, [field]: nextValue } : l))
-      const meta = { ...f.meta }
-      if (isForfait) {
-        meta.tarif_global_hors_lignes_ht = nextLines.reduce(
-          (sum, line) => sum + lineHt(1, line.unit_price, line.discount_percent ?? 0),
-          0,
-        )
-      }
-      return { ...f, lines: nextLines, meta }
+      return { ...f, lines: nextLines }
     })
   }
 
@@ -485,12 +490,6 @@ export default function QuoteEditorPage() {
         ...f.meta,
         devis_jalons: [...(f.meta.devis_jalons ?? []), newJalon],
         devis_parcours: nextParcours,
-      }
-      if (isForfait) {
-        meta.tarif_global_hors_lignes_ht = nextLines.reduce(
-          (sum, line) => sum + lineHt(1, line.unit_price, line.discount_percent ?? 0),
-          0,
-        )
       }
       return {
         ...f,

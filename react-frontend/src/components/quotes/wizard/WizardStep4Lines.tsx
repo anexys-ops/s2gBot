@@ -101,6 +101,9 @@ function LineRow({
 }) {
   const qty = isForfait ? 1 : line.quantity
   const ht = lineHt(qty, line.unit_price, line.discount_percent ?? 0)
+  const moneyLockedTitle = isForfait
+    ? 'En mode forfait, le montant est saisi une seule fois en haut de page'
+    : undefined
   return (
     <tr className={nested ? 'qw-s2g-line-row qw-s2g-line-row--nested' : 'qw-s2g-line-row'}>
       <td>
@@ -125,7 +128,7 @@ function LineRow({
           step={1}
           value={qty}
           disabled={isForfait}
-          title={isForfait ? 'En mode forfait, la quantité est fixée à 1' : undefined}
+          title={moneyLockedTitle}
           onChange={(e) => {
             if (isForfait) return
             const raw = e.target.value
@@ -144,7 +147,12 @@ function LineRow({
           min={0}
           step={0.01}
           value={line.unit_price}
-          onChange={(e) => updateLine(lineIndex, 'unit_price', Number(e.target.value))}
+          disabled={isForfait}
+          title={moneyLockedTitle}
+          onChange={(e) => {
+            if (isForfait) return
+            updateLine(lineIndex, 'unit_price', Number(e.target.value))
+          }}
         />
       </td>
       <td>
@@ -155,7 +163,12 @@ function LineRow({
           max={100}
           step={0.01}
           value={line.discount_percent ?? 0}
-          onChange={(e) => updateLine(lineIndex, 'discount_percent', Number(e.target.value))}
+          disabled={isForfait}
+          title={moneyLockedTitle}
+          onChange={(e) => {
+            if (isForfait) return
+            updateLine(lineIndex, 'discount_percent', Number(e.target.value))
+          }}
         />
       </td>
       <td>
@@ -166,7 +179,10 @@ function LineRow({
           max={100}
           step={1}
           value={line.tva_rate ?? form.tva_rate ?? 20}
+          disabled={isForfait}
+          title={moneyLockedTitle}
           onChange={(e) => {
+            if (isForfait) return
             const raw = e.target.value
             if (raw === '') {
               updateLine(lineIndex, 'tva_rate', 0)
@@ -176,7 +192,9 @@ function LineRow({
           }}
         />
       </td>
-      <td className="quote-lines-table__total">{formatMoney(ht)}</td>
+      <td className="quote-lines-table__total" title={moneyLockedTitle}>
+        {isForfait ? '—' : formatMoney(ht)}
+      </td>
       <td className="data-table__actions">
         <div className="data-table__actions-inner">
           <button
@@ -217,14 +235,20 @@ export default function WizardStep4Lines({
 
   const jalons = form.meta?.devis_jalons ?? []
 
+  const forfaitHt = Math.max(0, Number(form.meta?.tarif_global_hors_lignes_ht ?? 0))
+  const forfaitTva = Math.min(100, Math.max(0, Number(form.tva_rate ?? 20)))
+  const forfaitTvaAmount = Math.round(forfaitHt * (forfaitTva / 100) * 100) / 100
+  const forfaitTtc = Math.round((forfaitHt + forfaitTvaAmount) * 100) / 100
+
   const linesTotalHt = useMemo(
     () =>
-      form.lines.reduce(
-        (sum, line) =>
-          sum + lineHt(isForfait ? 1 : line.quantity, line.unit_price, line.discount_percent ?? 0),
-        0,
-      ),
-    [form.lines, isForfait],
+      isForfait
+        ? forfaitHt
+        : form.lines.reduce(
+            (sum, line) => sum + lineHt(line.quantity, line.unit_price, line.discount_percent ?? 0),
+            0,
+          ),
+    [form.lines, isForfait, forfaitHt],
   )
 
   const displayBlocks = useMemo(() => buildDisplayBlocks(form, jalons), [form, jalons])
@@ -243,7 +267,9 @@ export default function WizardStep4Lines({
       const meta = { ...f.meta }
       if (enabled) {
         meta.mode_devis = 'forfait'
-        meta.tarif_global_hors_lignes_ht = linesHt
+        const existing = Number(f.meta?.tarif_global_hors_lignes_ht)
+        meta.tarif_global_hors_lignes_ht =
+          Number.isFinite(existing) && existing > 0 ? existing : linesHt
         delete meta.ligne_masque_prix_pdf
       } else {
         delete meta.mode_devis
@@ -251,6 +277,24 @@ export default function WizardStep4Lines({
       }
       return { ...f, lines: nextLines, meta }
     })
+  }
+
+  const setForfaitHt = (raw: string) => {
+    setForm((f) => ({
+      ...f,
+      meta: {
+        ...f.meta,
+        mode_devis: 'forfait',
+        tarif_global_hors_lignes_ht: raw === '' ? 0 : Math.max(0, Number(raw)),
+      },
+    }))
+  }
+
+  const setForfaitTva = (raw: string) => {
+    setForm((f) => ({
+      ...f,
+      tva_rate: raw === '' ? 0 : Math.min(100, Math.max(0, Math.round(Number(raw)))),
+    }))
   }
 
   const lineIndexByKey = useMemo(
@@ -299,6 +343,49 @@ export default function WizardStep4Lines({
         </div>
       </div>
 
+      {isForfait ? (
+        <div className="qw-forfait-box">
+          <p className="qw-forfait-box__title">Montant forfaitaire</p>
+          <p className="qw-forfait-box__hint">
+            Un seul montant HT pour tout le devis. Les prix des articles sont désactivés ; le TTC et le PDF
+            utilisent ce forfait.
+          </p>
+          <div className="qw-forfait-box__fields">
+            <label className="qw-forfait-box__field">
+              <span>Montant HT</span>
+              <input
+                className="qw-forfait-input"
+                type="number"
+                min={0}
+                step={0.01}
+                value={form.meta?.tarif_global_hors_lignes_ht ?? 0}
+                onChange={(e) => setForfaitHt(e.target.value)}
+              />
+            </label>
+            <label className="qw-forfait-box__field">
+              <span>TVA %</span>
+              <input
+                className="qw-forfait-input"
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={forfaitTva}
+                onChange={(e) => setForfaitTva(e.target.value)}
+              />
+            </label>
+            <div className="qw-forfait-box__field qw-forfait-box__field--readonly">
+              <span>TVA</span>
+              <strong>{formatMoney(forfaitTvaAmount)}</strong>
+            </div>
+            <div className="qw-forfait-box__field qw-forfait-box__field--readonly">
+              <span>Total TTC</span>
+              <strong>{formatMoney(forfaitTtc)}</strong>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="quote-lines-toolbar qw-lines-step__toolbar">
         <div>
           <h4 className="qw-lines-step__toolbar-title">Catalogue S2G</h4>
@@ -306,13 +393,23 @@ export default function WizardStep4Lines({
             <p className="qw-lines-step__summary">
               {form.lines.length} ligne{form.lines.length !== 1 ? 's' : ''}
               {jalons.length > 0 ? ` · ${jalons.length} jalon${jalons.length !== 1 ? 's' : ''}` : ''}
-              {isForfait ? ' · Forfait (qté 1)' : ''} · Total HT{' '}
+              {isForfait ? ' · Forfait global' : ''} · Total HT{' '}
               <strong>{formatMoney(linesTotalHt)}</strong>
             </p>
           ) : jalons.length > 0 ? (
             <p className="qw-lines-step__summary">
               {jalons.length} jalon{jalons.length !== 1 ? 's' : ''}
-              {isForfait ? ' · Forfait (qté 1)' : ''}
+              {isForfait ? ' · Forfait global' : ''}
+              {isForfait ? (
+                <>
+                  {' '}
+                  · Total HT <strong>{formatMoney(linesTotalHt)}</strong>
+                </>
+              ) : null}
+            </p>
+          ) : isForfait ? (
+            <p className="qw-lines-step__summary">
+              Forfait global · Total HT <strong>{formatMoney(linesTotalHt)}</strong>
             </p>
           ) : null}
         </div>

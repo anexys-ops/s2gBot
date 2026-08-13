@@ -193,10 +193,40 @@
   padding-top: 1rem;
   border-top: 1px solid #e5e7eb;
 }
+.qw-forfait-box__title {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #92400e;
+}
 .qw-forfait-box__hint {
   font-size: 0.8rem;
   color: #92400e;
-  margin: 0.5rem 0 0;
+  margin: 0 0 0.85rem;
+}
+.qw-forfait-box__fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.25rem;
+  align-items: flex-end;
+}
+.qw-forfait-box__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  color: #78350f;
+}
+.qw-forfait-box__field .qw-forfait-input {
+  margin-left: 0;
+  width: 9.5rem;
+}
+.qw-forfait-box__field--readonly strong {
+  font-size: 1rem;
+  color: #1f2937;
+  min-height: 2rem;
+  display: inline-flex;
+  align-items: center;
 }
 .qw-jalon-row__amount {
   width: 130px;

@@ -1,0 +1,43 @@
+# Run incremental DescriptifArticle sync on production (code must already be deployed).
+name: Sync descriptif article CSV
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: sync-descriptif-article
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configurer SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p 167 -T 10 "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Dry-run puis sync incrémental
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          SSH=(ssh -i ~/.ssh/deploy_key -p 167 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30)
+          echo "=== DRY-RUN ==="
+          "${SSH[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && ./scripts/docker-artisan.sh catalogue:sync-descriptif-article --dry-run"
+          echo "=== APPLY ==="
+          "${SSH[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && ./scripts/docker-artisan.sh catalogue:sync-descriptif-article"
+          echo "=== COUNTS ==="
+          "${SSH[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && ./scripts/docker-artisan.sh tinker --execute=\"echo 'jalons=' . App\\\\Models\\\\Catalogue\\\\Article::where('kind','jalon')->count() . ' products=' . App\\\\Models\\\\Catalogue\\\\Article::where('kind','product')->count() . ' links=' . App\\\\Models\\\\JalonProduct::count();\""

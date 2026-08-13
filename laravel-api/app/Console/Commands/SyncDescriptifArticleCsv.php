@@ -268,22 +268,45 @@ class SyncDescriptifArticleCsv extends Command
                 $row[$key] = isset($data[$i]) ? (string) $data[$i] : '';
             }
 
-            $productLabel = $row['Libelle Descriptif Commecial']
-                ?? $row['Libelle Descriptif Commercial']
-                ?? '';
+            $jalonCode = $this->csvValue($row, ['Code Article', 'CodeArticle']);
+            $jalonLabel = $this->csvValue($row, ['Libelle Article', 'LibelleArticle']);
+            $productCode = $this->csvValue($row, ['Code Descriptif Commercial', 'CodeDescriptifCommercial']);
+            $productLabel = $this->csvValue($row, [
+                'Libelle Descriptif Commecial',
+                'Libelle Descriptif Commercial',
+                'LibelleDescriptifCommecial',
+                'LibelleDescriptifCommercial',
+            ]);
+            $tacheCode = $this->csvValue($row, ['Code Taches', 'CodeTaches', 'Code Tache', 'CodeTache']);
+            $tacheLabel = $this->csvValue($row, ['Libelle Tache', 'LibelleTache']);
 
             $out[] = [
-                'jalon_code' => trim($row['Code Article'] ?? ''),
-                'jalon_label' => preg_replace('/\s+/u', ' ', trim($row['Libelle Article'] ?? '')) ?? '',
-                'product_code' => trim($row['Code Descriptif Commercial'] ?? ''),
-                'product_label' => preg_replace('/\s+/u', ' ', trim($productLabel)) ?? '',
+                'jalon_code' => $jalonCode,
+                'jalon_label' => preg_replace('/\s+/u', ' ', $jalonLabel) ?? '',
+                'product_code' => $productCode,
+                'product_label' => preg_replace('/\s+/u', ' ', $productLabel) ?? '',
                 'ordre' => (int) ((float) ($row['Ordre'] ?? 0)),
-                'tache_code' => trim($row['Code Taches'] ?? ''),
-                'tache_label' => preg_replace('/\s+/u', ' ', trim($row['Libelle Tache'] ?? '')) ?? '',
+                'tache_code' => $tacheCode,
+                'tache_label' => preg_replace('/\s+/u', ' ', $tacheLabel) ?? '',
             ];
         }
         fclose($handle);
 
         return $out;
+    }
+
+    /**
+     * @param  array<string, string>  $row
+     * @param  list<string>  $keys
+     */
+    private function csvValue(array $row, array $keys): string
+    {
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $row) && trim($row[$key]) !== '') {
+                return trim($row[$key]);
+            }
+        }
+
+        return '';
     }
 }

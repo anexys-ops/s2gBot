@@ -65,7 +65,11 @@ class CleanupEmptyTacheJalonProducts extends Command
             return self::SUCCESS;
         }
 
-        $deleted = $query->delete();
+        $ids = $query->pluck('id');
+        $deleted = 0;
+        foreach ($ids->chunk(500) as $chunk) {
+            $deleted += JalonProduct::query()->whereIn('id', $chunk->all())->delete();
+        }
         $this->info("Supprimé : {$deleted} lien(s) vides en doublon.");
 
         return self::SUCCESS;

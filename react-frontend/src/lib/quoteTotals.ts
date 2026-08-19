@@ -1,3 +1,5 @@
+import { lineKeyForRow } from './devisParcours'
+
 /**
  * Totaux devis / facture — aligné sur `CommercialDocumentTotalsService` (Laravel).
  */
@@ -103,6 +105,92 @@ export function computeQuoteFormDocumentTotals(
     travelFeeHt,
     travelFeeTvaRate,
   )
+}
+
+export function isJalonForfait(jalon: { mode?: string } | undefined | null): boolean {
+  return jalon?.mode === 'forfait'
+}
+
+type PricingLine = {
+  row_key?: string
+  parent_jalon_id?: string | null
+  quantity: number
+  unit_price: number
+  discount_percent?: number
+  tva_rate: number
+}
+
+type PricingJalon = {
+  id?: string
+  mode?: string
+  montant_ht?: number
+  tva_rate?: number
+  product_line_keys?: string[]
+}
+
+export function forfaitJalonChildKeys(
+  lines: PricingLine[],
+  jalons: PricingJalon[] | undefined,
+): Set<string> {
+  const keys = new Set<string>()
+  for (const jalon of jalons ?? []) {
+    if (!isJalonForfait(jalon)) continue
+    for (const key of jalon.product_line_keys ?? []) keys.add(key)
+    lines.forEach((line, index) => {
+      if (jalon.id && line.parent_jalon_id === jalon.id) {
+        keys.add(lineKeyForRow(line, index))
+      }
+    })
+  }
+  return keys
+}
+
+export function lineLockedByForfaitJalon(
+  line: PricingLine,
+  index: number,
+  jalons: PricingJalon[] | undefined,
+): boolean {
+  const key = lineKeyForRow(line, index)
+  return (jalons ?? []).some(
+    (jalon) =>
+      isJalonForfait(jalon) &&
+      (line.parent_jalon_id === jalon.id || (jalon.product_line_keys ?? []).includes(key)),
+  )
+}
+
+/** Lignes HT/TVA pour les totaux — aligné sur `QuotePricingService` (Laravel). */
+export function quoteFormPricingLines(
+  formLines: PricingLine[],
+  jalons: PricingJalon[] | undefined,
+  documentTva: number,
+  isDocumentForfait: boolean,
+  documentForfaitHt: number,
+): QuoteLineTotalsInput[] {
+  if (isDocumentForfait) {
+    return [{ quantity: 1, unit_price: Math.max(0, documentForfaitHt), discount_percent: 0, tva_rate: documentTva }]
+  }
+
+  const skip = forfaitJalonChildKeys(formLines, jalons)
+  const lines: QuoteLineTotalsInput[] = formLines
+    .filter((line, index) => !skip.has(lineKeyForRow(line, index)))
+    .map((line) => ({
+      quantity: line.quantity,
+      unit_price: line.unit_price,
+      discount_percent: line.discount_percent,
+      tva_rate: line.tva_rate,
+    }))
+
+  for (const jalon of jalons ?? []) {
+    if (!isJalonForfait(jalon)) continue
+    lines.push({
+      quantity: 1,
+      unit_price: Math.max(0, Number(jalon.montant_ht ?? 0)),
+      discount_percent: 0,
+      tva_rate: Number.isFinite(Number(jalon.tva_rate)) ? Number(jalon.tva_rate) : documentTva,
+    })
+  }
+
+  return lines
 }
 
 function round2(n: number): number {

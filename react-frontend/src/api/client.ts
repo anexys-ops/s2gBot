@@ -1901,6 +1901,9 @@ export type EntityMetaPayload = {
     id?: string
     libelle: string
     montant_ht?: number
+    /** Forfait au jalon (devis détaillé mixte) ; omit = détaillé */
+    mode?: string
+    tva_rate?: number
     ref_article_id?: number | null
     commercial_offering_id?: number | null
     /** Clés row_key des lignes produit rattachées (catalogue S2G). */

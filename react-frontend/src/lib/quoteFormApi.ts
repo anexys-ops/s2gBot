@@ -47,6 +47,20 @@ export function buildQuoteApiBody(form: QuoteFormState): QuoteCreateBody {
   const meta = { ...form.meta }
   syncJalonProductKeysBeforeSave(form.lines, meta)
   if (meta.devis_jalons && meta.devis_jalons.length === 0) delete meta.devis_jalons
+  if (meta.devis_jalons?.length) {
+    meta.devis_jalons = meta.devis_jalons.map((j) => {
+      if (j.mode !== 'forfait') {
+        const next = { ...j }
+        delete next.mode
+        return next
+      }
+      return {
+        ...j,
+        montant_ht: Math.max(0, finiteNum(j.montant_ht, 0)),
+        tva_rate: Math.min(100, Math.max(0, finiteNum(j.tva_rate, defaultTva))),
+      }
+    })
+  }
   if (meta.mode_devis === 'forfait') {
     meta.tarif_global_hors_lignes_ht = Math.max(0, finiteNum(meta.tarif_global_hors_lignes_ht, 0))
   } else if (meta.tarif_global_hors_lignes_ht == null) {

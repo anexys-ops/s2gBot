@@ -30,7 +30,7 @@ class QuotePdfPresentationService
         $jalons = $meta['devis_jalons'] ?? [];
         $parcours = $meta['devis_parcours'] ?? [];
         $maskPrices = $meta['ligne_masque_prix_pdf'] ?? [];
-        $isForfait = ($meta['mode_devis'] ?? '') === 'forfait';
+        $documentForfait = ($meta['mode_devis'] ?? '') === 'forfait';
 
         /** @var Collection<int, QuoteLine> $lines */
         $lines = $quote->quoteLines->values();
@@ -59,14 +59,19 @@ class QuotePdfPresentationService
                     if ($jalon === null) {
                         continue;
                     }
-                    $rows[] = $this->formatJalonHeaderRow($jalon);
+                    $jalonForfait = ! $documentForfait && (($jalon['mode'] ?? '') === 'forfait');
+                    $rows[] = $this->formatJalonHeaderRow($jalon, $jalonForfait);
+                    if ($jalonForfait) {
+                        $rows[] = $this->formatJalonForfaitRow($jalon);
+                    }
                     foreach ($jalon['product_ref_article_ids'] ?? [] as $refId) {
                         $entry = $this->findLineByRefId($lines, (int) $refId, $seenLineIds);
                         if ($entry === null) {
                             continue;
                         }
-                        $mask = $isForfait || ($maskPrices[$entry['index']] ?? false) === true;
-                        $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, true, $isForfait);
+                        $hidePrices = $documentForfait || $jalonForfait;
+                        $mask = $hidePrices || ($maskPrices[$entry['index']] ?? false) === true;
+                        $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, true, $hidePrices);
                         $seenLineIds[$entry['line']->id] = true;
                     }
 
@@ -78,21 +83,26 @@ class QuotePdfPresentationService
                     if ($entry === null) {
                         continue;
                     }
-                    $mask = $isForfait || ($maskPrices[$entry['index']] ?? false) === true;
-                    $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, false, $isForfait);
+                    $mask = $documentForfait || ($maskPrices[$entry['index']] ?? false) === true;
+                    $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, false, $documentForfait);
                     $seenLineIds[$entry['line']->id] = true;
                 }
             }
         } elseif ($jalons !== []) {
             foreach ($jalons as $jalon) {
-                $rows[] = $this->formatJalonHeaderRow($jalon);
+                $jalonForfait = ! $documentForfait && (($jalon['mode'] ?? '') === 'forfait');
+                $rows[] = $this->formatJalonHeaderRow($jalon, $jalonForfait);
+                if ($jalonForfait) {
+                    $rows[] = $this->formatJalonForfaitRow($jalon);
+                }
                 foreach ($jalon['product_ref_article_ids'] ?? [] as $refId) {
                     $entry = $this->findLineByRefId($lines, (int) $refId, $seenLineIds);
                     if ($entry === null) {
                         continue;
                     }
-                    $mask = $isForfait || ($maskPrices[$entry['index']] ?? false) === true;
-                    $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, true, $isForfait);
+                    $hidePrices = $documentForfait || $jalonForfait;
+                    $mask = $hidePrices || ($maskPrices[$entry['index']] ?? false) === true;
+                    $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, true, $hidePrices);
                     $seenLineIds[$entry['line']->id] = true;
                 }
             }
@@ -102,12 +112,12 @@ class QuotePdfPresentationService
             if (isset($seenLineIds[$line->id])) {
                 continue;
             }
-            $mask = $isForfait || ($maskPrices[$index] ?? false) === true;
-            $rows[] = $this->formatProductRow($line, ++$itemNum, $mask, false, $isForfait);
+            $mask = $documentForfait || ($maskPrices[$index] ?? false) === true;
+            $rows[] = $this->formatProductRow($line, ++$itemNum, $mask, false, $documentForfait);
             $seenLineIds[$line->id] = true;
         }
 
-        if ($isForfait) {
+        if ($documentForfait) {
             $forfaitHt = $this->resolveForfaitHt($quote, $meta, $lines);
             array_unshift($rows, [
                 'type' => 'forfait_total',
@@ -249,12 +259,31 @@ class QuotePdfPresentationService
      * @param  array<string, mixed>  $jalon
      * @return array<string, mixed>
      */
-    private function formatJalonHeaderRow(array $jalon): array
+    private function formatJalonHeaderRow(array $jalon, bool $isForfait = false): array
     {
         return [
             'type' => 'jalon_header',
             'label' => trim((string) ($jalon['libelle'] ?? '')),
             'code' => $jalon['s2g_code'] ?? null,
+            'is_forfait' => $isForfait,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $jalon
+     * @return array<string, mixed>
+     */
+    private function formatJalonForfaitRow(array $jalon): array
+    {
+        $ht = round(max(0, (float) ($jalon['montant_ht'] ?? 0)), 2);
+
+        return [
+            'type' => 'forfait_total',
+            'label' => 'Prestation forfaitaire',
+            'unite' => 'F',
+            'qte' => 1,
+            'pu' => $ht,
+            'pt' => $ht,
         ];
     }
 

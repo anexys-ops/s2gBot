@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import ConfirmDialog from '../../ConfirmDialog'
 import type { QuoteFormState, QuoteLineDraft } from '../QuoteFormFields'
-import { lineHt } from '../../../lib/quoteTotals'
+import { lineHt, isJalonForfait, lineLockedByForfaitJalon, quoteFormPricingLines } from '../../../lib/quoteTotals'
 import { formatMoney } from '../../../lib/appLocale'
 import { getEffectiveDevisParcours, lineKeyForRow } from '../../../lib/devisParcours'
 import type { DevisParcoursItem } from '../../../lib/devisParcours'
@@ -85,7 +85,8 @@ function buildDisplayBlocks(
 function LineRow({
   line,
   lineIndex,
-  isForfait,
+  moneyLocked,
+  lockTitle,
   form,
   updateLine,
   onDelete,
@@ -93,17 +94,15 @@ function LineRow({
 }: {
   line: QuoteLineDraft
   lineIndex: number
-  isForfait: boolean
+  moneyLocked: boolean
+  lockTitle?: string
   form: QuoteFormState
   updateLine: Props['updateLine']
   onDelete: () => void
   nested?: boolean
 }) {
-  const qty = isForfait ? 1 : line.quantity
+  const qty = moneyLocked ? 1 : line.quantity
   const ht = lineHt(qty, line.unit_price, line.discount_percent ?? 0)
-  const moneyLockedTitle = isForfait
-    ? 'En mode forfait, le montant est saisi une seule fois en haut de page'
-    : undefined
   return (
     <tr className={nested ? 'qw-s2g-line-row qw-s2g-line-row--nested' : 'qw-s2g-line-row'}>
       <td>
@@ -127,10 +126,10 @@ function LineRow({
           min={1}
           step={1}
           value={qty}
-          disabled={isForfait}
-          title={moneyLockedTitle}
+          disabled={moneyLocked}
+          title={lockTitle}
           onChange={(e) => {
-            if (isForfait) return
+            if (moneyLocked) return
             const raw = e.target.value
             if (raw === '') {
               updateLine(lineIndex, 'quantity', 0)
@@ -147,10 +146,10 @@ function LineRow({
           min={0}
           step={0.01}
           value={line.unit_price}
-          disabled={isForfait}
-          title={moneyLockedTitle}
+          disabled={moneyLocked}
+          title={lockTitle}
           onChange={(e) => {
-            if (isForfait) return
+            if (moneyLocked) return
             updateLine(lineIndex, 'unit_price', Number(e.target.value))
           }}
         />
@@ -163,10 +162,10 @@ function LineRow({
           max={100}
           step={0.01}
           value={line.discount_percent ?? 0}
-          disabled={isForfait}
-          title={moneyLockedTitle}
+          disabled={moneyLocked}
+          title={lockTitle}
           onChange={(e) => {
-            if (isForfait) return
+            if (moneyLocked) return
             updateLine(lineIndex, 'discount_percent', Number(e.target.value))
           }}
         />
@@ -179,10 +178,10 @@ function LineRow({
           max={100}
           step={1}
           value={line.tva_rate ?? form.tva_rate ?? 20}
-          disabled={isForfait}
-          title={moneyLockedTitle}
+          disabled={moneyLocked}
+          title={lockTitle}
           onChange={(e) => {
-            if (isForfait) return
+            if (moneyLocked) return
             const raw = e.target.value
             if (raw === '') {
               updateLine(lineIndex, 'tva_rate', 0)
@@ -192,8 +191,8 @@ function LineRow({
           }}
         />
       </td>
-      <td className="quote-lines-table__total" title={moneyLockedTitle}>
-        {isForfait ? '—' : formatMoney(ht)}
+      <td className="quote-lines-table__total" title={lockTitle}>
+        {moneyLocked ? '—' : formatMoney(ht)}
       </td>
       <td className="data-table__actions">
         <div className="data-table__actions-inner">
@@ -242,18 +241,35 @@ export default function WizardStep4Lines({
 
   const linesTotalHt = useMemo(
     () =>
-      isForfait
-        ? forfaitHt
-        : form.lines.reduce(
-            (sum, line) => sum + lineHt(line.quantity, line.unit_price, line.discount_percent ?? 0),
-            0,
-          ),
-    [form.lines, isForfait, forfaitHt],
+      quoteFormPricingLines(
+        form.lines,
+        jalons,
+        form.tva_rate ?? 20,
+        isForfait,
+        forfaitHt,
+      ).reduce((sum, line) => sum + lineHt(line.quantity, line.unit_price, line.discount_percent ?? 0), 0),
+    [form.lines, jalons, form.tva_rate, isForfait, forfaitHt],
   )
 
   const displayBlocks = useMemo(() => buildDisplayBlocks(form, jalons), [form, jalons])
 
   const hasContent = form.lines.length > 0 || jalons.length > 0
+
+  const lineMoneyLock = (line: QuoteLineDraft, index: number) => {
+    if (isForfait) {
+      return {
+        locked: true,
+        title: 'En mode forfait, le montant est saisi une seule fois en haut de page',
+      }
+    }
+    if (lineLockedByForfaitJalon(line, index, jalons)) {
+      return {
+        locked: true,
+        title: 'En forfait jalon, le montant est saisi sur le jalon',
+      }
+    }
+    return { locked: false, title: undefined as string | undefined }
+  }
 
   const toggleForfait = (enabled: boolean) => {
     setForm((f) => {
@@ -297,6 +313,50 @@ export default function WizardStep4Lines({
     }))
   }
 
+  const toggleJalonForfait = (jalonId: string, enabled: boolean) => {
+    setForm((f) => {
+      const list = [...(f.meta.devis_jalons ?? [])]
+      const idx = list.findIndex((j) => j.id === jalonId)
+      if (idx < 0) return f
+      const jalon = { ...list[idx] }
+      if (enabled) {
+        jalon.mode = 'forfait'
+        const existing = Number(jalon.montant_ht)
+        if (!Number.isFinite(existing) || existing <= 0) {
+          const childKeys = new Set(jalon.product_line_keys ?? [])
+          jalon.montant_ht = f.lines.reduce((sum, line, i) => {
+            const key = lineKeyForRow(line, i)
+            if (line.parent_jalon_id === jalonId || childKeys.has(key)) {
+              return sum + lineHt(line.quantity, line.unit_price, line.discount_percent ?? 0)
+            }
+            return sum
+          }, 0)
+        }
+        if (jalon.tva_rate == null) jalon.tva_rate = f.tva_rate ?? 20
+      } else {
+        delete jalon.mode
+      }
+      list[idx] = jalon
+      return { ...f, meta: { ...f.meta, devis_jalons: list } }
+    })
+  }
+
+  const updateJalonForfait = (jalonId: string, field: 'montant_ht' | 'tva_rate', raw: string) => {
+    setForm((f) => {
+      const list = [...(f.meta.devis_jalons ?? [])]
+      const idx = list.findIndex((j) => j.id === jalonId)
+      if (idx < 0) return f
+      const jalon = { ...list[idx], mode: 'forfait' as const }
+      if (field === 'montant_ht') {
+        jalon.montant_ht = raw === '' ? 0 : Math.max(0, Number(raw))
+      } else {
+        jalon.tva_rate = raw === '' ? 0 : Math.min(100, Math.max(0, Math.round(Number(raw))))
+      }
+      list[idx] = jalon
+      return { ...f, meta: { ...f.meta, devis_jalons: list } }
+    })
+  }
+
   const lineIndexByKey = useMemo(
     () => new Map(form.lines.map((l, i) => [lineKeyForRow(l, i), i])),
     [form.lines],
@@ -319,8 +379,8 @@ export default function WizardStep4Lines({
       <p className="qw-section-title">Lignes du devis</p>
       <p className="qw-section-sub">
         Ajoutez des jalons depuis le catalogue S2G en suivant le parcours{' '}
-        <strong>Qualification → Jalon → Articles</strong>. Seuls les articles sélectionnés apparaissent sous chaque
-        jalon.
+        <strong>Qualification → Jalon → Articles</strong>. En mode détaillé, chaque jalon peut être tarifé au forfait
+        ou à la ligne.
       </p>
 
       <div className="qw-lines-step__mode">
@@ -450,12 +510,14 @@ export default function WizardStep4Lines({
                 if (block.type === 'line') {
                   const line = form.lines[block.lineIndex]
                   if (!line) return null
+                  const lock = lineMoneyLock(line, block.lineIndex)
                   return (
                     <LineRow
                       key={line.row_key ?? `line-${block.lineIndex}`}
                       line={line}
                       lineIndex={block.lineIndex}
-                      isForfait={isForfait}
+                      moneyLocked={lock.locked}
+                      lockTitle={lock.title}
                       form={form}
                       updateLine={updateLine}
                       onDelete={() => setDeleteIndex(block.lineIndex)}
@@ -467,6 +529,11 @@ export default function WizardStep4Lines({
                 if (!jalon) return null
                 const productKeys = jalon.product_line_keys ?? []
                 const children = childLinesForJalon(productKeys)
+                const jalonForfait = !isForfait && isJalonForfait(jalon)
+                const jalonHt = Math.max(0, Number(jalon.montant_ht ?? 0))
+                const jalonTva = Math.min(100, Math.max(0, Number(jalon.tva_rate ?? form.tva_rate ?? 20)))
+                const jalonTvaAmount = Math.round(jalonHt * (jalonTva / 100) * 100) / 100
+                const jalonTtc = Math.round((jalonHt + jalonTvaAmount) * 100) / 100
 
                 return (
                   <Fragment key={`jalon-block-${block.jalonId}`}>
@@ -479,6 +546,54 @@ export default function WizardStep4Lines({
                           <strong className="qw-s2g-jalon-row__title">{jalon.libelle}</strong>
                           {jalon.s2g_code ? (
                             <span className="text-muted qw-s2g-jalon-row__code">{jalon.s2g_code}</span>
+                          ) : null}
+                          {!isForfait ? (
+                            <div className="qw-mode-btns qw-s2g-jalon-row__mode">
+                              <button
+                                type="button"
+                                className={`qw-mode-btn${!jalonForfait ? ' qw-mode-btn--active' : ''}`}
+                                onClick={() => toggleJalonForfait(block.jalonId, false)}
+                              >
+                                Détaillé
+                              </button>
+                              <button
+                                type="button"
+                                className={`qw-mode-btn${jalonForfait ? ' qw-mode-btn--active' : ''}`}
+                                onClick={() => toggleJalonForfait(block.jalonId, true)}
+                              >
+                                Forfait
+                              </button>
+                            </div>
+                          ) : null}
+                          {jalonForfait ? (
+                            <div className="qw-s2g-jalon-row__forfait">
+                              <label>
+                                HT
+                                <input
+                                  className="qw-forfait-input qw-s2g-jalon-row__forfait-input"
+                                  type="number"
+                                  min={0}
+                                  step={0.01}
+                                  value={jalon.montant_ht ?? 0}
+                                  onChange={(e) => updateJalonForfait(block.jalonId, 'montant_ht', e.target.value)}
+                                />
+                              </label>
+                              <label>
+                                TVA %
+                                <input
+                                  className="qw-forfait-input qw-s2g-jalon-row__forfait-input"
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  step={1}
+                                  value={jalonTva}
+                                  onChange={(e) => updateJalonForfait(block.jalonId, 'tva_rate', e.target.value)}
+                                />
+                              </label>
+                              <span className="qw-s2g-jalon-row__forfait-ttc">
+                                TTC <strong>{formatMoney(jalonTtc)}</strong>
+                              </span>
+                            </div>
                           ) : null}
                           <button
                             type="button"
@@ -507,18 +622,22 @@ export default function WizardStep4Lines({
                       </td>
                       <td />
                     </tr>
-                    {children.map(({ line, index }) => (
-                      <LineRow
-                        key={line.row_key ?? `child-${index}`}
-                        line={line}
-                        lineIndex={index}
-                        isForfait={isForfait}
-                        form={form}
-                        updateLine={updateLine}
-                        onDelete={() => setDeleteIndex(index)}
-                        nested
-                      />
-                    ))}
+                    {children.map(({ line, index }) => {
+                      const lock = lineMoneyLock(line, index)
+                      return (
+                        <LineRow
+                          key={line.row_key ?? `child-${index}`}
+                          line={line}
+                          lineIndex={index}
+                          moneyLocked={lock.locked}
+                          lockTitle={lock.title}
+                          form={form}
+                          updateLine={updateLine}
+                          onDelete={() => setDeleteIndex(index)}
+                          nested
+                        />
+                      )
+                    })}
                   </Fragment>
                 )
               })}

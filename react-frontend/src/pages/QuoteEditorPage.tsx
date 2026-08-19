@@ -26,7 +26,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { formatMoney } from '../lib/appLocale'
 import { QUOTE_STATUS_LABELS } from '../lib/commercialStatusLabels'
-import { computeQuoteFormDocumentTotals, lineHt, sumFraisSupplementairesTtc } from '../lib/quoteTotals'
+import { computeQuoteFormDocumentTotals, lineHt, quoteFormPricingLines, lineLockedByForfaitJalon, sumFraisSupplementairesTtc } from '../lib/quoteTotals'
 import {
   getEffectiveDevisParcours,
   lineKeyForRow,
@@ -311,9 +311,13 @@ export default function QuoteEditorPage() {
     const defaultTva = form.tva_rate ?? 20
     const isForfait = form.meta?.mode_devis === 'forfait'
     const forfaitHt = Math.max(0, Number(form.meta?.tarif_global_hors_lignes_ht ?? 0))
-    const linesForTotals = isForfait
-      ? [{ quantity: 1, unit_price: forfaitHt, discount_percent: 0, tva_rate: defaultTva }]
-      : form.lines
+    const linesForTotals = quoteFormPricingLines(
+      form.lines,
+      form.meta?.devis_jalons,
+      defaultTva,
+      isForfait,
+      forfaitHt,
+    )
     return computeQuoteFormDocumentTotals(
       linesForTotals,
       defaultTva,
@@ -326,6 +330,7 @@ export default function QuoteEditorPage() {
     )
   }, [
     form.lines,
+    form.meta?.devis_jalons,
     form.meta?.mode_devis,
     form.meta?.tarif_global_hors_lignes_ht,
     form.tva_rate,
@@ -361,15 +366,13 @@ export default function QuoteEditorPage() {
 
   const updateLine = (index: number, field: keyof QuoteLineDraft, value: string | number | null | boolean) => {
     setForm((f) => {
-      const isForfait = f.meta?.mode_devis === 'forfait'
-      if (isForfait && (field === 'quantity' || field === 'unit_price' || field === 'discount_percent' || field === 'tva_rate')) {
+      const moneyLocked =
+        f.meta?.mode_devis === 'forfait' ||
+        lineLockedByForfaitJalon(f.lines[index], index, f.meta?.devis_jalons)
+      if (moneyLocked && (field === 'quantity' || field === 'unit_price' || field === 'discount_percent' || field === 'tva_rate')) {
         return f
       }
-      let nextValue = value
-      if (field === 'quantity' && isForfait) {
-        nextValue = 1
-      }
-      const nextLines = f.lines.map((l, i) => (i === index ? { ...l, [field]: nextValue } : l))
+      const nextLines = f.lines.map((l, i) => (i === index ? { ...l, [field]: value } : l))
       return { ...f, lines: nextLines }
     })
   }

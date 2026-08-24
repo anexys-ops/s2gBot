@@ -144,6 +144,10 @@ class QuotePdfPresentationTest extends TestCase
                         'id' => 'j1',
                         'libelle' => 'Lot forfait',
                         's2g_code' => 'J-F',
+                        'quantity' => 1,
+                        'prix_unitaire_ht' => 1500,
+                        'montant_ht' => 1500,
+                        'unite' => 'F',
                         'product_ref_article_ids' => [$child->id],
                     ],
                 ],
@@ -166,12 +170,12 @@ class QuotePdfPresentationTest extends TestCase
         $quote->load('quoteLines.refArticle');
         $rows = (new QuotePdfPresentationService)->buildItemRows($quote);
 
-        $this->assertSame('forfait_total', $rows[0]['type']);
-        $this->assertSame('F', $rows[0]['unite']);
-        $this->assertSame(1, $rows[0]['qte']);
-        $this->assertSame(1500.0, $rows[0]['pu']);
-        $this->assertSame(1500.0, $rows[0]['pt']);
-        $this->assertSame('jalon_header', $rows[1]['type']);
+        $this->assertSame('jalon_header', $rows[0]['type']);
+        $this->assertSame('forfait_total', $rows[1]['type']);
+        $this->assertSame('F', $rows[1]['unite']);
+        $this->assertSame(1, $rows[1]['qte']);
+        $this->assertSame(1500.0, $rows[1]['pu']);
+        $this->assertSame(1500.0, $rows[1]['pt']);
         $this->assertSame('product', $rows[2]['type']);
         $this->assertSame('', $rows[2]['unite']);
         $this->assertNull($rows[2]['qte']);

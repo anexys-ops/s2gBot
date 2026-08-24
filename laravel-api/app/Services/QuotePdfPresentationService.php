@@ -59,8 +59,8 @@ class QuotePdfPresentationService
                     if ($jalon === null) {
                         continue;
                     }
-                    $jalonForfait = ! $documentForfait && (($jalon['mode'] ?? '') === 'forfait');
-                    $rows[] = $this->formatJalonHeaderRow($jalon, $jalonForfait);
+                    $jalonForfait = $documentForfait || (($jalon['mode'] ?? '') === 'forfait');
+                    $rows[] = $this->formatJalonHeaderRow($jalon, $jalonForfait && ! $documentForfait);
                     if ($jalonForfait) {
                         $rows[] = $this->formatJalonForfaitRow($jalon);
                     }
@@ -90,8 +90,8 @@ class QuotePdfPresentationService
             }
         } elseif ($jalons !== []) {
             foreach ($jalons as $jalon) {
-                $jalonForfait = ! $documentForfait && (($jalon['mode'] ?? '') === 'forfait');
-                $rows[] = $this->formatJalonHeaderRow($jalon, $jalonForfait);
+                $jalonForfait = $documentForfait || (($jalon['mode'] ?? '') === 'forfait');
+                $rows[] = $this->formatJalonHeaderRow($jalon, $jalonForfait && ! $documentForfait);
                 if ($jalonForfait) {
                     $rows[] = $this->formatJalonForfaitRow($jalon);
                 }
@@ -117,21 +117,9 @@ class QuotePdfPresentationService
             $seenLineIds[$line->id] = true;
         }
 
-        if ($documentForfait) {
+        if ($documentForfait && ($jalons === [] || ! is_array($jalons))) {
             $forfaitHt = $this->resolveForfaitHt($quote, $meta, $lines);
             $forfaitUnite = trim((string) ($meta['tarif_global_unite'] ?? ''));
-            if ($forfaitUnite === '') {
-                foreach ($jalons as $jalon) {
-                    if (! is_array($jalon)) {
-                        continue;
-                    }
-                    $candidate = trim((string) ($jalon['unite'] ?? ''));
-                    if ($candidate !== '') {
-                        $forfaitUnite = $candidate;
-                        break;
-                    }
-                }
-            }
             if ($forfaitUnite === '') {
                 $forfaitUnite = 'F';
             }
@@ -206,6 +194,19 @@ class QuotePdfPresentationService
      */
     private function resolveForfaitHt(Quote $quote, array $meta, iterable $lines): float
     {
+        $jalons = $meta['devis_jalons'] ?? [];
+        if (is_array($jalons) && $jalons !== []) {
+            $sum = 0.0;
+            foreach ($jalons as $jalon) {
+                if (is_array($jalon)) {
+                    $sum += QuotePricingService::forfaitJalonTotalHt($jalon);
+                }
+            }
+            if ($sum > 0) {
+                return round($sum, 2);
+            }
+        }
+
         $fromMeta = (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0);
         if ($fromMeta > 0) {
             return round($fromMeta, 2);
@@ -291,19 +292,34 @@ class QuotePdfPresentationService
      */
     private function formatJalonForfaitRow(array $jalon): array
     {
-        $ht = round(max(0, (float) ($jalon['montant_ht'] ?? 0)), 2);
+        $qty = (float) ($jalon['quantity'] ?? 1);
+        if ($qty <= 0) {
+            $qty = 1;
+        } else {
+            $qty = max(1, round($qty));
+        }
+
         $unite = trim((string) ($jalon['unite'] ?? ''));
         if ($unite === '') {
             $unite = 'F';
+        }
+
+        if (array_key_exists('prix_unitaire_ht', $jalon)) {
+            $pu = round(max(0, (float) $jalon['prix_unitaire_ht']), 2);
+            $pt = round($qty * $pu, 2);
+        } else {
+            $pt = round(max(0, (float) ($jalon['montant_ht'] ?? 0)), 2);
+            $pu = $pt;
+            $qty = 1;
         }
 
         return [
             'type' => 'forfait_total',
             'label' => 'Prestation forfaitaire',
             'unite' => $unite,
-            'qte' => 1,
-            'pu' => $ht,
-            'pt' => $ht,
+            'qte' => (int) $qty,
+            'pu' => $pu,
+            'pt' => $pt,
         ];
     }
 

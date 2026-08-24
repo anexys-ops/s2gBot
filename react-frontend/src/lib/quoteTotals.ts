@@ -1,4 +1,5 @@
 import { lineKeyForRow } from './devisParcours'
+import { forfaitJalonTotalHt, sumForfaitJalonsHt } from './quoteForfaitJalon'
 
 /**
  * Totaux devis / facture — aligné sur `CommercialDocumentTotalsService` (Laravel).
@@ -123,6 +124,8 @@ type PricingLine = {
 type PricingJalon = {
   id?: string
   mode?: string
+  quantity?: number
+  prix_unitaire_ht?: number
   montant_ht?: number
   tva_rate?: number
   product_line_keys?: string[]
@@ -167,7 +170,9 @@ export function quoteFormPricingLines(
   documentForfaitHt: number,
 ): QuoteLineTotalsInput[] {
   if (isDocumentForfait) {
-    return [{ quantity: 1, unit_price: Math.max(0, documentForfaitHt), discount_percent: 0, tva_rate: documentTva }]
+    const jalonsTotal = sumForfaitJalonsHt(jalons)
+    const ht = jalonsTotal > 0 ? jalonsTotal : Math.max(0, documentForfaitHt)
+    return [{ quantity: 1, unit_price: ht, discount_percent: 0, tva_rate: documentTva }]
   }
 
   const skip = forfaitJalonChildKeys(formLines, jalons)
@@ -184,7 +189,7 @@ export function quoteFormPricingLines(
     if (!isJalonForfait(jalon)) continue
     lines.push({
       quantity: 1,
-      unit_price: Math.max(0, Number(jalon.montant_ht ?? 0)),
+      unit_price: forfaitJalonTotalHt(jalon),
       discount_percent: 0,
       tva_rate: Number.isFinite(Number(jalon.tva_rate)) ? Number(jalon.tva_rate) : documentTva,
     })

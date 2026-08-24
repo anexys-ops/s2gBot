@@ -31,6 +31,21 @@ class QuotePricingService
         $documentTva = (float) $quote->tva_rate;
 
         if (self::isDocumentForfait($meta)) {
+            $jalons = $meta['devis_jalons'] ?? [];
+            if (is_array($jalons) && $jalons !== []) {
+                $sum = 0.0;
+                foreach ($jalons as $jalon) {
+                    if (is_array($jalon)) {
+                        $sum += self::forfaitJalonTotalHt($jalon);
+                    }
+                }
+                if ($sum > 0) {
+                    return [
+                        ['ht' => round($sum, 2), 'tva_rate' => $documentTva],
+                    ];
+                }
+            }
+
             $ht = round(max(0, (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0)), 2);
             if ($ht > 0) {
                 return [
@@ -72,7 +87,7 @@ class QuotePricingService
         }
 
         foreach ($forfaitJalons as $jalon) {
-            $ht = round(max(0, (float) ($jalon['montant_ht'] ?? 0)), 2);
+            $ht = self::forfaitJalonTotalHt($jalon);
             $tva = isset($jalon['tva_rate']) ? (float) $jalon['tva_rate'] : $documentTva;
             $lines[] = [
                 'ht' => $ht,
@@ -81,5 +96,26 @@ class QuotePricingService
         }
 
         return $lines;
+    }
+
+    /**
+     * @param  array<string, mixed>  $jalon
+     */
+    public static function forfaitJalonTotalHt(array $jalon): float
+    {
+        $qty = (float) ($jalon['quantity'] ?? 1);
+        if ($qty <= 0) {
+            $qty = 1;
+        } else {
+            $qty = max(1, round($qty));
+        }
+
+        if (array_key_exists('prix_unitaire_ht', $jalon)) {
+            $pu = round(max(0, (float) $jalon['prix_unitaire_ht']), 2);
+
+            return round($qty * $pu, 2);
+        }
+
+        return round(max(0, (float) ($jalon['montant_ht'] ?? 0)), 2);
     }
 }

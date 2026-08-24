@@ -1900,6 +1900,10 @@ export type EntityMetaPayload = {
   devis_jalons?: Array<{
     id?: string
     libelle: string
+    /** Quantité forfait jalon */
+    quantity?: number
+    /** PU HT forfait jalon */
+    prix_unitaire_ht?: number
     montant_ht?: number
     /** Forfait au jalon (devis détaillé mixte) ; omit = détaillé */
     mode?: string

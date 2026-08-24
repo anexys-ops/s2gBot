@@ -45,6 +45,8 @@ class QuotePricingServiceTest extends TestCase
                         'id' => 'j-f',
                         'libelle' => 'Lot forfait',
                         'mode' => 'forfait',
+                        'quantity' => 2,
+                        'prix_unitaire_ht' => 750,
                         'montant_ht' => 1500,
                         'tva_rate' => 20,
                         'product_ref_article_ids' => [$child->id],

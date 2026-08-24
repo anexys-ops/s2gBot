@@ -26,7 +26,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { formatMoney } from '../lib/appLocale'
 import { QUOTE_STATUS_LABELS } from '../lib/commercialStatusLabels'
-import { computeQuoteFormDocumentTotals, lineHt, quoteFormPricingLines, lineLockedByForfaitJalon, sumFraisSupplementairesTtc } from '../lib/quoteTotals'
+import { computeQuoteFormDocumentTotals, quoteFormPricingLines, lineLockedByForfaitJalon, sumFraisSupplementairesTtc } from '../lib/quoteTotals'
 import {
   getEffectiveDevisParcours,
   lineKeyForRow,
@@ -41,6 +41,11 @@ import {
   newDevisLineRowKey,
   restoreS2gJalonLineLinks,
 } from '../lib/s2gDevisCatalogue'
+import {
+  forfaitJalonQuantity,
+  forfaitJalonUnitPrice,
+  withSyncedForfaitJalonMontant,
+} from '../lib/quoteForfaitJalon'
 
 function newLineRowKey() {
   return newDevisLineRowKey()
@@ -230,14 +235,18 @@ export default function QuoteEditorPage() {
     const meta = restored.meta
     if (meta.mode_devis === 'forfait') {
       lines = lines.map((l) => (l.quantity === 1 ? l : { ...l, quantity: 1 }))
-      const existingTarif = Number(meta.tarif_global_hors_lignes_ht)
-      if (!Number.isFinite(existingTarif) || existingTarif <= 0) {
-        meta.tarif_global_hors_lignes_ht = lines.reduce(
-          (sum, line) => sum + lineHt(1, line.unit_price, line.discount_percent ?? 0),
-          0,
-        )
-      }
+      meta.devis_jalons = (meta.devis_jalons ?? []).map((j) => {
+        const pu = forfaitJalonUnitPrice(j)
+        const qty = forfaitJalonQuantity(j)
+        return withSyncedForfaitJalonMontant({
+          ...j,
+          quantity: qty,
+          prix_unitaire_ht: pu > 0 ? pu : undefined,
+          unite: (j.unite ?? '').trim() || undefined,
+        })
+      })
       delete meta.ligne_masque_prix_pdf
+      delete meta.tarif_global_unite
     }
     setForm({
       contextMode: inferContextMode(quote),

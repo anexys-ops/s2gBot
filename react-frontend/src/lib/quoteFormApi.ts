@@ -1,6 +1,13 @@
 import type { QuoteCreateBody } from '../api/client'
 import type { QuoteFormState } from '../components/quotes/QuoteFormFields'
 import { normalizeDevisParcoursInMeta } from './devisParcours'
+import {
+  forfaitJalonQuantity,
+  forfaitJalonTotalHt,
+  forfaitJalonUnitPrice,
+  sumForfaitJalonsHt,
+  withSyncedForfaitJalonMontant,
+} from './quoteForfaitJalon'
 import { syncJalonProductKeysBeforeSave } from './s2gDevisCatalogue'
 
 const MAX_LINE_DESCRIPTION = 500
@@ -50,22 +57,38 @@ export function buildQuoteApiBody(form: QuoteFormState): QuoteCreateBody {
   if (meta.devis_jalons && meta.devis_jalons.length === 0) delete meta.devis_jalons
   if (meta.devis_jalons?.length) {
     meta.devis_jalons = meta.devis_jalons.map((j) => {
+      if (meta.mode_devis === 'forfait') {
+        return withSyncedForfaitJalonMontant({
+          ...j,
+          quantity: Math.max(1, Math.round(finiteNum(j.quantity, forfaitJalonQuantity(j)))),
+          prix_unitaire_ht: Math.max(0, finiteNum(j.prix_unitaire_ht, forfaitJalonUnitPrice(j))),
+          montant_ht: Math.max(0, forfaitJalonTotalHt(j)),
+          unite: (j.unite ?? '').trim() || 'F',
+        })
+      }
       if (j.mode !== 'forfait') {
         const next = { ...j }
         delete next.mode
         return next
       }
-      return {
+      return withSyncedForfaitJalonMontant({
         ...j,
-        montant_ht: Math.max(0, finiteNum(j.montant_ht, 0)),
+        quantity: Math.max(1, Math.round(finiteNum(j.quantity, forfaitJalonQuantity(j)))),
+        prix_unitaire_ht: Math.max(0, finiteNum(j.prix_unitaire_ht, forfaitJalonUnitPrice(j))),
+        montant_ht: Math.max(0, forfaitJalonTotalHt(j)),
         tva_rate: Math.min(100, Math.max(0, finiteNum(j.tva_rate, defaultTva))),
         unite: (j.unite ?? '').trim() || 'F',
-      }
+      })
     })
   }
   if (meta.mode_devis === 'forfait') {
-    meta.tarif_global_hors_lignes_ht = Math.max(0, finiteNum(meta.tarif_global_hors_lignes_ht, 0))
-    meta.tarif_global_unite = (meta.tarif_global_unite ?? '').trim() || 'F'
+    const jalonsTotal = sumForfaitJalonsHt(meta.devis_jalons)
+    meta.tarif_global_hors_lignes_ht = Math.max(0, jalonsTotal > 0 ? jalonsTotal : finiteNum(meta.tarif_global_hors_lignes_ht, 0))
+    if (meta.devis_jalons?.length) {
+      delete meta.tarif_global_unite
+    } else {
+      meta.tarif_global_unite = (meta.tarif_global_unite ?? '').trim() || 'F'
+    }
   } else if (meta.tarif_global_hors_lignes_ht == null) {
     delete meta.tarif_global_hors_lignes_ht
     delete meta.tarif_global_unite

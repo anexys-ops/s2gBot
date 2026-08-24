@@ -1904,6 +1904,8 @@ export type EntityMetaPayload = {
     /** Forfait au jalon (devis détaillé mixte) ; omit = détaillé */
     mode?: string
     tva_rate?: number
+    /** Unité affichée sur le PDF lorsque le jalon est forfait */
+    unite?: string
     ref_article_id?: number | null
     commercial_offering_id?: number | null
     /** Clés row_key des lignes produit rattachées (catalogue S2G). */
@@ -1915,6 +1917,8 @@ export type EntityMetaPayload = {
   }>
   /** Tarif forfaitaire lorsqu’il n’y a pas de lignes article (optionnel) */
   tarif_global_hors_lignes_ht?: number
+  /** Unité du montant forfaitaire global (PDF) */
+  tarif_global_unite?: string
   /** Un booléen par ligne (même ordre) : ne pas afficher le prix sur le PDF */
   ligne_masque_prix_pdf?: boolean[]
   /** Frais complémentaires (brouillon / PDF — le recalcul API n’intègre que port & déplacement) */
@@ -2030,6 +2034,7 @@ export interface QuoteLine {
   type_ligne?: string | null
   line_code?: string | null
   description: string
+  unite?: string | null
   quantity: number
   unit_price: number
   tva_rate?: number
@@ -2135,6 +2140,7 @@ export interface QuoteCreateBody {
     type_ligne?: string
     line_code?: string | null
     description: string
+    unite?: string | null
     quantity: number
     unit_price: number
     tva_rate?: number

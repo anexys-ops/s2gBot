@@ -51,6 +51,7 @@ function emptyLine(defaultTva: number): QuoteLineDraft {
     row_key: newLineRowKey(),
     description: '',
     quantity: 1,
+    unite: 'U',
     unit_price: 0,
     tva_rate: defaultTva,
     discount_percent: 0,
@@ -216,6 +217,7 @@ export default function QuoteEditorPage() {
       ref_package_id: l.ref_package_id ?? undefined,
       description: l.description,
       quantity: l.quantity,
+      unite: (l.unite ?? '').trim() || 'U',
       unit_price: Number(l.unit_price),
       tva_rate: Number(l.tva_rate ?? quote.tva_rate ?? 20),
       discount_percent: Number(l.discount_percent ?? 0),
@@ -451,7 +453,7 @@ export default function QuoteEditorPage() {
 
   async function applyS2gCataloguePick(result: {
     jalon: RefArticleRow
-    products: Array<Pick<RefArticleRow, 'id' | 'code' | 'libelle' | 'prix_unitaire_ht' | 'tva_rate'>>
+    products: Array<Pick<RefArticleRow, 'id' | 'code' | 'libelle' | 'prix_unitaire_ht' | 'tva_rate' | 'unite'>>
   }) {
     const { jalon: art, products } = result
     if (!products.length) {
@@ -513,6 +515,7 @@ export default function QuoteEditorPage() {
               ref_article_id: undefined,
               ref_package_id: undefined,
               description: o.name,
+              unite: (l.unite ?? '').trim() || 'U',
               unit_price: Number(o.sale_price_ht),
               tva_rate: Number(o.default_tva_rate),
             }
@@ -549,6 +552,7 @@ export default function QuoteEditorPage() {
               ref_package_id: undefined,
               ref_article_id: art.id,
               description: art.libelle,
+              unite: (art.unite ?? '').trim() || 'U',
               unit_price: Number(art.prix_unitaire_ht),
               tva_rate: Number(art.tva_rate),
             }

@@ -17,6 +17,7 @@ class QuoteLine extends Model
         'type_ligne',
         'line_code',
         'description',
+        'unite',
         'quantity',
         'unit_price',
         'tva_rate',

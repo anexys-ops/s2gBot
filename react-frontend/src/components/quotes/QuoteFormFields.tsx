@@ -17,6 +17,8 @@ export type QuoteLineDraft = {
   ref_article_id?: number | null
   ref_package_id?: number | null
   description: string
+  /** Unité de quantité (code catalogue devis) */
+  unite?: string
   quantity: number
   unit_price: number
   tva_rate: number

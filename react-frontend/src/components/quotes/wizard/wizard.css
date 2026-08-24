@@ -248,7 +248,24 @@
 /* Forfait toggle */
 .qw-forfait-box { background: #fffbeb; border: 1px solid #fbbf24; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
 .qw-forfait-box label { font-weight: 600; font-size: .9rem; }
-.qw-forfait-input { width: 180px; padding: .4rem .7rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: .95rem; margin-left: .75rem; }
+.qw-forfait-unite {
+  width: 11rem;
+  margin-left: 0;
+}
+.quote-lines-table__unite {
+  min-width: 7.5rem;
+  max-width: 11rem;
+  width: 100%;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  background: #fff;
+}
+.quote-lines-table__unite:disabled {
+  background: #f3f4f6;
+  color: #6b7280;
+}
 
 /* Jalon */
 .qw-jalon-row { background: #f0fdf4; border-left: 3px solid #16a34a; padding: .5rem .75rem; margin: .25rem 0; border-radius: 0 6px 6px 0; display: flex; gap: .5rem; align-items: center; }

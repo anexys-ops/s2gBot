@@ -297,6 +297,7 @@ class QuotePdfPresentationTest extends TestCase
         $this->assertSame('jalon_header', $rows[0]['type']);
         $this->assertTrue($rows[0]['is_forfait']);
         $this->assertSame('forfait_total', $rows[1]['type']);
+        $this->assertSame('F', $rows[1]['unite']);
         $this->assertSame(1500.0, $rows[1]['pt']);
         $this->assertSame('product', $rows[2]['type']);
         $this->assertNull($rows[2]['pu']);
@@ -306,6 +307,79 @@ class QuotePdfPresentationTest extends TestCase
         $this->assertSame('product', $rows[4]['type']);
         $this->assertSame(200.0, $rows[4]['pu']);
         $this->assertSame(400.0, $rows[4]['pt']);
+    }
+
+    public function test_pdf_uses_line_and_jalon_custom_unites(): void
+    {
+        $client = Client::query()->create(['name' => 'Client unites']);
+        $famille = FamilleArticle::query()->create([
+            'code' => 'FAM-U',
+            'libelle' => 'Famille unites',
+            'actif' => true,
+        ]);
+        $child = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
+            'code' => 'ART-U1',
+            'libelle' => 'Essai m2',
+            'unite' => 'U',
+            'actif' => true,
+            'kind' => Article::KIND_PRODUCT,
+        ]);
+
+        $quote = Quote::query()->create([
+            'client_id' => $client->id,
+            'number' => 'DV-UNITE-1',
+            'quote_date' => '2026-06-16',
+            'amount_ht' => 900,
+            'amount_ttc' => 1080,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_DRAFT,
+            'meta' => [
+                'devis_jalons' => [
+                    [
+                        'id' => 'j-f',
+                        'libelle' => 'Lot forfait ml',
+                        'mode' => 'forfait',
+                        'montant_ht' => 500,
+                        'unite' => 'ml',
+                        'product_ref_article_ids' => [$child->id],
+                    ],
+                ],
+                'devis_parcours' => [
+                    ['kind' => 'jalon', 'id' => 'j-f'],
+                    ['kind' => 'ligne', 'id' => 'libre'],
+                ],
+            ],
+        ]);
+
+        QuoteLine::query()->create([
+            'quote_id' => $quote->id,
+            'ref_article_id' => $child->id,
+            'description' => 'Sous forfait',
+            'unite' => 'm3',
+            'quantity' => 1,
+            'unit_price' => 100,
+            'total' => 100,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $quote->id,
+            'description' => 'Ligne detaillee',
+            'unite' => 'm²',
+            'quantity' => 2,
+            'unit_price' => 200,
+            'total' => 400,
+        ]);
+
+        $quote->load('quoteLines.refArticle');
+        $rows = (new QuotePdfPresentationService)->buildItemRows($quote);
+
+        $this->assertSame('jalon_header', $rows[0]['type']);
+        $this->assertSame('forfait_total', $rows[1]['type']);
+        $this->assertSame('ml', $rows[1]['unite']);
+        $this->assertSame('product', $rows[2]['type']);
+        $this->assertSame('', $rows[2]['unite']);
+        $this->assertSame('product', $rows[3]['type']);
+        $this->assertSame('m²', $rows[3]['unite']);
     }
 
     public function test_build_context_includes_frais_supplementaires_in_total_ttc(): void

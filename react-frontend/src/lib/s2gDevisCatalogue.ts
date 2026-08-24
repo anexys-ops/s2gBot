@@ -39,7 +39,9 @@ export function s2gProductDescription(
 }
 
 export function lineFromS2gProduct(
-  product: Pick<RefArticleRow, 'id' | 'libelle' | 'code' | 'prix_unitaire_ht'> & { tva_rate?: string | number },
+  product: Pick<RefArticleRow, 'id' | 'libelle' | 'code' | 'prix_unitaire_ht' | 'unite'> & {
+    tva_rate?: string | number
+  },
   parentJalonId: string | null,
   defaultTva: number,
 ): QuoteLineDraft {
@@ -48,6 +50,7 @@ export function lineFromS2gProduct(
     ref_article_id: product.id,
     description: s2gProductDescription(product),
     quantity: 1,
+    unite: (product.unite ?? '').trim() || 'U',
     unit_price: Number(product.prix_unitaire_ht) || 0,
     tva_rate: product.tva_rate != null ? Number(product.tva_rate) || defaultTva : defaultTva,
     discount_percent: 0,

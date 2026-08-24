@@ -37,6 +37,7 @@ class QuoteController extends Controller
         'lines.*.ref_article_id' => 'nullable|exists:ref_articles,id',
         'lines.*.ref_package_id' => 'nullable|exists:ref_packages,id',
         'lines.*.description' => 'required|string|max:500',
+        'lines.*.unite' => 'nullable|string|max:64',
         'lines.*.quantity' => 'required|integer|min:1',
         'lines.*.unit_price' => 'required|numeric|min:0',
         'lines.*.tva_rate' => 'nullable|numeric|min:0|max:100',
@@ -540,6 +541,7 @@ class QuoteController extends Controller
             $refPackageId = ! empty($line['ref_package_id']) ? (int) $line['ref_package_id'] : null;
             $description = (string) $line['description'];
             $unit = (float) $line['unit_price'];
+            $unite = isset($line['unite']) ? trim((string) $line['unite']) : '';
 
             if ($refPackageId) {
                 $p = Package::query()->find($refPackageId);
@@ -564,10 +566,17 @@ class QuoteController extends Controller
                     if ($unit <= 0) {
                         $unit = (float) $a->prix_unitaire_ht;
                     }
+                    if ($unite === '' && filled($a->unite)) {
+                        $unite = trim((string) $a->unite);
+                    }
                     if (! isset($line['tva_rate']) && $a->tva_rate !== null) {
                         $tva = (float) $a->tva_rate;
                     }
                 }
+            }
+
+            if ($unite === '') {
+                $unite = 'U';
             }
 
             $ht = CommercialDocumentTotalsService::lineHt(
@@ -587,6 +596,7 @@ class QuoteController extends Controller
                 'type_ligne' => $typeLigne,
                 'line_code' => isset($line['line_code']) ? (string) $line['line_code'] : null,
                 'description' => $description,
+                'unite' => $unite,
                 'quantity' => (int) $line['quantity'],
                 'unit_price' => $unit,
                 'tva_rate' => $tva,

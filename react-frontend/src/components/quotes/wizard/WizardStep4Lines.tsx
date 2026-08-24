@@ -1,10 +1,12 @@
 import { Fragment, useMemo, useState } from 'react'
 import ConfirmDialog from '../../ConfirmDialog'
 import type { QuoteFormState, QuoteLineDraft } from '../QuoteFormFields'
+import UniteSelect from '../UniteSelect'
 import { lineHt, isJalonForfait, lineLockedByForfaitJalon, quoteFormPricingLines } from '../../../lib/quoteTotals'
 import { formatMoney } from '../../../lib/appLocale'
 import { getEffectiveDevisParcours, lineKeyForRow } from '../../../lib/devisParcours'
 import type { DevisParcoursItem } from '../../../lib/devisParcours'
+import { DEFAULT_FORFAIT_UNITE, DEFAULT_QUOTE_UNITE } from '../../../lib/quoteUnites'
 
 type Props = {
   form: QuoteFormState
@@ -87,6 +89,7 @@ function LineRow({
   lineIndex,
   moneyLocked,
   lockTitle,
+  uniteLocked,
   form,
   updateLine,
   onDelete,
@@ -96,6 +99,7 @@ function LineRow({
   lineIndex: number
   moneyLocked: boolean
   lockTitle?: string
+  uniteLocked?: boolean
   form: QuoteFormState
   updateLine: Props['updateLine']
   onDelete: () => void
@@ -117,6 +121,18 @@ function LineRow({
           value={line.description}
           onChange={(e) => updateLine(lineIndex, 'description', e.target.value)}
           placeholder="Désignation…"
+        />
+      </td>
+      <td>
+        <UniteSelect
+          value={line.unite || DEFAULT_QUOTE_UNITE}
+          disabled={uniteLocked}
+          title={
+            uniteLocked
+              ? 'En forfait, l’unité se choisit sur le jalon (ou le montant global)'
+              : undefined
+          }
+          onChange={(code) => updateLine(lineIndex, 'unite', code)}
         />
       </td>
       <td>
@@ -286,10 +302,12 @@ export default function WizardStep4Lines({
         const existing = Number(f.meta?.tarif_global_hors_lignes_ht)
         meta.tarif_global_hors_lignes_ht =
           Number.isFinite(existing) && existing > 0 ? existing : linesHt
+        if (!(meta.tarif_global_unite ?? '').trim()) meta.tarif_global_unite = DEFAULT_FORFAIT_UNITE
         delete meta.ligne_masque_prix_pdf
       } else {
         delete meta.mode_devis
         delete meta.tarif_global_hors_lignes_ht
+        delete meta.tarif_global_unite
       }
       return { ...f, lines: nextLines, meta }
     })
@@ -313,6 +331,17 @@ export default function WizardStep4Lines({
     }))
   }
 
+  const setForfaitUnite = (code: string) => {
+    setForm((f) => ({
+      ...f,
+      meta: {
+        ...f.meta,
+        mode_devis: 'forfait',
+        tarif_global_unite: code || DEFAULT_FORFAIT_UNITE,
+      },
+    }))
+  }
+
   const toggleJalonForfait = (jalonId: string, enabled: boolean) => {
     setForm((f) => {
       const list = [...(f.meta.devis_jalons ?? [])]
@@ -333,6 +362,7 @@ export default function WizardStep4Lines({
           }, 0)
         }
         if (jalon.tva_rate == null) jalon.tva_rate = f.tva_rate ?? 20
+        if (!(jalon.unite ?? '').trim()) jalon.unite = DEFAULT_FORFAIT_UNITE
       } else {
         delete jalon.mode
       }
@@ -341,16 +371,26 @@ export default function WizardStep4Lines({
     })
   }
 
-  const updateJalonForfait = (jalonId: string, field: 'montant_ht' | 'tva_rate', raw: string) => {
+  const updateJalonForfait = (
+    jalonId: string,
+    field: 'montant_ht' | 'tva_rate' | 'unite',
+    raw: string,
+  ) => {
     setForm((f) => {
       const list = [...(f.meta.devis_jalons ?? [])]
       const idx = list.findIndex((j) => j.id === jalonId)
       if (idx < 0) return f
-      const jalon = { ...list[idx], mode: 'forfait' as const }
+      const forceForfaitMode = field === 'montant_ht' || field === 'tva_rate'
+      const jalon = {
+        ...list[idx],
+        ...(forceForfaitMode || list[idx].mode === 'forfait' ? { mode: 'forfait' as const } : {}),
+      }
       if (field === 'montant_ht') {
         jalon.montant_ht = raw === '' ? 0 : Math.max(0, Number(raw))
-      } else {
+      } else if (field === 'tva_rate') {
         jalon.tva_rate = raw === '' ? 0 : Math.min(100, Math.max(0, Math.round(Number(raw))))
+      } else {
+        jalon.unite = raw || DEFAULT_FORFAIT_UNITE
       }
       list[idx] = jalon
       return { ...f, meta: { ...f.meta, devis_jalons: list } }
@@ -420,6 +460,14 @@ export default function WizardStep4Lines({
                 step={0.01}
                 value={form.meta?.tarif_global_hors_lignes_ht ?? 0}
                 onChange={(e) => setForfaitHt(e.target.value)}
+              />
+            </label>
+            <label className="qw-forfait-box__field">
+              <span>Unité</span>
+              <UniteSelect
+                className="qw-forfait-input qw-forfait-unite"
+                value={form.meta?.tarif_global_unite || DEFAULT_FORFAIT_UNITE}
+                onChange={setForfaitUnite}
               />
             </label>
             <label className="qw-forfait-box__field">
@@ -497,6 +545,7 @@ export default function WizardStep4Lines({
               <tr>
                 <th>Origine</th>
                 <th>Désignation</th>
+                <th>Unité</th>
                 <th>Qté</th>
                 <th>PU HT</th>
                 <th>Rem. %</th>
@@ -518,6 +567,7 @@ export default function WizardStep4Lines({
                       lineIndex={block.lineIndex}
                       moneyLocked={lock.locked}
                       lockTitle={lock.title}
+                      uniteLocked={isForfait || lock.locked}
                       form={form}
                       updateLine={updateLine}
                       onDelete={() => setDeleteIndex(block.lineIndex)}
@@ -538,7 +588,7 @@ export default function WizardStep4Lines({
                 return (
                   <Fragment key={`jalon-block-${block.jalonId}`}>
                     <tr key={`jalon-${block.jalonId}`} className="qw-s2g-jalon-row">
-                      <td colSpan={7}>
+                      <td colSpan={8}>
                         <div className="qw-s2g-jalon-row__inner">
                           <span className="status-pill status-pill--emerald" style={{ fontSize: '0.72rem' }}>
                             Jalon
@@ -565,34 +615,46 @@ export default function WizardStep4Lines({
                               </button>
                             </div>
                           ) : null}
-                          {jalonForfait ? (
+                          {jalonForfait || isForfait ? (
                             <div className="qw-s2g-jalon-row__forfait">
+                              {jalonForfait ? (
+                                <>
+                                  <label>
+                                    HT
+                                    <input
+                                      className="qw-forfait-input qw-s2g-jalon-row__forfait-input"
+                                      type="number"
+                                      min={0}
+                                      step={0.01}
+                                      value={jalon.montant_ht ?? 0}
+                                      onChange={(e) => updateJalonForfait(block.jalonId, 'montant_ht', e.target.value)}
+                                    />
+                                  </label>
+                                  <label>
+                                    TVA %
+                                    <input
+                                      className="qw-forfait-input qw-s2g-jalon-row__forfait-input"
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      step={1}
+                                      value={jalonTva}
+                                      onChange={(e) => updateJalonForfait(block.jalonId, 'tva_rate', e.target.value)}
+                                    />
+                                  </label>
+                                  <span className="qw-s2g-jalon-row__forfait-ttc">
+                                    TTC <strong>{formatMoney(jalonTtc)}</strong>
+                                  </span>
+                                </>
+                              ) : null}
                               <label>
-                                HT
-                                <input
+                                Unité
+                                <UniteSelect
                                   className="qw-forfait-input qw-s2g-jalon-row__forfait-input"
-                                  type="number"
-                                  min={0}
-                                  step={0.01}
-                                  value={jalon.montant_ht ?? 0}
-                                  onChange={(e) => updateJalonForfait(block.jalonId, 'montant_ht', e.target.value)}
+                                  value={jalon.unite || DEFAULT_FORFAIT_UNITE}
+                                  onChange={(code) => updateJalonForfait(block.jalonId, 'unite', code)}
                                 />
                               </label>
-                              <label>
-                                TVA %
-                                <input
-                                  className="qw-forfait-input qw-s2g-jalon-row__forfait-input"
-                                  type="number"
-                                  min={0}
-                                  max={100}
-                                  step={1}
-                                  value={jalonTva}
-                                  onChange={(e) => updateJalonForfait(block.jalonId, 'tva_rate', e.target.value)}
-                                />
-                              </label>
-                              <span className="qw-s2g-jalon-row__forfait-ttc">
-                                TTC <strong>{formatMoney(jalonTtc)}</strong>
-                              </span>
                             </div>
                           ) : null}
                           <button
@@ -631,6 +693,7 @@ export default function WizardStep4Lines({
                           lineIndex={index}
                           moneyLocked={lock.locked}
                           lockTitle={lock.title}
+                      uniteLocked={isForfait || lock.locked}
                           form={form}
                           updateLine={updateLine}
                           onDelete={() => setDeleteIndex(index)}

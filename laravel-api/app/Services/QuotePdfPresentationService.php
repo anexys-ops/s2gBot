@@ -119,10 +119,26 @@ class QuotePdfPresentationService
 
         if ($documentForfait) {
             $forfaitHt = $this->resolveForfaitHt($quote, $meta, $lines);
+            $forfaitUnite = trim((string) ($meta['tarif_global_unite'] ?? ''));
+            if ($forfaitUnite === '') {
+                foreach ($jalons as $jalon) {
+                    if (! is_array($jalon)) {
+                        continue;
+                    }
+                    $candidate = trim((string) ($jalon['unite'] ?? ''));
+                    if ($candidate !== '') {
+                        $forfaitUnite = $candidate;
+                        break;
+                    }
+                }
+            }
+            if ($forfaitUnite === '') {
+                $forfaitUnite = 'F';
+            }
             array_unshift($rows, [
                 'type' => 'forfait_total',
                 'label' => 'Prestation forfaitaire',
-                'unite' => 'F',
+                'unite' => $forfaitUnite,
                 'qte' => 1,
                 'pu' => $forfaitHt,
                 'pt' => $forfaitHt,
@@ -276,11 +292,15 @@ class QuotePdfPresentationService
     private function formatJalonForfaitRow(array $jalon): array
     {
         $ht = round(max(0, (float) ($jalon['montant_ht'] ?? 0)), 2);
+        $unite = trim((string) ($jalon['unite'] ?? ''));
+        if ($unite === '') {
+            $unite = 'F';
+        }
 
         return [
             'type' => 'forfait_total',
             'label' => 'Prestation forfaitaire',
-            'unite' => 'F',
+            'unite' => $unite,
             'qte' => 1,
             'pu' => $ht,
             'pt' => $ht,
@@ -338,12 +358,20 @@ class QuotePdfPresentationService
             $article?->description_commerciale ?? $article?->description ?? null,
         );
 
+        $lineUnite = trim((string) ($line->unite ?? ''));
+        if ($lineUnite === '') {
+            $lineUnite = trim((string) ($article?->unite ?? ''));
+        }
+        if ($lineUnite === '') {
+            $lineUnite = 'U';
+        }
+
         return [
             'type' => 'product',
             'nested' => $nested,
             'num' => (string) $num,
             'label' => trim((string) $line->description),
-            'unite' => $isForfait ? '' : ($article?->unite ?? 'U'),
+            'unite' => $isForfait ? '' : $lineUnite,
             'qte' => $isForfait ? null : (int) $line->quantity,
             'pu' => ($maskPrice || $isForfait) ? null : (float) $line->unit_price,
             'pt' => ($maskPrice || $isForfait) ? null : (float) $line->total,

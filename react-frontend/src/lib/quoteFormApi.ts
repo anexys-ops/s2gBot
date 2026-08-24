@@ -29,6 +29,7 @@ export function buildQuoteApiBody(form: QuoteFormState): QuoteCreateBody {
       const isForfait = form.meta?.mode_devis === 'forfait'
       const row: QuoteCreateBody['lines'][number] = {
         description: trimLineDescription(l.description),
+        unite: (l.unite ?? '').trim() || 'U',
         quantity: isForfait ? 1 : Math.max(1, Math.round(finiteNum(l.quantity, 1))),
         unit_price: Math.max(0, finiteNum(l.unit_price, 0)),
         tva_rate: finiteNum(l.tva_rate, defaultTva),
@@ -58,13 +59,16 @@ export function buildQuoteApiBody(form: QuoteFormState): QuoteCreateBody {
         ...j,
         montant_ht: Math.max(0, finiteNum(j.montant_ht, 0)),
         tva_rate: Math.min(100, Math.max(0, finiteNum(j.tva_rate, defaultTva))),
+        unite: (j.unite ?? '').trim() || 'F',
       }
     })
   }
   if (meta.mode_devis === 'forfait') {
     meta.tarif_global_hors_lignes_ht = Math.max(0, finiteNum(meta.tarif_global_hors_lignes_ht, 0))
+    meta.tarif_global_unite = (meta.tarif_global_unite ?? '').trim() || 'F'
   } else if (meta.tarif_global_hors_lignes_ht == null) {
     delete meta.tarif_global_hors_lignes_ht
+    delete meta.tarif_global_unite
   }
   if (meta.frais_supplementaires && meta.frais_supplementaires.length === 0) delete meta.frais_supplementaires
   if (meta.ligne_masque_prix_pdf && !meta.ligne_masque_prix_pdf.some(Boolean)) delete meta.ligne_masque_prix_pdf

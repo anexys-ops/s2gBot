@@ -367,6 +367,16 @@ export default function WizardStep4Lines({
     })
   }
 
+  const updateJalonLibelle = (jalonId: string, libelle: string) => {
+    setForm((f) => {
+      const list = [...(f.meta.devis_jalons ?? [])]
+      const idx = list.findIndex((j) => j.id === jalonId)
+      if (idx < 0) return f
+      list[idx] = { ...list[idx], libelle }
+      return { ...f, meta: { ...f.meta, devis_jalons: list } }
+    })
+  }
+
   const updateJalonForfait = (
     jalonId: string,
     field: 'quantity' | 'prix_unitaire_ht' | 'tva_rate' | 'unite',
@@ -593,7 +603,14 @@ export default function WizardStep4Lines({
                       </td>
                       <td>
                         <div className="qw-s2g-jalon-row__designation">
-                          <strong className="qw-s2g-jalon-row__title">{jalon.libelle}</strong>
+                          <input
+                            className="quote-lines-table__desc qw-s2g-jalon-row__title-input"
+                            type="text"
+                            value={jalon.libelle}
+                            onChange={(e) => updateJalonLibelle(block.jalonId, e.target.value)}
+                            placeholder="Nom du jalon…"
+                            aria-label="Nom du jalon"
+                          />
                           {jalon.s2g_code ? (
                             <span className="text-muted qw-s2g-jalon-row__code">{jalon.s2g_code}</span>
                           ) : null}

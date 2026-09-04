@@ -32,6 +32,7 @@ type Props = {
   onOpenCommercialCatalog?: (lineIndex: number) => void
   onOpenProlabCatalog?: (lineIndex: number) => void
   onOpenS2gCatalog?: () => void
+  onAddArticlesToJalon?: (jalonId: string) => void
   onRemoveJalon: (jalonId: string) => void
   onAddFromCommercialCatalog?: () => void
   onAddFromProlabCatalog?: () => void
@@ -82,6 +83,7 @@ export default function QuoteWizard({
   updateLine,
   removeLine,
   onOpenS2gCatalog,
+  onAddArticlesToJalon,
   onRemoveJalon,
   totals,
   metaFraisTtc,
@@ -192,6 +194,7 @@ export default function QuoteWizard({
             updateLine={updateLine}
             removeLine={removeLine}
             onOpenS2gCatalog={onOpenS2gCatalog ?? (() => {})}
+            onAddArticlesToJalon={onAddArticlesToJalon}
             onRemoveJalon={onRemoveJalon}
           />
         </fieldset>

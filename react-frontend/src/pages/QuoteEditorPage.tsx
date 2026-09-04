@@ -113,6 +113,7 @@ export default function QuoteEditorPage() {
   const [catalogPick, setCatalogPick] = useState<LineOrJalon | null>(null)
   const [prolabPick, setProlabPick] = useState<LineOrJalon | null>(null)
   const [s2gPickOpen, setS2gPickOpen] = useState(false)
+  const [s2gAppendJalonId, setS2gAppendJalonId] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [catalogSearch, setCatalogSearch] = useState('')
   const [prolabFamilleId, setProlabFamilleId] = useState<number | ''>('')
@@ -469,6 +470,84 @@ export default function QuoteEditorPage() {
       throw new Error('Sélectionnez au moins un article.')
     }
     const defaultTva = form.tva_rate ?? 20
+    const targetJalonId = s2gAppendJalonId
+
+    if (targetJalonId) {
+      setForm((f) => {
+        const list = [...(f.meta.devis_jalons ?? [])]
+        const idx = list.findIndex((j) => j.id === targetJalonId)
+        if (idx < 0) return f
+        const existing = list[idx]
+        const existingKeys = [...(existing.product_line_keys ?? [])]
+        const existingRefs = new Set(existing.product_ref_article_ids ?? [])
+        f.lines.forEach((line) => {
+          if (line.parent_jalon_id === targetJalonId && line.ref_article_id != null) {
+            existingRefs.add(line.ref_article_id)
+          }
+        })
+        const freshProducts = products.filter((p) => !existingRefs.has(p.id))
+        if (freshProducts.length === 0) return f
+
+        const isForfaitDoc = f.meta?.mode_devis === 'forfait' || existing.mode === 'forfait'
+        const childLines: QuoteLineDraft[] = freshProducts.map((p) => {
+          const line = lineFromS2gProduct(p, targetJalonId, defaultTva)
+          return isForfaitDoc && line.quantity !== 1 ? { ...line, quantity: 1 } : line
+        })
+        const productLineKeys = childLines.map((l) => l.row_key!).filter(Boolean)
+        const productRefIds = childLines
+          .map((l) => l.ref_article_id)
+          .filter((id): id is number => id != null)
+
+        list[idx] = {
+          ...existing,
+          product_line_keys: [...existingKeys, ...productLineKeys],
+          product_ref_article_ids: [...(existing.product_ref_article_ids ?? []), ...productRefIds],
+        }
+
+        const nextLines = [...f.lines, ...childLines]
+        const base =
+          f.meta.devis_parcours && f.meta.devis_parcours.length > 0
+            ? [...f.meta.devis_parcours]
+            : getEffectiveDevisParcours(f.lines, f.meta)
+        const jalonPos = base.findIndex((item) => item.kind === 'jalon' && item.id === targetJalonId)
+        const newParcoursItems = productLineKeys.map((id) => ({ kind: 'ligne' as const, id }))
+        const previousKeySet = new Set(existingKeys)
+        let nextParcours = base
+        if (jalonPos >= 0) {
+          let insertAt = jalonPos + 1
+          while (
+            insertAt < nextParcours.length &&
+            nextParcours[insertAt].kind === 'ligne' &&
+            previousKeySet.has(nextParcours[insertAt].id)
+          ) {
+            insertAt++
+          }
+          nextParcours = [
+            ...nextParcours.slice(0, insertAt),
+            ...newParcoursItems,
+            ...nextParcours.slice(insertAt),
+          ]
+        } else {
+          nextParcours = [
+            ...nextParcours,
+            { kind: 'jalon' as const, id: targetJalonId },
+            ...newParcoursItems,
+          ]
+        }
+
+        return {
+          ...f,
+          lines: nextLines,
+          meta: {
+            ...f.meta,
+            devis_jalons: list,
+            devis_parcours: nextParcours,
+          },
+        }
+      })
+      return
+    }
+
     const jalonId = newDevisJalonId()
     const childLines: QuoteLineDraft[] = products.map((p) => lineFromS2gProduct(p, jalonId, defaultTva))
     const productLineKeys = childLines.map((l) => l.row_key!).filter(Boolean)
@@ -511,6 +590,27 @@ export default function QuoteEditorPage() {
         meta,
       }
     })
+  }
+
+  function openS2gCatalog(jalonId?: string) {
+    if (isReadOnly) return
+    if (jalonId) {
+      const jalon = form.meta.devis_jalons?.find((j) => j.id === jalonId)
+      if (!jalon?.ref_article_id) {
+        setSubmitError(
+          'Ce jalon n’est pas lié au catalogue S2G : impossible d’y ajouter des articles depuis le catalogue.',
+        )
+        return
+      }
+    }
+    setSubmitError(null)
+    setS2gAppendJalonId(jalonId ?? null)
+    setS2gPickOpen(true)
+  }
+
+  function closeS2gCatalog() {
+    setS2gPickOpen(false)
+    setS2gAppendJalonId(null)
   }
 
   function applyOfferingToLine(index: number, o: CommercialOffering) {
@@ -712,7 +812,8 @@ export default function QuoteEditorPage() {
             setProlabPick({ target: 'line', index: i })
             setProlabFamilleId('')
           }}
-          onOpenS2gCatalog={isReadOnly ? undefined : () => setS2gPickOpen(true)}
+          onOpenS2gCatalog={isReadOnly ? undefined : () => openS2gCatalog()}
+          onAddArticlesToJalon={isReadOnly ? undefined : (jalonId) => openS2gCatalog(jalonId)}
           onRemoveJalon={removeJalon}
           onAddFromCommercialCatalog={isReadOnly ? undefined : addLineFromCommercialCatalog}
           onAddFromProlabCatalog={isReadOnly ? undefined : addLineFromProlabCatalog}
@@ -729,7 +830,27 @@ export default function QuoteEditorPage() {
 
       {s2gPickOpen && (
         <S2gCataloguePickerModal
-          onClose={() => setS2gPickOpen(false)}
+          appendToJalon={
+            s2gAppendJalonId
+              ? (() => {
+                  const j = form.meta.devis_jalons?.find((x) => x.id === s2gAppendJalonId)
+                  if (!j?.ref_article_id) return null
+                  const exclude = new Set<number>(j.product_ref_article_ids ?? [])
+                  form.lines.forEach((line) => {
+                    if (line.parent_jalon_id === s2gAppendJalonId && line.ref_article_id != null) {
+                      exclude.add(line.ref_article_id)
+                    }
+                  })
+                  return {
+                    devisJalonId: s2gAppendJalonId,
+                    refArticleId: j.ref_article_id,
+                    libelle: j.libelle,
+                    excludeProductIds: [...exclude],
+                  }
+                })()
+              : null
+          }
+          onClose={closeS2gCatalog}
           onPick={async (result) => {
             try {
               await applyS2gCataloguePick(result)

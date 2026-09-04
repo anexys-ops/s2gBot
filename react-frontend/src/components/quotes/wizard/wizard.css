@@ -315,5 +315,12 @@
   color: #1f2937;
 }
 .qw-s2g-jalon-row__empty { margin: .35rem 0 0; font-size: .82rem; }
+.qw-s2g-jalon-row__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .35rem;
+  flex-wrap: wrap;
+}
 .qw-s2g-line-row--nested td:first-child { padding-left: 1.75rem; }
 .qw-s2g-line-row--nested td:nth-child(2) { padding-left: 1.25rem; }

@@ -21,6 +21,7 @@ type Props = {
   updateLine: (index: number, field: keyof QuoteLineDraft, value: string | number | null | boolean) => void
   removeLine: (index: number) => void
   onOpenS2gCatalog: () => void
+  onAddArticlesToJalon?: (jalonId: string) => void
   onRemoveJalon: (jalonId: string) => void
 }
 
@@ -249,6 +250,7 @@ export default function WizardStep4Lines({
   updateLine,
   removeLine,
   onOpenS2gCatalog,
+  onAddArticlesToJalon,
   onRemoveJalon,
 }: Props) {
   const isForfait = form.meta?.mode_devis === 'forfait'
@@ -698,24 +700,36 @@ export default function WizardStep4Lines({
                         <td colSpan={6} />
                       )}
                       <td className="data-table__actions">
-                        <button
-                          type="button"
-                          className="ds-icon-btn ds-icon-btn--danger"
-                          title="Retirer le jalon"
-                          aria-label="Retirer le jalon"
-                          onClick={() => setDeleteJalonId(block.jalonId)}
-                        >
-                          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-                            <path
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.75"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M5 6h14v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6zM10 11v6M14 11v6"
-                            />
-                          </svg>
-                        </button>
+                        <div className="qw-s2g-jalon-row__actions">
+                          {onAddArticlesToJalon && jalon.ref_article_id ? (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              title="Ajouter des articles à ce jalon"
+                              onClick={() => onAddArticlesToJalon(block.jalonId)}
+                            >
+                              + Articles
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="ds-icon-btn ds-icon-btn--danger"
+                            title="Retirer le jalon"
+                            aria-label="Retirer le jalon"
+                            onClick={() => setDeleteJalonId(block.jalonId)}
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+                              <path
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.75"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M5 6h14v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6zM10 11v6M14 11v6"
+                              />
+                            </svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                     {children.map(({ line, index }) => {

@@ -425,11 +425,6 @@ export default function OrderDetail() {
           <p style={{ fontSize: '0.9rem', color: 'var(--muted, #64748b)' }}>
             Choisissez un modèle PDF et un formulaire métier (données terrain). La même structure s&apos;applique à tous les services via les définitions côté API.
           </p>
-          {isAdmin && (
-            <p style={{ fontSize: '0.85rem' }}>
-              <Link to="/back-office/modeles-rapports-pdf">Configurer les modèles PDF des rapports (défaut, libellés)</Link>
-            </p>
-          )}
           <div className="form-group">
             <label>Modèle PDF</label>
             <select

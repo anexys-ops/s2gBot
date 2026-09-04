@@ -59,7 +59,6 @@ import SiteLayout from './pages/sites/SiteLayout'
 import SiteFicheTab from './pages/sites/SiteFicheTab'
 import SiteMissionsTab from './pages/sites/SiteMissionsTab'
 import SiteMapTab from './pages/sites/SiteMapTab'
-import ReportPdfTemplates from './pages/ReportPdfTemplates'
 import DocumentPdfTemplates from './pages/DocumentPdfTemplates'
 import ModuleConfigurationPage from './pages/back-office/ModuleConfigurationPage'
 import ReportComptaPage from './pages/reports/ReportComptaPage'
@@ -216,7 +215,7 @@ function AppRoutes() {
             <Route path="journal-audit" element={<ActivityLogPage />} />
             <Route path="non-conformites" element={<NonConformitiesPage />} />
             <Route path="non-conformites/:id" element={<NonConformityDetailPage />} />
-            <Route path="modeles-rapports-pdf" element={<ReportPdfTemplates />} />
+            <Route path="modeles-rapports-pdf" element={<Navigate to="/back-office/modeles-documents-pdf" replace />} />
             <Route path="modeles-documents-pdf" element={<DocumentPdfTemplates />} />
             <Route path="configuration" element={<ModuleConfigurationPage />} />
             <Route path="pdf" element={<PdfModule />} />

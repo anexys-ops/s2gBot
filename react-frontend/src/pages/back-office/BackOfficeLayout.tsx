@@ -43,12 +43,6 @@ function metaForPath(pathname: string): PageMeta {
       subtitle: 'Suivi des écarts ISO 17025, actions correctives et indicateurs d’ouverture / clôture.',
       crumb: 'Non-conformités',
     }
-  if (pathname.includes('/modeles-rapports-pdf'))
-    return {
-      title: 'Modèles PDF — rapports',
-      subtitle: 'Modèles des rapports d’essais : défaut et personnalisation (logo, signature, champs).',
-      crumb: 'Modèles PDF rapports',
-    }
   if (pathname.includes('/modeles-documents-pdf'))
     return {
       title: 'Modèles PDF — devis & factures',
@@ -115,7 +109,6 @@ export default function BackOfficeLayout() {
       : []),
     ...(isAdmin
       ? [
-          { to: '/back-office/modeles-rapports-pdf', label: 'PDF rapports', end: true as const },
           { to: '/back-office/modeles-documents-pdf', label: 'PDF devis/factures', end: true as const },
         ]
       : []),

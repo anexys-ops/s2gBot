@@ -13,8 +13,6 @@ type Props = {
   layoutConfig: PdfLayoutConfig
   onSave: (parsed: PdfLayoutConfig) => Promise<void>
   disabled?: boolean
-  /** Affiche la section totaux HT/TVA/TTC (modèles devis / factures). */
-  showDocumentTotals?: boolean
   /** N’affiche que le cadre totaux (conserve le reste de layout_config à l’enregistrement). */
   totalsOnly?: boolean
 }
@@ -23,7 +21,6 @@ export default function PdfLayoutConfigEditor({
   layoutConfig,
   onSave,
   disabled,
-  showDocumentTotals,
   totalsOnly,
 }: Props) {
   const [form, setForm] = useState<PdfLayoutConfigForm>(() => layoutConfigToForm(layoutConfig))
@@ -97,10 +94,9 @@ export default function PdfLayoutConfigEditor({
 
   const totalsSection = (
     <section className="pdf-layout-editor__section">
-      <h3 className="pdf-layout-editor__h">Cadre totaux (PDF devis)</h3>
+      <h3 className="pdf-layout-editor__h">Cadre totaux</h3>
       <p className="pdf-layout-editor__hint">
-        Cochez les montants à afficher dans le cadre récapitulatif en bas du PDF devis. Si aucune case n’est cochée, le
-        cadre est masqué.
+        Montants affichés dans le cadre récapitulatif du PDF. Si aucune case n’est cochée, le cadre est masqué.
       </p>
       <label className="pdf-layout-editor__check">
         <input
@@ -233,8 +229,6 @@ export default function PdfLayoutConfigEditor({
           </select>
         </div>
       </section>
-
-      {showDocumentTotals ? totalsSection : null}
 
       <section className="pdf-layout-editor__section">
         <div className="pdf-layout-editor__section-head">

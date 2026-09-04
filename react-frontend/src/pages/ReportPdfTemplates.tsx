@@ -1,11 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import {
-  documentPdfTemplatesApi,
-  reportPdfTemplatesApi,
-  type DocumentPdfTemplateRow,
-  type ReportPdfTemplateRow,
-} from '../api/client'
+import { reportPdfTemplatesApi, type ReportPdfTemplateRow } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import PageBackNav from '../components/PageBackNav'
 import PdfLayoutConfigEditor from '../components/PdfLayoutConfigEditor'
@@ -22,16 +16,6 @@ export default function ReportPdfTemplates() {
     enabled: isLab,
   })
 
-  const {
-    data: documentData,
-    isLoading: documentLoading,
-    error: documentError,
-  } = useQuery({
-    queryKey: ['document-pdf-templates', 'quote'],
-    queryFn: () => documentPdfTemplatesApi.list('quote'),
-    enabled: isLab,
-  })
-
   const setDefaultMut = useMutation({
     mutationFn: (id: number) => reportPdfTemplatesApi.update(id, { is_default: true }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['report-pdf-templates'] }),
@@ -41,12 +25,6 @@ export default function ReportPdfTemplates() {
     mutationFn: ({ id, layout_config }: { id: number; layout_config: Record<string, unknown> }) =>
       reportPdfTemplatesApi.update(id, { layout_config }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['report-pdf-templates'] }),
-  })
-
-  const saveQuoteLayoutMut = useMutation({
-    mutationFn: ({ id, layout_config }: { id: number; layout_config: Record<string, unknown> }) =>
-      documentPdfTemplatesApi.update(id, { layout_config }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['document-pdf-templates'] }),
   })
 
   if (!isLab) {
@@ -62,9 +40,6 @@ export default function ReportPdfTemplates() {
   if (error) return <p className="error">{String(error)}</p>
 
   const rows: ReportPdfTemplateRow[] = data?.data ?? []
-  const quoteTemplates: DocumentPdfTemplateRow[] = (documentData?.data ?? []).filter(
-    (t) => t.document_type === 'quote',
-  )
 
   return (
     <div>
@@ -74,9 +49,8 @@ export default function ReportPdfTemplates() {
       />
       <div className="card" style={{ marginBottom: '1rem', fontSize: '0.95rem' }}>
         <p style={{ margin: 0 }}>
-          Choix du modèle <strong>par défaut</strong> pour les rapports PDF depuis une commande. Les administrateurs peuvent
-          configurer la mise en page (exports, en-tête, champs et photos) dans le panneau graphique ci-dessous — enregistré
-          côté serveur avec fusion des valeurs par défaut.
+          Modèles PDF des <strong>rapports d’essais</strong> : choisissez le modèle par défaut, puis adaptez logo,
+          signature et champs affichés.
         </p>
       </div>
       <div className="card">
@@ -84,8 +58,6 @@ export default function ReportPdfTemplates() {
           <thead>
             <tr>
               <th>Nom</th>
-              <th>Slug</th>
-              <th>Vue Blade</th>
               <th>Défaut</th>
               {isAdmin && <th>Actions</th>}
             </tr>
@@ -94,12 +66,6 @@ export default function ReportPdfTemplates() {
             {rows.map((t) => (
               <tr key={t.id}>
                 <td>{t.name}</td>
-                <td>
-                  <code>{t.slug}</code>
-                </td>
-                <td>
-                  <code>{t.blade_view}</code>
-                </td>
                 <td>{t.is_default ? 'Oui' : '—'}</td>
                 {isAdmin && (
                   <td>
@@ -119,13 +85,14 @@ export default function ReportPdfTemplates() {
             ))}
           </tbody>
         </table>
-        {rows.length === 0 && <p style={{ padding: '1rem' }}>Aucun modèle (exécutez les migrations / seeders Laravel).</p>}
+        {rows.length === 0 && <p style={{ padding: '1rem' }}>Aucun modèle (migrations / seeders Laravel).</p>}
       </div>
       {isAdmin &&
         rows.map((t) => (
-          <details key={`cfg-${t.id}`} className="card" style={{ marginTop: '1rem' }}>
+          <details key={`cfg-${t.id}`} className="card" style={{ marginTop: '1rem' }} open={t.is_default}>
             <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
-              Mise en page — {t.name}
+              Personnalisation — {t.name}
+              {t.is_default ? ' (défaut)' : ''}
             </summary>
             <PdfLayoutConfigEditor
               layoutConfig={(t.layout_config ?? {}) as Record<string, unknown>}
@@ -136,44 +103,8 @@ export default function ReportPdfTemplates() {
             />
           </details>
         ))}
-
-      <div className="card" style={{ marginTop: '1.5rem', fontSize: '0.95rem' }}>
-        <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem' }}>PDF Devis — cadre totaux</h2>
-        <p style={{ margin: 0 }}>
-          Personnalisez l’affichage du cadre <strong>Total HT</strong>, <strong>Total TVA</strong> et{' '}
-          <strong>Total TTC</strong> sur les PDF générés depuis <code>/devis</code>. Les modèles complets devis/factures
-          restent aussi disponibles dans{' '}
-          <Link to="/back-office/modeles-documents-pdf">Modèles PDF devis/factures</Link>.
-        </p>
-      </div>
-      {documentLoading ? <p>Chargement des modèles devis…</p> : null}
-      {documentError ? <p className="error">{String(documentError)}</p> : null}
-      {!documentLoading && quoteTemplates.length === 0 ? (
-        <div className="card" style={{ marginTop: '1rem' }}>
-          <p style={{ margin: 0 }}>Aucun modèle PDF devis trouvé (migrations / seeders Laravel).</p>
-        </div>
-      ) : null}
-      {isAdmin &&
-        quoteTemplates.map((t) => (
-          <details key={`quote-cfg-${t.id}`} className="card" style={{ marginTop: '1rem' }} open={t.is_default}>
-            <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
-              Devis — {t.name}
-              {t.is_default ? ' (défaut)' : ''}
-            </summary>
-            <PdfLayoutConfigEditor
-              layoutConfig={(t.layout_config ?? {}) as Record<string, unknown>}
-              totalsOnly
-              disabled={saveQuoteLayoutMut.isPending}
-              onSave={async (parsed) => {
-                await saveQuoteLayoutMut.mutateAsync({ id: t.id, layout_config: parsed })
-              }}
-            />
-          </details>
-        ))}
-
       {setDefaultMut.isError && <p className="error">{(setDefaultMut.error as Error).message}</p>}
       {saveLayoutMut.isError && <p className="error">{(saveLayoutMut.error as Error).message}</p>}
-      {saveQuoteLayoutMut.isError && <p className="error">{(saveQuoteLayoutMut.error as Error).message}</p>}
     </div>
   )
 }

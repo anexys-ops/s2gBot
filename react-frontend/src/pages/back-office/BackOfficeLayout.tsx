@@ -45,15 +45,15 @@ function metaForPath(pathname: string): PageMeta {
     }
   if (pathname.includes('/modeles-rapports-pdf'))
     return {
-      title: 'Modèles PDF — rapports d’essais',
-      subtitle: 'Modèle par défaut utilisé lors de la génération depuis une commande.',
+      title: 'Modèles PDF — rapports',
+      subtitle: 'Modèles des rapports d’essais : défaut et personnalisation (logo, signature, champs).',
       crumb: 'Modèles PDF rapports',
     }
   if (pathname.includes('/modeles-documents-pdf'))
     return {
       title: 'Modèles PDF — devis & factures',
-      subtitle: 'Modèle par défaut par type de document et mise en page (logo, signature, champs).',
-      crumb: 'Modèles PDF documents',
+      subtitle: 'Types de PDF existants, modèle par défaut, et affichage Total HT / TVA / TTC.',
+      crumb: 'Modèles PDF devis/factures',
     }
   if (pathname.includes('/pdf'))
     return {
@@ -115,8 +115,8 @@ export default function BackOfficeLayout() {
       : []),
     ...(isAdmin
       ? [
-          { to: '/back-office/modeles-rapports-pdf', label: 'Modèles PDF rapports', end: true as const },
-          { to: '/back-office/modeles-documents-pdf', label: 'Modèles PDF devis/factures', end: true as const },
+          { to: '/back-office/modeles-rapports-pdf', label: 'PDF rapports', end: true as const },
+          { to: '/back-office/modeles-documents-pdf', label: 'PDF devis/factures', end: true as const },
         ]
       : []),
     ...(canAppConfig ? [{ to: '/back-office/configuration', label: 'Configuration', end: true as const }] : []),

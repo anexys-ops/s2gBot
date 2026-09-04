@@ -23,6 +23,12 @@ function chainCount(value: number | undefined): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
+function quotePricingMode(q: Quote): { label: string; variant: 'warning' | 'info' } {
+  return q.meta?.mode_devis === 'forfait'
+    ? { label: 'Forfait', variant: 'warning' }
+    : { label: 'Détaillé', variant: 'info' }
+}
+
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
   validated: 'Validé',
@@ -190,6 +196,7 @@ export default function Devis() {
           { id: 'date', label: 'Date' },
           { id: 'ttc', label: 'Montant TTC' },
           { id: 'travel', label: 'Dépl. HT' },
+          { id: 'mode', label: 'Mode' },
           { id: 'status', label: 'Statut' },
           ...(isLab
             ? [
@@ -251,6 +258,7 @@ export default function Devis() {
                   {visible.date !== false && <th>Date</th>}
                   {visible.ttc !== false && <th>Montant TTC ({MONEY_UNIT_LABEL})</th>}
                   {visible.travel !== false && <th>Dépl. HT ({MONEY_UNIT_LABEL})</th>}
+                  {visible.mode !== false && <th>Mode</th>}
                   {visible.status !== false && <th>Statut</th>}
                   {isLab && visible.bc !== false && <th>BC</th>}
                   {isLab && visible.bl !== false && <th className="data-table__num">BL</th>}
@@ -262,6 +270,7 @@ export default function Devis() {
               <tbody>
                 {quotes.map((q) => {
                   const st = quoteStatutBadgeProps(q.status)
+                  const mode = quotePricingMode(q)
                   const bc = quoteBonCommande(q)
                   const blCount = chainCount(bc?.bons_livraison_count)
                   const invoiceCount = chainCount(bc?.invoices_count)
@@ -278,6 +287,13 @@ export default function Devis() {
                       {visible.date !== false && <td>{formatAppDate(q.quote_date)}</td>}
                       {visible.ttc !== false && <td>{formatMoney(Number(q.amount_ttc))}</td>}
                       {visible.travel !== false && <td>{formatMoney(Number(q.travel_fee_ht ?? 0))}</td>}
+                      {visible.mode !== false && (
+                        <td className="data-table__status">
+                          <StatusBadge variant={mode.variant} size="sm">
+                            {mode.label}
+                          </StatusBadge>
+                        </td>
+                      )}
                       {visible.status !== false && (
                         <td className="data-table__status">
                           <StatusBadge variant={st.variant} size="sm">

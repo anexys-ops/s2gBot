@@ -277,7 +277,7 @@ export default function Devis() {
                   return (
                     <tr key={q.id}>
                       {visible.number !== false && (
-                        <td>
+                        <td className="data-table__nowrap">
                           <Link to={`/devis/${q.id}/editer`} className="link-inline">
                             <code className="code-badge">{q.number}</code>
                           </Link>

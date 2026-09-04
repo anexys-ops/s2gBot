@@ -5820,6 +5820,7 @@ a.catalogue-tree__link-article:hover {
   color: #0f172a;
   border: 1px solid #e2e8f0;
   font-family: ui-monospace, 'Cascadia Code', monospace;
+  white-space: nowrap;
 }
 .status-pill {
   display: inline-block;
@@ -7834,6 +7835,10 @@ a.catalogue-tree__link-article:hover {
 .data-table td.data-table__num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.data-table th.data-table__nowrap,
+.data-table td.data-table__nowrap {
   white-space: nowrap;
 }
 .bc-lignes-table {

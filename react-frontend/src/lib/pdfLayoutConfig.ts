@@ -21,6 +21,12 @@ export interface PdfLayoutConfigForm {
     subtitle: string
   }
   extra_fields: PdfLayoutExtraFieldRow[]
+  /** Cadre totaux PDF devis (HT / TVA / TTC). */
+  totals: {
+    show_total_ht: boolean
+    show_total_tva: boolean
+    show_total_ttc: boolean
+  }
 }
 
 function clampPhotoSlots(n: number): number {
@@ -32,6 +38,7 @@ function clampPhotoSlots(n: number): number {
 export function layoutConfigToForm(raw: PdfLayoutConfig | undefined | null): PdfLayoutConfigForm {
   const r = raw ?? {}
   const h = (r.header as Record<string, unknown> | undefined) ?? {}
+  const t = (r.totals as Record<string, unknown> | undefined) ?? {}
   const rawFields = r.extra_fields
   const fields: PdfLayoutExtraFieldRow[] = Array.isArray(rawFields)
     ? rawFields
@@ -56,6 +63,11 @@ export function layoutConfigToForm(raw: PdfLayoutConfig | undefined | null): Pdf
       subtitle: typeof h.subtitle === 'string' ? h.subtitle : '',
     },
     extra_fields: fields,
+    totals: {
+      show_total_ht: t.show_total_ht !== false,
+      show_total_tva: t.show_total_tva !== false,
+      show_total_ttc: t.show_total_ttc !== false,
+    },
   }
 }
 
@@ -84,6 +96,11 @@ export function formToLayoutConfigPayload(form: PdfLayoutConfigForm): PdfLayoutC
     export_docx: form.export_docx,
     header,
     extra_fields,
+    totals: {
+      show_total_ht: form.totals.show_total_ht,
+      show_total_tva: form.totals.show_total_tva,
+      show_total_ttc: form.totals.show_total_ttc,
+    },
   }
 }
 

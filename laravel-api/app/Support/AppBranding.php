@@ -181,6 +181,12 @@ class AppBranding
                 'photo_slots' => 0,
             ],
             'extra_fields' => [],
+            /** Affichage du cadre totaux sur les PDF devis (ignoré par les rapports). */
+            'totals' => [
+                'show_total_ht' => true,
+                'show_total_tva' => true,
+                'show_total_ttc' => true,
+            ],
         ];
     }
 

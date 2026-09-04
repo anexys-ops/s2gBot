@@ -71,14 +71,27 @@
     </table>
 
     <div class="totals">
+        @php
+            $totalsCfg = is_array(($layoutConfig['totals'] ?? null)) ? $layoutConfig['totals'] : [];
+            $showTotalHt = ($totalsCfg['show_total_ht'] ?? true) !== false;
+            $showTotalTva = ($totalsCfg['show_total_tva'] ?? true) !== false;
+            $showTotalTtc = ($totalsCfg['show_total_ttc'] ?? true) !== false;
+        @endphp
         @if((float)$quote->discount_percent > 0 || (float)$quote->discount_amount > 0)
         <p>Remise document : {{ number_format($quote->discount_percent, 2, ',', ' ') }} % @if((float)$quote->discount_amount > 0) + {{ number_format($quote->discount_amount, 2, ',', ' ') }} {{ $currencyLabel }} HT @endif</p>
         @endif
         @if((float)$quote->shipping_amount_ht > 0)
         <p>Frais de port / livraison HT : {{ number_format($quote->shipping_amount_ht, 2, ',', ' ') }} {{ $currencyLabel }} (TVA {{ number_format($quote->shipping_tva_rate, 2, ',', ' ') }} %)</p>
         @endif
+        @if($showTotalHt)
         <p><strong>Total HT :</strong> {{ number_format($quote->amount_ht, 2, ',', ' ') }} {{ $currencyLabel }}</p>
+        @endif
+        @if($showTotalTva)
+        <p><strong>Total TVA :</strong> {{ number_format(max(0, (float)$quote->amount_ttc - (float)$quote->amount_ht), 2, ',', ' ') }} {{ $currencyLabel }}</p>
+        @endif
+        @if($showTotalTtc)
         <p><strong>Total TTC :</strong> {{ number_format($quote->amount_ttc, 2, ',', ' ') }} {{ $currencyLabel }}</p>
+        @endif
     </div>
 
     @if($quote->notes)

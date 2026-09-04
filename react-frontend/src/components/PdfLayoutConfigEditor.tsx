@@ -13,9 +13,19 @@ type Props = {
   layoutConfig: PdfLayoutConfig
   onSave: (parsed: PdfLayoutConfig) => Promise<void>
   disabled?: boolean
+  /** Affiche la section totaux HT/TVA/TTC (modèles devis / factures). */
+  showDocumentTotals?: boolean
+  /** N’affiche que le cadre totaux (conserve le reste de layout_config à l’enregistrement). */
+  totalsOnly?: boolean
 }
 
-export default function PdfLayoutConfigEditor({ layoutConfig, onSave, disabled }: Props) {
+export default function PdfLayoutConfigEditor({
+  layoutConfig,
+  onSave,
+  disabled,
+  showDocumentTotals,
+  totalsOnly,
+}: Props) {
   const [form, setForm] = useState<PdfLayoutConfigForm>(() => layoutConfigToForm(layoutConfig))
   const [err, setErr] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -52,14 +62,27 @@ export default function PdfLayoutConfigEditor({ layoutConfig, onSave, disabled }
 
   async function handleSave() {
     setErr(null)
-    const msg = validateLayoutForm(form)
-    if (msg) {
-      setErr(msg)
-      return
+    if (!totalsOnly) {
+      const msg = validateLayoutForm(form)
+      if (msg) {
+        setErr(msg)
+        return
+      }
     }
     setSaving(true)
     try {
-      await onSave(formToLayoutConfigPayload(form))
+      if (totalsOnly) {
+        await onSave({
+          ...layoutConfig,
+          totals: {
+            show_total_ht: form.totals.show_total_ht,
+            show_total_tva: form.totals.show_total_tva,
+            show_total_ttc: form.totals.show_total_ttc,
+          },
+        })
+      } else {
+        await onSave(formToLayoutConfigPayload(form))
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -70,6 +93,65 @@ export default function PdfLayoutConfigEditor({ layoutConfig, onSave, disabled }
   function handleReset() {
     setForm(layoutConfigToForm(layoutConfig))
     setErr(null)
+  }
+
+  const totalsSection = (
+    <section className="pdf-layout-editor__section">
+      <h3 className="pdf-layout-editor__h">Cadre totaux (PDF devis)</h3>
+      <p className="pdf-layout-editor__hint">
+        Cochez les montants à afficher dans le cadre récapitulatif en bas du PDF devis. Si aucune case n’est cochée, le
+        cadre est masqué.
+      </p>
+      <label className="pdf-layout-editor__check">
+        <input
+          type="checkbox"
+          checked={form.totals.show_total_ht}
+          onChange={(e) => setForm((f) => ({ ...f, totals: { ...f.totals, show_total_ht: e.target.checked } }))}
+          disabled={disabled || saving}
+        />
+        Afficher Total HT
+      </label>
+      <label className="pdf-layout-editor__check">
+        <input
+          type="checkbox"
+          checked={form.totals.show_total_tva}
+          onChange={(e) => setForm((f) => ({ ...f, totals: { ...f.totals, show_total_tva: e.target.checked } }))}
+          disabled={disabled || saving}
+        />
+        Afficher Total TVA
+      </label>
+      <label className="pdf-layout-editor__check">
+        <input
+          type="checkbox"
+          checked={form.totals.show_total_ttc}
+          onChange={(e) => setForm((f) => ({ ...f, totals: { ...f.totals, show_total_ttc: e.target.checked } }))}
+          disabled={disabled || saving}
+        />
+        Afficher Total TTC
+      </label>
+    </section>
+  )
+
+  if (totalsOnly) {
+    return (
+      <div className="pdf-layout-editor">
+        {totalsSection}
+        {err ? <p className="error pdf-layout-editor__err">{err}</p> : null}
+        <div className="pdf-layout-editor__actions">
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={disabled || saving}
+            onClick={() => void handleSave()}
+          >
+            {saving ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={disabled || saving} onClick={handleReset}>
+            Annuler les modifications
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -151,6 +233,8 @@ export default function PdfLayoutConfigEditor({ layoutConfig, onSave, disabled }
           </select>
         </div>
       </section>
+
+      {showDocumentTotals ? totalsSection : null}
 
       <section className="pdf-layout-editor__section">
         <div className="pdf-layout-editor__section-head">

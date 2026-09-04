@@ -142,38 +142,63 @@
         $fraisSuppTtc = (float) ($ctx['frais_supplementaires_ttc'] ?? 0);
         $documentTtc = (float) $quote->amount_ttc;
         $totalTtc = (float) ($ctx['total_ttc'] ?? $documentTtc);
+        $totalsCfg = is_array($layoutConfig['totals'] ?? null) ? $layoutConfig['totals'] : [];
+        $showTotalHt = ($totalsCfg['show_total_ht'] ?? true) !== false;
+        $showTotalTva = ($totalsCfg['show_total_tva'] ?? true) !== false;
+        $showTotalTtc = ($totalsCfg['show_total_ttc'] ?? true) !== false;
+        $showTotalsBox = $showTotalHt || $showTotalTva || $showTotalTtc;
+        $amountCols = ($showTotalHt ? 1 : 0) + ($showTotalTva ? 1 : 0) + ($showTotalTtc ? 1 : 0);
+        $fraisPadColspan = max(1, $amountCols - ($showTotalTtc ? 1 : 0));
     @endphp
 
+    @if($showTotalsBox)
     <table style="width:100%;margin-bottom:14px;">
         <thead>
             <tr>
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;width:37%;font-weight:bold;text-align:center;">Total</td>
+                @if($showTotalHt)
                 <th style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;background:{{ $LGRAY }};">Total HT</th>
+                @endif
+                @if($showTotalTva)
                 <th style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;background:{{ $LGRAY }};">Total TVA</th>
+                @endif
+                @if($showTotalTtc)
                 <th style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;background:{{ $LGRAY }};">Total TTC</th>
+                @endif
             </tr>
         </thead>
         <tbody>
             <tr>
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;">&nbsp;</td>
+                @if($showTotalHt)
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;">{{ $fmt($totalHt) }}</td>
+                @endif
+                @if($showTotalTva)
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;">{{ $fmt($totalTva) }}</td>
+                @endif
+                @if($showTotalTtc)
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;">{{ $fmt($fraisSuppTtc > 0 ? $documentTtc : $totalTtc) }}</td>
+                @endif
             </tr>
-            @if($fraisSuppTtc > 0)
+            @if($fraisSuppTtc > 0 && $showTotalTtc)
             <tr>
                 <td style="border:1px solid {{ $BORDER }};padding:4px 8px;font-size:8.5pt;">+ Frais suppl. TTC</td>
-                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;" colspan="2">&nbsp;</td>
+                @if($fraisPadColspan > 0)
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;" colspan="{{ $fraisPadColspan }}">&nbsp;</td>
+                @endif
                 <td style="border:1px solid {{ $BORDER }};padding:4px 8px;text-align:center;font-size:8.5pt;">{{ $fmt($fraisSuppTtc) }}</td>
             </tr>
             <tr>
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;font-weight:bold;">Total TTC</td>
-                <td style="border:1px solid {{ $BORDER }};padding:5px 8px;" colspan="2">&nbsp;</td>
+                @if($fraisPadColspan > 0)
+                <td style="border:1px solid {{ $BORDER }};padding:5px 8px;" colspan="{{ $fraisPadColspan }}">&nbsp;</td>
+                @endif
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;">{{ $fmt($totalTtc) }}</td>
             </tr>
             @endif
         </tbody>
     </table>
+    @endif
 
     <p style="font-size:8.5pt;margin:0 0 4px;">
         Arrêtée le présent devis à la somme de <strong>{{ $amountInWords ?? '' }}</strong> toute taxe comprise.

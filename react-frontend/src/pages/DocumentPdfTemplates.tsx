@@ -107,6 +107,7 @@ export default function DocumentPdfTemplates() {
             </summary>
             <PdfLayoutConfigEditor
               layoutConfig={(t.layout_config ?? {}) as Record<string, unknown>}
+              showDocumentTotals={t.document_type === 'quote' || t.document_type === 'invoice'}
               disabled={saveLayoutMut.isPending}
               onSave={async (parsed) => {
                 await saveLayoutMut.mutateAsync({ id: t.id, layout_config: parsed })

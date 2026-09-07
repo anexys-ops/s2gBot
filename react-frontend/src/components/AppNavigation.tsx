@@ -20,8 +20,6 @@ type MenuGroupId =
 type MenuGroup = {
   id: MenuGroupId
   label: string
-  /** Clic sur le libellé du menu → hub module (ex. /terrain). */
-  hubTo?: string
   items: SubItem[]
 }
 
@@ -135,7 +133,6 @@ export default function AppNavigation() {
       {
         id: 'terrain' as MenuGroupId,
         label: 'Terrain',
-        hubTo: '/terrain',
         items: filterItems([
           { to: '/terrain/chantiers', label: 'Chantiers et carte GPS' },
           { to: '/terrain/mesures', label: 'Mesures terrain' },
@@ -278,48 +275,16 @@ export default function AppNavigation() {
                     .filter(Boolean)
                     .join(' ')}
                 >
-                  {group.hubTo ? (
-                    <div
-                      className={[
-                        'nav-dropdown-trigger',
-                        'nav-dropdown-trigger--split',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                    >
-                      <NavLink
-                        to={group.hubTo}
-                        end={group.hubTo === '/terrain'}
-                        className={({ isActive }) =>
-                          `nav-dropdown-trigger__label${isActive ? ' nav-dropdown-trigger__label--active' : ''}`
-                        }
-                        onClick={closeAll}
-                      >
-                        {group.label}
-                      </NavLink>
-                      <button
-                        type="button"
-                        className="nav-dropdown-trigger__toggle"
-                        aria-expanded={openDropdown === group.id}
-                        aria-haspopup="true"
-                        aria-label={`${openDropdown === group.id ? 'Fermer' : 'Ouvrir'} le menu ${group.label}`}
-                        onClick={() => toggleDropdown(group.id)}
-                      >
-                        <span className="nav-dropdown-chevron" aria-hidden />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="nav-dropdown-trigger"
-                      aria-expanded={openDropdown === group.id}
-                      aria-haspopup="true"
-                      onClick={() => toggleDropdown(group.id)}
-                    >
-                      <span>{group.label}</span>
-                      <span className="nav-dropdown-chevron" aria-hidden />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="nav-dropdown-trigger"
+                    aria-expanded={openDropdown === group.id}
+                    aria-haspopup="true"
+                    onClick={() => toggleDropdown(group.id)}
+                  >
+                    <span>{group.label}</span>
+                    <span className="nav-dropdown-chevron" aria-hidden />
+                  </button>
                   <ul className="nav-dropdown-panel" role="menu">
                     {group.items.map((item) => (
                       <li key={`${item.to}-${item.label}`} role="none">

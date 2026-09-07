@@ -4,10 +4,10 @@ import type { QuoteFormState, QuoteLineDraft } from '../QuoteFormFields'
 import UniteSelect from '../UniteSelect'
 import { lineHt, isJalonForfait, lineLockedByForfaitJalon, quoteFormPricingLines } from '../../../lib/quoteTotals'
 import {
+  clearedForfaitJalonPricing,
   forfaitJalonQuantity,
   forfaitJalonTotalHt,
   forfaitJalonUnitPrice,
-  sumForfaitJalonsHt,
   withSyncedForfaitJalonMontant,
 } from '../../../lib/quoteForfaitJalon'
 import { formatMoney } from '../../../lib/appLocale'
@@ -259,9 +259,7 @@ export default function WizardStep4Lines({
 
   const jalons = form.meta?.devis_jalons ?? []
 
-  const forfaitHt = isForfait
-    ? sumForfaitJalonsHt(jalons) || Math.max(0, Number(form.meta?.tarif_global_hors_lignes_ht ?? 0))
-    : Math.max(0, Number(form.meta?.tarif_global_hors_lignes_ht ?? 0))
+  const forfaitHt = Math.max(0, Number(form.meta?.tarif_global_hors_lignes_ht ?? 0))
   const forfaitTva = Math.min(100, Math.max(0, Number(form.tva_rate ?? 20)))
   const forfaitTvaAmount = Math.round(forfaitHt * (forfaitTva / 100) * 100) / 100
   const forfaitTtc = Math.round((forfaitHt + forfaitTvaAmount) * 100) / 100
@@ -286,7 +284,7 @@ export default function WizardStep4Lines({
     if (isForfait) {
       return {
         locked: true,
-        title: 'En mode forfait, le montant se saisit sur chaque jalon (qté × PU HT)',
+        title: 'En mode forfait, le montant HT global se saisit en haut de page',
       }
     }
     if (lineLockedByForfaitJalon(line, index, jalons)) {
@@ -331,12 +329,16 @@ export default function WizardStep4Lines({
       const meta = { ...f.meta }
       if (enabled) {
         meta.mode_devis = 'forfait'
-        const list = [...(meta.devis_jalons ?? [])]
-        meta.devis_jalons = list.map((j) =>
-          initJalonForfaitPricing(j, j.id ?? '', nextLines, f.tva_rate ?? 20),
+        const existing = Number(f.meta?.tarif_global_hors_lignes_ht)
+        const linesHt = nextLines.reduce(
+          (sum, line) => sum + lineHt(line.quantity, line.unit_price, line.discount_percent ?? 0),
+          0,
         )
+        meta.tarif_global_hors_lignes_ht =
+          Number.isFinite(existing) && existing > 0 ? existing : Math.round(linesHt * 100) / 100
+        meta.tarif_global_unite = 'F'
+        meta.devis_jalons = (meta.devis_jalons ?? []).map((j) => clearedForfaitJalonPricing(j))
         delete meta.ligne_masque_prix_pdf
-        delete meta.tarif_global_unite
       } else {
         delete meta.mode_devis
         delete meta.tarif_global_hors_lignes_ht
@@ -344,6 +346,20 @@ export default function WizardStep4Lines({
       }
       return { ...f, lines: nextLines, meta }
     })
+  }
+
+  const setForfaitHt = (raw: string) => {
+    setForm((f) => ({
+      ...f,
+      lines: f.lines.map((l) => ({ ...l, unit_price: 0, discount_percent: 0 })),
+      meta: {
+        ...f.meta,
+        mode_devis: 'forfait',
+        tarif_global_hors_lignes_ht: raw === '' ? 0 : Math.max(0, Number(raw)),
+        tarif_global_unite: 'F',
+        devis_jalons: (f.meta.devis_jalons ?? []).map((j) => clearedForfaitJalonPricing(j)),
+      },
+    }))
   }
 
   const setForfaitTva = (raw: string) => {
@@ -457,15 +473,25 @@ export default function WizardStep4Lines({
 
       {isForfait ? (
         <div className="qw-forfait-box">
-          <p className="qw-forfait-box__title">Forfait par jalon</p>
+          <p className="qw-forfait-box__title">Montant forfaitaire</p>
           <p className="qw-forfait-box__hint">
-            Saisissez la quantité et le PU HT sur chaque jalon, ou un montant global à l&apos;étape 5
-            (Tarif &amp; Validation). Les prix des articles sont désactivés ; le total HT, la TVA et le PDF
-            utilisent ces montants.
+            Un seul montant HT pour tout le devis, sans affecter de prix aux jalons. Les prix des articles
+            sont désactivés ; le TTC et le PDF utilisent ce forfait.
           </p>
           <div className="qw-forfait-box__fields">
             <label className="qw-forfait-box__field">
-              <span>TVA % (document)</span>
+              <span>Montant HT</span>
+              <input
+                className="qw-forfait-input"
+                type="number"
+                min={0}
+                step={0.01}
+                value={form.meta?.tarif_global_hors_lignes_ht ?? 0}
+                onChange={(e) => setForfaitHt(e.target.value)}
+              />
+            </label>
+            <label className="qw-forfait-box__field">
+              <span>TVA %</span>
               <input
                 className="qw-forfait-input"
                 type="number"
@@ -476,10 +502,6 @@ export default function WizardStep4Lines({
                 onChange={(e) => setForfaitTva(e.target.value)}
               />
             </label>
-            <div className="qw-forfait-box__field qw-forfait-box__field--readonly">
-              <span>Total HT</span>
-              <strong>{formatMoney(forfaitHt)}</strong>
-            </div>
             <div className="qw-forfait-box__field qw-forfait-box__field--readonly">
               <span>TVA</span>
               <strong>{formatMoney(forfaitTvaAmount)}</strong>
@@ -577,24 +599,18 @@ export default function WizardStep4Lines({
                 if (!jalon) return null
                 const productKeys = jalon.product_line_keys ?? []
                 const children = childLinesForJalon(productKeys)
-                const jalonForfait = isForfait || isJalonForfait(jalon)
+                const jalonForfait = isJalonForfait(jalon)
                 const jalonQty = forfaitJalonQuantity(jalon)
                 const jalonPu = forfaitJalonUnitPrice(jalon)
                 const jalonHt = forfaitJalonTotalHt(jalon)
                 const jalonTva = Math.min(
                   100,
-                  Math.max(
-                    0,
-                    Number(
-                      jalonForfait && !isForfait
-                        ? (jalon.tva_rate ?? form.tva_rate ?? 20)
-                        : (form.tva_rate ?? 20),
-                    ),
-                  ),
+                  Math.max(0, Number(jalon.tva_rate ?? form.tva_rate ?? 20)),
                 )
                 const jalonTvaAmount = Math.round(jalonHt * (jalonTva / 100) * 100) / 100
                 const jalonTtc = Math.round((jalonHt + jalonTvaAmount) * 100) / 100
-                const showJalonPricing = jalonForfait
+                /** Document forfait = montant global only; per-jalon pricing stays in mode détaillé. */
+                const showJalonPricing = !isForfait && jalonForfait
 
                 return (
                   <Fragment key={`jalon-block-${block.jalonId}`}>

@@ -42,15 +42,14 @@ export function sumForfaitJalonsHt(
   return Math.round(jalons.reduce((sum, j) => sum + forfaitJalonTotalHt(j), 0) * 100) / 100
 }
 
-/** Montant HT effectif d'un devis forfait : somme des jalons, sinon tarif global. */
+/** Montant HT effectif d'un devis forfait document : tarif global, sinon somme des jalons. */
 export function effectiveForfaitDocumentHt(
   jalons: ForfaitJalonFields[] | undefined | null,
   tarifGlobalHt: number | undefined | null,
 ): number {
-  const jalonsTotal = sumForfaitJalonsHt(jalons)
-  if (jalonsTotal > 0) return jalonsTotal
   const global = Number(tarifGlobalHt)
-  return Number.isFinite(global) && global >= 0 ? Math.round(global * 100) / 100 : 0
+  if (Number.isFinite(global) && global > 0) return Math.round(global * 100) / 100
+  return sumForfaitJalonsHt(jalons)
 }
 
 export function ttcFromHt(ht: number, tvaRate: number): number {

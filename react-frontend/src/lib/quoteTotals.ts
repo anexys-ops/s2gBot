@@ -1,5 +1,5 @@
 import { lineKeyForRow } from './devisParcours'
-import { forfaitJalonTotalHt, sumForfaitJalonsHt } from './quoteForfaitJalon'
+import { forfaitJalonTotalHt } from './quoteForfaitJalon'
 
 /**
  * Totaux devis / facture — aligné sur `CommercialDocumentTotalsService` (Laravel).
@@ -170,8 +170,7 @@ export function quoteFormPricingLines(
   documentForfaitHt: number,
 ): QuoteLineTotalsInput[] {
   if (isDocumentForfait) {
-    const jalonsTotal = sumForfaitJalonsHt(jalons)
-    const ht = jalonsTotal > 0 ? jalonsTotal : Math.max(0, documentForfaitHt)
+    const ht = Math.max(0, documentForfaitHt)
     return [{ quantity: 1, unit_price: ht, discount_percent: 0, tva_rate: documentTva }]
   }
 

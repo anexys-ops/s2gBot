@@ -207,6 +207,13 @@ class QuotePdfPresentationService
      */
     private function resolveForfaitHt(Quote $quote, array $meta, iterable $lines): float
     {
+        if (QuotePricingService::isDocumentForfait($meta)) {
+            $fromMeta = (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0);
+            if ($fromMeta > 0) {
+                return round($fromMeta, 2);
+            }
+        }
+
         $jalons = $meta['devis_jalons'] ?? [];
         if (is_array($jalons) && $jalons !== []) {
             $sum = 0.0;

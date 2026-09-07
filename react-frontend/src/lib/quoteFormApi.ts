@@ -5,7 +5,6 @@ import {
   forfaitJalonQuantity,
   forfaitJalonTotalHt,
   forfaitJalonUnitPrice,
-  sumForfaitJalonsHt,
   withSyncedForfaitJalonMontant,
 } from './quoteForfaitJalon'
 import { syncJalonProductKeysBeforeSave } from './s2gDevisCatalogue'
@@ -58,13 +57,11 @@ export function buildQuoteApiBody(form: QuoteFormState): QuoteCreateBody {
   if (meta.devis_jalons?.length) {
     meta.devis_jalons = meta.devis_jalons.map((j) => {
       if (meta.mode_devis === 'forfait') {
-        return withSyncedForfaitJalonMontant({
-          ...j,
-          quantity: Math.max(1, Math.round(finiteNum(j.quantity, forfaitJalonQuantity(j)))),
-          prix_unitaire_ht: Math.max(0, finiteNum(j.prix_unitaire_ht, forfaitJalonUnitPrice(j))),
-          montant_ht: Math.max(0, forfaitJalonTotalHt(j)),
-          unite: (j.unite ?? '').trim() || 'F',
-        })
+        const next = { ...j }
+        delete next.prix_unitaire_ht
+        delete next.montant_ht
+        delete next.mode
+        return next
       }
       if (j.mode !== 'forfait') {
         const next = { ...j }
@@ -82,13 +79,8 @@ export function buildQuoteApiBody(form: QuoteFormState): QuoteCreateBody {
     })
   }
   if (meta.mode_devis === 'forfait') {
-    const jalonsTotal = sumForfaitJalonsHt(meta.devis_jalons)
-    meta.tarif_global_hors_lignes_ht = Math.max(0, jalonsTotal > 0 ? jalonsTotal : finiteNum(meta.tarif_global_hors_lignes_ht, 0))
-    if (meta.devis_jalons?.length) {
-      delete meta.tarif_global_unite
-    } else {
-      meta.tarif_global_unite = (meta.tarif_global_unite ?? '').trim() || 'F'
-    }
+    meta.tarif_global_hors_lignes_ht = Math.max(0, finiteNum(meta.tarif_global_hors_lignes_ht, 0))
+    meta.tarif_global_unite = (meta.tarif_global_unite ?? '').trim() || 'F'
   } else if (meta.tarif_global_hors_lignes_ht == null) {
     delete meta.tarif_global_hors_lignes_ht
     delete meta.tarif_global_unite

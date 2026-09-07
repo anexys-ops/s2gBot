@@ -45,9 +45,8 @@ import {
   restoreS2gJalonLineLinks,
 } from '../lib/s2gDevisCatalogue'
 import {
-  forfaitJalonQuantity,
-  forfaitJalonUnitPrice,
-  withSyncedForfaitJalonMontant,
+  clearedForfaitJalonPricing,
+  sumForfaitJalonsHt,
 } from '../lib/quoteForfaitJalon'
 
 function newLineRowKey() {
@@ -240,18 +239,14 @@ export default function QuoteEditorPage() {
     const meta = restored.meta
     if (meta.mode_devis === 'forfait') {
       lines = lines.map((l) => (l.quantity === 1 ? l : { ...l, quantity: 1 }))
-      meta.devis_jalons = (meta.devis_jalons ?? []).map((j) => {
-        const pu = forfaitJalonUnitPrice(j)
-        const qty = forfaitJalonQuantity(j)
-        return withSyncedForfaitJalonMontant({
-          ...j,
-          quantity: qty,
-          prix_unitaire_ht: pu > 0 ? pu : undefined,
-          unite: (j.unite ?? '').trim() || undefined,
-        })
-      })
+      const existingGlobal = Number(meta.tarif_global_hors_lignes_ht)
+      const jalonsTotal = sumForfaitJalonsHt(meta.devis_jalons)
+      if (!(Number.isFinite(existingGlobal) && existingGlobal > 0) && jalonsTotal > 0) {
+        meta.tarif_global_hors_lignes_ht = jalonsTotal
+      }
+      meta.tarif_global_unite = (meta.tarif_global_unite ?? '').trim() || 'F'
+      meta.devis_jalons = (meta.devis_jalons ?? []).map((j) => clearedForfaitJalonPricing(j))
       delete meta.ligne_masque_prix_pdf
-      delete meta.tarif_global_unite
     }
     setForm({
       contextMode: inferContextMode(quote),

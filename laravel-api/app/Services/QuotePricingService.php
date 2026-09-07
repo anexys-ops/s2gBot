@@ -31,21 +31,6 @@ class QuotePricingService
         $documentTva = (float) $quote->tva_rate;
 
         if (self::isDocumentForfait($meta)) {
-            $jalons = $meta['devis_jalons'] ?? [];
-            if (is_array($jalons) && $jalons !== []) {
-                $sum = 0.0;
-                foreach ($jalons as $jalon) {
-                    if (is_array($jalon)) {
-                        $sum += self::forfaitJalonTotalHt($jalon);
-                    }
-                }
-                if ($sum > 0) {
-                    return [
-                        ['ht' => round($sum, 2), 'tva_rate' => $documentTva],
-                    ];
-                }
-            }
-
             $ht = round(max(0, (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0)), 2);
             if ($ht > 0) {
                 return [

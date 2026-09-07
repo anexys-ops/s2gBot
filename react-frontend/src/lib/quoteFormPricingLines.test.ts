@@ -19,15 +19,19 @@ describe('quoteForfaitJalon', () => {
     expect(forfaitJalonTotalHt({ montant_ht: 900 })).toBe(900)
   })
 
-  it('prefers jalon sum over global tarif', () => {
+  it('prefers global tarif over jalon sum for document forfait', () => {
     expect(
       effectiveForfaitDocumentHt([{ prix_unitaire_ht: 500, quantity: 2 }], 999),
-    ).toBe(1000)
+    ).toBe(999)
   })
 
   it('uses global tarif when jalons have no prices', () => {
     expect(effectiveForfaitDocumentHt([{}], 2500)).toBe(2500)
     expect(effectiveForfaitDocumentHt([], 1800)).toBe(1800)
+  })
+
+  it('falls back to jalon sum when global tarif is empty', () => {
+    expect(effectiveForfaitDocumentHt([{ prix_unitaire_ht: 400, quantity: 2 }], 0)).toBe(800)
   })
 
   it('converts HT and TTC both ways', () => {
@@ -90,7 +94,7 @@ describe('quoteFormPricingLines', () => {
     ])
   })
 
-  it('sums jalon forfait amounts in document forfait mode', () => {
+  it('uses document forfait HT and ignores jalon prices', () => {
     const lines = quoteFormPricingLines(
       [],
       [
@@ -99,9 +103,9 @@ describe('quoteFormPricingLines', () => {
       ],
       20,
       true,
-      0,
+      4200,
     )
 
-    expect(lines).toEqual([{ quantity: 1, unit_price: 1300, discount_percent: 0, tva_rate: 20 }])
+    expect(lines).toEqual([{ quantity: 1, unit_price: 4200, discount_percent: 0, tva_rate: 20 }])
   })
 })

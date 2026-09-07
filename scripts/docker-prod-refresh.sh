@@ -94,6 +94,15 @@ if grep -qE '^RUN_S2G_CATALOGUE_SEED=1' "$ENV_FILE" 2>/dev/null; then
     echo "✓ RUN_S2G_CATALOGUE_SEED remis à 0 dans $ENV_FILE (one-shot)"
   fi
 fi
+if grep -qE '^RUN_LAB_AGENCY_SETUP=1' "$ENV_FILE" 2>/dev/null; then
+  echo "=== 5d/6 Setup agences labo (reset siège + 10 villes Maroc) ==="
+  "${DC[@]}" exec -T app php artisan db:seed --class=LabAgencySiegeResetSeeder --force
+  "${DC[@]}" exec -T app php artisan db:seed --class=MoroccoLabAgenciesSeeder --force
+  if sed -i 's/^RUN_LAB_AGENCY_SETUP=1/RUN_LAB_AGENCY_SETUP=0/' "$ENV_FILE" 2>/dev/null; then
+    echo "✓ RUN_LAB_AGENCY_SETUP remis à 0 dans $ENV_FILE (one-shot)"
+  fi
+fi
+"${DC[@]}" exec -T app php artisan db:seed --class=MoroccoLabAgenciesSeeder --force || true
 "${DC[@]}" exec -T app php artisan config:clear
 "${DC[@]}" exec -T app php artisan config:cache
 

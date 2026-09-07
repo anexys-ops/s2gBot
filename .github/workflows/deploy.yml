@@ -183,7 +183,16 @@ jobs:
           echo "GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT" >> .env.docker
           echo "✓ .env.docker mis à jour (APP_VERSION=$PKG_VER, GIT_COMMIT_SHORT=$GIT_COMMIT_SHORT)"
 
+          if ! grep -q '^LAB_AGENCY_SETUP_DONE=1' .env.docker 2>/dev/null; then
+            echo "▶ Premier setup agences labo : RUN_LAB_AGENCY_SETUP=1"
+            echo "RUN_LAB_AGENCY_SETUP=1" >> .env.docker
+          fi
+
           echo "▶ Exécution docker-prod-refresh.sh (NO_CACHE=0 — cache Docker actif)"
           NO_CACHE=0 ./scripts/docker-prod-refresh.sh
+          if ! grep -q '^LAB_AGENCY_SETUP_DONE=1' .env.docker 2>/dev/null; then
+            echo "LAB_AGENCY_SETUP_DONE=1" >> .env.docker
+            echo "✓ Setup agences labo terminé (LAB_AGENCY_SETUP_DONE=1)"
+          fi
           echo "✓ Déploiement terminé"
           ENDSSH

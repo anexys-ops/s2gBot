@@ -165,6 +165,18 @@ return new class extends Migration
             return true;
         }
 
+        $driver = Schema::getConnection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            foreach (DB::select('PRAGMA foreign_key_list(reports)') as $row) {
+                if (($row->from ?? null) === 'pdf_template_id') {
+                    return ($row->table ?? null) === 'document_pdf_templates';
+                }
+            }
+
+            return false;
+        }
+
         $database = DB::getDatabaseName();
         $row = DB::selectOne(
             'SELECT REFERENCED_TABLE_NAME AS ref_table

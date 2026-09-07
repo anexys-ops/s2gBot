@@ -61,7 +61,7 @@ export default function DossierDevisTab() {
             <table className="data-table data-table--compact">
               <thead>
                 <tr>
-                  <th>N°</th>
+                  <th className="data-table__code">N°</th>
                   <th>Statut</th>
                   <th>Date</th>
                   <th>Montant HT ({MONEY_UNIT_LABEL})</th>
@@ -83,7 +83,7 @@ export default function DossierDevisTab() {
                         navigate(`/devis/${q.id}/editer`)
                       }}
                     >
-                      <td>
+                      <td className="data-table__code">
                         <Link to={`/devis/${q.id}/editer`} onClick={(e) => e.stopPropagation()}>
                           <code>{q.number}</code>
                         </Link>

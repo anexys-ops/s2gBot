@@ -240,8 +240,8 @@ export default function LaboOdmPage() {
               <thead>
                 <tr>
                   <th style={{ width: 32 }} />
-                  <th>Numéro</th>
-                  <th>BC / Client</th>
+                  <th className="data-table__code">Numéro</th>
+                  <th className="data-table__code">BC / Client</th>
                   <th>Essais</th>
                   <th>Statut</th>
                   <th>Assigné à</th>
@@ -278,7 +278,7 @@ export default function LaboOdmPage() {
                         </td>
 
                         {/* Numéro */}
-                        <td>
+                        <td className="data-table__code">
                           <Link to={`/ordres-mission/${om.id}`} className="link-inline" style={{ fontWeight: 600 }}>
                             {om.numero}
                           </Link>
@@ -290,7 +290,7 @@ export default function LaboOdmPage() {
                         </td>
 
                         {/* BC / Client */}
-                        <td>
+                        <td className="data-table__reference">
                           {om.bonCommande ? (
                             <Link to={`/bons-commande/${om.bon_commande_id}`} className="link-inline">
                               {om.bonCommande.numero}

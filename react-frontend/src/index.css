@@ -8071,8 +8071,23 @@ a.catalogue-tree__link-article:hover {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* Colonnes références / numéros — largeur minimale pour affichage complet */
+.data-table th.data-table__reference,
+.data-table td.data-table__reference {
+  min-width: 10rem;
+  width: 1%;
+  white-space: nowrap;
+}
+.data-table th.data-table__code,
+.data-table td.data-table__code {
+  min-width: 8.5rem;
+  width: 1%;
+  white-space: nowrap;
+}
 .data-table th.data-table__nowrap,
 .data-table td.data-table__nowrap {
+  min-width: 8.5rem;
+  width: 1%;
   white-space: nowrap;
 }
 .bc-lignes-table {

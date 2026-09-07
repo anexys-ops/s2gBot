@@ -353,7 +353,7 @@ export default function MaterielStocksPage() {
               <table className="data-table data-table--compact">
                 <thead>
                   <tr>
-                    <th>Code</th>
+                    <th className="data-table__code">Code</th>
                     <th>Désignation</th>
                     <th>Unité</th>
                     <th>Stock</th>
@@ -382,7 +382,7 @@ export default function MaterielStocksPage() {
                             : undefined
                         }
                       >
-                        <td>
+                        <td className="data-table__code">
                           <code className="code-badge">{row.code?.trim() || '—'}</code>
                         </td>
                         <td>

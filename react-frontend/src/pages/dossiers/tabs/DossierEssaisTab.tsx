@@ -77,7 +77,7 @@ export default function DossierEssaisTab() {
             <table className="data-table data-table--compact">
               <thead>
                 <tr>
-                  <th>Référence</th>
+                  <th className="data-table__reference">Référence</th>
                   <th>Titre</th>
                   <th>Statut</th>
                   <th className="data-table__actions">Actions</th>
@@ -92,7 +92,7 @@ export default function DossierEssaisTab() {
                       if (dossier.site_id) navigate(`/sites/${dossier.site_id}/missions`)
                     }}
                   >
-                    <td>
+                    <td className="data-table__reference">
                       <code>{m.reference ?? `#${m.id}`}</code>
                     </td>
                     <td>{m.title?.trim() ? m.title : '—'}</td>
@@ -125,10 +125,10 @@ export default function DossierEssaisTab() {
             <table className="data-table data-table--compact">
               <thead>
                 <tr>
-                  <th>N°</th>
+                  <th className="data-table__code">N°</th>
                   <th>Statut</th>
                   <th>Date prévue</th>
-                  <th>BC lié</th>
+                  <th className="data-table__code">BC lié</th>
                   <th className="data-table__actions">Actions</th>
                 </tr>
               </thead>
@@ -145,7 +145,7 @@ export default function DossierEssaisTab() {
                         navigate(`/ordres-mission/${om.id}`)
                       }}
                     >
-                      <td>
+                      <td className="data-table__code">
                         <Link to={`/ordres-mission/${om.id}`} onClick={(e) => e.stopPropagation()}>
                           <code>{om.numero}</code>
                         </Link>
@@ -156,7 +156,7 @@ export default function DossierEssaisTab() {
                         </StatusBadge>
                       </td>
                       <td>{om.date_prevue ? formatAppDate(om.date_prevue) : '—'}</td>
-                      <td>
+                      <td className="data-table__code">
                         {om.bon_commande_id ? (
                           <Link
                             to={`/bons-commande/${om.bon_commande_id}`}

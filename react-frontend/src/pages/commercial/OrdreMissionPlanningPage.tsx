@@ -168,7 +168,7 @@ export default function OrdreMissionPlanningPage() {
                 <thead>
                   <tr>
                     <th>Date</th>
-                    <th>Numéro</th>
+                    <th className="data-table__code">Numéro</th>
                     <th>Type</th>
                     <th>Client</th>
                     <th>Responsable</th>
@@ -184,7 +184,7 @@ export default function OrdreMissionPlanningPage() {
                       return (
                         <tr key={om.id}>
                           <td>{om.date_prevue ? new Date(om.date_prevue).toLocaleDateString('fr-FR') : '—'}</td>
-                          <td><Link to={`/ordres-mission/${om.id}`} className="link-inline" style={{ fontWeight: 600 }}>{om.numero}</Link></td>
+                          <td className="data-table__code"><Link to={`/ordres-mission/${om.id}`} className="link-inline" style={{ fontWeight: 600 }}>{om.numero}</Link></td>
                           <td><span style={{ color: meta.color, fontWeight: 600, fontSize: '0.82rem' }}>{meta.label}</span></td>
                           <td>{om.client?.name ?? `#${om.client_id}`}</td>
                           <td>{om.responsable?.name ?? '—'}</td>

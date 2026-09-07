@@ -93,7 +93,7 @@ export default function Orders() {
         <table className="data-table data-table--compact">
           <thead>
             <tr>
-              {visible.reference !== false && <th>Référence</th>}
+              {visible.reference !== false && <th className="data-table__reference">Référence</th>}
               {visible.client !== false && <th>Client</th>}
               {visible.site !== false && <th>Chantier</th>}
               {visible.date !== false && <th>Date</th>}
@@ -104,7 +104,7 @@ export default function Orders() {
           <tbody>
             {orders.map((o) => (
               <tr key={o.id}>
-                {visible.reference !== false && <td>{o.reference}</td>}
+                {visible.reference !== false && <td className="data-table__reference">{o.reference}</td>}
                 {visible.client !== false && <td>{o.client?.name}</td>}
                 {visible.site !== false && <td>{o.site?.name ?? '-'}</td>}
                 {visible.date !== false && <td>{new Date(o.order_date).toLocaleDateString('fr-FR')}</td>}

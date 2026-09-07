@@ -283,7 +283,7 @@ export default function Sites() {
               {visible.client !== false && <th>Client</th>}
               {visible.status !== false && <th>Statut</th>}
               {visible.created !== false && <th>Création</th>}
-              {visible.reference !== false && <th>Référence</th>}
+              {visible.reference !== false && <th className="data-table__reference">Référence</th>}
               {visible.address !== false && <th>Adresse</th>}
               {visible.travelQuote !== false && <th>Dépl. devis (HT)</th>}
               {visible.travelInvoice !== false && <th>Dépl. facture (HT)</th>}
@@ -332,7 +332,7 @@ export default function Sites() {
                 {visible.created !== false && (
                   <td>{s.created_at ? new Date(s.created_at).toLocaleDateString('fr-FR') : '—'}</td>
                 )}
-                {visible.reference !== false && <td>{s.reference ?? '-'}</td>}
+                {visible.reference !== false && <td className="data-table__reference">{s.reference ?? '-'}</td>}
                 {visible.address !== false && <td>{s.address ?? '-'}</td>}
                 {visible.travelQuote !== false && (
                   <td className="data-table__num">{formatMoney(Number(s.travel_fee_quote_ht ?? 0))}</td>

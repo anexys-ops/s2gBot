@@ -155,10 +155,10 @@ export default function OrdresMissionPage() {
             <table className="data-table data-table--compact">
               <thead>
                 <tr>
-                  <th>Numéro</th>
+                  <th className="data-table__code">Numéro</th>
                   <th>Type</th>
                   <th>Client</th>
-                  <th>BC</th>
+                  <th className="data-table__code">BC</th>
                   <th>Statut</th>
                   <th>Date prévue</th>
                   <th>Responsable</th>
@@ -168,10 +168,10 @@ export default function OrdresMissionPage() {
               <tbody>
                 {ordres.map((om) => (
                   <tr key={om.id}>
-                    <td><Link to={`/ordres-mission/${om.id}`} className="link-inline" style={{ fontWeight: 600 }}>{om.numero}</Link></td>
+                    <td className="data-table__code"><Link to={`/ordres-mission/${om.id}`} className="link-inline" style={{ fontWeight: 600 }}>{om.numero}</Link></td>
                     <td><TypeBadge type={om.type} /></td>
                     <td>{om.client?.name ?? `#${om.client_id}`}</td>
-                    <td>{om.bonCommande && <Link to={`/bons-commande/${om.bon_commande_id}`} className="link-inline">{om.bonCommande.numero}</Link>}</td>
+                    <td className="data-table__code">{om.bonCommande && <Link to={`/bons-commande/${om.bon_commande_id}`} className="link-inline">{om.bonCommande.numero}</Link>}</td>
                     <td><span className="badge">{STATUT_META[om.statut] ?? om.statut}</span></td>
                     <td>{om.date_prevue ? new Date(om.date_prevue).toLocaleDateString('fr-FR') : '—'}</td>
                     <td>{om.responsable?.name ?? '—'}</td>

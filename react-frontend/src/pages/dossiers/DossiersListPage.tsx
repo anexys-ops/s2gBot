@@ -371,7 +371,7 @@ export default function DossiersListPage() {
           <table className="data-table data-table--compact">
             <thead>
               <tr>
-                {visible.reference !== false && <th>Référence</th>}
+                {visible.reference !== false && <th className="data-table__reference">Référence</th>}
                 {visible.titre !== false && <th>Titre</th>}
                 {visible.client !== false && <th>Client</th>}
                 {visible.site !== false && <th>Chantier</th>}
@@ -393,7 +393,7 @@ export default function DossiersListPage() {
                     }}
                   >
                     {visible.reference !== false && (
-                      <td>
+                      <td className="data-table__reference">
                         <Link to={`/dossiers/${d.id}`} onClick={(e) => e.stopPropagation()}>
                           <code>{d.reference}</code>
                         </Link>

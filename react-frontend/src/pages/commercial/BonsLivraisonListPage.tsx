@@ -321,10 +321,10 @@ export default function BonsLivraisonListPage() {
             <table className="data-table data-table--compact">
               <thead>
                 <tr>
-                  {visible.number !== false && <th>Numéro</th>}
-                  {visible.dossier !== false && <th>Dossier</th>}
+                  {visible.number !== false && <th className="data-table__code">Numéro</th>}
+                  {visible.dossier !== false && <th className="data-table__reference">Dossier</th>}
                   {visible.client !== false && <th>Client</th>}
-                  {visible.bc !== false && <th>BC source</th>}
+                  {visible.bc !== false && <th className="data-table__code">BC source</th>}
                   {visible.date !== false && <th>Date livraison</th>}
                   {visible.status !== false && <th>Statut</th>}
                   {visible.actions !== false && isLab && <th className="data-table__actions">Actions</th>}
@@ -344,7 +344,7 @@ export default function BonsLivraisonListPage() {
                       }}
                     >
                       {visible.number !== false && (
-                        <td>
+                        <td className="data-table__code">
                           <Link
                             to={`/bons-livraison/${bl.id}`}
                             className="link-inline"
@@ -355,7 +355,7 @@ export default function BonsLivraisonListPage() {
                         </td>
                       )}
                       {visible.dossier !== false && (
-                        <td>
+                        <td className="data-table__reference">
                           {bl.dossier ? (
                             <Link
                               to={`/dossiers/${bl.dossier_id}/bc-bl`}
@@ -373,7 +373,7 @@ export default function BonsLivraisonListPage() {
                         <td>{bl.dossier?.client?.name ?? bl.client?.name ?? '—'}</td>
                       )}
                       {visible.bc !== false && (
-                        <td>
+                        <td className="data-table__code">
                           {bl.bon_commande_id ? (
                             <Link
                               to={`/bons-commande/${bl.bon_commande_id}`}

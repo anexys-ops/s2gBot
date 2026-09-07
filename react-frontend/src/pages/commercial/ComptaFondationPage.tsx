@@ -128,7 +128,7 @@ export default function ComptaFondationPage() {
           <table className="data-table data-table--compact" style={{ width: '100%' }}>
             <thead>
               <tr>
-                <th>N°</th>
+                <th className="data-table__code">N°</th>
                 <th>Client</th>
                 <th>Facture</th>
                 <th>Mode</th>
@@ -139,7 +139,7 @@ export default function ComptaFondationPage() {
             <tbody>
               {regs.map((r) => (
                 <tr key={r.id}>
-                  <td>
+                  <td className="data-table__code">
                     <code>{r.numero}</code>
                   </td>
                   <td>#{r.client_id}</td>
@@ -164,8 +164,8 @@ export default function ComptaFondationPage() {
           <table className="data-table data-table--compact" style={{ width: '100%' }}>
             <thead>
               <tr>
-                <th>N°</th>
-                <th>Dossier</th>
+                <th className="data-table__code">N°</th>
+                <th className="data-table__reference">Dossier</th>
                 <th>Libellé</th>
                 <th>%</th>
                 <th>HT</th>
@@ -175,10 +175,10 @@ export default function ComptaFondationPage() {
             <tbody>
               {sit.map((s) => (
                 <tr key={s.id}>
-                  <td>
+                  <td className="data-table__code">
                     <code>{s.numero}</code>
                   </td>
-                  <td>#{s.dossier_id}</td>
+                  <td className="data-table__reference">#{s.dossier_id}</td>
                   <td>{s.label}</td>
                   <td>{s.percent_complete}</td>
                   <td>{formatMoney(Number(s.amount_ht))}</td>
@@ -200,7 +200,7 @@ export default function ComptaFondationPage() {
           <table className="data-table data-table--compact" style={{ width: '100%' }}>
             <thead>
               <tr>
-                <th>N°</th>
+                <th className="data-table__code">N°</th>
                 <th>Client</th>
                 <th>Facture source</th>
                 <th>TTC</th>
@@ -210,7 +210,7 @@ export default function ComptaFondationPage() {
             <tbody>
               {av.map((a) => (
                 <tr key={a.id}>
-                  <td>
+                  <td className="data-table__code">
                     <code>{a.numero}</code>
                   </td>
                   <td>#{a.client_id}</td>

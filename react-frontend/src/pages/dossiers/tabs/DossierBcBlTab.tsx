@@ -65,7 +65,7 @@ export default function DossierBcBlTab() {
             <table className="data-table data-table--compact">
               <thead>
                 <tr>
-                  <th>N°</th>
+                  <th className="data-table__code">N°</th>
                   <th>Statut</th>
                   <th>Date</th>
                   <th>Montant HT ({MONEY_UNIT_LABEL})</th>
@@ -84,7 +84,7 @@ export default function DossierBcBlTab() {
                         navigate(`/bons-commande/${bc.id}`)
                       }}
                     >
-                      <td>
+                      <td className="data-table__code">
                         <Link to={`/bons-commande/${bc.id}`} onClick={(e) => e.stopPropagation()}>
                           <code>{bc.numero}</code>
                         </Link>
@@ -126,10 +126,10 @@ export default function DossierBcBlTab() {
             <table className="data-table data-table--compact">
               <thead>
                 <tr>
-                  <th>N°</th>
+                  <th className="data-table__code">N°</th>
                   <th>Statut</th>
                   <th>Date</th>
-                  <th>BC lié</th>
+                  <th className="data-table__code">BC lié</th>
                 </tr>
               </thead>
               <tbody>
@@ -144,7 +144,7 @@ export default function DossierBcBlTab() {
                         navigate(`/bons-livraison/${bl.id}`)
                       }}
                     >
-                      <td>
+                      <td className="data-table__code">
                         <Link to={`/bons-livraison/${bl.id}`} onClick={(e) => e.stopPropagation()}>
                           <code>{bl.numero}</code>
                         </Link>
@@ -155,7 +155,7 @@ export default function DossierBcBlTab() {
                         </StatusBadge>
                       </td>
                       <td>{formatAppDate(bl.date_livraison)}</td>
-                      <td>
+                      <td className="data-table__code">
                         {bl.bon_commande_id ? (
                           <Link
                             to={`/bons-commande/${bl.bon_commande_id}`}

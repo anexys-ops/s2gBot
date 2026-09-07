@@ -280,7 +280,7 @@ export default function Devis() {
             <table className="data-table data-table--compact">
               <thead>
                 <tr>
-                  {visible.number !== false && <th>Numéro</th>}
+                  {visible.number !== false && <th className="data-table__code">Numéro</th>}
                   {visible.client !== false && <th>Client</th>}
                   {visible.date !== false && <th>Date</th>}
                   {visible.ht !== false && <th>Montant HT ({MONEY_UNIT_LABEL})</th>}
@@ -288,7 +288,7 @@ export default function Devis() {
                   {visible.travel !== false && <th>Dépl. HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.mode !== false && <th>Mode</th>}
                   {visible.status !== false && <th>Statut</th>}
-                  {isLab && visible.bc !== false && <th>BC</th>}
+                  {isLab && visible.bc !== false && <th className="data-table__code">BC</th>}
                   {isLab && visible.bl !== false && <th className="data-table__num">BL</th>}
                   {isLab && visible.invoices !== false && <th className="data-table__num">Factures</th>}
                   {isLab && visible.pdf !== false && <th className="data-table__pdf">PDF</th>}
@@ -312,7 +312,7 @@ export default function Devis() {
                       }}
                     >
                       {visible.number !== false && (
-                        <td className="data-table__nowrap">
+                        <td className="data-table__code">
                           <Link to={`/devis/${q.id}/editer`} className="link-inline" onClick={(e) => e.stopPropagation()}>
                             <code className="code-badge">{q.number}</code>
                           </Link>
@@ -351,7 +351,7 @@ export default function Devis() {
                         </td>
                       )}
                       {isLab && visible.bc !== false && (
-                        <td>
+                        <td className="data-table__code">
                           {bc ? (
                             <Link to={`/bons-commande/${bc.id}`} className="link-inline">
                               <code className="code-badge">{bc.numero}</code>

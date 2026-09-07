@@ -589,7 +589,7 @@ export default function Invoices() {
             <table className="data-table data-table--compact">
               <thead>
                 <tr>
-                  {visible.number !== false && <th>Numéro</th>}
+                  {visible.number !== false && <th className="data-table__code">Numéro</th>}
                   {visible.client !== false && <th>Client</th>}
                   {visible.date !== false && <th>Date</th>}
                   {visible.ht !== false && <th className="data-table__num">Montant HT ({MONEY_UNIT_LABEL})</th>}
@@ -613,7 +613,7 @@ export default function Invoices() {
                       }}
                     >
                       {visible.number !== false && (
-                        <td>
+                        <td className="data-table__code">
                           <button
                             type="button"
                             className="link-inline invoice-number-btn"

@@ -180,8 +180,8 @@ export default function LaboReceptionPage() {
               <thead>
                 <tr>
                   <th>Produit / Essai</th>
-                  <th>BC</th>
-                  <th>Chantier / Dossier</th>
+                  <th className="data-table__code">BC</th>
+                  <th className="data-table__reference">Chantier / Dossier</th>
                   <th>Technicien</th>
                   <th className="data-table__num">Réception</th>
                 </tr>
@@ -202,7 +202,7 @@ export default function LaboReceptionPage() {
                         <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>[{row.article.code}]</div>
                       )}
                     </td>
-                    <td>
+                    <td className="data-table__code">
                       {row.bon_commande ? (
                         <Link to={`/bons-commande/${row.bon_commande.id}`} className="link-inline">
                           {row.bon_commande.numero}
@@ -214,7 +214,7 @@ export default function LaboReceptionPage() {
                         <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{row.client.name}</div>
                       )}
                     </td>
-                    <td>
+                    <td className="data-table__reference">
                       {row.chantier?.name ?? <span className="text-muted">—</span>}
                       {row.dossier && (
                         <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
@@ -243,9 +243,9 @@ export default function LaboReceptionPage() {
             <table className="data-table data-table--compact">
               <thead>
                 <tr>
-                  <th>FOLD</th>
+                  <th className="data-table__code">FOLD</th>
                   <th>Produit</th>
-                  <th>Dossier</th>
+                  <th className="data-table__reference">Dossier</th>
                   <th>Prélevé par</th>
                   <th>Actions</th>
                 </tr>
@@ -260,14 +260,14 @@ export default function LaboReceptionPage() {
                 )}
                 {enTransit.map((sample) => (
                   <tr key={sample.id}>
-                    <td style={{ fontWeight: 600, fontFamily: 'monospace' }}>{sample.fold_number ?? '—'}</td>
+                    <td className="data-table__code" style={{ fontWeight: 600, fontFamily: 'monospace' }}>{sample.fold_number ?? '—'}</td>
                     <td>
                       {sample.product?.libelle ?? sample.bonCommandeLigne?.libelle ?? '—'}
                       {sample.product?.code && (
                         <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>[{sample.product.code}]</div>
                       )}
                     </td>
-                    <td style={{ fontSize: '0.88rem' }}>
+                    <td className="data-table__reference" style={{ fontSize: '0.88rem' }}>
                       {sample.dossier?.reference ?? '—'}
                     </td>
                     <td style={{ fontSize: '0.88rem' }}>{sample.collectedBy?.name ?? '—'}</td>

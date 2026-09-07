@@ -170,7 +170,7 @@ export default function CommercialCatalogPage() {
         <table className="commercial-catalog-table">
           <thead>
             <tr>
-              <th>Code</th>
+              <th className="data-table__code">Code</th>
               <th>Libellé</th>
               <th>Type</th>
               <th>Unité</th>
@@ -186,7 +186,7 @@ export default function CommercialCatalogPage() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
-                <td>{r.code ?? '—'}</td>
+                <td className="data-table__code">{r.code ?? '—'}</td>
                 <td>
                   <strong>{r.name}</strong>
                   {r.description && <div className="text-muted" style={{ fontSize: '0.8rem' }}>{r.description}</div>}

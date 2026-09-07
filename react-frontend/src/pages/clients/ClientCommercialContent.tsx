@@ -287,10 +287,10 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <h2 style={{ marginTop: 0 }}>Devis</h2>
-        <table>
+        <table className="data-table data-table--compact">
           <thead>
             <tr>
-              <th>N°</th>
+              <th className="data-table__code">N°</th>
               <th>Date</th>
               <th>Statut</th>
               <th>TTC</th>
@@ -300,7 +300,7 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
           <tbody>
             {quotes.map((q) => (
               <tr key={q.id}>
-                <td>{q.number}</td>
+                <td className="data-table__code">{q.number}</td>
                 <td>{new Date(q.quote_date).toLocaleDateString('fr-FR')}</td>
                 <td>{q.status}</td>
                 <td>{formatMoney(Number(q.amount_ttc))}</td>
@@ -317,10 +317,10 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <h2 style={{ marginTop: 0 }}>Factures</h2>
-        <table>
+        <table className="data-table data-table--compact">
           <thead>
             <tr>
-              <th>N°</th>
+              <th className="data-table__code">N°</th>
               <th>Date</th>
               <th>Statut</th>
               <th>TTC</th>
@@ -330,7 +330,7 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
           <tbody>
             {invoices.map((inv) => (
               <tr key={inv.id}>
-                <td>{inv.number}</td>
+                <td className="data-table__code">{inv.number}</td>
                 <td>{new Date(inv.invoice_date).toLocaleDateString('fr-FR')}</td>
                 <td>{inv.status}</td>
                 <td>{formatMoney(Number(inv.amount_ttc))}</td>

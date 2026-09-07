@@ -163,7 +163,7 @@ export default function EquipmentsPage() {
               <table className="data-table data-table--compact">
                 <thead>
                   <tr>
-                    <th>Code</th>
+                    <th className="data-table__code">Code</th>
                     <th>Nom</th>
                     <th>Statut</th>
                     <th>Agence</th>
@@ -176,7 +176,7 @@ export default function EquipmentsPage() {
                     const st = equipementStatutBadgeProps(eq.status)
                     return (
                       <tr key={eq.id}>
-                        <td>
+                        <td className="data-table__code">
                           <Link to={`/materiel/equipements/${eq.id}`} className="link-inline">
                             <code className="code-badge">{eq.code}</code>
                           </Link>

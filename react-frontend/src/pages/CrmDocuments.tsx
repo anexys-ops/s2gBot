@@ -266,7 +266,7 @@ export default function CrmDocuments() {
               <thead>
                 <tr>
                   {showClientCol && <th>Client</th>}
-                  {visible.number !== false && <th>N°</th>}
+                  {visible.number !== false && <th className="data-table__code">N°</th>}
                   {visible.date !== false && <th>Date</th>}
                   {visible.status !== false && <th>Statut</th>}
                   {visible.ht !== false && <th>HT ({MONEY_UNIT_LABEL})</th>}
@@ -281,7 +281,7 @@ export default function CrmDocuments() {
                 {quotes.map((q) => (
                   <tr key={q.id}>
                     {showClientCol && <td>{q.client?.name ?? '—'}</td>}
-                    {visible.number !== false && <td>{q.number}</td>}
+                    {visible.number !== false && <td className="data-table__code">{q.number}</td>}
                     {visible.date !== false && <td>{new Date(q.quote_date).toLocaleDateString('fr-FR')}</td>}
                     {visible.status !== false && <td>{QUOTE_STATUS_LABELS[q.status] ?? q.status}</td>}
                     {visible.ht !== false && <td className="data-table__num">{formatMoney(Number(q.amount_ht))}</td>}
@@ -342,7 +342,7 @@ export default function CrmDocuments() {
             <table className="data-table data-table--compact">
               <thead>
                 <tr>
-                  {visible.off_code !== false && <th>Code</th>}
+                  {visible.off_code !== false && <th className="data-table__code">Code</th>}
                   {visible.off_name !== false && <th>Libellé</th>}
                   {visible.off_kind !== false && <th>Type</th>}
                   {visible.off_unit !== false && <th>Unité</th>}
@@ -354,7 +354,7 @@ export default function CrmDocuments() {
               <tbody>
                 {offerings.map((o) => (
                   <tr key={o.id}>
-                    {visible.off_code !== false && <td>{o.code || '—'}</td>}
+                    {visible.off_code !== false && <td className="data-table__code">{o.code || '—'}</td>}
                     {visible.off_name !== false && <td>{o.name}</td>}
                     {visible.off_kind !== false && <td>{OFFERING_KIND_LABEL[o.kind] ?? o.kind}</td>}
                     {visible.off_unit !== false && <td>{o.unit || '—'}</td>}
@@ -395,7 +395,7 @@ export default function CrmDocuments() {
               <thead>
                 <tr>
                   {showClientCol && <th>Client</th>}
-                  {visible.number !== false && <th>N°</th>}
+                  {visible.number !== false && <th className="data-table__code">N°</th>}
                   {visible.date !== false && <th>Date</th>}
                   {visible.status !== false && <th>Statut</th>}
                   {visible.ht !== false && <th>HT ({MONEY_UNIT_LABEL})</th>}
@@ -410,7 +410,7 @@ export default function CrmDocuments() {
                 {invoices.map((inv) => (
                   <tr key={inv.id}>
                     {showClientCol && <td>{inv.client?.name ?? '—'}</td>}
-                    {visible.number !== false && <td>{inv.number}</td>}
+                    {visible.number !== false && <td className="data-table__code">{inv.number}</td>}
                     {visible.date !== false && <td>{new Date(inv.invoice_date).toLocaleDateString('fr-FR')}</td>}
                     {visible.status !== false && <td>{INVOICE_STATUS_LABELS[inv.status] ?? inv.status}</td>}
                     {visible.ht !== false && <td className="data-table__num">{formatMoney(Number(inv.amount_ht))}</td>}

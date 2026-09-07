@@ -358,9 +358,9 @@ export default function BonsCommandeListPage() {
             <table className="data-table data-table--compact">
               <thead>
                 <tr>
-                  {visible.number !== false && <th>Numéro</th>}
-                  {visible.devis !== false && <th>Devis</th>}
-                  {visible.dossier !== false && <th>Dossier</th>}
+                  {visible.number !== false && <th className="data-table__code">Numéro</th>}
+                  {visible.devis !== false && <th className="data-table__code">Devis</th>}
+                  {visible.dossier !== false && <th className="data-table__reference">Dossier</th>}
                   {visible.client !== false && <th>Client</th>}
                   {visible.date !== false && <th>Date</th>}
                   {visible.ht !== false && <th>HT ({MONEY_UNIT_LABEL})</th>}
@@ -382,7 +382,7 @@ export default function BonsCommandeListPage() {
                       }}
                     >
                       {visible.number !== false && (
-                        <td>
+                        <td className="data-table__code">
                           <Link
                             to={`/bons-commande/${bc.id}`}
                             className="link-inline"
@@ -393,7 +393,7 @@ export default function BonsCommandeListPage() {
                         </td>
                       )}
                       {visible.devis !== false && (
-                        <td>
+                        <td className="data-table__code">
                           {bc.quote_id && bc.quote?.number ? (
                             <Link
                               to={`/devis/${bc.quote_id}/editer`}
@@ -408,7 +408,7 @@ export default function BonsCommandeListPage() {
                         </td>
                       )}
                       {visible.dossier !== false && (
-                        <td>
+                        <td className="data-table__reference">
                           {bc.dossier ? (
                             <Link
                               to={`/dossiers/${bc.dossier_id}/bc-bl`}

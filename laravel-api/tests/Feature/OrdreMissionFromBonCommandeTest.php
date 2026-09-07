@@ -67,6 +67,50 @@ class OrdreMissionFromBonCommandeTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_generate_from_bc_creates_technicien_om_for_libelle_only_line(): void
+    {
+        $client = Client::query()->create(['name' => 'ODM Client libelle']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Chantier libelle']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-ODM-LIB',
+            'titre' => 'Dossier libelle',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_EN_COURS,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $bc = BonCommande::query()->create([
+            'numero' => 'BCC-TEST-LIB',
+            'dossier_id' => $dossier->id,
+            'client_id' => $client->id,
+            'statut' => BonCommande::STATUT_EN_COURS,
+            'date_commande' => '2026-03-01',
+            'montant_ht' => 50,
+            'montant_ttc' => 60,
+            'tva_rate' => 20,
+            'created_by' => $lab->id,
+        ]);
+        BonCommandeLigne::query()->create([
+            'bon_commande_id' => $bc->id,
+            'ref_article_id' => null,
+            'libelle' => 'Prestation terrain sans article',
+            'quantite' => 1,
+            'prix_unitaire_ht' => 50,
+            'tva_rate' => 20,
+            'montant_ht' => 50,
+        ]);
+
+        $res = $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission");
+
+        $res->assertCreated();
+        $res->assertJsonPath('0.type', OrdreMission::TYPE_TECHNICIEN);
+        $this->assertSame(1, OrdreMissionLigne::query()->count());
+        $this->assertSame(1, MissionTask::query()->count());
+    }
+
     /**
      * @return array{0: BonCommande, 1: User, 2?: User}
      */

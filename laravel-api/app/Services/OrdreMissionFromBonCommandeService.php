@@ -128,7 +128,7 @@ class OrdreMissionFromBonCommandeService
                 continue;
             }
 
-            if ($type === OrdreMission::TYPE_TECHNICIEN && $this->ligneEligibleTerrainFallback($ligne)) {
+            if ($type === OrdreMission::TYPE_TECHNICIEN && $this->ligneEligibleTechnicienFallback($ligne)) {
                 $entries->push(['ligne' => $ligne, 'action' => null]);
             }
         }
@@ -211,11 +211,13 @@ class OrdreMissionFromBonCommandeService
         };
     }
 
-    private function ligneEligibleTerrainFallback(BonCommandeLigne $ligne): bool
+    private function ligneEligibleTechnicienFallback(BonCommandeLigne $ligne): bool
     {
-        return $ligne->technicien_id
-            && $ligne->date_debut_prevue
-            && $ligne->date_fin_prevue;
+        if ($ligne->technicien_id && $ligne->date_debut_prevue) {
+            return true;
+        }
+
+        return trim((string) $ligne->libelle) !== '';
     }
 
     /**

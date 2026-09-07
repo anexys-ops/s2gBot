@@ -7,8 +7,10 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { bonsCommandeApi, ordresMissionApi } from '../../api/client'
+import { bonsCommandeApi, ordresMissionApi, type OrdreMission } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
+import { useAuth } from '../../contexts/AuthContext'
 
 const TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
   labo:       { label: 'Laboratoire', color: '#10b981', bg: '#d1fae5' },
@@ -24,6 +26,8 @@ const STATUT_META: Record<string, string> = {
   annule:    'Annulé',
 }
 
+const STATUTS = ['brouillon', 'planifie', 'en_cours', 'termine', 'annule'] as const
+
 function TypeBadge({ type }: { type: string }) {
   const meta = TYPE_META[type] ?? { label: type, color: '#6b7280', bg: '#f3f4f6' }
   return (
@@ -35,6 +39,8 @@ function TypeBadge({ type }: { type: string }) {
 
 export default function OrdresMissionPage() {
   const qc = useQueryClient()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'lab_admin'
   const [searchParams] = useSearchParams()
   const bcFilterFromUrl = searchParams.get('bon_commande_id')
   const [typeFilter, setTypeFilter] = useState('')
@@ -92,6 +98,15 @@ export default function OrdresMissionPage() {
   const deleteMut = useMutation({
     mutationFn: (id: number) => ordresMissionApi.delete(id),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['ordres-mission'] }),
+  })
+
+  const updateStatutMut = useMutation({
+    mutationFn: ({ id, statut }: { id: number; statut: OrdreMission['statut'] }) =>
+      ordresMissionApi.update(id, { statut }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
+      void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+    },
   })
 
   const stats = Object.keys(TYPE_META).map((type) => ({
@@ -176,6 +191,12 @@ export default function OrdresMissionPage() {
         </Link>
       </div>
 
+      {updateStatutMut.isError ? (
+        <p className="error" style={{ marginBottom: '0.75rem' }}>
+          {(updateStatutMut.error as Error).message}
+        </p>
+      ) : null}
+
       {isLoading && <p>Chargement…</p>}
       {!isLoading && (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -200,7 +221,30 @@ export default function OrdresMissionPage() {
                     <td><TypeBadge type={om.type} /></td>
                     <td>{om.client?.name ?? `#${om.client_id}`}</td>
                     <td className="data-table__code">{om.bonCommande && <Link to={`/bons-commande/${om.bon_commande_id}`} className="link-inline">{om.bonCommande.numero}</Link>}</td>
-                    <td><span className="badge">{STATUT_META[om.statut] ?? om.statut}</span></td>
+                    <td>
+                      {isAdmin ? (
+                        <select
+                          className="om-list__statut-select"
+                          value={om.statut}
+                          disabled={updateStatutMut.isPending && updateStatutMut.variables?.id === om.id}
+                          onChange={(e) =>
+                            updateStatutMut.mutate({
+                              id: om.id,
+                              statut: e.target.value as OrdreMission['statut'],
+                            })
+                          }
+                          aria-label={`Statut de ${om.numero}`}
+                        >
+                          {STATUTS.map((s) => (
+                            <option key={s} value={s}>
+                              {STATUT_META[s] ?? s}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <StatusBadge {...ordreMissionStatutBadgeProps(om.statut)} size="sm" />
+                      )}
+                    </td>
                     <td>{om.date_prevue ? new Date(om.date_prevue).toLocaleDateString('fr-FR') : '—'}</td>
                     <td>{om.responsable?.name ?? '—'}</td>
                     <td>

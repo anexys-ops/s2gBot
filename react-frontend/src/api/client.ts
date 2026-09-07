@@ -1774,6 +1774,11 @@ export const samplesReceptionApi = {
   search: (fold: string) => api<{ data: ReceptionSample[] }>(`/v1/samples/search?fold=${encodeURIComponent(fold)}`),
   receiveFromLine: (body: ReceiveFromLineBody) =>
     api<ReceptionSample>('/v1/lab/reception/receive-from-line', { method: 'POST', body: JSON.stringify(body) }),
+  receiveBatchFromLine: (body: { bon_commande_ligne_id: number; samples: Omit<ReceiveFromLineBody, 'bon_commande_ligne_id'>[] }) =>
+    api<{ data: ReceptionSample[] }>('/v1/lab/reception/receive-batch-from-line', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   receive: (id: number, body: ReceiveSampleBody) =>
     api<ReceptionSample>(`/v1/samples/${id}/receive`, { method: 'PATCH', body: JSON.stringify(body) }),
   update: (id: number, body: Partial<ReceiveFromLineBody>) =>

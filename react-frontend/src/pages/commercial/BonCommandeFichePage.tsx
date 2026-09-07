@@ -20,6 +20,26 @@ const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technicia
 type LignePeriodeEdit = { debut: string; fin: string }
 type LigneExtraEdit = { technicien_id: number | null; date_livraison: string; notes_ligne: string }
 
+function normalizeLignePlanningDates(
+  periode: LignePeriodeEdit,
+  extra: LigneExtraEdit,
+): { periode: LignePeriodeEdit; extra: LigneExtraEdit } {
+  const debut = periode.debut.trim()
+  if (!debut) {
+    return { periode, extra }
+  }
+  return {
+    periode: {
+      debut,
+      fin: periode.fin.trim() || debut,
+    },
+    extra: {
+      ...extra,
+      date_livraison: extra.date_livraison.trim() || debut,
+    },
+  }
+}
+
 function qtyInputFromApi(q: string | number | null | undefined): string {
   if (q == null || q === '') return '0'
   const n = Number(q)
@@ -161,12 +181,13 @@ export default function BonCommandeFichePage() {
     }) => {
       if (!bc?.lignes?.length) return
       for (const l of bc.lignes) {
-        const periode = payload.edits[l.id] ?? { debut: '', fin: '' }
-        const extra = payload.extras[l.id] ?? {
+        const rawPeriode = payload.edits[l.id] ?? { debut: '', fin: '' }
+        const rawExtra = payload.extras[l.id] ?? {
           technicien_id: null,
           date_livraison: '',
           notes_ligne: '',
         }
+        const { periode, extra } = normalizeLignePlanningDates(rawPeriode, rawExtra)
         await bonsCommandeApi.updateLigne(bcId, l.id, {
           date_debut_prevue: periode.debut || null,
           date_fin_prevue: periode.fin || null,
@@ -246,26 +267,32 @@ export default function BonCommandeFichePage() {
     setLigneEdits((prev) => {
       const next = { ...prev }
       for (const l of bc.lignes!) {
+        const debut = hasDebut ? massDebut : (prev[l.id]?.debut ?? '')
         next[l.id] = {
-          debut: hasDebut ? massDebut : (prev[l.id]?.debut ?? ''),
-          fin: hasFin ? massFin : (prev[l.id]?.fin ?? ''),
+          debut,
+          fin: hasFin ? massFin : (hasDebut ? massDebut : (prev[l.id]?.fin ?? '')),
         }
       }
       return next
     })
-    if (hasTech) {
+    if (hasTech || hasDebut) {
       setLigneExtraEdits((prev) => {
         const next = { ...prev }
         for (const l of bc.lignes!) {
           next[l.id] = {
-            technicien_id: massTechnicienId,
-            date_livraison: prev[l.id]?.date_livraison ?? '',
+            technicien_id: hasTech ? massTechnicienId : (prev[l.id]?.technicien_id ?? null),
+            date_livraison: hasDebut ? massDebut : (prev[l.id]?.date_livraison ?? ''),
             notes_ligne: prev[l.id]?.notes_ligne ?? '',
           }
         }
         return next
       })
     }
+  }
+
+  function handleMassDebutChange(value: string) {
+    setMassDebut(value)
+    setMassFin(value)
   }
 
   const ligneDisplayRows = useMemo(
@@ -685,7 +712,7 @@ export default function BonCommandeFichePage() {
                   assigneeId={massTechnicienId}
                   onAssigneeChange={setMassTechnicienId}
                   dateDebut={massDebut}
-                  onDateDebutChange={setMassDebut}
+                  onDateDebutChange={handleMassDebutChange}
                   dateFin={massFin}
                   onDateFinChange={setMassFin}
                   onApply={applyMassPlanning}
@@ -712,9 +739,18 @@ export default function BonCommandeFichePage() {
                             value={ligneEdits[l.id]?.debut ?? ''}
                             onChange={(e) => {
                               mutLignes.reset()
+                              const debut = e.target.value
                               setLigneEdits((s) => ({
                                 ...s,
-                                [l.id]: { debut: e.target.value, fin: s[l.id]?.fin ?? '' },
+                                [l.id]: { debut, fin: debut },
+                              }))
+                              setLigneExtraEdits((s) => ({
+                                ...s,
+                                [l.id]: {
+                                  technicien_id: s[l.id]?.technicien_id ?? null,
+                                  date_livraison: debut,
+                                  notes_ligne: s[l.id]?.notes_ligne ?? '',
+                                },
                               }))
                             }}
                           />

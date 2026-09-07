@@ -171,4 +171,17 @@ class LabReceptionService
 
         return $bc->dossier_id !== null && $bc->dossier?->site_id !== null;
     }
+
+    /** Places restantes pour de nouveaux échantillons sur une ligne BC. */
+    public function remainingCapacityForLine(BonCommandeLigne $ligne): int
+    {
+        $attendu = (int) round((float) $ligne->quantite);
+        if ($attendu <= 0) {
+            return 0;
+        }
+
+        $counts = $this->sampleCountsByLine([$ligne->id]);
+
+        return max(0, $attendu - ($counts[$ligne->id]['total'] ?? 0));
+    }
 }

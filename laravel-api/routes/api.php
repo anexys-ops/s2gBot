@@ -411,6 +411,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('lab/reception/stats',    [LabReceptionController::class, 'stats']);
         Route::post('lab/reception/receive-from-line', [SampleReceptionController::class, 'receiveFromLine'])
             ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur');
+        Route::post('lab/reception/receive-batch-from-line', [SampleReceptionController::class, 'receiveBatchFromLine'])
+            ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur');
         Route::get('samples',                 [SampleReceptionController::class, 'index']);
         Route::get('samples/stats',           [SampleReceptionController::class, 'stats']);
         Route::get('samples/search',          [SampleReceptionController::class, 'searchByFold']);

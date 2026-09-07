@@ -14,6 +14,7 @@ import {
 } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import SampleReceptionModal, { type ReceptionMode } from '../../components/labo/SampleReceptionModal'
+import SampleEditModal from '../../components/labo/SampleEditModal'
 import SampleLabelPrint, { type LabelFormat } from '../../components/labo/SampleLabelPrint'
 
 type AttenduFilter = 'all' | 'pending' | 'complete'
@@ -79,8 +80,11 @@ export default function LaboReceptionPage() {
   const [attenduFilter, setAttenduFilter] = useState<AttenduFilter>('pending')
   const [receptionMode, setReceptionMode] = useState<ReceptionMode | null>(null)
   const [labelData, setLabelData] = useState<SampleLabelData | null>(null)
+  const [labelQueue, setLabelQueue] = useState<SampleLabelData[]>([])
+  const [labelIndex, setLabelIndex] = useState(0)
   const [labelFormat, setLabelFormat] = useState<LabelFormat>('a6')
   const [expandedLineId, setExpandedLineId] = useState<number | null>(null)
+  const [editSample, setEditSample] = useState<ReceptionSample | null>(null)
 
   const { data: attendusRes, isLoading: loadingAttendus } = useQuery({
     queryKey: ['lab-reception', 'attendus', search],
@@ -129,17 +133,32 @@ export default function LaboReceptionPage() {
 
   const openLabel = async (sampleId: number) => {
     const data = await samplesReceptionApi.labelData(sampleId)
+    setLabelQueue([data])
+    setLabelIndex(0)
     setLabelData(data)
   }
 
-  const handleReceptionSuccess = async (sample: ReceptionSample) => {
+  const openLabelBatch = async (sampleIds: number[]) => {
+    const labels = await Promise.all(sampleIds.map((id) => samplesReceptionApi.labelData(id)))
+    setLabelQueue(labels)
+    setLabelIndex(0)
+    setLabelData(labels[0] ?? null)
+  }
+
+  const handleReceptionSuccess = async (samples: ReceptionSample[]) => {
     setReceptionMode(null)
     invalidateAll()
     try {
-      await openLabel(sample.id)
+      await openLabelBatch(samples.map((s) => s.id))
     } catch {
-      // étiquette optionnelle si erreur
+      // étiquettes optionnelles
     }
+  }
+
+  const closeLabels = () => {
+    setLabelData(null)
+    setLabelQueue([])
+    setLabelIndex(0)
   }
 
   return (
@@ -287,7 +306,11 @@ export default function LaboReceptionPage() {
                     {expandedLineId === row.id && (
                       <tr>
                         <td colSpan={6} style={{ background: '#f9fafb', padding: '0.75rem 1rem' }}>
-                          <LineSamplesHistory lineId={row.id} onPrintLabel={(id) => void openLabel(id)} />
+                          <LineSamplesHistory
+                            lineId={row.id}
+                            onPrintLabel={(id) => void openLabel(id)}
+                            onEdit={setEditSample}
+                          />
                         </td>
                       </tr>
                     )}
@@ -409,6 +432,13 @@ export default function LaboReceptionPage() {
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm"
+                          onClick={() => setEditSample(sample)}
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
                           onClick={() => void openLabel(sample.id)}
                         >
                           Étiquette
@@ -449,7 +479,23 @@ export default function LaboReceptionPage() {
         <SampleReceptionModal
           mode={receptionMode}
           onClose={() => setReceptionMode(null)}
-          onSuccess={(s) => void handleReceptionSuccess(s)}
+          onSuccess={(samples) => void handleReceptionSuccess(samples)}
+        />
+      )}
+
+      {editSample && (
+        <SampleEditModal
+          sample={editSample}
+          onClose={() => setEditSample(null)}
+          onSaved={() => {
+            setEditSample(null)
+            invalidateAll()
+          }}
+          onDeleted={() => {
+            setEditSample(null)
+            invalidateAll()
+          }}
+          onPrintLabel={(id) => void openLabel(id)}
         />
       )}
 
@@ -458,7 +504,27 @@ export default function LaboReceptionPage() {
           label={labelData}
           format={labelFormat}
           onFormatChange={setLabelFormat}
-          onClose={() => setLabelData(null)}
+          onClose={closeLabels}
+          batchIndex={labelIndex}
+          batchTotal={labelQueue.length}
+          onBatchPrev={
+            labelIndex > 0
+              ? () => {
+                  const next = labelIndex - 1
+                  setLabelIndex(next)
+                  setLabelData(labelQueue[next] ?? null)
+                }
+              : undefined
+          }
+          onBatchNext={
+            labelIndex < labelQueue.length - 1
+              ? () => {
+                  const next = labelIndex + 1
+                  setLabelIndex(next)
+                  setLabelData(labelQueue[next] ?? null)
+                }
+              : undefined
+          }
         />
       )}
     </ModuleEntityShell>
@@ -468,13 +534,20 @@ export default function LaboReceptionPage() {
 function LineSamplesHistory({
   lineId,
   onPrintLabel,
+  onEdit,
 }: {
   lineId: number
   onPrintLabel: (id: number) => void
+  onEdit: (sample: ReceptionSample) => void
 }) {
+  const qc = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: ['lab-reception', 'line-samples', lineId],
     queryFn: () => samplesReceptionApi.list({ bon_commande_ligne_id: lineId, per_page: 50 }),
+  })
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => samplesReceptionApi.delete(id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['lab-reception'] }),
   })
   const samples = data?.data ?? []
 
@@ -489,7 +562,7 @@ function LineSamplesHistory({
           <th>Transco</th>
           <th>Statut</th>
           <th>Réception</th>
-          <th />
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -500,11 +573,26 @@ function LineSamplesHistory({
             <td>{s.status}</td>
             <td>{formatDateTime(s.received_at)}</td>
             <td>
-              {s.transco_number && (
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => onPrintLabel(s.id)}>
-                  Étiquette
+              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => onEdit(s)}>
+                  Modifier
                 </button>
-              )}
+                {s.transco_number && (
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => onPrintLabel(s.id)}>
+                    Étiquette
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={deleteMut.isPending}
+                  onClick={() => {
+                    if (window.confirm(`Supprimer ${s.fold_number} ?`)) deleteMut.mutate(s.id)
+                  }}
+                >
+                  Suppr.
+                </button>
+              </div>
             </td>
           </tr>
         ))}

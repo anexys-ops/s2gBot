@@ -172,6 +172,14 @@ class BonCommandeController extends Controller
         if (array_key_exists('notes_ligne', $data)) {
             $ligne->notes_ligne = $data['notes_ligne'];
         }
+        if ($ligne->date_debut_prevue) {
+            if (! $ligne->date_fin_prevue) {
+                $ligne->date_fin_prevue = $ligne->date_debut_prevue;
+            }
+            if (! $ligne->date_livraison) {
+                $ligne->date_livraison = $ligne->date_debut_prevue;
+            }
+        }
         $qtyChanged = false;
         if (array_key_exists('quantite', $data)) {
             $qty = round((float) $data['quantite'], 3);
@@ -237,9 +245,11 @@ class BonCommandeController extends Controller
     {
         $ligne->refresh();
 
-        if (! $ligne->technicien_id || ! $ligne->date_debut_prevue || ! $ligne->date_fin_prevue) {
+        if (! $ligne->technicien_id || ! $ligne->date_debut_prevue) {
             return;
         }
+
+        $dateFin = $ligne->date_fin_prevue ?? $ligne->date_debut_prevue;
 
         BcLignePlanningAffectation::query()->updateOrCreate(
             [
@@ -248,7 +258,7 @@ class BonCommandeController extends Controller
             ],
             [
                 'date_debut' => $ligne->date_debut_prevue->format('Y-m-d'),
-                'date_fin' => $ligne->date_fin_prevue->format('Y-m-d'),
+                'date_fin' => $dateFin->format('Y-m-d'),
                 'notes' => $ligne->notes_ligne,
                 'created_by' => $actorId,
             ]

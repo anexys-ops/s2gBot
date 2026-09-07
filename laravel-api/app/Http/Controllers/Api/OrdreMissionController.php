@@ -88,7 +88,7 @@ class OrdreMissionController extends Controller
 
         if ($orders === []) {
             return response()->json([
-                'message' => 'Aucun ordre de mission généré : vérifiez les actions catalogue sur les articles du BC, ou renseignez technicien + dates sur les lignes.',
+                'message' => 'Aucun ordre de mission généré : le bon de commande ne contient aucune ligne éligible (actions catalogue, déclencheurs OdM ou lignes avec libellé).',
                 'data' => [],
             ], 422);
         }

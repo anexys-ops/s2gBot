@@ -128,27 +128,7 @@ class SampleReceptionController extends Controller
         }
 
         $bc = $ligne->bonCommande;
-        $createData = [
-            'bon_commande_ligne_id' => $ligne->id,
-            'dossier_id' => $bc?->dossier_id,
-            'product_id' => $ligne->ref_article_id,
-            'description' => $data['description'] ?? $ligne->libelle,
-            'sample_type' => $data['sample_type'] ?? 'sol',
-            'origin_location' => $data['origin_location'] ?? null,
-            'depth_m' => $data['depth_m'] ?? null,
-            'collected_by' => $data['collected_by'] ?? $ligne->technicien_id,
-            'collected_at' => now(),
-            'reference' => 'SMP-'.now()->format('Ymd-His').'-'.random_int(100, 999),
-            'status' => Sample::STATUS_EN_TRANSIT,
-        ];
-
-        if (Schema::hasColumn('samples', 'order_item_id')
-            && Schema::getConnection()->getDriverName() === 'sqlite') {
-            $fallback = OrderItem::query()->value('id');
-            if ($fallback !== null) {
-                $createData['order_item_id'] = $fallback;
-            }
-        }
+        $createData = $this->buildCreateDataFromLine($ligne, $data);
 
         $sample = Sample::create($createData);
 
@@ -157,9 +137,59 @@ class SampleReceptionController extends Controller
         return response()->json($sample->load(self::REL), 201);
     }
 
+    /**
+     * Réception multiple depuis une ligne BC — un échantillon / étiquette par entrée.
+     *
+     * @return JsonResponse{data: list<Sample>}
+     */
+    public function receiveBatchFromLine(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $payload = $request->validate([
+            'bon_commande_ligne_id' => ['required', 'integer', 'exists:bons_commande_lignes,id'],
+            'samples' => ['required', 'array', 'min:1', 'max:50'],
+            'samples.*.condition_state' => ['required', Rule::in(Sample::CONDITIONS)],
+            'samples.*.storage_location' => ['nullable', 'string', 'max:191'],
+            'samples.*.collected_by' => ['nullable', 'integer', 'exists:users,id'],
+            'samples.*.sample_type' => ['nullable', Rule::in(Sample::TYPES)],
+            'samples.*.origin_location' => ['nullable', 'string', 'max:255'],
+            'samples.*.depth_m' => ['nullable', 'numeric'],
+            'samples.*.weight_g' => ['nullable', 'numeric', 'min:0'],
+            'samples.*.quantity' => ['nullable', 'integer', 'min:1'],
+            'samples.*.notes' => ['nullable', 'string'],
+            'samples.*.description' => ['nullable', 'string'],
+        ]);
+
+        /** @var BonCommandeLigne $ligne */
+        $ligne = BonCommandeLigne::query()
+            ->with(['bonCommande.dossier', 'article'])
+            ->findOrFail($payload['bon_commande_ligne_id']);
+
+        if (! $this->receptionService->isLineEligible($ligne)) {
+            return response()->json(['message' => 'Cette ligne BC n\'est pas éligible à la réception labo.'], 422);
+        }
+
+        $remaining = $this->receptionService->remainingCapacityForLine($ligne);
+        $count = count($payload['samples']);
+        if ($count > $remaining) {
+            return response()->json([
+                'message' => "Impossible de réceptionner {$count} échantillon(s) : seulement {$remaining} place(s) restante(s).",
+            ], 422);
+        }
+
+        $created = [];
+        foreach ($payload['samples'] as $row) {
+            $sample = Sample::create($this->buildCreateDataFromLine($ligne, $row));
+            $this->finalizeReception($sample, $user, $row);
+            $created[] = $sample->load(self::REL);
+        }
+
+        return response()->json(['data' => $created], 201);
+    }
+
     public function update(Request $request, Sample $sample): JsonResponse
     {
-        $data = $this->validateForCreate($request, partial: true);
+        $data = $this->validateForUpdate($request);
         $sample->fill($data)->save();
 
         return response()->json($sample->load(self::REL));
@@ -315,6 +345,52 @@ class SampleReceptionController extends Controller
         }
 
         $sample->save();
+    }
+
+    /** @param  array<string, mixed>  $data */
+    private function buildCreateDataFromLine(BonCommandeLigne $ligne, array $data): array
+    {
+        $bc = $ligne->bonCommande;
+        $createData = [
+            'bon_commande_ligne_id' => $ligne->id,
+            'dossier_id' => $bc?->dossier_id,
+            'product_id' => $ligne->ref_article_id,
+            'description' => $data['description'] ?? $ligne->libelle,
+            'sample_type' => $data['sample_type'] ?? 'sol',
+            'origin_location' => $data['origin_location'] ?? null,
+            'depth_m' => $data['depth_m'] ?? null,
+            'collected_by' => $data['collected_by'] ?? $ligne->technicien_id,
+            'collected_at' => now(),
+            'reference' => 'SMP-'.now()->format('Ymd-His').'-'.random_int(100, 999),
+            'status' => Sample::STATUS_EN_TRANSIT,
+        ];
+
+        if (Schema::hasColumn('samples', 'order_item_id')
+            && Schema::getConnection()->getDriverName() === 'sqlite') {
+            $fallback = OrderItem::query()->value('id');
+            if ($fallback !== null) {
+                $createData['order_item_id'] = $fallback;
+            }
+        }
+
+        return $createData;
+    }
+
+    /** @return array<string, mixed> */
+    private function validateForUpdate(Request $request): array
+    {
+        return $request->validate([
+            'description' => ['sometimes', 'nullable', 'string'],
+            'sample_type' => ['sometimes', Rule::in(Sample::TYPES)],
+            'origin_location' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'depth_m' => ['sometimes', 'nullable', 'numeric'],
+            'collected_by' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'condition_state' => ['sometimes', Rule::in(Sample::CONDITIONS)],
+            'storage_location' => ['sometimes', 'nullable', 'string', 'max:191'],
+            'weight_g' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'quantity' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'notes' => ['sometimes', 'nullable', 'string'],
+        ]);
     }
 
     /** @return array<string, mixed> */

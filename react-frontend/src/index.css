@@ -6456,6 +6456,36 @@ a.catalogue-tree__link-article:hover {
   align-items: center;
   gap: 0.5rem 0.75rem;
 }
+
+.om-fiche__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.om-fiche__statut-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.om-fiche__statut-select-label {
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.om-fiche__statut-select select {
+  min-width: 8.5rem;
+}
+
+.om-list__statut-select {
+  font-size: 0.82rem;
+  min-width: 7.5rem;
+  max-width: 100%;
+}
 .code-badge {
   display: inline-block;
   font-size: 0.88rem;
@@ -8631,3 +8661,300 @@ a.catalogue-tree__link-article:hover {
   margin-left: auto;
   display: block;
 }
+
+/* ── Étiquette FOLD (réception labo) ───────────────────────────────────── */
+.sample-label-modal {
+  max-width: 440px;
+}
+
+.sample-label-modal__toolbar {
+  margin-bottom: 1rem;
+}
+
+.sample-label-modal__format {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.sample-label-modal__format select {
+  flex: 1;
+}
+
+.sample-label-preview {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  background: #fff;
+  box-shadow: var(--shadow-card);
+}
+
+.sample-label-modal__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.fold-label {
+  width: 100%;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.fold-label__header {
+  padding: 0.75rem 0.85rem 0.85rem;
+  border-bottom: 2px solid var(--color-primary);
+  background: linear-gradient(180deg, var(--color-accent-soft) 0%, #fff 100%);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  margin: -1rem -1rem 0;
+}
+
+.fold-label__logo {
+  display: block;
+  margin: 0 auto 0.5rem;
+  max-height: 48px;
+  max-width: 160px;
+  object-fit: contain;
+}
+
+.fold-label--a5 .fold-label__logo {
+  max-height: 56px;
+  max-width: 180px;
+}
+
+.fold-label__brand {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.fold-label__fold {
+  margin: 1rem 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.04em;
+  color: var(--color-info);
+}
+
+.fold-label--a5 .fold-label__fold {
+  font-size: 1.55rem;
+}
+
+.fold-label__transco {
+  display: inline-block;
+  margin-bottom: 0.75rem;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  background: var(--color-secondary-soft);
+  border: 1px solid #a7f3d0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #065f46;
+}
+
+.fold-label__product {
+  margin: 0 0.5rem 0.85rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.fold-label--a5 .fold-label__product {
+  font-size: 0.95rem;
+}
+
+.fold-label__meta {
+  margin: 0 auto 0.85rem;
+  padding: 0;
+  list-style: none;
+  max-width: 100%;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.fold-label__meta li {
+  margin: 0 0 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+}
+
+.fold-label__meta strong {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 0.92em;
+}
+
+.fold-label__codes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed var(--color-border);
+}
+
+.fold-label__qr canvas {
+  display: block;
+  margin: 0 auto;
+  border-radius: var(--radius-sm);
+}
+
+.fold-label__barcode svg {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.fold-label__footer {
+  margin-top: 0.65rem;
+  font-size: 0.62rem;
+  color: #9ca3af;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── Réception multi-échantillons ─────────────────────────────────────── */
+.sample-reception-intro {
+  font-size: 0.9rem;
+  margin-top: 0;
+}
+
+.sample-reception-count__label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+
+.sample-reception-count input[type='number'] {
+  width: 100%;
+  max-width: 120px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.sample-reception-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.sample-reception-forms {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: min(52vh, 520px);
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.sample-reception-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+
+.sample-reception-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #fff;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sample-reception-card__title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-info);
+}
+
+.sample-reception-card__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  padding: 0.75rem;
+}
+
+.sample-reception-card__grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+}
+
+.sample-reception-card__grid label > span {
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.sample-reception-card__grid input,
+.sample-reception-card__grid select,
+.sample-reception-card__grid textarea {
+  width: 100%;
+}
+
+.sample-reception-card__full {
+  grid-column: 1 / -1;
+}
+
+.sample-reception-card__photo {
+  margin-top: 0.5rem;
+  max-width: 100%;
+  max-height: 120px;
+  border-radius: var(--radius-sm);
+}
+
+.sample-reception-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.sample-reception-done__msg {
+  font-weight: 600;
+  margin-top: 0;
+}
+
+.sample-reception-done__list {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sample-reception-done__list li {
+  padding: 0.4rem 0.65rem;
+  margin-bottom: 0.35rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  font-family: ui-monospace, monospace;
+  font-size: 0.88rem;
+}
+
+.sample-label-modal__batch-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+

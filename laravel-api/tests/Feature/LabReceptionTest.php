@@ -150,6 +150,27 @@ class LabReceptionTest extends TestCase
         $this->assertStringContainsString($res->json('fold_number'), $label->json('qr_json'));
     }
 
+    public function test_receive_batch_from_line_creates_multiple_samples(): void
+    {
+        [$labLine, , , $client, $technicien] = $this->seedBcWithLabAndReportLines();
+        $this->legacyOrderItemId($client);
+        $receptionnaire = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+
+        $res = $this->actingAs($receptionnaire, 'sanctum')->postJson('/api/v1/lab/reception/receive-batch-from-line', [
+            'bon_commande_ligne_id' => $labLine->id,
+            'samples' => [
+                ['condition_state' => 'bon', 'collected_by' => $technicien->id, 'sample_type' => 'sol'],
+                ['condition_state' => 'bon', 'collected_by' => $technicien->id, 'sample_type' => 'sol'],
+            ],
+        ]);
+
+        $res->assertCreated();
+        $res->assertJsonCount(2, 'data');
+        $this->assertNotEmpty($res->json('data.0.transco_number'));
+        $this->assertNotEmpty($res->json('data.1.transco_number'));
+        $this->assertNotSame($res->json('data.0.transco_number'), $res->json('data.1.transco_number'));
+    }
+
     private function legacyOrderItemId(Client $client): int
     {
         $agency = Agency::query()->create([

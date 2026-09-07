@@ -108,7 +108,7 @@ class AgencyController extends Controller
      */
     public function indexStandalone(Request $request): JsonResponse
     {
-        $query = Agency::withCount('users');
+        $query = Agency::query()->lab()->withCount(['labStaff as users_count']);
 
         if ($request->boolean('active')) {
             $query->where('active', true);
@@ -140,9 +140,9 @@ class AgencyController extends Controller
             'active'   => 'sometimes|boolean',
         ]);
 
-        $agency = Agency::create($validated);
+        $agency = Agency::create(array_merge($validated, ['client_id' => null]));
 
-        return response()->json($agency->loadCount('users'), 201);
+        return response()->json($agency->loadCount(['labStaff as users_count']), 201);
     }
 
     /**
@@ -150,7 +150,7 @@ class AgencyController extends Controller
      */
     public function showStandalone(int $id): JsonResponse
     {
-        $agency = Agency::withCount('users')->findOrFail($id);
+        $agency = Agency::query()->lab()->withCount(['labStaff as users_count'])->findOrFail($id);
 
         return response()->json($agency);
     }
@@ -164,7 +164,7 @@ class AgencyController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $agency = Agency::findOrFail($id);
+        $agency = Agency::query()->lab()->findOrFail($id);
 
         $validated = $request->validate([
             'name'     => 'sometimes|string|max:255',
@@ -179,7 +179,7 @@ class AgencyController extends Controller
 
         $agency->update($validated);
 
-        return response()->json($agency->fresh()->loadCount('users'));
+        return response()->json($agency->fresh()->loadCount(['labStaff as users_count']));
     }
 
     /**
@@ -191,10 +191,14 @@ class AgencyController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $agency = Agency::findOrFail($id);
+        $agency = Agency::query()->lab()->findOrFail($id);
 
         if ($agency->is_siege) {
             return response()->json(['message' => 'Impossible de supprimer l\'agence siège.'], 422);
+        }
+
+        if ($agency->client_id !== null) {
+            return response()->json(['message' => 'Agence client : gérée depuis la fiche client.'], 422);
         }
 
         $agency->delete();
@@ -211,7 +215,7 @@ class AgencyController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $agency = Agency::findOrFail($id);
+        $agency = Agency::query()->lab()->findOrFail($id);
 
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
@@ -228,9 +232,9 @@ class AgencyController extends Controller
      */
     public function agencyUsers(int $id): JsonResponse
     {
-        $agency = Agency::findOrFail($id);
+        Agency::query()->lab()->findOrFail($id);
 
-        $users = User::where('agency_id', $agency->id)
+        $users = User::where('agency_id', $id)
             ->select(['id', 'name', 'email', 'role', 'phone', 'agency_id'])
             ->orderBy('name')
             ->get();

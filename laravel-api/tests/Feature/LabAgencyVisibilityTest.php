@@ -18,11 +18,13 @@ class LabAgencyVisibilityTest extends TestCase
         $labAgency = Agency::query()->create([
             'name' => 'Agence Test',
             'code' => 'TST',
+            'client_id' => null,
             'active' => true,
         ]);
         $otherAgency = Agency::query()->create([
             'name' => 'Autre',
             'code' => 'OTH',
+            'client_id' => null,
             'active' => true,
         ]);
 
@@ -44,7 +46,7 @@ class LabAgencyVisibilityTest extends TestCase
 
     public function test_siege_user_sees_all_clients(): void
     {
-        $labAgency = Agency::query()->create(['name' => 'A1', 'code' => 'A1', 'active' => true]);
+        $labAgency = Agency::query()->create(['name' => 'A1', 'code' => 'A1', 'client_id' => null, 'active' => true]);
         $client = Client::query()->create(['name' => 'Restreint']);
         $client->visibleLabAgencies()->sync([$labAgency->id]);
 

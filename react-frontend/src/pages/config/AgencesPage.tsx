@@ -98,7 +98,12 @@ export default function AgencesPage() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h2 style={{ margin: 0 }}>Agences</h2>
+        <div>
+          <h2 style={{ margin: 0 }}>Agences labo</h2>
+          <p className="text-muted" style={{ margin: '0.35rem 0 0', fontSize: '0.9rem' }}>
+            Agences internes S2G uniquement. Les sièges clients (code HQ) ne figurent pas ici — voir la fiche client.
+          </p>
+        </div>
         <button type="button" className="btn btn-primary" onClick={openCreate}>
           + Nouvelle agence
         </button>

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Agence (tenant opérationnel) rattachée au siège {@see Client}.
@@ -47,6 +48,12 @@ class Agency extends Model
         return $this->belongsToMany(User::class, 'agency_user')->withTimestamps();
     }
 
+    /** Employés labo rattachés via users.agency_id. */
+    public function labStaff(): HasMany
+    {
+        return $this->hasMany(User::class, 'agency_id');
+    }
+
     public function sites(): HasMany
     {
         return $this->hasMany(Site::class);
@@ -77,5 +84,16 @@ class Agency extends Model
     public static function siegeId(): ?int
     {
         return static::siege()?->id;
+    }
+
+    /** Agences internes du laboratoire S2G (sans client_id). */
+    public function scopeLab(Builder $query): Builder
+    {
+        return $query->whereNull('client_id');
+    }
+
+    public function isLabAgency(): bool
+    {
+        return $this->client_id === null;
     }
 }

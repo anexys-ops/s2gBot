@@ -54,6 +54,7 @@ import ClientCommerceTab from './pages/clients/ClientCommerceTab'
 import ClientDocumentsTab from './pages/clients/ClientDocumentsTab'
 import ClientContactsPage from './pages/clients/ClientContactsPage'
 import ClientExtrafieldsTab from './pages/clients/ClientExtrafieldsTab'
+import ClientAgenciesRoute from './pages/clients/ClientAgenciesRoute'
 import ClientsMapPage from './pages/clients/ClientsMapPage'
 import SiteLayout from './pages/sites/SiteLayout'
 import SiteFicheTab from './pages/sites/SiteFicheTab'
@@ -162,6 +163,7 @@ function AppRoutes() {
           <Route path="extrafields" element={<DossierExtrafieldsTab />} />
         </Route>
         <Route path="terrain" element={<TerrainHub />} />
+        <Route path="terrain/carte" element={<Navigate to="/terrain/chantiers" replace />} />
         <Route path="terrain/mesures" element={<TerrainMesuresPage />} />
         <Route path="terrain/chantiers" element={<TerrainChantiersCartePage />} />
         <Route path="terrain/planning" element={<PlanningTechniciensPage />} />
@@ -232,6 +234,7 @@ function AppRoutes() {
           <Route path="fiche" element={<ClientFicheTab />} />
           <Route path="commerce" element={<ClientCommerceTab />} />
           <Route path="documents" element={<ClientDocumentsTab />} />
+          <Route path="agences" element={<ClientAgenciesRoute />} />
           <Route path="extrafields" element={<ClientExtrafieldsTab />} />
         </Route>
         <Route path="clients/:clientId/commercial" element={<LegacyClientCommercialRedirect />} />

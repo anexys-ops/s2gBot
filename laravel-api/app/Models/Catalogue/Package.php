@@ -2,6 +2,7 @@
 
 namespace App\Models\Catalogue;
 
+use App\Support\MoneyFormat;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -40,7 +41,7 @@ class Package extends Model
     protected function prixHtFormate(): Attribute
     {
         return Attribute::get(function (): string {
-            return number_format((float) $this->prix_ht, 2, ',', ' ').' € HT';
+            return MoneyFormat::formatHt($this->prix_ht);
         });
     }
 

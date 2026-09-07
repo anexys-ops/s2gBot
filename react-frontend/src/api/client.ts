@@ -907,12 +907,13 @@ export const dossiersApi = {
 }
 
 export const bonsCommandeApi = {
-  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string }) => {
+  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string; planning?: boolean }) => {
     const q = new URLSearchParams()
     if (params?.dossier_id) q.set('dossier_id', String(params.dossier_id))
     if (params?.client_id) q.set('client_id', String(params.client_id))
     if (params?.statut) q.set('statut', params.statut)
     if (params?.search) q.set('search', params.search)
+    if (params?.planning) q.set('planning', '1')
     const s = q.toString()
     return api<BonCommande[]>(`/v1/bons-commande${s ? `?${s}` : ''}`)
   },
@@ -1831,7 +1832,13 @@ export const reportsApi = {
 }
 
 export const invoicesApi = {
-  list: (params?: { search?: string; status?: string | string[]; page?: number; client_id?: number }) => {
+  list: (params?: {
+    search?: string
+    status?: string | string[]
+    page?: number
+    client_id?: number
+    quick_filter?: '' | 'unpaid' | 'overdue' | 'relance'
+  }) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
     if (params?.status) {
@@ -1843,6 +1850,7 @@ export const invoicesApi = {
     }
     if (params?.page) q.set('page', String(params.page))
     if (params?.client_id) q.set('client_id', String(params.client_id))
+    if (params?.quick_filter) q.set('quick_filter', params.quick_filter)
     const s = q.toString()
     return api<LaravelPaginator<Invoice>>(`/invoices${s ? `?${s}` : ''}`)
   },
@@ -1899,6 +1907,19 @@ export const invoicesApi = {
     }),
   update: (id: number, body: Partial<Invoice>) =>
     api<Invoice>(`/invoices/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  sendEmail: (
+    id: number,
+    body: { recipient_email?: string; recipient_name?: string; message?: string; pdf_template_id?: number },
+  ) =>
+    api<{ message?: string; invoice?: Invoice }>(`/invoices/${id}/send-email`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  sendReminder: (id: number, body?: { note?: string; next_reminder_date?: string }) =>
+    api<{ message?: string; invoice?: Invoice }>(`/invoices/${id}/send-reminder`, {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
+    }),
   delete: (id: number) => api(`/invoices/${id}`, { method: 'DELETE' }),
 }
 
@@ -2751,6 +2772,11 @@ export interface Invoice {
   delivery_address_id?: number
   pdf_template_id?: number
   status: string
+  notes?: string | null
+  last_reminder_sent_at?: string | null
+  reminder_count?: number
+  next_reminder_date?: string | null
+  reminder_notes?: string | null
   meta?: EntityMetaPayload | null
   client?: Client
   client_contact?: ClientContactRow

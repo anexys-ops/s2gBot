@@ -36,6 +36,9 @@ class BonCommandeController extends Controller
         if ($request->filled('statut')) {
             $q->where('statut', (string) $request->query('statut'));
         }
+        if ($request->boolean('planning')) {
+            $q->planifiable();
+        }
         if ($search = trim((string) $request->query('search', ''))) {
             $like = '%'.$search.'%';
             $q->where(function ($sub) use ($like) {

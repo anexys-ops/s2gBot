@@ -8958,3 +8958,77 @@ a.catalogue-tree__link-article:hover {
   gap: 0.5rem;
 }
 
+/* Factures — filtres rapides & échéances */
+.invoice-quick-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.invoice-quick-filters__btn {
+  cursor: pointer;
+  border: 1px solid var(--border, #d8dee6);
+  background: var(--surface, #fff);
+}
+
+.invoice-quick-filters__btn--active {
+  border-color: var(--primary, #1c3a6e);
+  background: color-mix(in srgb, var(--primary, #1c3a6e) 8%, #fff);
+  font-weight: 600;
+}
+
+.invoice-due-badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.invoice-due-badge--neutral {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.invoice-due-badge--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.invoice-due-badge--danger {
+  background: #fee2e2;
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.invoice-row--overdue td {
+  background: color-mix(in srgb, #fee2e2 35%, transparent);
+}
+
+.invoice-lines-editor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.invoice-lines-editor__total {
+  margin-top: 0.5rem;
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.input--warning {
+  border-color: #d97706 !important;
+  background: #fffbeb;
+}
+
+.input--danger {
+  border-color: #dc2626 !important;
+  background: #fef2f2;
+}

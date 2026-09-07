@@ -18,6 +18,7 @@ import {
   type CommercialDocumentType,
 } from '../../lib/commercialDocumentActionConfig'
 import { buildQuoteDuplicateBody } from '../../lib/quoteDuplicateBody'
+import { invoiceEmailRecipient } from '../../lib/invoiceEmailRecipient'
 import { quoteEmailRecipient } from '../../lib/quoteEmailRecipient'
 
 type Props = {
@@ -29,6 +30,8 @@ type Props = {
   isAdmin: boolean
   /** Devis complet pour l’email (optionnel si quoteForEmail omis et documentType quote). */
   quoteForEmail?: Quote | null
+  /** Facture complète pour l’email (documentType invoice). */
+  invoiceForEmail?: Invoice | null
   /** BC : empêche la suppression si un BL existe déjà. */
   hasBonLivraison?: boolean
   /** Afficher la barre de boutons (défaut true). */
@@ -47,6 +50,7 @@ export default function CommercialDocumentActions({
   isLab,
   isAdmin,
   quoteForEmail = null,
+  invoiceForEmail = null,
   hasBonLivraison = false,
   showHeader = true,
   onDeleted,
@@ -63,7 +67,11 @@ export default function CommercialDocumentActions({
   const [actionError, setActionError] = useState<string | null>(null)
 
   const emailRecipient =
-    documentType === 'quote' && quoteForEmail ? quoteEmailRecipient(quoteForEmail) : null
+    documentType === 'quote' && quoteForEmail
+      ? quoteEmailRecipient(quoteForEmail)
+      : documentType === 'invoice' && invoiceForEmail
+        ? invoiceEmailRecipient(invoiceForEmail)
+        : null
 
   const capabilities = commercialDocumentCapabilities({
     documentType,
@@ -196,7 +204,20 @@ export default function CommercialDocumentActions({
       templateId: number
       email: string
       name: string
-    }) => quotesApi.sendEmail(entityId, { recipient_email: email, recipient_name: name, pdf_template_id: templateId }),
+    }) => {
+      if (documentType === 'invoice') {
+        return invoicesApi.sendEmail(entityId, {
+          recipient_email: email,
+          recipient_name: name,
+          pdf_template_id: templateId,
+        })
+      }
+      return quotesApi.sendEmail(entityId, {
+        recipient_email: email,
+        recipient_name: name,
+        pdf_template_id: templateId,
+      })
+    },
     onSuccess: () => {
       invalidate()
       setEmailOpen(false)
@@ -283,7 +304,7 @@ export default function CommercialDocumentActions({
 
       {emailOpen && emailRecipient ? (
         <DocumentPdfPickerModal
-          documentType="quote"
+          documentType={documentType === 'invoice' ? 'invoice' : 'quote'}
           documentId={entityId}
           documentLabel={entityLabel}
           onClose={() => {

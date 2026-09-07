@@ -7,6 +7,8 @@ import {
   type BonCommande,
   type BonCommandeLigne,
 } from '../../api/client'
+import { bonCommandeStatutBadgeProps } from '../../components/ds/StatusBadge'
+import StatusBadge from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import PlanningMassActionsBar from '../../components/planning/PlanningMassActionsBar'
 import { useAuth } from '../../contexts/AuthContext'
@@ -58,6 +60,16 @@ function affectationOnDay(
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
 
+function formatBcPlanningOption(bc: BonCommande): string {
+  const statut = bonCommandeStatutBadgeProps(bc.statut).label
+  const client = bc.client?.name ? ` — ${bc.client.name}` : ''
+  return `${bc.numero} (${statut})${client}`
+}
+
+function handleDebutCascade(debut: string, setFin: (value: string) => void) {
+  setFin(debut)
+}
+
 export default function PlanningTechniciensPage() {
   const { user } = useAuth()
   const lab = isLab(user?.role)
@@ -98,8 +110,8 @@ export default function PlanningTechniciensPage() {
   })
 
   const { data: bonsListe } = useQuery({
-    queryKey: ['bons-commande', 'all-planning'],
-    queryFn: () => bonsCommandeApi.list(),
+    queryKey: ['bons-commande', 'planning'],
+    queryFn: () => bonsCommandeApi.list({ planning: true }),
   })
 
   const bcs: BonCommande[] = bonsListe ?? []
@@ -114,7 +126,7 @@ export default function PlanningTechniciensPage() {
   )
 
   const unpositionedLignes = useMemo(() => {
-    const all: (BonCommandeLigne & { bc_id: number; bc_numero: string; dossier_id: number })[] = []
+    const all: (BonCommandeLigne & { bc_id: number; bc_numero: string; bc_statut: string; dossier_id: number })[] = []
     for (const bc of bcs) {
       if (unposBcFilter !== '' && bc.id !== unposBcFilter) continue
       for (const ligne of bc.lignes ?? []) {
@@ -123,6 +135,7 @@ export default function PlanningTechniciensPage() {
             ...ligne,
             bc_id: bc.id,
             bc_numero: bc.numero,
+            bc_statut: bc.statut,
             dossier_id: bc.dossier_id,
           })
         }
@@ -236,7 +249,8 @@ export default function PlanningTechniciensPage() {
             Lignes non affectées
           </h2>
           <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-            Lignes de BC sans affectation terrain. Assignez un technicien et des dates pour créer l'affectation.
+            Lignes de BC sans affectation terrain (y compris BC en brouillon). Assignez un technicien et des dates pour
+            créer l'affectation.
           </p>
           <div style={{ marginBottom: '0.75rem' }}>
             <label>
@@ -249,7 +263,7 @@ export default function PlanningTechniciensPage() {
                 <option value="">Tous</option>
                 {bcs.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.numero} (dossier #{b.dossier_id})
+                    {formatBcPlanningOption(b)}
                   </option>
                 ))}
               </select>
@@ -312,6 +326,7 @@ export default function PlanningTechniciensPage() {
                       />
                     </th>
                     <th>BC</th>
+                    <th>Statut BC</th>
                     <th>Ligne</th>
                     <th>Technicien</th>
                     <th>Début</th>
@@ -342,6 +357,9 @@ export default function PlanningTechniciensPage() {
                           {ligne.bc_numero}
                         </Link>
                       </td>
+                      <td>
+                        <StatusBadge {...bonCommandeStatutBadgeProps(ligne.bc_statut)} />
+                      </td>
                       <td>{ligne.libelle}</td>
                       <td>
                         <select
@@ -366,12 +384,17 @@ export default function PlanningTechniciensPage() {
                         <input
                           type="date"
                           value={unposDebugMap[ligne.id] || toYmd(new Date())}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const debut = e.target.value
                             setUnposDebugMap((m) => ({
                               ...m,
-                              [ligne.id]: e.target.value,
+                              [ligne.id]: debut,
                             }))
-                          }
+                            setUnposFinMap((m) => ({
+                              ...m,
+                              [ligne.id]: debut,
+                            }))
+                          }}
                           style={{ width: '100%' }}
                         />
                       </td>
@@ -616,8 +639,9 @@ export default function PlanningTechniciensPage() {
             Nouvelle affectation
           </h2>
           <p className="text-muted" style={{ fontSize: '0.9rem' }}>
-            Choisissez un bon de commande, une ligne de produit, puis le technicien et les dates d'intervention. Les
-            dates d'affectation doivent rester dans la période prévue sur la ligne (défini sur la fiche BC).
+            Choisissez un bon de commande (brouillon, confirmé ou en cours), une ligne de produit, puis le technicien
+            et les dates d'intervention. Les dates d'affectation doivent rester dans la période prévue sur la ligne
+            (défini sur la fiche BC).
           </p>
           <div style={{ display: 'grid', gap: '0.75rem', marginTop: '0.75rem' }}>
             <label>
@@ -648,7 +672,7 @@ export default function PlanningTechniciensPage() {
                 <option value="">—</option>
                 {bcs.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.numero} (dossier #{b.dossier_id})
+                    {formatBcPlanningOption(b)}
                   </option>
                 ))}
               </select>
@@ -675,7 +699,11 @@ export default function PlanningTechniciensPage() {
                 <input
                   type="date"
                   value={newDebut}
-                  onChange={(e) => setNewDebut(e.target.value)}
+                  onChange={(e) => {
+                    const debut = e.target.value
+                    setNewDebut(debut)
+                    handleDebutCascade(debut, setNewFin)
+                  }}
                   style={{ display: 'block', marginTop: 4 }}
                 />
               </label>

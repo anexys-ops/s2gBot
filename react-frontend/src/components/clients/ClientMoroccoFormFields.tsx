@@ -1,4 +1,5 @@
 import type { Client } from '../../api/client'
+import { MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import {
   MOROCCO_CITIES,
   MOROCCO_LEGAL_FORMS,
@@ -183,7 +184,7 @@ export default function ClientMoroccoFormFields({ form, setForm }: Props) {
       </div>
 
       <div className="form-group">
-        <label>Capital social (MAD)</label>
+        <label>Capital social ({MONEY_UNIT_LABEL})</label>
         <input
           type="number"
           min={0}

@@ -19,6 +19,7 @@ import Orders from './pages/Orders'
 import OrderDetail from './pages/OrderDetail'
 import OrderNew from './pages/OrderNew'
 import Invoices from './pages/Invoices'
+import InvoiceEditorPage from './pages/invoices/InvoiceEditorPage'
 import Clients from './pages/Clients'
 import Sites from './pages/Sites'
 import Devis from './pages/Devis'
@@ -201,6 +202,8 @@ function AppRoutes() {
         <Route path="graphiques-essais" element={<GraphiquesEssais />} />
         <Route path="factures" element={<Invoices />} />
         <Route path="invoices" element={<Invoices />} />
+        <Route path="factures/:invoiceId/editer" element={<InvoiceEditorPage />} />
+        <Route path="invoices/:invoiceId/editer" element={<InvoiceEditorPage />} />
         <Route path="devis/nouveau" element={<QuoteEditorPage />} />
         <Route path="devis/:quoteId/editer" element={<QuoteEditorPage />} />
         <Route path="devis/:quoteId" element={<QuoteIdRedirect />} />

@@ -58,6 +58,9 @@ class Invoice extends Model
         'status',
         'last_reminder_sent_at',
         'reminder_count',
+        'next_reminder_date',
+        'reminder_notes',
+        'notes',
         'meta',
     ];
 
@@ -68,6 +71,7 @@ class Invoice extends Model
             'order_date' => 'date',
             'site_delivery_date' => 'date',
             'due_date' => 'date',
+            'next_reminder_date' => 'date',
             'last_reminder_sent_at' => 'datetime',
             'reminder_count' => 'integer',
             'amount_ht' => 'decimal:2',

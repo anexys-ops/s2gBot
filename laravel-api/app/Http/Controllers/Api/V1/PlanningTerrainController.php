@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\BcLignePlanningAffectation;
+use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
 use App\Models\User;
 use App\Support\AgencyAccess;
@@ -111,6 +112,9 @@ class PlanningTerrainController extends Controller
         if (! AgencyAccess::userMayAccessBonCommande($request->user(), $ligne->bonCommande)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
+        if ($ligne->bonCommande->statut === BonCommande::STATUT_ANNULE) {
+            return response()->json(['message' => 'Impossible de planifier une ligne d\'un bon de commande annulé.'], 422);
+        }
 
         $this->assertAssignmentWithinLigneWindow($ligne, $data['date_debut'], $data['date_fin']);
 
@@ -121,6 +125,12 @@ class PlanningTerrainController extends Controller
             'date_fin' => $data['date_fin'],
             'notes' => $data['notes'] ?? null,
             'created_by' => $request->user()->id,
+        ]);
+
+        $ligne->update([
+            'technicien_id' => (int) $data['user_id'],
+            'date_debut_prevue' => $data['date_debut'],
+            'date_fin_prevue' => $data['date_fin'],
         ]);
 
         return response()->json($row->load([

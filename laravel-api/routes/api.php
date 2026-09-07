@@ -278,6 +278,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('invoices/from-bons-commande', [InvoiceController::class, 'fromBonsCommande']);
     Route::get('invoices/unpaid', [InvoiceController::class, 'unpaid']);
     Route::get('invoices/{invoice}/pdf-link', [InvoiceController::class, 'pdfLink']);
+    Route::post('invoices/{invoice}/send-email', [InvoiceController::class, 'sendEmail']);
+    Route::post('invoices/{invoice}/send-reminder', [InvoiceController::class, 'sendReminder']);
     Route::apiResource('invoices', InvoiceController::class);
     Route::apiResource('quotes', QuoteController::class);
     Route::post('quotes/{id}/send-email', [QuoteController::class, 'sendEmail'])->whereNumber('id');

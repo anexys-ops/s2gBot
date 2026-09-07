@@ -105,7 +105,7 @@ export function commercialDocumentCapabilities(input: CapabilityInput): Commerci
       return {
         canDuplicate: false,
         canPrint: true,
-        canEmail: false,
+        canEmail: isLab && status !== 'paid' && emailAvailable,
         canChangeStatus: isAdmin,
         canCancel: false,
         canDelete: isAdmin,

@@ -11,6 +11,7 @@ import {
   type ExpenseLine,
   type ExpenseCategory,
 } from '../../api/client'
+import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 
 // ── Couleur badge statut ─────────────────────────────────────────────────────
 const STATUT_COLORS: Record<string, string> = {
@@ -55,7 +56,7 @@ function LineRow({
       <td>
         <span className="badge">{line.category}</span>
       </td>
-      <td style={{ fontWeight: 600 }}>{Number(line.amount).toFixed(2)} €</td>
+      <td style={{ fontWeight: 600 }}>{formatMoney(Number(line.amount))}</td>
       <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>{line.description || '—'}</td>
       <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>{line.user?.name || `#${line.user_id}`}</td>
       {canEdit && (
@@ -140,7 +141,7 @@ function LineForm({
               </select>
             </label>
             <label>
-              Montant TTC (€) *
+              Montant TTC ({MONEY_UNIT_LABEL}) *
               <input
                 type="number"
                 step="0.01"
@@ -215,7 +216,7 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
           {report.statut}
         </span>
         <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: '1rem' }}>
-          Total : {total.toFixed(2)} €
+          Total : {formatMoney(total)}
         </span>
       </div>
 
@@ -471,7 +472,7 @@ export default function ExpenseReportsPage() {
                     </span>
                   </td>
                   <td style={{ fontWeight: 600 }}>
-                    {r.total !== undefined ? `${Number(r.total).toFixed(2)} €` : '—'}
+                    {r.total !== undefined ? formatMoney(Number(r.total)) : '—'}
                   </td>
                   <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
                     {r.created_at?.slice(0, 10)}

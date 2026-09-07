@@ -7,7 +7,7 @@ use App\Models\ArticleEquipmentRequirement;
 use App\Models\ArticleSectionProduct;
 use App\Models\JalonProduct;
 use App\Models\QualificationTag;
-use Illuminate\Database\Eloquent\Builder;
+use App\Support\MoneyFormat;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -86,7 +86,7 @@ class Article extends Model
     protected function prixUnitaireHtFormate(): Attribute
     {
         return Attribute::get(function (): string {
-            return number_format((float) $this->prix_unitaire_ht, 2, ',', ' ').' € HT';
+            return MoneyFormat::formatHt($this->prix_unitaire_ht);
         });
     }
 

@@ -10,8 +10,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminUsersApi, ordresMissionApi, type FraisDeplacement, type OrdreMission, type OrdreMissionLigne, type User } from '../../api/client'
-import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
+import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { dateInputFromApi } from '../../lib/appLocale'
 
 const TYPE_META: Record<string, { label: string; color: string }> = {
@@ -417,7 +418,7 @@ export default function OrdreMissionFichePage() {
           <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <span style={{ fontWeight: 600 }}>Frais de déplacement</span>
-              {frais.length > 0 && <span className="text-muted" style={{ marginLeft: '0.5rem', fontSize: '0.85rem' }}>Total : {totalFrais.toFixed(2)} €</span>}
+              {frais.length > 0 && <span className="text-muted" style={{ marginLeft: '0.5rem', fontSize: '0.85rem' }}>Total : {formatMoney(totalFrais)}</span>}
             </div>
             <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowFraisForm((v) => !v)}>+ Ajouter</button>
           </div>
@@ -452,13 +453,13 @@ export default function OrdreMissionFichePage() {
                   <input type="number" min={0} step="0.1" value={fraisForm.distance_km} onChange={(e) => setFraisForm((f) => ({ ...f, distance_km: e.target.value }))} required />
                 </label>
                 <label>
-                  Taux €/km
+                  Taux {MONEY_UNIT_LABEL}/km
                   <input type="number" min={0} step="0.0001" value={fraisForm.taux_km} onChange={(e) => setFraisForm((f) => ({ ...f, taux_km: e.target.value }))} />
                 </label>
               </div>
               {fraisForm.distance_km && fraisForm.taux_km && (
                 <p style={{ fontSize: '0.85rem', margin: '0.25rem 0' }}>
-                  Montant estimé (A/R) : <strong>{(Number(fraisForm.distance_km) * Number(fraisForm.taux_km) * 2).toFixed(2)} €</strong>
+                  Montant estimé (A/R) : <strong>{formatMoney(Number(fraisForm.distance_km) * Number(fraisForm.taux_km) * 2)}</strong>
                 </p>
               )}
               <div className="crud-actions" style={{ marginTop: '0.5rem' }}>
@@ -488,7 +489,7 @@ export default function OrdreMissionFichePage() {
                     <td>{new Date(f.date).toLocaleDateString('fr-FR')}</td>
                     <td>{[f.lieu_depart, f.lieu_arrivee].filter(Boolean).join(' → ') || '—'}</td>
                     <td>{f.distance_km} km</td>
-                    <td><strong>{f.montant.toFixed(2)} €</strong></td>
+                    <td><strong>{formatMoney(f.montant)}</strong></td>
                     <td><span className="badge">{f.statut}</span></td>
                     <td>
                       <button type="button" className="btn btn-secondary btn-sm btn-danger-outline"

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Support\AgencyAccess;
+use App\Support\ClientListEnrichment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -62,10 +63,16 @@ class ClientController extends Controller
             $perPage = (int) $request->query('per_page', 20);
             $perPage = min(100, max(1, $perPage));
 
-            return response()->json($query->paginate($perPage));
+            $paginator = $query->paginate($perPage);
+            ClientListEnrichment::enrich($paginator->getCollection());
+
+            return response()->json($paginator);
         }
 
-        return response()->json($query->get());
+        $clients = $query->get();
+        ClientListEnrichment::enrich($clients);
+
+        return response()->json($clients);
     }
 
     public function store(Request $request): JsonResponse

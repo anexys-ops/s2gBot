@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -86,5 +87,16 @@ class BonCommande extends Model
     public function invoices(): BelongsToMany
     {
         return $this->belongsToMany(Invoice::class, 'invoice_bon_commande')->withTimestamps();
+    }
+
+    /** BC planifiables sur le terrain (brouillon inclus, hors annulés). */
+    public function scopePlanifiable(Builder $query): Builder
+    {
+        return $query->whereIn('statut', [
+            self::STATUT_BROUILLON,
+            self::STATUT_CONFIRME,
+            self::STATUT_EN_COURS,
+            self::STATUT_LIVRE,
+        ]);
     }
 }

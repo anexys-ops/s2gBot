@@ -1,33 +1,37 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import {
-  clientContactsApi,
   clientsApi,
   invoicesApi,
-  moduleSettingsApi,
-  type EntityMetaPayload,
   type Invoice,
 } from '../api/client'
-import { QuotePdfButton } from '../components/crm/QuoteListTableActions'
-import CommercialDocumentActions from '../components/crm/CommercialDocumentActions'
-import DocumentPdfPickerModal from '../components/pdf/DocumentPdfPickerModal'
+import {
+  InvoiceRowActionCells,
+  InvoiceRowActionHeaders,
+} from '../components/invoices/InvoiceListTableActions'
+import StatusChangeModal from '../components/StatusChangeModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ClickableStatusBadge from '../components/ds/ClickableStatusBadge'
 import StatusBadge, { bonCommandeStatutBadgeProps, invoiceStatutBadgeProps } from '../components/ds/StatusBadge'
 import Toast, { toastErrorMessage, type ToastVariant } from '../components/Toast'
-import EntityMetaCard from '../components/module/EntityMetaCard'
-import ExtrafieldsForm from '../components/module/ExtrafieldsForm'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import TableRowActions from '../components/TableRowActions'
+import DocumentPdfPickerModal from '../components/pdf/DocumentPdfPickerModal'
 import { useAuth } from '../contexts/AuthContext'
-import Modal from '../components/Modal'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { ListTableFootRow, ListTablePanelHeader } from '../components/ListTablePanel'
 import { sumNumeric } from '../lib/listTableTotals'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
+import { invoiceEmailRecipient, invoiceWhatsAppPhone } from '../lib/invoiceEmailRecipient'
+import {
+  INVOICE_QUICK_FILTERS,
+  invoiceReminderLabel,
+  invoiceReminderTone,
+  type InvoiceQuickFilter,
+} from '../lib/invoiceReminder'
 import { shouldIgnoreTableRowClick } from '../lib/tableRowInteraction'
 
 const BC_STATUT_LABELS: Record<string, string> = {
@@ -45,14 +49,6 @@ const STATUS_LABELS: Record<string, string> = {
   sent: 'Envoyée',
   relanced: 'Relancée',
   paid: 'Encaissée',
-}
-
-const DEFAULT_TVA_OPTIONS = [20, 10, 5.5, 0]
-
-function numList(v: unknown): number[] {
-  if (!Array.isArray(v) || v.length === 0) return DEFAULT_TVA_OPTIONS
-  const out = v.map((x) => Number(x)).filter((n) => !Number.isNaN(n))
-  return out.length ? out : DEFAULT_TVA_OPTIONS
 }
 
 function InvoiceCreateFromBcPanel({ onNotify }: { onNotify: (message: string, variant: ToastVariant) => void }) {
@@ -233,37 +229,32 @@ export default function Invoices() {
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const isAdmin = user?.role === 'lab_admin'
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
-  const [editInvoice, setEditInvoice] = useState<Invoice | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null)
   const [pdfTarget, setPdfTarget] = useState<Invoice | null>(null)
+  const [sendTarget, setSendTarget] = useState<Invoice | null>(null)
+  const [reminderTarget, setReminderTarget] = useState<Invoice | null>(null)
+  const [statusModalInvoice, setStatusModalInvoice] = useState<Invoice | null>(null)
+  const [sendError, setSendError] = useState('')
   const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
-  const [editForm, setEditForm] = useState({
-    status: 'draft',
-    invoice_date: '',
-    due_date: '',
-    amount_ht: 0,
-    tva_rate: 20,
-    travel_fee_ht: 0,
-    travel_fee_tva_rate: 20,
-    pdf_template_id: '' as number | '',
-    contact_id: '' as number | '',
-  })
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statusFilter, setStatusFilter] = useState('')
   const [clientFilter, setClientFilter] = useState('')
+  const [quickFilter, setQuickFilter] = useState<InvoiceQuickFilter>('')
   const [page, setPage] = useState(1)
   const { visible, toggle } = usePersistedColumnVisibility('invoices', {
     number: true,
     client: true,
     date: true,
+    due: true,
+    relance: true,
     ht: true,
     ttc: true,
-    travel: true,
+    travel: false,
     status: true,
-    pdf: true,
     actions: true,
   })
 
@@ -283,70 +274,65 @@ export default function Invoices() {
     setToast({ message, variant })
   }
 
-  const { data: modInvoices } = useQuery({
-    queryKey: ['module-settings', 'invoices'],
-    queryFn: () => moduleSettingsApi.get('invoices'),
-    enabled: isLab,
-  })
-
-  const tvaOptions = useMemo(() => numList(modInvoices?.settings?.tva_rate_options), [modInvoices])
-  const travelTvaOptions = useMemo(() => numList(modInvoices?.settings?.travel_tva_rate_options), [modInvoices])
-  const tvaOptionsForEdit = useMemo(() => {
-    const base = [...tvaOptions]
-    if (editInvoice && !base.includes(editForm.tva_rate)) base.push(editForm.tva_rate)
-    return [...new Set(base)].sort((a, b) => b - a)
-  }, [tvaOptions, editInvoice, editForm.tva_rate])
-  const travelTvaOptionsForEdit = useMemo(() => {
-    const base = [...travelTvaOptions]
-    if (editInvoice && !base.includes(editForm.travel_fee_tva_rate)) base.push(editForm.travel_fee_tva_rate)
-    return [...new Set(base)].sort((a, b) => b - a)
-  }, [travelTvaOptions, editInvoice, editForm.travel_fee_tva_rate])
-
   const { data: clientsList = [] } = useQuery({
     queryKey: ['clients', 'invoices-toolbar'],
     queryFn: () => clientsApi.list(),
     enabled: isLab,
   })
 
-  const { data: invoiceEditContacts = [] } = useQuery({
-    queryKey: ['client-contacts', 'invoice-edit', editInvoice?.client_id],
-    queryFn: () => clientContactsApi.list(editInvoice!.client_id),
-    enabled: isLab && !!editInvoice && editInvoice.client_id > 0,
-  })
-
   const { data, isLoading, error } = useQuery({
-    queryKey: ['invoices', debouncedSearch, statusFilter, clientFilter, page],
+    queryKey: ['invoices', debouncedSearch, statusFilter, clientFilter, quickFilter, page],
     queryFn: () =>
       invoicesApi.list({
         search: debouncedSearch.trim() || undefined,
         status: statusFilter || undefined,
         page,
         client_id: clientFilter ? Number(clientFilter) : undefined,
+        quick_filter: quickFilter || undefined,
       }),
     placeholderData: keepPreviousData,
   })
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: Partial<Invoice> }) => invoicesApi.update(id, body),
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) => invoicesApi.update(id, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      setEditInvoice(null)
-      showToast('Facture enregistrée.', 'success')
-    },
-    onError: (err) => {
-      showToast(toastErrorMessage(err, 'Échec de l’enregistrement de la facture.'), 'error')
+      setStatusModalInvoice(null)
     },
   })
 
-  const invoiceMetaMut = useMutation({
-    mutationFn: ({ id, meta }: { id: number; meta: EntityMetaPayload }) => invoicesApi.update(id, { meta }),
-    onSuccess: (updated, variables) => {
+  const sendEmailMutation = useMutation({
+    mutationFn: ({
+      id,
+      email,
+      name,
+      pdf_template_id,
+    }: {
+      id: number
+      email: string
+      name: string
+      pdf_template_id?: number
+    }) => invoicesApi.sendEmail(id, { recipient_email: email, recipient_name: name, pdf_template_id }),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      setEditInvoice((prev) => (prev && prev.id === variables.id ? updated : prev))
-      showToast('Métadonnées enregistrées.', 'success')
+      setSendTarget(null)
+      setSendError('')
+      showToast('Facture envoyée par email.', 'success')
     },
     onError: (err) => {
-      showToast(toastErrorMessage(err, 'Échec de l’enregistrement des métadonnées.'), 'error')
+      setSendError(toastErrorMessage(err, 'Échec de l’envoi email.'))
+    },
+  })
+
+  const reminderMutation = useMutation({
+    mutationFn: ({ id, note }: { id: number; note?: string }) => invoicesApi.sendReminder(id, { note }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      setReminderTarget(null)
+      showToast(res.message ?? 'Relance enregistrée.', 'success')
+    },
+    onError: (err) => {
+      showToast(toastErrorMessage(err, 'Échec de la relance.'), 'error')
     },
   })
 
@@ -373,88 +359,48 @@ export default function Invoices() {
   )
   const lastPage = data?.last_page ?? 1
   const statusOptions = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
-  const hasActiveFilters = searchInput.trim() !== '' || statusFilter !== '' || clientFilter !== ''
+  const hasActiveFilters =
+    searchInput.trim() !== '' || statusFilter !== '' || clientFilter !== '' || quickFilter !== ''
 
-  const openEdit = useCallback((inv: Invoice) => {
-    setEditInvoice(inv)
-    setEditForm({
-      status: inv.status,
-      invoice_date: inv.invoice_date?.slice(0, 10) ?? '',
-      due_date: inv.due_date?.slice(0, 10) ?? '',
-      amount_ht: Number(inv.amount_ht),
-      tva_rate: Number(inv.tva_rate),
-      travel_fee_ht: Number(inv.travel_fee_ht ?? 0),
-      travel_fee_tva_rate: Number(inv.travel_fee_tva_rate ?? 20),
-      pdf_template_id: inv.pdf_template_id ?? '',
-      contact_id: inv.contact_id != null && inv.contact_id > 0 ? inv.contact_id : '',
-    })
+  const openEditor = useCallback(
+    (inv: Invoice) => {
+      navigate(`/factures/${inv.id}/editer`)
+    },
+    [navigate],
+  )
+
+  const openWhatsApp = useCallback(async (inv: Invoice) => {
+    const phone = invoiceWhatsAppPhone(inv)
+    if (!phone) {
+      showToast('Aucun numéro WhatsApp ou téléphone client.', 'error')
+      return
+    }
+    try {
+      const { url } = await invoicesApi.getPdfLink(inv.id)
+      const text = encodeURIComponent(
+        `Bonjour, voici la facture ${inv.number} (${formatMoney(Number(inv.amount_ttc))} TTC) : ${url}`,
+      )
+      window.open(`https://wa.me/${phone}?text=${text}`, '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      showToast(toastErrorMessage(err, 'Impossible d’ouvrir WhatsApp.'), 'error')
+    }
   }, [])
 
   const editFromQuery = searchParams.get('edit')
   useEffect(() => {
-    if (!editFromQuery || !isAdmin) return
+    if (!editFromQuery) return
     const id = Number(editFromQuery)
     if (!Number.isFinite(id) || id <= 0) return
-    let cancelled = false
-    void invoicesApi
-      .get(id)
-      .then((inv) => {
-        if (cancelled) return
-        openEdit(inv)
-        setSearchParams(
-          (prev) => {
-            const n = new URLSearchParams(prev)
-            n.delete('edit')
-            return n
-          },
-          { replace: true },
-        )
-      })
-      .catch(() => {
-        setSearchParams(
-          (prev) => {
-            const n = new URLSearchParams(prev)
-            n.delete('edit')
-            return n
-          },
-          { replace: true },
-        )
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [editFromQuery, isAdmin, openEdit, setSearchParams])
-
-  const submitEdit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editInvoice) return
-    if (editInvoice.status !== 'draft') {
-      updateMutation.mutate({
-        id: editInvoice.id,
-        body: {
-          status: editForm.status,
-          due_date: editForm.due_date || undefined,
-          pdf_template_id: editForm.pdf_template_id === '' ? undefined : editForm.pdf_template_id,
-          contact_id: editForm.contact_id === '' ? undefined : editForm.contact_id,
-        },
-      })
-      return
-    }
-    updateMutation.mutate({
-      id: editInvoice.id,
-      body: {
-        status: editForm.status,
-        invoice_date: editForm.invoice_date,
-        due_date: editForm.due_date || undefined,
-        amount_ht: editForm.amount_ht,
-        tva_rate: editForm.tva_rate,
-        travel_fee_ht: editForm.travel_fee_ht,
-        travel_fee_tva_rate: editForm.travel_fee_tva_rate,
-        pdf_template_id: editForm.pdf_template_id === '' ? undefined : editForm.pdf_template_id,
-        contact_id: editForm.contact_id === '' ? undefined : editForm.contact_id,
+    navigate(`/factures/${id}/editer`, { replace: true })
+    setSearchParams(
+      (prev) => {
+        const n = new URLSearchParams(prev)
+        n.delete('edit')
+        return n
       },
-    })
-  }
+      { replace: true },
+    )
+  }, [editFromQuery, navigate, setSearchParams])
 
   if (isLoading && !data) {
     return (
@@ -484,6 +430,24 @@ export default function Invoices() {
       }
     >
       {isLab ? <InvoiceCreateFromBcPanel onNotify={showToast} /> : null}
+
+      <div className="invoice-quick-filters" role="toolbar" aria-label="Filtres rapides factures">
+        {INVOICE_QUICK_FILTERS.map((f) => (
+          <button
+            key={f.id || 'all'}
+            type="button"
+            className={`list-table-toolbar__chip invoice-quick-filters__btn${
+              quickFilter === f.id ? ' invoice-quick-filters__btn--active' : ''
+            }`}
+            onClick={() => {
+              setQuickFilter(f.id)
+              setPage(1)
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
 
       <ListTableToolbar
         searchValue={searchInput}
@@ -523,12 +487,13 @@ export default function Invoices() {
           { id: 'number', label: 'Numéro' },
           { id: 'client', label: 'Client' },
           { id: 'date', label: 'Date' },
+          { id: 'due', label: 'Échéance' },
+          { id: 'relance', label: 'Relance' },
           { id: 'ht', label: 'Montant HT' },
           { id: 'ttc', label: 'Montant TTC' },
           { id: 'travel', label: 'Dépl. HT' },
           { id: 'status', label: 'Statut' },
-          { id: 'pdf', label: 'PDF' },
-          ...(isAdmin ? [{ id: 'actions', label: 'Actions' }] : []),
+          ...(isLab ? [{ id: 'actions', label: 'Actions' }] : []),
         ]}
         visibleColumns={visible}
         onToggleColumn={toggle}
@@ -577,6 +542,21 @@ export default function Invoices() {
                   </button>
                 </span>
               ) : null}
+              {quickFilter ? (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">
+                    {INVOICE_QUICK_FILTERS.find((f) => f.id === quickFilter)?.label ?? quickFilter}
+                  </span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => setQuickFilter('')}
+                    aria-label="Effacer le filtre rapide"
+                  >
+                    ×
+                  </button>
+                </span>
+              ) : null}
             </>
           ) : null
         }
@@ -592,44 +572,51 @@ export default function Invoices() {
                   {visible.number !== false && <th className="data-table__code">Numéro</th>}
                   {visible.client !== false && <th>Client</th>}
                   {visible.date !== false && <th>Date</th>}
+                  {visible.due !== false && <th>Échéance</th>}
+                  {visible.relance !== false && <th>Relance</th>}
                   {visible.ht !== false && <th className="data-table__num">Montant HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.ttc !== false && <th className="data-table__num">Montant TTC ({MONEY_UNIT_LABEL})</th>}
                   {visible.travel !== false && <th className="data-table__num">Dépl. HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.status !== false && <th>Statut</th>}
-                  {visible.pdf !== false && <th className="data-table__pdf">PDF</th>}
-                  {isAdmin && visible.actions !== false && <th className="data-table__actions">Actions</th>}
+                  {isLab && visible.actions !== false && (
+                    <>
+                      <InvoiceRowActionHeaders />
+                      {isAdmin ? <th className="data-table__actions">Suppr.</th> : null}
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {invoices.map((inv) => {
                   const st = invoiceStatutBadgeProps(inv.status)
+                  const reminderTone = invoiceReminderTone(inv)
+                  const reminderBadge = invoiceReminderLabel(inv)
+                  const emailRecipient = invoiceEmailRecipient(inv)
+                  const whatsApp = invoiceWhatsAppPhone(inv)
                   return (
                     <tr
                       key={inv.id}
-                      className="table-row-link"
+                      className={`table-row-link${reminderTone === 'danger' ? ' invoice-row--overdue' : ''}`}
                       onClick={(e) => {
                         if (shouldIgnoreTableRowClick(e.target)) return
-                        openEdit(inv)
+                        openEditor(inv)
                       }}
                     >
                       {visible.number !== false && (
                         <td className="data-table__code">
-                          <button
-                            type="button"
-                            className="link-inline invoice-number-btn"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              openEdit(inv)
-                            }}
+                          <Link
+                            to={`/factures/${inv.id}/editer`}
+                            className="link-inline"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <code className="code-badge">{inv.number}</code>
-                          </button>
+                          </Link>
                         </td>
                       )}
                       {visible.client !== false && (
                         <td>
                           {inv.client?.name ? (
-                            <Link to={`/clients/${inv.client_id}`} className="link-inline">
+                            <Link to={`/clients/${inv.client_id}/fiche`} className="link-inline" onClick={(e) => e.stopPropagation()}>
                               {inv.client.name}
                             </Link>
                           ) : (
@@ -638,6 +625,32 @@ export default function Invoices() {
                         </td>
                       )}
                       {visible.date !== false && <td>{formatAppDate(inv.invoice_date)}</td>}
+                      {visible.due !== false && (
+                        <td>
+                          {inv.due_date ? (
+                            <span className={`invoice-due-badge invoice-due-badge--${reminderTone ?? 'neutral'}`}>
+                              {formatAppDate(inv.due_date)}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      )}
+                      {visible.relance !== false && (
+                        <td>
+                          {inv.next_reminder_date ? (
+                            <span className={`invoice-due-badge invoice-due-badge--${reminderTone ?? 'neutral'}`}>
+                              {formatAppDate(inv.next_reminder_date)}
+                            </span>
+                          ) : reminderBadge ? (
+                            <StatusBadge variant={reminderTone === 'danger' ? 'danger' : 'warning'} size="sm">
+                              {reminderBadge}
+                            </StatusBadge>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      )}
                       {visible.ht !== false && (
                         <td className="data-table__num">{formatMoney(Number(inv.amount_ht))}</td>
                       )}
@@ -654,7 +667,7 @@ export default function Invoices() {
                               variant={st.variant}
                               size="sm"
                               ariaLabel={`Changer le statut de la facture ${inv.number}`}
-                              onClick={() => openEdit(inv)}
+                              onClick={() => setStatusModalInvoice(inv)}
                             >
                               {st.label}
                             </ClickableStatusBadge>
@@ -665,22 +678,25 @@ export default function Invoices() {
                           )}
                         </td>
                       )}
-                      {visible.pdf !== false && (
-                        <td className="data-table__pdf">
-                          {isLab ? (
-                            <QuotePdfButton onClick={() => setPdfTarget(inv)} />
-                          ) : (
-                            <QuotePdfButton
-                              onClick={() => invoicesApi.openInvoicePdf(inv.id)}
-                              label="Télécharger le PDF"
-                            />
-                          )}
-                        </td>
-                      )}
-                      {isAdmin && visible.actions !== false && (
-                        <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
-                          <TableRowActions onDelete={() => setDeleteTarget(inv)} />
-                        </td>
+                      {isLab && visible.actions !== false && (
+                        <>
+                          <InvoiceRowActionCells
+                            invoiceNumber={inv.number}
+                            status={inv.status}
+                            canEmail={!!emailRecipient}
+                            canWhatsApp={!!whatsApp}
+                            onPdf={() => (isLab ? setPdfTarget(inv) : void invoicesApi.openInvoicePdf(inv.id))}
+                            onEmail={emailRecipient ? () => setSendTarget(inv) : undefined}
+                            onWhatsApp={whatsApp ? () => void openWhatsApp(inv) : undefined}
+                            onReminder={() => setReminderTarget(inv)}
+                            emailLoading={sendEmailMutation.isPending && sendTarget?.id === inv.id}
+                          />
+                          {isAdmin ? (
+                            <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
+                              <TableRowActions onDelete={() => setDeleteTarget(inv)} />
+                            </td>
+                          ) : null}
+                        </>
                       )}
                     </tr>
                   )
@@ -691,12 +707,13 @@ export default function Invoices() {
                   { id: 'number', kind: 'text' },
                   { id: 'client', kind: 'text' },
                   { id: 'date', kind: 'text' },
+                  { id: 'due', kind: 'text' },
+                  { id: 'relance', kind: 'text' },
                   { id: 'ht', kind: 'money' },
                   { id: 'ttc', kind: 'money' },
                   { id: 'travel', kind: 'money' },
                   { id: 'status', kind: 'text' },
-                  { id: 'pdf', kind: 'text' },
-                  ...(isAdmin ? [{ id: 'actions', kind: 'text' as const }] : []),
+                  ...(isLab ? [{ id: 'actions', kind: 'text' as const }] : []),
                 ]}
                 visible={visible}
                 totals={totals}
@@ -728,163 +745,80 @@ export default function Invoices() {
         />
       ) : null}
 
-      {editInvoice && (
-        <Modal title={`Facture ${editInvoice.number}`} onClose={() => setEditInvoice(null)}>
-          <>
-            <CommercialDocumentActions
-              documentType="invoice"
-              entityId={editInvoice.id}
-              entityLabel={editInvoice.number}
-              status={editInvoice.status}
-              isLab={isLab}
-              isAdmin={isAdmin}
-              onDeleted={() => setEditInvoice(null)}
-              onStatusChanged={() => {
-                void queryClient.invalidateQueries({ queryKey: ['invoices'] })
-                void invoicesApi.get(editInvoice.id).then((fresh) => {
-                  setEditInvoice(fresh)
-                  setEditForm((f) => ({ ...f, status: fresh.status }))
-                })
-              }}
-            />
-            <form onSubmit={submitEdit}>
-              <div className="form-group">
-                <label>Statut</label>
-                <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))}>
-                  {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {editInvoice.status === 'draft' && (
-                <div className="form-group">
-                  <label>Date facture</label>
-                  <input
-                    type="date"
-                    value={editForm.invoice_date}
-                    onChange={(e) => setEditForm((f) => ({ ...f, invoice_date: e.target.value }))}
-                  />
-                </div>
-              )}
-              <div className="form-group">
-                <label>Échéance</label>
-                <input
-                  type="date"
-                  value={editForm.due_date}
-                  onChange={(e) => setEditForm((f) => ({ ...f, due_date: e.target.value }))}
-                />
-              </div>
-              <div className="form-group">
-                <label>Échéance</label>
-                <select
-                  value={editForm.contact_id === '' ? '' : String(editForm.contact_id)}
-                  onChange={(e) =>
-                    setEditForm((f) => ({
-                      ...f,
-                      contact_id: e.target.value === '' ? '' : Number(e.target.value),
-                    }))
-                  }
-                >
-                  <option value="">—</option>
-                  {invoiceEditContacts.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {[c.prenom, c.nom].filter(Boolean).join(' ').trim() || `Contact #${c.id}`}
-                      {c.email ? ` — ${c.email}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {editInvoice.status === 'draft' && (
-                <>
-                  <div className="form-group">
-                    <label>Montant HT ({MONEY_UNIT_LABEL})</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      value={editForm.amount_ht}
-                      onChange={(e) => setEditForm((f) => ({ ...f, amount_ht: Number(e.target.value) }))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>TVA (%)</label>
-                    <select
-                      value={String(editForm.tva_rate)}
-                      onChange={(e) => setEditForm((f) => ({ ...f, tva_rate: Number(e.target.value) }))}
-                    >
-                      {tvaOptionsForEdit.map((n) => (
-                        <option key={n} value={n}>
-                          {n} %
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Frais déplacement HT</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      value={editForm.travel_fee_ht}
-                      onChange={(e) => setEditForm((f) => ({ ...f, travel_fee_ht: Number(e.target.value) }))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>TVA sur déplacement (%)</label>
-                    <select
-                      value={String(editForm.travel_fee_tva_rate)}
-                      onChange={(e) => setEditForm((f) => ({ ...f, travel_fee_tva_rate: Number(e.target.value) }))}
-                    >
-                      {travelTvaOptionsForEdit.map((n) => (
-                        <option key={n} value={n}>
-                          {n} %
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
-              {editInvoice.status !== 'draft' && (
-                <p className="text-muted" style={{ fontSize: '0.9rem' }}>
-                  Hors brouillon : statut, échéance et modèle PDF sont modifiables ; le reste est figé (API).
-                </p>
-              )}
-              {updateMutation.isError && <p className="error">{(updateMutation.error as Error).message}</p>}
-              <div className="crud-actions">
-                <button type="submit" className="btn btn-primary" disabled={updateMutation.isPending}>
-                  Enregistrer
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={() => setEditInvoice(null)}>
-                  Annuler
-                </button>
-              </div>
-            </form>
-            {isAdmin && (
-              <EntityMetaCard
-                meta={editInvoice.meta}
-                editable
-                onSave={(meta) => invoiceMetaMut.mutateAsync({ id: editInvoice.id, meta })}
-                isSaving={invoiceMetaMut.isPending}
-                saveError={invoiceMetaMut.isError ? (invoiceMetaMut.error as Error).message : null}
-              />
-            )}
-            {isAdmin && (
-              <ExtrafieldsForm
-                entityType="invoice"
-                entityId={editInvoice.id}
-                canEdit
-                title="Champs configurés (extrafields)"
-              />
-            )}
-          </>
-        </Modal>
-      )}
-
       {toast ? (
         <Toast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} />
       ) : null}
+
+      {statusModalInvoice ? (
+        <StatusChangeModal
+          title={`Statut — ${statusModalInvoice.number}`}
+          initialValue={statusModalInvoice.status}
+          options={statusOptions}
+          isPending={statusMutation.isPending}
+          error={statusMutation.isError ? (statusMutation.error as Error).message : null}
+          onClose={() => setStatusModalInvoice(null)}
+          onSave={(next) => statusMutation.mutate({ id: statusModalInvoice.id, status: next })}
+        />
+      ) : null}
+
+      {sendTarget ? (
+        <DocumentPdfPickerModal
+          documentType="invoice"
+          documentId={sendTarget.id}
+          documentLabel={sendTarget.number}
+          onClose={() => {
+            if (!sendEmailMutation.isPending) {
+              setSendTarget(null)
+              setSendError('')
+            }
+          }}
+          onEmail={async (templateId) => {
+            const recipient = invoiceEmailRecipient(sendTarget)
+            if (!recipient) {
+              setSendError('Destinataire email introuvable.')
+              return
+            }
+            await sendEmailMutation.mutateAsync({
+              id: sendTarget.id,
+              email: recipient.email,
+              name: recipient.name,
+              pdf_template_id: templateId,
+            })
+          }}
+        />
+      ) : null}
+
+      {reminderTarget ? (
+        <ConfirmDialog
+          title={`Relancer — ${reminderTarget.number}`}
+          message={
+            <>
+              Envoyer une relance pour la facture <strong>{reminderTarget.number}</strong> ?
+              {reminderTarget.reminder_notes ? (
+                <>
+                  <br />
+                  <br />
+                  <span className="text-muted" style={{ whiteSpace: 'pre-line', fontSize: '0.9rem' }}>
+                    {reminderTarget.reminder_notes}
+                  </span>
+                </>
+              ) : null}
+            </>
+          }
+          confirmLabel="Relancer"
+          loading={reminderMutation.isPending}
+          error={reminderMutation.isError ? (reminderMutation.error as Error).message : null}
+          onConfirm={() => {
+            const note = window.prompt('Note de relance (optionnel) :') ?? ''
+            reminderMutation.mutate({ id: reminderTarget.id, note: note || undefined })
+          }}
+          onCancel={() => {
+            if (!reminderMutation.isPending) setReminderTarget(null)
+          }}
+        />
+      ) : null}
+
+      {sendError && !sendTarget ? <p className="error">{sendError}</p> : null}
 
       {pdfTarget ? (
         <DocumentPdfPickerModal

@@ -19,7 +19,7 @@ const cards: Card[] = [
   {
     to: '/terrain/chantiers',
     title: 'Chantiers et carte GPS',
-    desc: 'Carte des points géolocalisés (coordonnées renseignées).',
+    desc: 'Carte interactive, filtres et accès direct au dossier chantier.',
     icon: 'map',
   },
   {

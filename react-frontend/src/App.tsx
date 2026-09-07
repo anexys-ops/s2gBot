@@ -60,6 +60,7 @@ import SiteFicheTab from './pages/sites/SiteFicheTab'
 import SiteMissionsTab from './pages/sites/SiteMissionsTab'
 import SiteMapTab from './pages/sites/SiteMapTab'
 import DocumentPdfTemplates from './pages/DocumentPdfTemplates'
+import DocumentPdfTemplateDetail from './pages/DocumentPdfTemplateDetail'
 import ModuleConfigurationPage from './pages/back-office/ModuleConfigurationPage'
 import ReportComptaPage from './pages/reports/ReportComptaPage'
 import ReportVentesPage from './pages/reports/ReportVentesPage'
@@ -217,6 +218,7 @@ function AppRoutes() {
             <Route path="non-conformites/:id" element={<NonConformityDetailPage />} />
             <Route path="modeles-rapports-pdf" element={<Navigate to="/back-office/modeles-documents-pdf" replace />} />
             <Route path="modeles-documents-pdf" element={<DocumentPdfTemplates />} />
+            <Route path="modeles-documents-pdf/:id" element={<DocumentPdfTemplateDetail />} />
             <Route path="configuration" element={<ModuleConfigurationPage />} />
             <Route path="pdf" element={<PdfModule />} />
             <Route path="mails" element={<Mails />} />

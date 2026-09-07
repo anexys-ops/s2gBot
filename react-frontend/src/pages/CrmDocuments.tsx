@@ -1,18 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
+import { ListTableFootRow, ListTablePanelHeader } from '../components/ListTablePanel'
+import { sumNumeric } from '../lib/listTableTotals'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import {
   commercialOfferingsApi,
-  pdfApi,
   quotesApi,
   invoicesApi,
-  type CommercialOffering,
-  type Invoice,
-  type Quote,
 } from '../api/client'
+import DocumentPdfPickerModal from '../components/pdf/DocumentPdfPickerModal'
+import type { PdfGenerateType } from '../lib/documentPdfTypes'
 import { useAuth } from '../contexts/AuthContext'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import { formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
@@ -51,6 +51,7 @@ export default function CrmDocuments() {
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
+  const [pdfTarget, setPdfTarget] = useState<{ type: PdfGenerateType; id: number; label: string } | null>(null)
 
   const quoteStatusOptions = Object.entries(QUOTE_STATUS_LABELS).map(([value, label]) => ({ value, label }))
   const invoiceStatusOptions = Object.entries(INVOICE_STATUS_LABELS).map(([value, label]) => ({ value, label }))
@@ -60,7 +61,9 @@ export default function CrmDocuments() {
     number: true,
     date: true,
     status: true,
+    ht: true,
     ttc: true,
+    travel: true,
     pdf: true,
     crm: true,
     actions: true,
@@ -111,6 +114,33 @@ export default function CrmDocuments() {
     tab === 'quotes' ? quotesQ.error : tab === 'invoices' ? invoicesQ.error : offeringsQ.error
   const data = tab === 'quotes' ? quotesQ.data : tab === 'invoices' ? invoicesQ.data : offeringsQ.data
 
+  const quotes = tab === 'quotes' ? (quotesQ.data?.data ?? []) : []
+  const invoices = tab === 'invoices' ? (invoicesQ.data?.data ?? []) : []
+  const offerings = tab === 'offerings' ? (offeringsQ.data?.data ?? []) : []
+
+  const quoteTotals = useMemo(
+    () => ({
+      ht: sumNumeric(quotes, (q) => q.amount_ht),
+      ttc: sumNumeric(quotes, (q) => q.amount_ttc),
+      travel: sumNumeric(quotes, (q) => q.travel_fee_ht ?? 0),
+    }),
+    [quotes],
+  )
+  const invoiceTotals = useMemo(
+    () => ({
+      ht: sumNumeric(invoices, (inv) => inv.amount_ht),
+      ttc: sumNumeric(invoices, (inv) => inv.amount_ttc),
+      travel: sumNumeric(invoices, (inv) => inv.travel_fee_ht ?? 0),
+    }),
+    [invoices],
+  )
+  const offeringTotals = useMemo(
+    () => ({
+      off_price: sumNumeric(offerings, (o) => o.sale_price_ht),
+    }),
+    [offerings],
+  )
+
   if (loading) {
     return (
       <ModuleEntityShell
@@ -134,9 +164,8 @@ export default function CrmDocuments() {
     )
   }
 
-  const quotes = tab === 'quotes' && data && 'data' in data ? (data.data as Quote[]) : []
-  const invoices = tab === 'invoices' && data && 'data' in data ? (data.data as Invoice[]) : []
-  const offerings = tab === 'offerings' && data && 'data' in data ? (data.data as CommercialOffering[]) : []
+  const tabTitle = tab === 'quotes' ? 'Devis' : tab === 'invoices' ? 'Factures' : 'Offres commerciales'
+  const tabCount = tab === 'quotes' ? quotes.length : tab === 'invoices' ? invoices.length : offerings.length
   const lastPage = data?.last_page ?? 1
   const currentPage = data?.current_page ?? page
 
@@ -158,7 +187,9 @@ export default function CrmDocuments() {
           { id: 'number', label: 'Numéro' },
           { id: 'date', label: 'Date' },
           { id: 'status', label: 'Statut' },
+          { id: 'ht', label: 'Montant HT' },
           { id: 'ttc', label: 'Montant TTC' },
+          { id: 'travel', label: 'Dépl. HT' },
           { id: 'pdf', label: 'PDF' },
           ...(isLab ? [{ id: 'crm', label: 'Fiche client' }] : []),
           ...(showDocEditCol ? [{ id: 'actions', label: 'Édition' }] : []),
@@ -227,151 +258,217 @@ export default function CrmDocuments() {
         onToggleColumn={toggle}
       />
 
-      <div className="card">
-        {tab === 'quotes' && (
-          <table>
-            <thead>
-              <tr>
-                {showClientCol && <th>Client</th>}
-                {visible.number !== false && <th>N°</th>}
-                {visible.date !== false && <th>Date</th>}
-                {visible.status !== false && <th>Statut</th>}
-                {visible.ttc !== false && <th>TTC ({MONEY_UNIT_LABEL})</th>}
-                {visible.pdf !== false && <th>PDF</th>}
-                {isLab && visible.crm !== false && <th>Fiche</th>}
-                {showDocEditCol && tab === 'quotes' && visible.actions !== false && <th>Édition</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {quotes.map((q) => (
-                <tr key={q.id}>
-                  {showClientCol && <td>{q.client?.name ?? '—'}</td>}
-                  {visible.number !== false && <td>{q.number}</td>}
-                  {visible.date !== false && <td>{new Date(q.quote_date).toLocaleDateString('fr-FR')}</td>}
-                  {visible.status !== false && <td>{QUOTE_STATUS_LABELS[q.status] ?? q.status}</td>}
-                  {visible.ttc !== false && <td>{formatMoney(Number(q.amount_ttc))}</td>}
-                  {visible.pdf !== false && (
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => pdfApi.generate('quote', q.id, q.pdf_template_id)}
-                      >
-                        PDF
-                      </button>
-                    </td>
-                  )}
-                  {isLab && visible.crm !== false && (
-                    <td>
-                      <Link className="btn btn-secondary btn-sm" to={`/clients/${q.client_id}/commerce`}>
-                        Vue commerciale
-                      </Link>
-                    </td>
-                  )}
-                  {showDocEditCol && tab === 'quotes' && visible.actions !== false && (
-                    <td>
-                      <Link className="btn btn-primary btn-sm" to={`/devis/${q.id}/editer`}>
-                        Éditer
-                      </Link>
-                    </td>
-                  )}
+      <div className="card dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title={tabTitle} count={tabCount} />
+        {tab === 'quotes' && quotes.length > 0 && (
+          <div className="table-wrap">
+            <table className="data-table data-table--compact">
+              <thead>
+                <tr>
+                  {showClientCol && <th>Client</th>}
+                  {visible.number !== false && <th>N°</th>}
+                  {visible.date !== false && <th>Date</th>}
+                  {visible.status !== false && <th>Statut</th>}
+                  {visible.ht !== false && <th>HT ({MONEY_UNIT_LABEL})</th>}
+                  {visible.ttc !== false && <th>TTC ({MONEY_UNIT_LABEL})</th>}
+                  {visible.travel !== false && <th>Dépl. HT ({MONEY_UNIT_LABEL})</th>}
+                  {visible.pdf !== false && <th>PDF</th>}
+                  {isLab && visible.crm !== false && <th>Fiche</th>}
+                  {showDocEditCol && visible.actions !== false && <th>Édition</th>}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {quotes.map((q) => (
+                  <tr key={q.id}>
+                    {showClientCol && <td>{q.client?.name ?? '—'}</td>}
+                    {visible.number !== false && <td>{q.number}</td>}
+                    {visible.date !== false && <td>{new Date(q.quote_date).toLocaleDateString('fr-FR')}</td>}
+                    {visible.status !== false && <td>{QUOTE_STATUS_LABELS[q.status] ?? q.status}</td>}
+                    {visible.ht !== false && <td className="data-table__num">{formatMoney(Number(q.amount_ht))}</td>}
+                    {visible.ttc !== false && <td className="data-table__num">{formatMoney(Number(q.amount_ttc))}</td>}
+                    {visible.travel !== false && (
+                      <td className="data-table__num">{formatMoney(Number(q.travel_fee_ht ?? 0))}</td>
+                    )}
+                    {visible.pdf !== false && (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setPdfTarget({ type: 'quote', id: q.id, label: q.number })}
+                        >
+                          PDF
+                        </button>
+                      </td>
+                    )}
+                    {isLab && visible.crm !== false && (
+                      <td>
+                        <Link className="btn btn-secondary btn-sm" to={`/clients/${q.client_id}/commerce`}>
+                          Vue commerciale
+                        </Link>
+                      </td>
+                    )}
+                    {showDocEditCol && visible.actions !== false && (
+                      <td>
+                        <Link className="btn btn-primary btn-sm" to={`/devis/${q.id}/editer`}>
+                          Éditer
+                        </Link>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+              <ListTableFootRow
+                columns={[
+                  ...(showClientCol ? [{ id: 'client', kind: 'text' as const }] : []),
+                  { id: 'number', kind: 'text' },
+                  { id: 'date', kind: 'text' },
+                  { id: 'status', kind: 'text' },
+                  { id: 'ht', kind: 'money' },
+                  { id: 'ttc', kind: 'money' },
+                  { id: 'travel', kind: 'money' },
+                  { id: 'pdf', kind: 'text' },
+                  ...(isLab ? [{ id: 'crm', kind: 'text' as const }] : []),
+                  ...(showDocEditCol ? [{ id: 'actions', kind: 'text' as const }] : []),
+                ]}
+                visible={{ ...visible, client: showClientCol }}
+                totals={quoteTotals}
+              />
+            </table>
+          </div>
         )}
 
-        {tab === 'offerings' && (
-          <table>
-            <thead>
-              <tr>
-                {visible.off_code !== false && <th>Code</th>}
-                {visible.off_name !== false && <th>Libellé</th>}
-                {visible.off_kind !== false && <th>Type</th>}
-                {visible.off_unit !== false && <th>Unité</th>}
-                {visible.off_price !== false && <th>Prix vente HT</th>}
-                {visible.off_active !== false && <th>Actif</th>}
-                {visible.off_actions !== false && <th>CRUD</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {offerings.map((o) => (
-                <tr key={o.id}>
-                  {visible.off_code !== false && <td>{o.code || '—'}</td>}
-                  {visible.off_name !== false && <td>{o.name}</td>}
-                  {visible.off_kind !== false && <td>{OFFERING_KIND_LABEL[o.kind] ?? o.kind}</td>}
-                  {visible.off_unit !== false && <td>{o.unit || '—'}</td>}
-                  {visible.off_price !== false && <td>{formatMoney(Number(o.sale_price_ht))}</td>}
-                  {visible.off_active !== false && <td>{o.active ? 'Oui' : 'Non'}</td>}
-                  {visible.off_actions !== false && (
-                    <td>
-                      <Link className="btn btn-primary btn-sm" to="/back-office/offres">
-                        Gérer
-                      </Link>
-                    </td>
-                  )}
+        {tab === 'offerings' && offerings.length > 0 && (
+          <div className="table-wrap">
+            <table className="data-table data-table--compact">
+              <thead>
+                <tr>
+                  {visible.off_code !== false && <th>Code</th>}
+                  {visible.off_name !== false && <th>Libellé</th>}
+                  {visible.off_kind !== false && <th>Type</th>}
+                  {visible.off_unit !== false && <th>Unité</th>}
+                  {visible.off_price !== false && <th>Prix vente HT</th>}
+                  {visible.off_active !== false && <th>Actif</th>}
+                  {visible.off_actions !== false && <th>CRUD</th>}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {offerings.map((o) => (
+                  <tr key={o.id}>
+                    {visible.off_code !== false && <td>{o.code || '—'}</td>}
+                    {visible.off_name !== false && <td>{o.name}</td>}
+                    {visible.off_kind !== false && <td>{OFFERING_KIND_LABEL[o.kind] ?? o.kind}</td>}
+                    {visible.off_unit !== false && <td>{o.unit || '—'}</td>}
+                    {visible.off_price !== false && (
+                      <td className="data-table__num">{formatMoney(Number(o.sale_price_ht))}</td>
+                    )}
+                    {visible.off_active !== false && <td>{o.active ? 'Oui' : 'Non'}</td>}
+                    {visible.off_actions !== false && (
+                      <td>
+                        <Link className="btn btn-primary btn-sm" to="/back-office/offres">
+                          Gérer
+                        </Link>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+              <ListTableFootRow
+                columns={[
+                  { id: 'off_code', kind: 'text' },
+                  { id: 'off_name', kind: 'text' },
+                  { id: 'off_kind', kind: 'text' },
+                  { id: 'off_unit', kind: 'text' },
+                  { id: 'off_price', kind: 'money' },
+                  { id: 'off_active', kind: 'text' },
+                  { id: 'off_actions', kind: 'text' },
+                ]}
+                visible={visible}
+                totals={offeringTotals}
+              />
+            </table>
+          </div>
         )}
 
-        {tab === 'invoices' && (
-          <table>
-            <thead>
-              <tr>
-                {showClientCol && <th>Client</th>}
-                {visible.number !== false && <th>N°</th>}
-                {visible.date !== false && <th>Date</th>}
-                {visible.status !== false && <th>Statut</th>}
-                {visible.ttc !== false && <th>TTC ({MONEY_UNIT_LABEL})</th>}
-                {visible.pdf !== false && <th>PDF</th>}
-                {isLab && visible.crm !== false && <th>Fiche</th>}
-                {showDocEditCol && tab === 'invoices' && visible.actions !== false && <th>Édition</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((inv) => (
-                <tr key={inv.id}>
-                  {showClientCol && <td>{inv.client?.name ?? '—'}</td>}
-                  {visible.number !== false && <td>{inv.number}</td>}
-                  {visible.date !== false && <td>{new Date(inv.invoice_date).toLocaleDateString('fr-FR')}</td>}
-                  {visible.status !== false && <td>{INVOICE_STATUS_LABELS[inv.status] ?? inv.status}</td>}
-                  {visible.ttc !== false && <td>{formatMoney(Number(inv.amount_ttc))}</td>}
-                  {visible.pdf !== false && (
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => pdfApi.generate('invoice', inv.id, inv.pdf_template_id)}
-                      >
-                        PDF
-                      </button>
-                    </td>
-                  )}
-                  {isLab && visible.crm !== false && (
-                    <td>
-                      <Link className="btn btn-secondary btn-sm" to={`/clients/${inv.client_id}/commerce`}>
-                        Vue commerciale
-                      </Link>
-                    </td>
-                  )}
-                  {showDocEditCol && tab === 'invoices' && visible.actions !== false && (
-                    <td>
-                      <Link className="btn btn-primary btn-sm" to={`/invoices?edit=${inv.id}`}>
-                        Modifier
-                      </Link>
-                    </td>
-                  )}
+        {tab === 'invoices' && invoices.length > 0 && (
+          <div className="table-wrap">
+            <table className="data-table data-table--compact">
+              <thead>
+                <tr>
+                  {showClientCol && <th>Client</th>}
+                  {visible.number !== false && <th>N°</th>}
+                  {visible.date !== false && <th>Date</th>}
+                  {visible.status !== false && <th>Statut</th>}
+                  {visible.ht !== false && <th>HT ({MONEY_UNIT_LABEL})</th>}
+                  {visible.ttc !== false && <th>TTC ({MONEY_UNIT_LABEL})</th>}
+                  {visible.travel !== false && <th>Dépl. HT ({MONEY_UNIT_LABEL})</th>}
+                  {visible.pdf !== false && <th>PDF</th>}
+                  {isLab && visible.crm !== false && <th>Fiche</th>}
+                  {showDocEditCol && visible.actions !== false && <th>Édition</th>}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {invoices.map((inv) => (
+                  <tr key={inv.id}>
+                    {showClientCol && <td>{inv.client?.name ?? '—'}</td>}
+                    {visible.number !== false && <td>{inv.number}</td>}
+                    {visible.date !== false && <td>{new Date(inv.invoice_date).toLocaleDateString('fr-FR')}</td>}
+                    {visible.status !== false && <td>{INVOICE_STATUS_LABELS[inv.status] ?? inv.status}</td>}
+                    {visible.ht !== false && <td className="data-table__num">{formatMoney(Number(inv.amount_ht))}</td>}
+                    {visible.ttc !== false && <td className="data-table__num">{formatMoney(Number(inv.amount_ttc))}</td>}
+                    {visible.travel !== false && (
+                      <td className="data-table__num">{formatMoney(Number(inv.travel_fee_ht ?? 0))}</td>
+                    )}
+                    {visible.pdf !== false && (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setPdfTarget({ type: 'invoice', id: inv.id, label: inv.number })}
+                        >
+                          PDF
+                        </button>
+                      </td>
+                    )}
+                    {isLab && visible.crm !== false && (
+                      <td>
+                        <Link className="btn btn-secondary btn-sm" to={`/clients/${inv.client_id}/commerce`}>
+                          Vue commerciale
+                        </Link>
+                      </td>
+                    )}
+                    {showDocEditCol && visible.actions !== false && (
+                      <td>
+                        <Link className="btn btn-primary btn-sm" to={`/invoices?edit=${inv.id}`}>
+                          Modifier
+                        </Link>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+              <ListTableFootRow
+                columns={[
+                  ...(showClientCol ? [{ id: 'client', kind: 'text' as const }] : []),
+                  { id: 'number', kind: 'text' },
+                  { id: 'date', kind: 'text' },
+                  { id: 'status', kind: 'text' },
+                  { id: 'ht', kind: 'money' },
+                  { id: 'ttc', kind: 'money' },
+                  { id: 'travel', kind: 'money' },
+                  { id: 'pdf', kind: 'text' },
+                  ...(isLab ? [{ id: 'crm', kind: 'text' as const }] : []),
+                  ...(showDocEditCol ? [{ id: 'actions', kind: 'text' as const }] : []),
+                ]}
+                visible={{ ...visible, client: showClientCol }}
+                totals={invoiceTotals}
+              />
+            </table>
+          </div>
         )}
 
-        {tab === 'quotes' && !quotes.length && <p style={{ padding: '1rem' }}>Aucun devis.</p>}
-        {tab === 'invoices' && !invoices.length && <p style={{ padding: '1rem' }}>Aucune facture.</p>}
-        {tab === 'offerings' && !offerings.length && <p style={{ padding: '1rem' }}>Aucune offre commerciale.</p>}
+        {tab === 'quotes' && !quotes.length && <p className="dossier-tab-empty">Aucun devis.</p>}
+        {tab === 'invoices' && !invoices.length && <p className="dossier-tab-empty">Aucune facture.</p>}
+        {tab === 'offerings' && !offerings.length && <p className="dossier-tab-empty">Aucune offre commerciale.</p>}
       </div>
 
       <PaginationBar page={currentPage} lastPage={lastPage} onPage={setPage} />
@@ -389,6 +486,15 @@ export default function CrmDocuments() {
           </>
         )}
       </p>
+
+      {pdfTarget ? (
+        <DocumentPdfPickerModal
+          documentType={pdfTarget.type}
+          documentId={pdfTarget.id}
+          documentLabel={pdfTarget.label}
+          onClose={() => setPdfTarget(null)}
+        />
+      ) : null}
     </ModuleEntityShell>
   )
 }

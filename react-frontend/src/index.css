@@ -1200,6 +1200,35 @@ th {
 .dossier-tab-panel__header .ds-form-section__title {
   margin: 0;
 }
+.list-table-panel__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  flex-wrap: wrap;
+}
+.list-table-panel__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.55rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.data-table tfoot tr.data-table__foot-row {
+  background: #f8fafc;
+  border-top: 2px solid #e2e8f0;
+}
+.data-table tfoot tr.data-table__foot-row td {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
 .dossier-tab-panel__intro {
   margin: 0 0 1rem;
   font-size: 0.9rem;
@@ -1394,10 +1423,17 @@ th {
   text-align: center;
   vertical-align: middle;
   padding: 0.4rem 0.2rem;
-  font-size: 0.7rem;
-  font-weight: 600;
+}
+.data-table__icon-header {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.125rem;
+  height: 2.125rem;
   color: #94a3b8;
-  letter-spacing: 0.02em;
+}
+.data-table__action-cell .data-table__icon-header svg {
+  display: block;
 }
 .data-table__action-slot {
   display: inline-flex;
@@ -1644,6 +1680,20 @@ a.ds-icon-btn {
 }
 .ds-status-badge--primary .ds-status-badge__dot {
   background: var(--color-primary);
+}
+.ds-status-badge--clickable {
+  cursor: pointer;
+  border: 1px solid transparent;
+  font: inherit;
+  transition: filter 0.15s, box-shadow 0.15s;
+}
+.ds-status-badge--clickable:hover {
+  filter: brightness(0.97);
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.08);
+}
+.ds-status-badge--clickable:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-focus);
 }
 
 /* Pastilles de statut (dashboard & listes) */
@@ -5470,6 +5520,180 @@ a.ds-icon-btn {
 .s2g-picker__count {
   font-size: 0.85rem;
 }
+
+/* ——— S2G catalogue picker — classement & métadonnées ——— */
+.s2g-picker__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.s2g-picker__search {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.s2g-picker__sort {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--color-muted, #64748b);
+  white-space: nowrap;
+}
+.s2g-picker__sort select {
+  font-size: 0.82rem;
+  padding: 0.3rem 0.45rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  background: var(--color-surface, #fff);
+}
+.s2g-picker__groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-height: min(58vh, 380px);
+  overflow-y: auto;
+}
+.s2g-picker__groups--products {
+  max-height: min(50vh, 340px);
+}
+.s2g-picker__group {
+  border: 1px solid var(--s2g-group-border, #cbd5e1);
+  border-radius: 10px;
+  background: var(--s2g-group-bg, #f8fafc);
+  overflow: hidden;
+}
+.s2g-picker__group--compact .catalog-picker-list {
+  max-height: none;
+}
+.s2g-picker__group-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--s2g-group-border, #cbd5e1);
+  background: color-mix(in srgb, var(--s2g-group-bg, #f8fafc) 70%, #fff);
+}
+.s2g-picker__group-title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--s2g-group-text, #0f172a);
+  letter-spacing: 0.01em;
+}
+.s2g-picker__group-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--s2g-group-accent, #475569);
+}
+.s2g-picker__group .catalog-picker-list {
+  padding: 0.45rem;
+  max-height: none;
+  background: #fff;
+}
+.s2g-picker__group .catalog-picker-row {
+  border-color: color-mix(in srgb, var(--s2g-group-border, #e2e8f0) 55%, transparent);
+}
+.s2g-picker__group .catalog-picker-row:hover {
+  border-color: var(--s2g-group-accent, #93c5fd);
+  background: color-mix(in srgb, var(--s2g-group-bg, #f8fafc) 35%, #fff);
+}
+.catalog-picker-row--rich {
+  gap: 0.25rem;
+}
+.catalog-picker-row__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.65rem;
+  width: 100%;
+}
+.catalog-picker-row__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+.catalog-picker-row__code {
+  font-size: 0.78rem;
+  background: #f1f5f9;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  color: #334155;
+}
+.catalog-picker-row__tags,
+.catalog-picker-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.catalog-picker-row__meta-text {
+  font-size: 0.78rem;
+  color: var(--color-muted, #64748b);
+}
+.s2g-picker__count-badge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+.catalog-picker-row:hover .s2g-picker__count-badge {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+  color: #0369a1;
+}
+.s2g-picker__price {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 6px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #6ee7b7;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.s2g-picker__price--muted {
+  background: #f8fafc;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+  font-weight: 600;
+}
+.s2g-picker__stock {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.s2g-picker__stock--ok {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+}
+.s2g-picker__stock--low {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fcd34d;
+}
+.s2g-picker__stock--empty {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+.s2g-picker__context-tag {
+  margin-left: auto;
+}
 .commercial-catalog-form {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -7612,11 +7836,21 @@ a.catalogue-tree__link-article:hover {
   gap: 0.5rem 0.85rem;
   align-items: center;
 }
-.bc-fiche__header-actions {
+.bc-fiche__header-actions,
+.commercial-doc-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
+}
+.commercial-doc-actions__error {
+  margin: 0.5rem 0 0;
+  font-size: 0.88rem;
+}
+.modal-body .commercial-doc-actions,
+.modal-content .commercial-doc-actions,
+[class*="modal"] .commercial-doc-actions {
+  margin-bottom: 1rem;
 }
 .entity-statut-panel__current {
   display: flex;

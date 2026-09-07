@@ -459,8 +459,9 @@ export default function WizardStep4Lines({
         <div className="qw-forfait-box">
           <p className="qw-forfait-box__title">Forfait par jalon</p>
           <p className="qw-forfait-box__hint">
-            Saisissez la quantité et le PU HT sur chaque jalon. Les prix des articles sont désactivés ; le
-            total HT, la TVA et le PDF utilisent ces montants.
+            Saisissez la quantité et le PU HT sur chaque jalon, ou un montant global à l&apos;étape 5
+            (Tarif &amp; Validation). Les prix des articles sont désactivés ; le total HT, la TVA et le PDF
+            utilisent ces montants.
           </p>
           <div className="qw-forfait-box__fields">
             <label className="qw-forfait-box__field">

@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import StatusBadge, { equipementStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ListTableToolbar from '../../components/ListTableToolbar'
+import { ListTablePanelHeader } from '../../components/ListTablePanel'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import EquipmentCreateModal from '../../components/materiel/EquipmentCreateModal'
 import EquipmentEditModal from '../../components/materiel/EquipmentEditModal'
@@ -156,6 +157,7 @@ export default function EquipmentsPage() {
       {error && <p className="error">{(error as Error).message}</p>}
       {!isLoading && !error && (
         <div className="card dossier-tab-panel dossier-tab-panel--table">
+          <ListTablePanelHeader title="Équipements" count={filteredRows.length} />
           {filteredRows.length > 0 ? (
             <div className="table-wrap">
               <table className="data-table data-table--compact">

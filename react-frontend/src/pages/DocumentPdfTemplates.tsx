@@ -1,17 +1,11 @@
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { documentPdfTemplatesApi, type DocumentPdfTemplateRow } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import PageBackNav from '../components/PageBackNav'
-import PdfLayoutConfigEditor from '../components/PdfLayoutConfigEditor'
+import { DOCUMENT_PDF_TYPE_LABELS, documentPdfTypeLabel } from '../lib/documentPdfTypes'
 
-const TYPE_LABELS: Record<string, string> = {
-  quote: 'Devis',
-  invoice: 'Facture',
-}
-
-function typeLabel(documentType: string): string {
-  return TYPE_LABELS[documentType] ?? documentType
-}
+const TYPE_ORDER = ['quote', 'invoice', 'purchase_order', 'delivery_note', 'report']
 
 export default function DocumentPdfTemplates() {
   const { user } = useAuth()
@@ -25,14 +19,9 @@ export default function DocumentPdfTemplates() {
     enabled: isLab,
   })
 
-  const setDefaultMut = useMutation({
-    mutationFn: (id: number) => documentPdfTemplatesApi.update(id, { is_default: true }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['document-pdf-templates'] }),
-  })
-
-  const saveLayoutMut = useMutation({
-    mutationFn: ({ id, layout_config }: { id: number; layout_config: Record<string, unknown> }) =>
-      documentPdfTemplatesApi.update(id, { layout_config }),
+  const toggleActiveMut = useMutation({
+    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
+      documentPdfTemplatesApi.update(id, { is_active }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['document-pdf-templates'] }),
   })
 
@@ -49,9 +38,16 @@ export default function DocumentPdfTemplates() {
   if (error) return <p className="error">{String(error)}</p>
 
   const rows: DocumentPdfTemplateRow[] = data?.data ?? []
-  const quoteRows = rows.filter((t) => t.document_type === 'quote')
-  const invoiceRows = rows.filter((t) => t.document_type === 'invoice')
-  const otherRows = rows.filter((t) => t.document_type !== 'quote' && t.document_type !== 'invoice')
+  const grouped = TYPE_ORDER.map((type) => ({
+    type,
+    title: documentPdfTypeLabel(type),
+    rows: rows.filter((t) => t.document_type === type),
+  })).filter((g) => g.rows.length > 0)
+
+  const orphanTypes = rows.filter((t) => !TYPE_ORDER.includes(t.document_type))
+  if (orphanTypes.length > 0) {
+    grouped.push({ type: 'other', title: 'Autres', rows: orphanTypes })
+  }
 
   return (
     <div>
@@ -61,34 +57,25 @@ export default function DocumentPdfTemplates() {
       />
       <div className="card" style={{ marginBottom: '1rem', fontSize: '0.95rem' }}>
         <p style={{ margin: 0 }}>
-          Modèles PDF <strong>devis</strong> et <strong>factures</strong> : type existant, modèle par défaut, et
-          personnalisation du cadre <strong>Total HT / TVA / TTC</strong> sur le PDF.
+          Configurez les <strong>modèles PDF</strong> par type de document. Ouvrez un modèle pour cocher les options
+          (TVA, prix, totaux…), le définir par défaut ou l&apos;activer / désactiver. À l&apos;impression ou à
+          l&apos;envoi par email, seuls les modèles actifs sont proposés.
+        </p>
+        <p style={{ margin: '0.75rem 0 0', fontSize: '0.88rem' }} className="text-muted">
+          Types : {Object.values(DOCUMENT_PDF_TYPE_LABELS).join(' · ')}
         </p>
       </div>
 
-      <TemplateTypeTable
-        title="Devis"
-        rows={quoteRows}
-        isAdmin={isAdmin}
-        setDefaultPending={setDefaultMut.isPending}
-        onSetDefault={(id) => setDefaultMut.mutate(id)}
-      />
-      <TemplateTypeTable
-        title="Factures"
-        rows={invoiceRows}
-        isAdmin={isAdmin}
-        setDefaultPending={setDefaultMut.isPending}
-        onSetDefault={(id) => setDefaultMut.mutate(id)}
-      />
-      {otherRows.length > 0 ? (
+      {grouped.map(({ type, title, rows: typeRows }) => (
         <TemplateTypeTable
-          title="Autres"
-          rows={otherRows}
+          key={type}
+          title={title}
+          rows={typeRows}
           isAdmin={isAdmin}
-          setDefaultPending={setDefaultMut.isPending}
-          onSetDefault={(id) => setDefaultMut.mutate(id)}
+          togglePending={toggleActiveMut.isPending}
+          onToggleActive={(id, is_active) => toggleActiveMut.mutate({ id, is_active })}
         />
-      ) : null}
+      ))}
 
       {rows.length === 0 ? (
         <div className="card">
@@ -96,26 +83,7 @@ export default function DocumentPdfTemplates() {
         </div>
       ) : null}
 
-      {isAdmin &&
-        rows.map((t) => (
-          <details key={`cfg-${t.id}`} className="card" style={{ marginTop: '1rem' }} open={t.is_default}>
-            <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
-              Personnalisation — {typeLabel(t.document_type)} · {t.name}
-              {t.is_default ? ' (défaut)' : ''}
-            </summary>
-            <PdfLayoutConfigEditor
-              layoutConfig={(t.layout_config ?? {}) as Record<string, unknown>}
-              totalsOnly
-              disabled={saveLayoutMut.isPending}
-              onSave={async (parsed) => {
-                await saveLayoutMut.mutateAsync({ id: t.id, layout_config: parsed })
-              }}
-            />
-          </details>
-        ))}
-
-      {setDefaultMut.isError && <p className="error">{(setDefaultMut.error as Error).message}</p>}
-      {saveLayoutMut.isError && <p className="error">{(saveLayoutMut.error as Error).message}</p>}
+      {toggleActiveMut.isError && <p className="error">{(toggleActiveMut.error as Error).message}</p>}
     </div>
   )
 }
@@ -124,17 +92,15 @@ function TemplateTypeTable({
   title,
   rows,
   isAdmin,
-  setDefaultPending,
-  onSetDefault,
+  togglePending,
+  onToggleActive,
 }: {
   title: string
   rows: DocumentPdfTemplateRow[]
   isAdmin: boolean
-  setDefaultPending: boolean
-  onSetDefault: (id: number) => void
+  togglePending: boolean
+  onToggleActive: (id: number, is_active: boolean) => void
 }) {
-  if (rows.length === 0) return null
-
   return (
     <div className="card" style={{ marginBottom: '1rem' }}>
       <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.05rem' }}>{title}</h2>
@@ -142,6 +108,7 @@ function TemplateTypeTable({
         <thead>
           <tr>
             <th>Modèle</th>
+            <th>Actif</th>
             <th>Défaut</th>
             {isAdmin && <th>Actions</th>}
           </tr>
@@ -150,19 +117,21 @@ function TemplateTypeTable({
           {rows.map((t) => (
             <tr key={t.id}>
               <td>{t.name}</td>
+              <td>{t.is_active !== false ? 'Oui' : 'Non'}</td>
               <td>{t.is_default ? 'Oui' : '—'}</td>
               {isAdmin && (
-                <td>
-                  {!t.is_default && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      disabled={setDefaultPending}
-                      onClick={() => onSetDefault(t.id)}
-                    >
-                      Définir par défaut
-                    </button>
-                  )}
+                <td style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <Link to={`/back-office/modeles-documents-pdf/${t.id}`} className="btn btn-secondary btn-sm">
+                    Configurer
+                  </Link>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={togglePending || (t.is_default && t.is_active !== false)}
+                    onClick={() => onToggleActive(t.id, t.is_active === false)}
+                  >
+                    {t.is_active !== false ? 'Désactiver' : 'Activer'}
+                  </button>
                 </td>
               )}
             </tr>

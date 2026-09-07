@@ -3,6 +3,9 @@ import { useNavigate, useParams, useSearchParams, useLocation } from 'react-rout
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import PageBackNav from '../components/PageBackNav'
 import Modal from '../components/Modal'
+import CommercialDocumentActions from '../components/crm/CommercialDocumentActions'
+import ModuleEntityShell from '../components/module/ModuleEntityShell'
+import StatusBadge, { quoteStatutBadgeProps } from '../components/ds/StatusBadge'
 import { type QuoteFormState, type QuoteLineDraft, type ContextMode } from '../components/quotes/QuoteFormFields'
 import QuoteWizard from '../components/quotes/wizard/QuoteWizard'
 import S2gCataloguePickerModal from '../components/quotes/S2gCataloguePickerModal'
@@ -25,7 +28,6 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { formatMoney } from '../lib/appLocale'
-import { QUOTE_STATUS_LABELS } from '../lib/commercialStatusLabels'
 import { computeQuoteFormDocumentTotals, quoteFormPricingLines, lineLockedByForfaitJalon, sumFraisSupplementairesTtc } from '../lib/quoteTotals'
 import {
   getEffectiveDevisParcours,
@@ -104,6 +106,7 @@ export default function QuoteEditorPage() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
+  const isAdmin = user?.role === 'lab_admin'
   const editingNumericId = quoteId && quoteId !== 'nouveau' ? Number(quoteId) : null
   const isCreate = editingNumericId === null || Number.isNaN(editingNumericId)
 
@@ -741,47 +744,54 @@ export default function QuoteEditorPage() {
 
   if (!isCreate && loadingQuote) {
     return (
-      <div className="container">
-        <p>Chargement du devis…</p>
-      </div>
+      <ModuleEntityShell
+        shellClassName="module-shell--crm"
+        breadcrumbs={[
+          { label: 'Accueil', to: '/' },
+          { label: 'Devis', to: '/devis' },
+          { label: 'Chargement…' },
+        ]}
+        moduleBarLabel="Commercial — Devis"
+        title="Chargement du devis…"
+      >
+        <p className="text-muted">Chargement du devis…</p>
+      </ModuleEntityShell>
     )
   }
 
-  return (
-    <div className="container quote-editor-page">
-      <PageBackNav back={{ to: '/devis', label: 'Liste des devis' }} />
+  const pageTitle = isCreate
+    ? 'Nouveau devis'
+    : isReadOnly
+      ? `Consulter le devis ${quote?.number ?? ''}`
+      : `Modifier le devis ${quote?.number ?? ''}`
+
+  const pageSubtitle = isReadOnly ? (
+    <span className="bc-fiche__subtitle">
+      {quote ? (
+        <StatusBadge variant={quoteStatutBadgeProps(quote.status).variant} size="sm">
+          {quoteStatutBadgeProps(quote.status).label}
+        </StatusBadge>
+      ) : null}
+      <span className="text-muted">
+        Consultation seule — repassez en <strong>brouillon</strong> pour modifier les lignes et le tarif.
+      </span>
+    </span>
+  ) : isCreate ? (
+    'Assistant en 5 étapes : contexte, dates, informations, lignes catalogue S2G, puis tarif et enregistrement.'
+  ) : (
+    'Modifiez le devis brouillon via l’assistant (lignes S2G, tarif, conditions).'
+  )
+
+  const editorContent = (
+    <>
       {justCreatedNumber && !isCreate ? (
         <p className="quote-editor-page__success" role="status">
-          Devis <strong>{justCreatedNumber}</strong> créé avec succès. Vous pouvez le modifier ou l’envoyer depuis la
-          liste.
+          Devis <strong>{justCreatedNumber}</strong> créé avec succès. Vous pouvez le modifier ou l’envoyer depuis cette
+          fiche.
         </p>
       ) : null}
-      <h1>
-        {isCreate
-          ? 'Nouveau devis'
-          : isReadOnly
-            ? `Consulter le devis ${quote?.number ?? ''}`
-            : `Modifier le devis ${quote?.number ?? ''}`}
-      </h1>
-      {isReadOnly ? (
-        <p className="text-muted" style={{ maxWidth: '48rem' }}>
-          Devis <strong>{QUOTE_STATUS_LABELS[quote?.status ?? ''] ?? quote?.status}</strong> — consultation seule. Pour
-          modifier les lignes et le tarif, repassez le devis en <strong>brouillon</strong> depuis la liste.
-        </p>
-      ) : isCreate ? (
-        <p className="text-muted" style={{ maxWidth: '48rem' }}>
-          Assistant en 5 étapes : contexte, dates, informations, lignes catalogue S2G, puis tarif et enregistrement.
-        </p>
-      ) : (
-        <p className="text-muted" style={{ maxWidth: '48rem' }}>
-          Modifiez le devis brouillon via l’assistant (lignes S2G, tarif, conditions).
-        </p>
-      )}
 
-      <form
-        onSubmit={handleSubmit}
-        className="card quote-editor-page__form"
-      >
+      <form onSubmit={handleSubmit} className="card quote-editor-page__form">
         <QuoteWizard
           form={form}
           setForm={setForm}
@@ -949,6 +959,53 @@ export default function QuoteEditorPage() {
           )}
         </Modal>
       )}
-    </div>
+    </>
+  )
+
+  if (isCreate) {
+    return (
+      <div className="container quote-editor-page">
+        <PageBackNav back={{ to: '/devis', label: 'Liste des devis' }} />
+        <h1>{pageTitle}</h1>
+        <p className="text-muted" style={{ maxWidth: '48rem' }}>
+          {typeof pageSubtitle === 'string' ? pageSubtitle : null}
+        </p>
+        {editorContent}
+      </div>
+    )
+  }
+
+  return (
+    <ModuleEntityShell
+      shellClassName="module-shell--crm"
+      breadcrumbs={[
+        { label: 'Accueil', to: '/' },
+        { label: 'Devis', to: '/devis' },
+        { label: quote?.number ?? `#${editingNumericId}` },
+      ]}
+      moduleBarLabel="Commercial — Devis"
+      title={pageTitle}
+      subtitle={pageSubtitle}
+      actions={
+        quote ? (
+          <CommercialDocumentActions
+            documentType="quote"
+            entityId={quote.id}
+            entityLabel={quote.number}
+            status={quote.status}
+            isLab={isLab}
+            isAdmin={isAdmin}
+            quoteForEmail={quote}
+            onDeleted={() => navigate('/devis')}
+            onDuplicated={(newId) => navigate(`/devis/${newId}/editer`)}
+            onStatusChanged={() => {
+              void queryClient.invalidateQueries({ queryKey: ['quote', editingNumericId] })
+            }}
+          />
+        ) : null
+      }
+    >
+      <div className="quote-editor-page">{editorContent}</div>
+    </ModuleEntityShell>
   )
 }

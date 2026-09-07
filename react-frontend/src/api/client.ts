@@ -282,6 +282,7 @@ export interface DocumentPdfTemplateRow {
   name: string
   blade_view: string
   is_default: boolean
+  is_active?: boolean
   layout_config?: PdfLayoutConfig
 }
 
@@ -379,13 +380,24 @@ export const commercialLinksApi = {
 }
 
 export const documentPdfTemplatesApi = {
-  list: (documentType?: string) =>
-    api<{ data: DocumentPdfTemplateRow[] }>(
-      documentType ? `/document-pdf-templates?document_type=${documentType}` : '/document-pdf-templates'
-    ),
+  list: (documentType?: string, activeOnly?: boolean) => {
+    const q = new URLSearchParams()
+    if (documentType) q.set('document_type', documentType)
+    if (activeOnly) q.set('active_only', '1')
+    const s = q.toString()
+    return api<{ data: DocumentPdfTemplateRow[] }>(
+      s ? `/document-pdf-templates?${s}` : '/document-pdf-templates',
+    )
+  },
+  get: (id: number) => api<DocumentPdfTemplateRow>(`/document-pdf-templates/${id}`),
   update: (
     id: number,
-    body: { is_default?: boolean; name?: string; layout_config?: PdfLayoutConfig },
+    body: {
+      is_default?: boolean
+      is_active?: boolean
+      name?: string
+      layout_config?: PdfLayoutConfig
+    },
   ) => api<DocumentPdfTemplateRow>(`/document-pdf-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
 }
 
@@ -577,6 +589,8 @@ export interface RefArticleRow {
   qualification_tags?: RefQualificationTagRow[]
   jalon_products?: RefArticleJalonProductRow[]
   product_jalons?: RefArticleProductJalonRow[]
+  /** Nombre de produits rattachés (jalons, avec `with_products_count`). */
+  products_count?: number | null
 }
 
 /** Laravel ArticleResource renvoie parfois { data: article }. */
@@ -639,6 +653,7 @@ export const catalogueApi = {
   articles: (params?: {
     ref_famille_article_id?: number
     with_inactif?: boolean
+    with_products_count?: boolean
     q?: string
     kind?: RefArticleKind
     qualification_tag_code?: string
@@ -646,6 +661,7 @@ export const catalogueApi = {
     const q = new URLSearchParams()
     if (params?.ref_famille_article_id) q.set('ref_famille_article_id', String(params.ref_famille_article_id))
     if (params?.with_inactif) q.set('with_inactif', '1')
+    if (params?.with_products_count) q.set('with_products_count', '1')
     if (params?.q?.trim()) q.set('q', params.q.trim())
     if (params?.kind) q.set('kind', params.kind)
     if (params?.qualification_tag_code?.trim()) q.set('qualification_tag_code', params.qualification_tag_code.trim())
@@ -888,7 +904,7 @@ export const bonsCommandeApi = {
     return api<BonCommande[]>(`/v1/bons-commande${s ? `?${s}` : ''}`)
   },
   get: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}`),
-  update: (id: number, body: { notes?: string; date_livraison_prevue?: string; montant_ht?: number; montant_ttc?: number; contact_id?: number | null }) =>
+  update: (id: number, body: { notes?: string; date_livraison_prevue?: string; montant_ht?: number; montant_ttc?: number; contact_id?: number | null; statut?: string }) =>
     api<BonCommande>(`/v1/bons-commande/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api<null>(`/v1/bons-commande/${id}`, { method: 'DELETE' }),
   confirmer: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}/confirmer`, { method: 'POST' }),
@@ -2111,7 +2127,12 @@ export const quotesApi = {
   delete: (id: number) => api(`/quotes/${id}`, { method: 'DELETE' }),
   sendEmail: (
     id: number,
-    body: { recipient_email: string; recipient_name: string; message?: string | null },
+    body: {
+      recipient_email: string
+      recipient_name: string
+      message?: string | null
+      pdf_template_id?: number
+    },
   ) => api<{ message?: string }>(`/quotes/${id}/send-email`, { method: 'POST', body: JSON.stringify(body) }),
 }
 

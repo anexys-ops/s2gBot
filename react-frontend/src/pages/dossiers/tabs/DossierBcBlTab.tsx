@@ -1,12 +1,16 @@
+import { useMemo } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { dossiersApi } from '../../../api/client'
 import type { DossierFicheOutletContext } from '../DossierFichePage'
+import { ListTableFootRow, ListTablePanelHeader } from '../../../components/ListTablePanel'
 import StatusBadge, {
   bonCommandeStatutBadgeProps,
   bonLivraisonStatutBadgeProps,
 } from '../../../components/ds/StatusBadge'
-import { formatAppDate, formatMoney } from '../../../lib/appLocale'
+import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../../lib/appLocale'
+import { sumNumeric } from '../../../lib/listTableTotals'
+import { shouldIgnoreTableRowClick } from '../../../lib/tableRowInteraction'
 
 export default function DossierBcBlTab() {
   const { id } = useParams<{ id: string }>()
@@ -19,6 +23,16 @@ export default function DossierBcBlTab() {
     queryFn: () => dossiersApi.bons(dossierId),
     enabled: Number.isFinite(dossierId) && dossierId > 0,
   })
+
+  const bcs = data?.bons_commande ?? []
+  const bls = data?.bons_livraison ?? []
+  const bcTotals = useMemo(
+    () => ({
+      ht: sumNumeric(bcs, (bc) => bc.montant_ht),
+      ttc: sumNumeric(bcs, (bc) => bc.montant_ttc),
+    }),
+    [bcs],
+  )
 
   if (isLoading) {
     return (
@@ -35,22 +49,17 @@ export default function DossierBcBlTab() {
     )
   }
 
-  const bcs = data?.bons_commande ?? []
-  const bls = data?.bons_livraison ?? []
-
   return (
     <div className="dossier-tab">
       <div className="card dossier-tab-panel dossier-tab-panel--table">
-        <div className="dossier-tab-panel__header">
-          <h2 className="ds-form-section__title">Bons de commande</h2>
-          <p className="dossier-tab-panel__intro">
-            Bons rattachés au dossier <code>{dossier.reference}</code>. Voir aussi la{' '}
-            <Link to="/bons-commande" className="link-inline">
-              liste globale des bons de commande
-            </Link>
-            .
-          </p>
-        </div>
+        <ListTablePanelHeader title="Bons de commande" count={bcs.length} />
+        <p className="dossier-tab-panel__intro" style={{ padding: '0 1.5rem', marginTop: '-0.25rem' }}>
+          Bons rattachés au dossier <code>{dossier.reference}</code>. Voir aussi la{' '}
+          <Link to="/bons-commande" className="link-inline">
+            liste globale des bons de commande
+          </Link>
+          .
+        </p>
         {bcs.length > 0 ? (
           <div className="table-wrap">
             <table className="data-table data-table--compact">
@@ -59,8 +68,8 @@ export default function DossierBcBlTab() {
                   <th>N°</th>
                   <th>Statut</th>
                   <th>Date</th>
-                  <th>Montant TTC</th>
-                  <th className="data-table__actions">Actions</th>
+                  <th>Montant HT ({MONEY_UNIT_LABEL})</th>
+                  <th>Montant TTC ({MONEY_UNIT_LABEL})</th>
                 </tr>
               </thead>
               <tbody>
@@ -71,8 +80,7 @@ export default function DossierBcBlTab() {
                       key={bc.id}
                       className="table-row-link"
                       onClick={(e) => {
-                        const t = e.target as HTMLElement
-                        if (t.closest('a, button')) return
+                        if (shouldIgnoreTableRowClick(e.target)) return
                         navigate(`/bons-commande/${bc.id}`)
                       }}
                     >
@@ -87,16 +95,23 @@ export default function DossierBcBlTab() {
                         </StatusBadge>
                       </td>
                       <td>{formatAppDate(bc.date_commande)}</td>
-                      <td>{formatMoney(Number(bc.montant_ttc))}</td>
-                      <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
-                        <Link to={`/bons-commande/${bc.id}`} className="btn btn-secondary btn-sm">
-                          Fiche
-                        </Link>
-                      </td>
+                      <td className="data-table__num">{formatMoney(Number(bc.montant_ht))}</td>
+                      <td className="data-table__num">{formatMoney(Number(bc.montant_ttc))}</td>
                     </tr>
                   )
                 })}
               </tbody>
+              <ListTableFootRow
+                columns={[
+                  { id: 'number', kind: 'text' },
+                  { id: 'status', kind: 'text' },
+                  { id: 'date', kind: 'text' },
+                  { id: 'ht', kind: 'money' },
+                  { id: 'ttc', kind: 'money' },
+                ]}
+                visible={{ number: true, status: true, date: true, ht: true, ttc: true }}
+                totals={bcTotals}
+              />
             </table>
           </div>
         ) : (
@@ -105,9 +120,7 @@ export default function DossierBcBlTab() {
       </div>
 
       <div className="card dossier-tab-panel dossier-tab-panel--table">
-        <div className="dossier-tab-panel__header">
-          <h2 className="ds-form-section__title">Bons de livraison</h2>
-        </div>
+        <ListTablePanelHeader title="Bons de livraison" count={bls.length} />
         {bls.length > 0 ? (
           <div className="table-wrap">
             <table className="data-table data-table--compact">
@@ -117,7 +130,6 @@ export default function DossierBcBlTab() {
                   <th>Statut</th>
                   <th>Date</th>
                   <th>BC lié</th>
-                  <th className="data-table__actions">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -128,8 +140,7 @@ export default function DossierBcBlTab() {
                       key={bl.id}
                       className="table-row-link"
                       onClick={(e) => {
-                        const t = e.target as HTMLElement
-                        if (t.closest('a, button')) return
+                        if (shouldIgnoreTableRowClick(e.target)) return
                         navigate(`/bons-livraison/${bl.id}`)
                       }}
                     >
@@ -156,11 +167,6 @@ export default function DossierBcBlTab() {
                         ) : (
                           '—'
                         )}
-                      </td>
-                      <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
-                        <Link to={`/bons-livraison/${bl.id}`} className="btn btn-secondary btn-sm">
-                          Fiche
-                        </Link>
                       </td>
                     </tr>
                   )

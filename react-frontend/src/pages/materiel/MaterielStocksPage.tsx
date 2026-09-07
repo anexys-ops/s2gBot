@@ -10,11 +10,15 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import ListTableToolbar, { PaginationBar } from '../../components/ListTableToolbar'
+import { ListTableFootRow, ListTablePanelHeader } from '../../components/ListTablePanel'
+import { sumNumeric } from '../../lib/listTableTotals'
 import Modal from '../../components/Modal'
 import StatusBadge from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import TableRowActions from '../../components/TableRowActions'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
 import { MATERIEL_HOME, MATERIEL_MODULE_TABS } from './materielModuleTabs'
 
 type StockFilter = '' | 'available' | 'empty'
@@ -121,6 +125,14 @@ export default function MaterielStocksPage() {
       .filter((row) => matchesStockFilter(row, stockFilter))
       .filter((row) => matchesActiveFilter(row, activeFilter))
   }, [activeFilter, data?.data, stockFilter])
+
+  const stockTotals = useMemo(
+    () => ({
+      purchase: sumNumeric(rows, (row) => row.purchase_price_ht),
+      sale: sumNumeric(rows, (row) => row.sale_price_ht),
+    }),
+    [rows],
+  )
 
   const lastPage = data?.last_page ?? 1
   const totalLoaded = data?.data?.length ?? 0
@@ -334,10 +346,7 @@ export default function MaterielStocksPage() {
 
       {!error && (data || isLoading) && (
         <div className="card dossier-tab-panel dossier-tab-panel--table materiel-stocks-table-card">
-          <div className="dossier-tab-panel__header">
-            <h2 className="ds-form-section__title">Les consommables</h2>
-            <span className="badge">{rows.length}</span>
-          </div>
+          <ListTablePanelHeader title="Consommables" count={rows.length} />
 
           {rows.length > 0 ? (
             <div className="table-wrap">
@@ -361,7 +370,18 @@ export default function MaterielStocksPage() {
                     const qty = toWholeNumber(row.stock_quantity)
                     const stockVariant = qty <= 0 ? 'danger' : qty <= 5 ? 'warning' : 'success'
                     return (
-                      <tr key={row.id}>
+                      <tr
+                        key={row.id}
+                        className={isLab ? 'table-row-link' : undefined}
+                        onClick={
+                          isLab
+                            ? (e) => {
+                                if (shouldIgnoreTableRowClick(e.target)) return
+                                openEdit(row)
+                              }
+                            : undefined
+                        }
+                      >
                         <td>
                           <code className="code-badge">{row.code?.trim() || '—'}</code>
                         </td>
@@ -395,22 +415,12 @@ export default function MaterielStocksPage() {
                           </StatusBadge>
                         </td>
                         {isLab ? (
-                          <td className="crud-actions materiel-stocks-table__actions">
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => openEdit(row)}
-                            >
-                              Modifier
-                            </button>
+                          <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
                             {isAdmin ? (
-                              <button
-                                type="button"
-                                className="btn btn-secondary btn-sm btn-danger-outline"
-                                onClick={() => setDeleteTarget(row)}
-                              >
-                                Supprimer
-                              </button>
+                              <TableRowActions
+                                onDelete={() => setDeleteTarget(row)}
+                                deleteLabel={`Supprimer ${row.name}`}
+                              />
                             ) : null}
                           </td>
                         ) : null}
@@ -418,6 +428,33 @@ export default function MaterielStocksPage() {
                     )
                   })}
                 </tbody>
+                <ListTableFootRow
+                  columns={[
+                    { id: 'code', kind: 'text' },
+                    { id: 'name', kind: 'text' },
+                    { id: 'unit', kind: 'text' },
+                    { id: 'stock', kind: 'text' },
+                    { id: 'purchase', kind: 'money' },
+                    { id: 'sale', kind: 'money' },
+                    { id: 'tva', kind: 'text' },
+                    { id: 'equipment', kind: 'text' },
+                    { id: 'status', kind: 'text' },
+                    ...(isLab ? [{ id: 'actions', kind: 'text' as const }] : []),
+                  ]}
+                  visible={{
+                    code: true,
+                    name: true,
+                    unit: true,
+                    stock: true,
+                    purchase: true,
+                    sale: true,
+                    tva: true,
+                    equipment: true,
+                    status: true,
+                    actions: isLab,
+                  }}
+                  totals={stockTotals}
+                />
               </table>
             </div>
           ) : (

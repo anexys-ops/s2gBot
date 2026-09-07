@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { bonsLivraisonApi } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
 import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
 import StatusBadge, { bonLivraisonStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
@@ -37,6 +38,7 @@ export default function BonLivraisonFichePage() {
   const [dateLivraison, setDateLivraison] = useState('')
   const [ligneQty, setLigneQty] = useState<Record<number, string>>({})
   const [confirmValider, setConfirmValider] = useState(false)
+  const [pdfOpen, setPdfOpen] = useState(false)
   const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
 
   const { data: bl, isLoading, error } = useQuery({
@@ -258,6 +260,9 @@ export default function BonLivraisonFichePage() {
       actions={
         lab && canEdit ? (
           <div className="bc-fiche__header-actions">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPdfOpen(true)}>
+              PDF
+            </button>
             <button
               type="button"
               className="btn btn-primary btn-sm"
@@ -637,6 +642,15 @@ export default function BonLivraisonFichePage() {
 
       {toast ? (
         <Toast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} />
+      ) : null}
+
+      {pdfOpen && bl ? (
+        <DocumentPdfPickerModal
+          documentType="delivery_note"
+          documentId={bl.id}
+          documentLabel={bl.numero}
+          onClose={() => setPdfOpen(false)}
+        />
       ) : null}
     </ModuleEntityShell>
   )

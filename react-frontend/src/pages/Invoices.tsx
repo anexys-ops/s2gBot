@@ -4,15 +4,16 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import {
   clientContactsApi,
   clientsApi,
-  documentPdfTemplatesApi,
   invoicesApi,
   moduleSettingsApi,
-  pdfApi,
   type EntityMetaPayload,
   type Invoice,
 } from '../api/client'
 import { QuotePdfButton } from '../components/crm/QuoteListTableActions'
+import CommercialDocumentActions from '../components/crm/CommercialDocumentActions'
+import DocumentPdfPickerModal from '../components/pdf/DocumentPdfPickerModal'
 import ConfirmDialog from '../components/ConfirmDialog'
+import ClickableStatusBadge from '../components/ds/ClickableStatusBadge'
 import StatusBadge, { bonCommandeStatutBadgeProps, invoiceStatutBadgeProps } from '../components/ds/StatusBadge'
 import Toast, { toastErrorMessage, type ToastVariant } from '../components/Toast'
 import EntityMetaCard from '../components/module/EntityMetaCard'
@@ -22,9 +23,12 @@ import TableRowActions from '../components/TableRowActions'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
+import { ListTableFootRow, ListTablePanelHeader } from '../components/ListTablePanel'
+import { sumNumeric } from '../lib/listTableTotals'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
+import { shouldIgnoreTableRowClick } from '../lib/tableRowInteraction'
 
 const BC_STATUT_LABELS: Record<string, string> = {
   brouillon: 'Brouillon',
@@ -233,6 +237,7 @@ export default function Invoices() {
   const queryClient = useQueryClient()
   const [editInvoice, setEditInvoice] = useState<Invoice | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null)
+  const [pdfTarget, setPdfTarget] = useState<Invoice | null>(null)
   const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
   const [editForm, setEditForm] = useState({
     status: 'draft',
@@ -254,6 +259,7 @@ export default function Invoices() {
     number: true,
     client: true,
     date: true,
+    ht: true,
     ttc: true,
     travel: true,
     status: true,
@@ -301,13 +307,6 @@ export default function Invoices() {
     queryFn: () => clientsApi.list(),
     enabled: isLab,
   })
-
-  const { data: pdfTplData } = useQuery({
-    queryKey: ['document-pdf-templates', 'invoice'],
-    queryFn: () => documentPdfTemplatesApi.list('invoice'),
-    enabled: isLab && !!editInvoice,
-  })
-  const pdfTemplates = pdfTplData?.data ?? []
 
   const { data: invoiceEditContacts = [] } = useQuery({
     queryKey: ['client-contacts', 'invoice-edit', editInvoice?.client_id],
@@ -364,6 +363,14 @@ export default function Invoices() {
   })
 
   const invoices = data?.data ?? []
+  const totals = useMemo(
+    () => ({
+      ht: sumNumeric(invoices, (inv) => inv.amount_ht),
+      ttc: sumNumeric(invoices, (inv) => inv.amount_ttc),
+      travel: sumNumeric(invoices, (inv) => inv.travel_fee_ht ?? 0),
+    }),
+    [invoices],
+  )
   const lastPage = data?.last_page ?? 1
   const statusOptions = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
   const hasActiveFilters = searchInput.trim() !== '' || statusFilter !== '' || clientFilter !== ''
@@ -516,6 +523,7 @@ export default function Invoices() {
           { id: 'number', label: 'Numéro' },
           { id: 'client', label: 'Client' },
           { id: 'date', label: 'Date' },
+          { id: 'ht', label: 'Montant HT' },
           { id: 'ttc', label: 'Montant TTC' },
           { id: 'travel', label: 'Dépl. HT' },
           { id: 'status', label: 'Statut' },
@@ -575,6 +583,7 @@ export default function Invoices() {
       />
 
       <div className="card dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title="Factures" count={invoices.length} />
         {invoices.length > 0 ? (
           <div className="table-wrap">
             <table className="data-table data-table--compact">
@@ -583,6 +592,7 @@ export default function Invoices() {
                   {visible.number !== false && <th>Numéro</th>}
                   {visible.client !== false && <th>Client</th>}
                   {visible.date !== false && <th>Date</th>}
+                  {visible.ht !== false && <th className="data-table__num">Montant HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.ttc !== false && <th className="data-table__num">Montant TTC ({MONEY_UNIT_LABEL})</th>}
                   {visible.travel !== false && <th className="data-table__num">Dépl. HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.status !== false && <th>Statut</th>}
@@ -594,10 +604,24 @@ export default function Invoices() {
                 {invoices.map((inv) => {
                   const st = invoiceStatutBadgeProps(inv.status)
                   return (
-                    <tr key={inv.id}>
+                    <tr
+                      key={inv.id}
+                      className="table-row-link"
+                      onClick={(e) => {
+                        if (shouldIgnoreTableRowClick(e.target)) return
+                        openEdit(inv)
+                      }}
+                    >
                       {visible.number !== false && (
                         <td>
-                          <button type="button" className="link-inline invoice-number-btn" onClick={() => openEdit(inv)}>
+                          <button
+                            type="button"
+                            className="link-inline invoice-number-btn"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openEdit(inv)
+                            }}
+                          >
                             <code className="code-badge">{inv.number}</code>
                           </button>
                         </td>
@@ -614,6 +638,9 @@ export default function Invoices() {
                         </td>
                       )}
                       {visible.date !== false && <td>{formatAppDate(inv.invoice_date)}</td>}
+                      {visible.ht !== false && (
+                        <td className="data-table__num">{formatMoney(Number(inv.amount_ht))}</td>
+                      )}
                       {visible.ttc !== false && (
                         <td className="data-table__num">{formatMoney(Number(inv.amount_ttc))}</td>
                       )}
@@ -622,15 +649,26 @@ export default function Invoices() {
                       )}
                       {visible.status !== false && (
                         <td className="data-table__status">
-                          <StatusBadge variant={st.variant} size="sm">
-                            {st.label}
-                          </StatusBadge>
+                          {isAdmin ? (
+                            <ClickableStatusBadge
+                              variant={st.variant}
+                              size="sm"
+                              ariaLabel={`Changer le statut de la facture ${inv.number}`}
+                              onClick={() => openEdit(inv)}
+                            >
+                              {st.label}
+                            </ClickableStatusBadge>
+                          ) : (
+                            <StatusBadge variant={st.variant} size="sm">
+                              {st.label}
+                            </StatusBadge>
+                          )}
                         </td>
                       )}
                       {visible.pdf !== false && (
                         <td className="data-table__pdf">
                           {isLab ? (
-                            <QuotePdfButton onClick={() => pdfApi.generate('invoice', inv.id, inv.pdf_template_id)} />
+                            <QuotePdfButton onClick={() => setPdfTarget(inv)} />
                           ) : (
                             <QuotePdfButton
                               onClick={() => invoicesApi.openInvoicePdf(inv.id)}
@@ -640,17 +678,29 @@ export default function Invoices() {
                         </td>
                       )}
                       {isAdmin && visible.actions !== false && (
-                        <td className="data-table__actions">
-                          <TableRowActions
-                            onEdit={() => openEdit(inv)}
-                            onDelete={() => setDeleteTarget(inv)}
-                          />
+                        <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
+                          <TableRowActions onDelete={() => setDeleteTarget(inv)} />
                         </td>
                       )}
                     </tr>
                   )
                 })}
               </tbody>
+              <ListTableFootRow
+                columns={[
+                  { id: 'number', kind: 'text' },
+                  { id: 'client', kind: 'text' },
+                  { id: 'date', kind: 'text' },
+                  { id: 'ht', kind: 'money' },
+                  { id: 'ttc', kind: 'money' },
+                  { id: 'travel', kind: 'money' },
+                  { id: 'status', kind: 'text' },
+                  { id: 'pdf', kind: 'text' },
+                  ...(isAdmin ? [{ id: 'actions', kind: 'text' as const }] : []),
+                ]}
+                visible={visible}
+                totals={totals}
+              />
             </table>
           </div>
         ) : (
@@ -679,8 +729,24 @@ export default function Invoices() {
       ) : null}
 
       {editInvoice && (
-        <Modal title={`Modifier ${editInvoice.number}`} onClose={() => setEditInvoice(null)}>
+        <Modal title={`Facture ${editInvoice.number}`} onClose={() => setEditInvoice(null)}>
           <>
+            <CommercialDocumentActions
+              documentType="invoice"
+              entityId={editInvoice.id}
+              entityLabel={editInvoice.number}
+              status={editInvoice.status}
+              isLab={isLab}
+              isAdmin={isAdmin}
+              onDeleted={() => setEditInvoice(null)}
+              onStatusChanged={() => {
+                void queryClient.invalidateQueries({ queryKey: ['invoices'] })
+                void invoicesApi.get(editInvoice.id).then((fresh) => {
+                  setEditInvoice(fresh)
+                  setEditForm((f) => ({ ...f, status: fresh.status }))
+                })
+              }}
+            />
             <form onSubmit={submitEdit}>
               <div className="form-group">
                 <label>Statut</label>
@@ -711,27 +777,7 @@ export default function Invoices() {
                 />
               </div>
               <div className="form-group">
-                <label>Modèle PDF facture</label>
-                <select
-                  value={editForm.pdf_template_id === '' ? '' : String(editForm.pdf_template_id)}
-                  onChange={(e) =>
-                    setEditForm((f) => ({
-                      ...f,
-                      pdf_template_id: e.target.value === '' ? '' : Number(e.target.value),
-                    }))
-                  }
-                >
-                  <option value="">— Par défaut —</option>
-                  {pdfTemplates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                      {t.is_default ? ' (défaut)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Contact client</label>
+                <label>Échéance</label>
                 <select
                   value={editForm.contact_id === '' ? '' : String(editForm.contact_id)}
                   onChange={(e) =>
@@ -838,6 +884,15 @@ export default function Invoices() {
 
       {toast ? (
         <Toast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} />
+      ) : null}
+
+      {pdfTarget ? (
+        <DocumentPdfPickerModal
+          documentType="invoice"
+          documentId={pdfTarget.id}
+          documentLabel={pdfTarget.number}
+          onClose={() => setPdfTarget(null)}
+        />
       ) : null}
     </ModuleEntityShell>
   )

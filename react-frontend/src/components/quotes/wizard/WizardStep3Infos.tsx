@@ -45,23 +45,6 @@ export default function WizardStep3Infos({
         </div>
 
         <div className="form-group">
-          <label>Modèle PDF</label>
-          <select
-            value={form.pdf_template_id ?? ''}
-            onChange={(e) =>
-              set('pdf_template_id', e.target.value ? Number(e.target.value) : undefined)
-            }
-          >
-            <option value="">Par défaut</option>
-            {quoteTemplates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group">
           <label>Adresse de facturation</label>
           <select
             value={form.billing_address_id ?? ''}

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { forfaitJalonTotalHt, forfaitJalonUnitPrice } from './quoteForfaitJalon'
+import {
+  clearedForfaitJalonPricing,
+  effectiveForfaitDocumentHt,
+  forfaitJalonTotalHt,
+  forfaitJalonUnitPrice,
+  htFromTtc,
+  ttcFromHt,
+} from './quoteForfaitJalon'
 import { quoteFormPricingLines } from './quoteTotals'
 
 describe('quoteForfaitJalon', () => {
@@ -10,6 +17,34 @@ describe('quoteForfaitJalon', () => {
   it('falls back to montant_ht when unit price is absent', () => {
     expect(forfaitJalonUnitPrice({ montant_ht: 900 })).toBe(900)
     expect(forfaitJalonTotalHt({ montant_ht: 900 })).toBe(900)
+  })
+
+  it('prefers jalon sum over global tarif', () => {
+    expect(
+      effectiveForfaitDocumentHt([{ prix_unitaire_ht: 500, quantity: 2 }], 999),
+    ).toBe(1000)
+  })
+
+  it('uses global tarif when jalons have no prices', () => {
+    expect(effectiveForfaitDocumentHt([{ id: 'j1' }], 2500)).toBe(2500)
+    expect(effectiveForfaitDocumentHt([], 1800)).toBe(1800)
+  })
+
+  it('converts HT and TTC both ways', () => {
+    expect(ttcFromHt(100, 20)).toBe(120)
+    expect(htFromTtc(120, 20)).toBe(100)
+  })
+
+  it('clears jalon pricing fields', () => {
+    expect(
+      clearedForfaitJalonPricing({
+        id: 'j1',
+        libelle: 'Lot',
+        quantity: 2,
+        prix_unitaire_ht: 500,
+        montant_ht: 1000,
+      }),
+    ).toEqual({ id: 'j1', libelle: 'Lot', quantity: 2 })
   })
 })
 

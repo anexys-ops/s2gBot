@@ -6,11 +6,15 @@ import { useAuth } from '../../contexts/AuthContext'
 import DossierCard from '../../components/Dossiers/DossierCard'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import StatusBadge, { dossierStatutBadgeProps } from '../../components/ds/StatusBadge'
+import ClickableStatusBadge from '../../components/ds/ClickableStatusBadge'
 import ListTableToolbar, { PaginationBar } from '../../components/ListTableToolbar'
+import { ListTablePanelHeader } from '../../components/ListTablePanel'
+import StatusChangeModal from '../../components/StatusChangeModal'
 import TableRowActions from '../../components/TableRowActions'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
+import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
 
 const STATUT_LABELS: Record<DossierStatut, string> = {
   brouillon: 'Brouillon',
@@ -37,6 +41,7 @@ export default function DossiersListPage() {
   const [dateDebutTo, setDateDebutTo] = useState('')
   const [page, setPage] = useState(1)
   const [dossierToDelete, setDossierToDelete] = useState<DossierRow | null>(null)
+  const [statusModalDossier, setStatusModalDossier] = useState<{ id: number; reference: string; statut: DossierStatut } | null>(null)
   const perPage = 20
 
   const { visible, toggle } = usePersistedColumnVisibility('dossiers', {
@@ -94,6 +99,14 @@ export default function DossiersListPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dossiers'] })
       setDossierToDelete(null)
+    },
+  })
+
+  const statusMut = useMutation({
+    mutationFn: ({ id, statut }: { id: number; statut: DossierStatut }) => dossiersApi.update(id, { statut }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dossiers'] })
+      setStatusModalDossier(null)
     },
   })
 
@@ -352,7 +365,8 @@ export default function DossiersListPage() {
         ))}
       </div>
 
-      <div className="card dossiers-table-desktop" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card dossiers-table-desktop dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title="Dossiers chantier" count={list.length} />
         <div className="table-wrap">
           <table className="data-table data-table--compact">
             <thead>
@@ -374,8 +388,7 @@ export default function DossiersListPage() {
                     key={d.id}
                     className="table-row-link"
                     onClick={(e) => {
-                      const t = e.target as HTMLElement
-                      if (t.closest('a, button')) return
+                      if (shouldIgnoreTableRowClick(e.target)) return
                       navigate(`/dossiers/${d.id}`)
                     }}
                   >
@@ -393,9 +406,22 @@ export default function DossiersListPage() {
                     {visible.site !== false && <td>{d.site?.name ?? `Chantier #${d.site_id}`}</td>}
                     {visible.statut !== false && (
                       <td className="data-table__status">
-                        <StatusBadge variant={st.variant} size="sm">
-                          {st.label}
-                        </StatusBadge>
+                        {isLab ? (
+                          <ClickableStatusBadge
+                            variant={st.variant}
+                            size="sm"
+                            ariaLabel={`Changer le statut du dossier ${d.reference}`}
+                            onClick={() =>
+                              setStatusModalDossier({ id: d.id, reference: d.reference, statut: d.statut })
+                            }
+                          >
+                            {st.label}
+                          </ClickableStatusBadge>
+                        ) : (
+                          <StatusBadge variant={st.variant} size="sm">
+                            {st.label}
+                          </StatusBadge>
+                        )}
                       </td>
                     )}
                     {visible.dateDebut !== false && (
@@ -404,9 +430,7 @@ export default function DossiersListPage() {
                     {isLab && visible.actions !== false && (
                       <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
                         <TableRowActions
-                          editLabel="Modifier le dossier"
                           deleteLabel="Supprimer le dossier"
-                          onEdit={() => navigate(`/dossiers/${d.id}/editer`)}
                           onDelete={() => setDossierToDelete(d)}
                         />
                       </td>
@@ -420,6 +444,18 @@ export default function DossiersListPage() {
         {!list.length && <p style={{ padding: '1rem' }}>Aucun dossier pour cette vue.</p>}
         <PaginationBar page={currentPage} lastPage={lastPage} onPage={setPage} />
       </div>
+
+      {statusModalDossier ? (
+        <StatusChangeModal
+          title={`Statut — ${statusModalDossier.reference}`}
+          initialValue={statusModalDossier.statut}
+          options={STATUT_OPTIONS}
+          isPending={statusMut.isPending}
+          error={statusMut.isError ? (statusMut.error as Error).message : null}
+          onClose={() => setStatusModalDossier(null)}
+          onSave={(value) => statusMut.mutate({ id: statusModalDossier.id, statut: value as DossierStatut })}
+        />
+      ) : null}
 
       {dossierToDelete && (
         <ConfirmDialog

@@ -51,6 +51,11 @@ class ArticleController extends Controller
             });
         }
 
+        $withProductsCount = $request->boolean('with_products_count');
+        if ($withProductsCount && $kind === Article::KIND_JALON) {
+            $q->withCount('jalonProductLinks as products_count');
+        }
+
         return response()->json(
             $q->ordonne()->get()->map(fn (Article $article) => [
                 'id' => $article->id,
@@ -90,6 +95,9 @@ class ArticleController extends Controller
                         'groupe' => $tag->groupe,
                     ])->values()
                     : [],
+                'products_count' => $withProductsCount && $article->isJalon()
+                    ? (int) ($article->products_count ?? 0)
+                    : null,
             ])
         );
     }

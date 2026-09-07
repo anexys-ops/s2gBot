@@ -1,25 +1,23 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { pdfApi, quotesApi, invoicesApi, ordersApi } from '../api/client'
+import { ordersApi, quotesApi, invoicesApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import PageBackNav from '../components/PageBackNav'
+import DocumentPdfPickerModal from '../components/pdf/DocumentPdfPickerModal'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import type { PdfGenerateType } from '../lib/documentPdfTypes'
+import { pdfGenerateTypeLabel } from '../lib/documentPdfTypes'
+
+const LAB_TYPES: PdfGenerateType[] = ['quote', 'invoice', 'report', 'purchase_order', 'delivery_note']
 
 export default function PdfModule() {
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
-  const [type, setType] = useState<string>('quote')
+  const [type, setType] = useState<PdfGenerateType>('quote')
   const [resourceId, setResourceId] = useState<string>('')
   const [docSearch, setDocSearch] = useState('')
   const debouncedDocSearch = useDebouncedValue(docSearch, 200)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const { data: templatesData } = useQuery({
-    queryKey: ['pdf-templates'],
-    queryFn: () => pdfApi.templates(),
-    enabled: isLab,
-  })
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const { data: quotesData } = useQuery({
     queryKey: ['quotes'],
@@ -39,17 +37,16 @@ export default function PdfModule() {
     enabled: isLab && type === 'report',
   })
 
-  const templates = templatesData?.data ?? []
   const quotes = quotesData?.data ?? []
   const invoices = invoicesData?.data ?? []
   const orders = ordersData?.data ?? []
 
-  const options =
-    type === 'quote'
-      ? quotes.map((q) => ({ id: q.id, label: `${q.number} - ${q.client?.name}` }))
-      : type === 'invoice'
-        ? invoices.map((i) => ({ id: i.id, label: `${i.number} - ${i.client?.name}` }))
-        : orders.map((o) => ({ id: o.id, label: `${o.reference} - ${o.client?.name}` }))
+  const options = useMemo(() => {
+    if (type === 'quote') return quotes.map((q) => ({ id: q.id, label: `${q.number} - ${q.client?.name}` }))
+    if (type === 'invoice') return invoices.map((i) => ({ id: i.id, label: `${i.number} - ${i.client?.name}` }))
+    if (type === 'report') return orders.map((o) => ({ id: o.id, label: `${o.reference} - ${o.client?.name}` }))
+    return []
+  }, [type, quotes, invoices, orders])
 
   const filteredOptions = useMemo(() => {
     const q = debouncedDocSearch.trim().toLowerCase()
@@ -57,19 +54,10 @@ export default function PdfModule() {
     return options.filter((o) => o.label.toLowerCase().includes(q))
   }, [options, debouncedDocSearch])
 
-  const handleGenerate = async () => {
+  const selectedLabel = useMemo(() => {
     const id = Number(resourceId)
-    if (!id) return
-    setLoading(true)
-    setError(null)
-    try {
-      await pdfApi.generate(type, id)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }
+    return options.find((o) => o.id === id)?.label ?? resourceId
+  }, [options, resourceId])
 
   if (!isLab) {
     return (
@@ -89,43 +77,65 @@ export default function PdfModule() {
           <select
             value={type}
             onChange={(e) => {
-              setType(e.target.value)
+              setType(e.target.value as PdfGenerateType)
               setResourceId('')
               setDocSearch('')
             }}
           >
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
+            {LAB_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {pdfGenerateTypeLabel(t)}
               </option>
             ))}
           </select>
         </div>
-        <div className="form-group">
-          <label>Filtrer les documents (vue liste)</label>
-          <input
-            type="search"
-            value={docSearch}
-            onChange={(e) => setDocSearch(e.target.value)}
-            placeholder="N°, client, référence…"
-          />
-        </div>
-        <div className="form-group">
-          <label>Document ({filteredOptions.length} proposition(s))</label>
-          <select value={resourceId} onChange={(e) => setResourceId(e.target.value)}>
-            <option value="">— Choisir —</option>
-            {filteredOptions.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button type="button" className="btn btn-primary" disabled={!resourceId || loading} onClick={handleGenerate}>
-          {loading ? 'Génération...' : 'Télécharger le PDF'}
+        {(type === 'quote' || type === 'invoice' || type === 'report') && (
+          <>
+            <div className="form-group">
+              <label>Filtrer les documents (vue liste)</label>
+              <input
+                type="search"
+                value={docSearch}
+                onChange={(e) => setDocSearch(e.target.value)}
+                placeholder="N°, client, référence…"
+              />
+            </div>
+            <div className="form-group">
+              <label>Document ({filteredOptions.length} proposition(s))</label>
+              <select value={resourceId} onChange={(e) => setResourceId(e.target.value)}>
+                <option value="">— Choisir —</option>
+                {filteredOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+        {(type === 'purchase_order' || type === 'delivery_note') && (
+          <p className="text-muted" style={{ fontSize: '0.9rem' }}>
+            Ouvrez la fiche BC ou BL depuis le module Commercial pour générer le PDF avec choix du modèle.
+          </p>
+        )}
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={!resourceId || type === 'purchase_order' || type === 'delivery_note'}
+          onClick={() => setPickerOpen(true)}
+        >
+          Choisir le modèle et télécharger
         </button>
-        {error && <p className="error">{error}</p>}
       </div>
+
+      {pickerOpen && resourceId ? (
+        <DocumentPdfPickerModal
+          documentType={type}
+          documentId={Number(resourceId)}
+          documentLabel={selectedLabel}
+          onClose={() => setPickerOpen(false)}
+        />
+      ) : null}
     </div>
   )
 }

@@ -73,20 +73,30 @@
     </table>
 
     <table style="width:100%;margin-bottom:10px;">
+        @php
+            $linesCfg = is_array($layoutConfig['lines'] ?? null) ? $layoutConfig['lines'] : [];
+            $showLinePrices = ($linesCfg['show_prices'] ?? true) !== false;
+            $showPuPtCols = $showLinePrices && (($linesCfg['show_pu_pt_columns'] ?? true) !== false);
+            $colCount = $showPuPtCols ? 5 : 3;
+        @endphp
         <colgroup>
-            <col style="width:48%;"/>
+            <col style="width:{{ $showPuPtCols ? '48%' : '70%' }};"/>
             <col style="width:6%;"/>
-            <col style="width:8%;"/>
+            <col style="width:{{ $showPuPtCols ? '8%' : '24%' }};"/>
+            @if($showPuPtCols)
             <col style="width:19%;"/>
             <col style="width:19%;"/>
+            @endif
         </colgroup>
         <thead>
             <tr>
                 <th style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $NAVY }};color:#fff;font-weight:bold;text-align:left;">DESIGNATION</th>
                 <th style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $NAVY }};color:#fff;font-weight:bold;text-align:center;">Unité</th>
                 <th style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $NAVY }};color:#fff;font-weight:bold;text-align:center;">Quantité</th>
+                @if($showPuPtCols)
                 <th style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $NAVY }};color:#fff;font-weight:bold;text-align:center;">PU HT</th>
                 <th style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $NAVY }};color:#fff;font-weight:bold;text-align:center;">PT HT</th>
+                @endif
             </tr>
         </thead>
         <tbody>
@@ -96,12 +106,14 @@
                         <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;">{{ $row['label'] }}</td>
                         <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:center;">{{ $row['unite'] ?? 'F' }}</td>
                         <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:center;">{{ $row['qte'] ?? 1 }}</td>
-                        <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:right;white-space:nowrap;">{{ $fmt($row['pu'] ?? 0) }}</td>
-                        <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:right;white-space:nowrap;">{{ $fmt($row['pt'] ?? 0) }}</td>
+                        @if($showPuPtCols)
+                        <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:right;white-space:nowrap;">@if($row['pu'] !== null){{ $fmt($row['pu']) }}@endif</td>
+                        <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:right;white-space:nowrap;">@if($row['pt'] !== null){{ $fmt($row['pt']) }}@endif</td>
+                        @endif
                     </tr>
                 @elseif(($row['type'] ?? '') === 'jalon_header')
                     <tr>
-                        <td colspan="5" style="padding:5px 8px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;color:{{ $NAVY }};font-size:9.5pt;">
+                        <td colspan="{{ $colCount }}" style="padding:5px 8px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;color:{{ $NAVY }};font-size:9.5pt;">
                             @if(!empty($row['code'])){{ $row['code'] }} — @endif{{ $row['label'] }}
                         </td>
                     </tr>
@@ -119,16 +131,18 @@
                         <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:center;">
                             @if($row['qte'] !== null && $row['qte'] !== ''){{ $row['qte'] }}@endif
                         </td>
+                        @if($showPuPtCols)
                         <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:right;white-space:nowrap;">
                             @if($row['pu'] !== null){{ $fmt($row['pu']) }}@endif
                         </td>
                         <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:right;white-space:nowrap;">
                             @if($row['pt'] !== null){{ $fmt($row['pt']) }}@endif
                         </td>
+                        @endif
                     </tr>
                     @foreach($row['details'] ?? [] as $detail)
                     <tr>
-                        <td colspan="5" style="{{ $detailPad }}border:1px solid #e0e0e0;font-size:8.5pt;color:#222;">- {{ $detail }}</td>
+                        <td colspan="{{ $colCount }}" style="{{ $detailPad }}border:1px solid #e0e0e0;font-size:8.5pt;color:#222;">- {{ $detail }}</td>
                     </tr>
                     @endforeach
                 @endif

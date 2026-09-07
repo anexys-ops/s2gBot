@@ -5,6 +5,7 @@ import { clientsApi, type Client } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
+import { ListTablePanelHeader } from '../components/ListTablePanel'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import ClientMoroccoFormFields from '../components/clients/ClientMoroccoFormFields'
@@ -12,6 +13,7 @@ import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import Toast, { toastErrorMessage, type ToastVariant } from '../components/Toast'
 import TableRowActions from '../components/TableRowActions'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { shouldIgnoreTableRowClick } from '../lib/tableRowInteraction'
 
 function parseCapital(v: Client['capital_social']): number | undefined {
   if (v === undefined || v === null || v === '') return undefined
@@ -346,7 +348,8 @@ export default function Clients() {
           ) : undefined
         }
       />
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title="Clients" count={list.length} />
         <div className="table-wrap">
           <table className="data-table data-table--compact">
             <thead>
@@ -368,9 +371,9 @@ export default function Clients() {
                 key={c.id}
                 className="table-row-link"
                 onClick={(e) => {
-                  const t = e.target as HTMLElement
-                  if (t.closest('a, button')) return
-                  navigate(`/clients/${c.id}/fiche`)
+                  if (shouldIgnoreTableRowClick(e.target)) return
+                  if (isAdmin) openEdit(c)
+                  else navigate(`/clients/${c.id}/fiche`)
                 }}
               >
                 {visible.name !== false && (
@@ -407,9 +410,7 @@ export default function Clients() {
                 {isAdmin && visible.actions !== false && (
                   <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
                     <TableRowActions
-                      editLabel="Modifier le client"
                       deleteLabel="Supprimer définitivement le client"
-                      onEdit={() => openEdit(c)}
                       onDelete={() => setClientToDelete(c)}
                     />
                   </td>

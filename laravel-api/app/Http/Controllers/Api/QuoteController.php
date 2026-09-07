@@ -368,6 +368,7 @@ class QuoteController extends Controller
             'recipient_email' => 'nullable|email',
             'recipient_name'  => 'nullable|string|max:100',
             'message'         => 'nullable|string|max:2000',
+            'pdf_template_id' => 'nullable|integer|exists:document_pdf_templates,id',
         ]);
 
         $recipientEmail = trim((string) ($validated['recipient_email'] ?? ''));
@@ -410,6 +411,7 @@ class QuoteController extends Controller
                     $recipientName,
                     $validated['message'] ?? null,
                     $user->name,
+                    isset($validated['pdf_template_id']) ? (int) $validated['pdf_template_id'] : null,
                 ));
 
             MailLog::create([

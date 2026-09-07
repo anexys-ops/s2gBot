@@ -103,7 +103,7 @@ export default function QuoteFormFields({
   sitesForClient,
   dossiers,
   addresses,
-  quoteTemplates,
+  quoteTemplates: _quoteTemplates,
   addLine,
   updateLine,
   removeLine,
@@ -501,26 +501,6 @@ export default function QuoteFormFields({
                 </button>
               )}
             </div>
-          </label>
-          <label>
-            Modèle PDF
-            <select
-              value={form.pdf_template_id ?? ''}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  pdf_template_id: e.target.value ? Number(e.target.value) : undefined,
-                }))
-              }
-            >
-              <option value="">Défaut</option>
-              {quoteTemplates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                  {t.is_default ? ' (défaut)' : ''}
-                </option>
-              ))}
-            </select>
           </label>
         </div>
       </div>

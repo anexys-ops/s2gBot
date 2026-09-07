@@ -5,12 +5,15 @@ import { bonsCommandeApi, devisV1Api, quotesApi, type BonCommande, type Quote } 
 import ConfirmDialog from '../../components/ConfirmDialog'
 import StatusBadge, { bonCommandeStatutBadgeProps, quoteStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ListTableToolbar from '../../components/ListTableToolbar'
+import { ListTableFootRow, ListTablePanelHeader } from '../../components/ListTablePanel'
+import { sumNumeric } from '../../lib/listTableTotals'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import TableRowActions from '../../components/TableRowActions'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
 import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
 
 const STATUT_LABELS: Record<string, string> = {
   brouillon: 'Brouillon',
@@ -250,6 +253,13 @@ export default function BonsCommandeListPage() {
   })
 
   const bons = data ?? []
+  const totals = useMemo(
+    () => ({
+      ht: sumNumeric(bons, (bc) => bc.montant_ht),
+      ttc: sumNumeric(bons, (bc) => bc.montant_ttc),
+    }),
+    [bons],
+  )
   const hasActiveFilters = searchInput.trim() !== '' || statutFilter !== ''
 
   const shellProps = {
@@ -342,6 +352,7 @@ export default function BonsCommandeListPage() {
       />
 
       <div className="card dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title="Bons de commande" count={bons.length} />
         {bons.length > 0 ? (
           <div className="table-wrap">
             <table className="data-table data-table--compact">
@@ -355,7 +366,7 @@ export default function BonsCommandeListPage() {
                   {visible.ht !== false && <th>HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.ttc !== false && <th>TTC ({MONEY_UNIT_LABEL})</th>}
                   {visible.status !== false && <th>Statut</th>}
-                  {visible.actions !== false && <th className="data-table__actions">Actions</th>}
+                  {visible.actions !== false && isLab && <th className="data-table__actions">Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -366,8 +377,7 @@ export default function BonsCommandeListPage() {
                       key={bc.id}
                       className="table-row-link"
                       onClick={(e) => {
-                        const t = e.target as HTMLElement
-                        if (t.closest('a, button')) return
+                        if (shouldIgnoreTableRowClick(e.target)) return
                         navigate(`/bons-commande/${bc.id}`)
                       }}
                     >
@@ -425,26 +435,33 @@ export default function BonsCommandeListPage() {
                           </StatusBadge>
                         </td>
                       )}
-                      {visible.actions !== false && (
+                      {visible.actions !== false && isLab ? (
                         <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
-                          {isLab ? (
-                            <TableRowActions
-                              onEdit={() => navigate(`/bons-commande/${bc.id}`)}
-                              onDelete={() => setDeleteTarget(bc)}
-                              editLabel={`Ouvrir le bon ${bc.numero}`}
-                              deleteLabel={`Supprimer le bon ${bc.numero}`}
-                            />
-                          ) : (
-                            <Link to={`/bons-commande/${bc.id}`} className="btn btn-secondary btn-sm">
-                              Ouvrir
-                            </Link>
-                          )}
+                          <TableRowActions
+                            onDelete={() => setDeleteTarget(bc)}
+                            deleteLabel={`Supprimer le bon ${bc.numero}`}
+                          />
                         </td>
-                      )}
+                      ) : null}
                     </tr>
                   )
                 })}
               </tbody>
+              <ListTableFootRow
+                columns={[
+                  { id: 'number', kind: 'text' },
+                  { id: 'devis', kind: 'text' },
+                  { id: 'dossier', kind: 'text' },
+                  { id: 'client', kind: 'text' },
+                  { id: 'date', kind: 'text' },
+                  { id: 'ht', kind: 'money' },
+                  { id: 'ttc', kind: 'money' },
+                  { id: 'status', kind: 'text' },
+                  { id: 'actions', kind: 'text' },
+                ]}
+                visible={visible}
+                totals={totals}
+              />
             </table>
           </div>
         ) : (

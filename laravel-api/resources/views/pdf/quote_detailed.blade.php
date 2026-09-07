@@ -17,6 +17,15 @@
     </style>
 </head>
 <body>
+@php
+    $linesCfg = is_array($layoutConfig['lines'] ?? null) ? $layoutConfig['lines'] : [];
+    $showLinePrices = ($linesCfg['show_prices'] ?? true) !== false;
+    $showPuPtCols = $showLinePrices && (($linesCfg['show_pu_pt_columns'] ?? true) !== false);
+    $totalsCfg = is_array($layoutConfig['totals'] ?? null) ? $layoutConfig['totals'] : [];
+    $showTotalTva = ($totalsCfg['show_total_tva'] ?? true) !== false;
+    $showTvaCol = $showLinePrices && $showTotalTva && (($linesCfg['show_tva_column'] ?? true) !== false);
+    $currencyLabel = $currencyLabel ?? 'DH';
+@endphp
     <div class="header">
         @include('pdf.partials.branding-header', ['layoutConfig' => $layoutConfig ?? [], 'brandingLogoDataUri' => $brandingLogoDataUri ?? null])
         <h1>Devis n° {{ $quote->number }}</h1>
@@ -50,10 +59,16 @@
             <tr>
                 <th>Désignation</th>
                 <th class="text-right">Qté</th>
+                @if($showPuPtCols)
                 <th class="text-right">PU HT</th>
                 <th class="text-right">Remise %</th>
+                @endif
+                @if($showTvaCol)
                 <th class="text-right">TVA %</th>
+                @endif
+                @if($showPuPtCols)
                 <th class="text-right">Total HT</th>
+                @endif
             </tr>
         </thead>
         <tbody>
@@ -61,10 +76,16 @@
             <tr>
                 <td>@include('pdf.partials.quote-line-designation', ['line' => $line, 'showEquipmentOnQuotePdf' => $showEquipmentOnQuotePdf ?? true])</td>
                 <td class="text-right">{{ $line->quantity }}</td>
+                @if($showPuPtCols)
                 <td class="text-right">{{ number_format($line->unit_price, 2, ',', ' ') }} {{ $currencyLabel }}</td>
                 <td class="text-right">{{ number_format($line->discount_percent, 2, ',', ' ') }}</td>
+                @endif
+                @if($showTvaCol)
                 <td class="text-right">{{ number_format($line->tva_rate, 2, ',', ' ') }}</td>
+                @endif
+                @if($showPuPtCols)
                 <td class="text-right">{{ number_format($line->total, 2, ',', ' ') }} {{ $currencyLabel }}</td>
+                @endif
             </tr>
             @endforeach
         </tbody>

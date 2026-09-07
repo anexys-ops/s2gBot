@@ -92,6 +92,7 @@ class BonCommandeController extends Controller
             'montant_ht' => 'sometimes|numeric|min:0',
             'montant_ttc' => 'sometimes|numeric|min:0',
             'contact_id' => 'sometimes|nullable|exists:client_contacts,id',
+            'statut' => 'sometimes|string|in:brouillon,confirme,en_cours,livre,annule',
         ]);
         if ($data !== []) {
             $bonCommande->update($data);

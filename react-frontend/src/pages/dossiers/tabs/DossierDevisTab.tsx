@@ -1,9 +1,12 @@
+import { useMemo } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { dossiersApi } from '../../../api/client'
 import type { DossierFicheOutletContext } from '../DossierFichePage'
+import { ListTableFootRow, ListTablePanelHeader } from '../../../components/ListTablePanel'
 import StatusBadge, { quoteStatutBadgeProps } from '../../../components/ds/StatusBadge'
-import { formatAppDate, formatMoney } from '../../../lib/appLocale'
+import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../../lib/appLocale'
+import { sumNumeric } from '../../../lib/listTableTotals'
 
 export default function DossierDevisTab() {
   const { id } = useParams<{ id: string }>()
@@ -16,6 +19,16 @@ export default function DossierDevisTab() {
     queryFn: () => dossiersApi.devis(dossierId),
     enabled: Number.isFinite(dossierId) && dossierId > 0,
   })
+
+  const list = devis ?? []
+  const totals = useMemo(
+    () => ({
+      ht: sumNumeric(list, (q) => q.amount_ht),
+      ttc: sumNumeric(list, (q) => q.amount_ttc),
+      travel: sumNumeric(list, (q) => q.travel_fee_ht ?? 0),
+    }),
+    [list],
+  )
 
   if (isLoading) {
     return (
@@ -32,21 +45,17 @@ export default function DossierDevisTab() {
     )
   }
 
-  const list = devis ?? []
-
   return (
     <div className="dossier-tab">
       <div className="card dossier-tab-panel dossier-tab-panel--table">
-        <div className="dossier-tab-panel__header">
-          <h2 className="ds-form-section__title">Devis du dossier</h2>
-          <p className="dossier-tab-panel__intro">
-            Devis rattachés au dossier <code>{dossier.reference}</code>. Création et suivi dans le module{' '}
-            <Link to="/devis" className="link-inline">
-              Devis
-            </Link>
-            .
-          </p>
-        </div>
+        <ListTablePanelHeader title="Devis du dossier" count={list.length} />
+        <p className="dossier-tab-panel__intro" style={{ padding: '0 1.5rem', marginTop: '-0.25rem' }}>
+          Devis rattachés au dossier <code>{dossier.reference}</code>. Création et suivi dans le module{' '}
+          <Link to="/devis" className="link-inline">
+            Devis
+          </Link>
+          .
+        </p>
         {list.length > 0 ? (
           <div className="table-wrap">
             <table className="data-table data-table--compact">
@@ -55,7 +64,9 @@ export default function DossierDevisTab() {
                   <th>N°</th>
                   <th>Statut</th>
                   <th>Date</th>
-                  <th>Montant TTC</th>
+                  <th>Montant HT ({MONEY_UNIT_LABEL})</th>
+                  <th>Montant TTC ({MONEY_UNIT_LABEL})</th>
+                  <th>Dépl. HT ({MONEY_UNIT_LABEL})</th>
                   <th className="data-table__actions">Actions</th>
                 </tr>
               </thead>
@@ -83,7 +94,9 @@ export default function DossierDevisTab() {
                         </StatusBadge>
                       </td>
                       <td>{q.quote_date ? formatAppDate(q.quote_date) : '—'}</td>
-                      <td>{formatMoney(Number(q.amount_ttc))}</td>
+                      <td className="data-table__num">{formatMoney(Number(q.amount_ht))}</td>
+                      <td className="data-table__num">{formatMoney(Number(q.amount_ttc))}</td>
+                      <td className="data-table__num">{formatMoney(Number(q.travel_fee_ht ?? 0))}</td>
                       <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
                         <Link to={`/devis/${q.id}/editer`} className="btn btn-secondary btn-sm">
                           Ouvrir
@@ -93,6 +106,27 @@ export default function DossierDevisTab() {
                   )
                 })}
               </tbody>
+              <ListTableFootRow
+                columns={[
+                  { id: 'number', kind: 'text' },
+                  { id: 'status', kind: 'text' },
+                  { id: 'date', kind: 'text' },
+                  { id: 'ht', kind: 'money' },
+                  { id: 'ttc', kind: 'money' },
+                  { id: 'travel', kind: 'money' },
+                  { id: 'actions', kind: 'text' },
+                ]}
+                visible={{
+                  number: true,
+                  status: true,
+                  date: true,
+                  ht: true,
+                  ttc: true,
+                  travel: true,
+                  actions: true,
+                }}
+                totals={totals}
+              />
             </table>
           </div>
         ) : (

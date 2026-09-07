@@ -1,19 +1,25 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { pdfApi, quotesApi, type EntityMetaPayload, type Quote } from '../api/client'
+import { quotesApi, type EntityMetaPayload, type Quote } from '../api/client'
 import { QuotePdfButton, QuoteRowActionCells, QuoteRowActionHeaders } from '../components/crm/QuoteListTableActions'
+import DocumentPdfPickerModal from '../components/pdf/DocumentPdfPickerModal'
 import ConfirmDialog from '../components/ConfirmDialog'
+import ClickableStatusBadge from '../components/ds/ClickableStatusBadge'
 import StatusBadge, { quoteStatutBadgeProps } from '../components/ds/StatusBadge'
 import EntityMetaCard from '../components/module/EntityMetaCard'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
+import StatusChangeModal from '../components/StatusChangeModal'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
+import { ListTableFootRow, ListTablePanelHeader } from '../components/ListTablePanel'
+import { sumNumeric } from '../lib/listTableTotals'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
 import { quoteEmailRecipient } from '../lib/quoteEmailRecipient'
+import { shouldIgnoreTableRowClick } from '../lib/tableRowInteraction'
 
 function quoteBonCommande(q: Quote) {
   return q.bon_commande ?? q.bonCommande ?? null
@@ -43,15 +49,16 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function Devis() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const isAdmin = user?.role === 'lab_admin'
   const queryClient = useQueryClient()
-  const [statusModalId, setStatusModalId] = useState<number | null>(null)
   const [metaModalQuote, setMetaModalQuote] = useState<{ id: number; number: string; meta: unknown } | null>(null)
+  const [statusModalQuote, setStatusModalQuote] = useState<{ id: number; number: string; status: string } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; number: string } | null>(null)
   const [sendTarget, setSendTarget] = useState<Quote | null>(null)
+  const [pdfTarget, setPdfTarget] = useState<Quote | null>(null)
   const [sendError, setSendError] = useState('')
-  const [statusValue, setStatusValue] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statusFilter, setStatusFilter] = useState('')
@@ -60,6 +67,7 @@ export default function Devis() {
     number: true,
     client: true,
     date: true,
+    ht: true,
     ttc: true,
     travel: true,
     status: true,
@@ -94,7 +102,7 @@ export default function Devis() {
     mutationFn: ({ id, status }: { id: number; status: string }) => quotesApi.update(id, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
-      setStatusModalId(null)
+      setStatusModalQuote(null)
     },
   })
 
@@ -107,8 +115,17 @@ export default function Devis() {
   })
 
   const sendEmailMutation = useMutation({
-    mutationFn: ({ id, email, name }: { id: number; email: string; name: string }) =>
-      quotesApi.sendEmail(id, { recipient_email: email, recipient_name: name }),
+    mutationFn: ({
+      id,
+      email,
+      name,
+      pdf_template_id,
+    }: {
+      id: number
+      email: string
+      name: string
+      pdf_template_id?: number
+    }) => quotesApi.sendEmail(id, { recipient_email: email, recipient_name: name, pdf_template_id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
       setSendTarget(null)
@@ -119,6 +136,14 @@ export default function Devis() {
 
   const quotes = data?.data ?? []
   const lastPage = data?.last_page ?? 1
+  const totals = useMemo(
+    () => ({
+      ht: sumNumeric(quotes, (q) => q.amount_ht),
+      ttc: sumNumeric(quotes, (q) => q.amount_ttc),
+      travel: sumNumeric(quotes, (q) => q.travel_fee_ht ?? 0),
+    }),
+    [quotes],
+  )
   const statusOptions = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
   const hasActiveFilters = searchInput.trim() !== '' || statusFilter !== ''
 
@@ -194,6 +219,7 @@ export default function Devis() {
           { id: 'number', label: 'Numéro' },
           { id: 'client', label: 'Client' },
           { id: 'date', label: 'Date' },
+          { id: 'ht', label: 'Montant HT' },
           { id: 'ttc', label: 'Montant TTC' },
           { id: 'travel', label: 'Dépl. HT' },
           { id: 'mode', label: 'Mode' },
@@ -248,6 +274,7 @@ export default function Devis() {
       />
 
       <div className="card dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title="Devis" count={quotes.length} />
         {quotes.length > 0 ? (
           <div className="table-wrap">
             <table className="data-table data-table--compact">
@@ -256,6 +283,7 @@ export default function Devis() {
                   {visible.number !== false && <th>Numéro</th>}
                   {visible.client !== false && <th>Client</th>}
                   {visible.date !== false && <th>Date</th>}
+                  {visible.ht !== false && <th>Montant HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.ttc !== false && <th>Montant TTC ({MONEY_UNIT_LABEL})</th>}
                   {visible.travel !== false && <th>Dépl. HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.mode !== false && <th>Mode</th>}
@@ -275,18 +303,28 @@ export default function Devis() {
                   const blCount = chainCount(bc?.bons_livraison_count)
                   const invoiceCount = chainCount(bc?.invoices_count)
                   return (
-                    <tr key={q.id}>
+                    <tr
+                      key={q.id}
+                      className="table-row-link"
+                      onClick={(e) => {
+                        if (shouldIgnoreTableRowClick(e.target)) return
+                        navigate(`/devis/${q.id}/editer`)
+                      }}
+                    >
                       {visible.number !== false && (
                         <td className="data-table__nowrap">
-                          <Link to={`/devis/${q.id}/editer`} className="link-inline">
+                          <Link to={`/devis/${q.id}/editer`} className="link-inline" onClick={(e) => e.stopPropagation()}>
                             <code className="code-badge">{q.number}</code>
                           </Link>
                         </td>
                       )}
                       {visible.client !== false && <td>{q.client?.name ?? '—'}</td>}
                       {visible.date !== false && <td>{formatAppDate(q.quote_date)}</td>}
-                      {visible.ttc !== false && <td>{formatMoney(Number(q.amount_ttc))}</td>}
-                      {visible.travel !== false && <td>{formatMoney(Number(q.travel_fee_ht ?? 0))}</td>}
+                      {visible.ht !== false && <td className="data-table__num">{formatMoney(Number(q.amount_ht))}</td>}
+                      {visible.ttc !== false && <td className="data-table__num">{formatMoney(Number(q.amount_ttc))}</td>}
+                      {visible.travel !== false && (
+                        <td className="data-table__num">{formatMoney(Number(q.travel_fee_ht ?? 0))}</td>
+                      )}
                       {visible.mode !== false && (
                         <td className="data-table__status">
                           <StatusBadge variant={mode.variant} size="sm">
@@ -296,9 +334,20 @@ export default function Devis() {
                       )}
                       {visible.status !== false && (
                         <td className="data-table__status">
-                          <StatusBadge variant={st.variant} size="sm">
-                            {st.label}
-                          </StatusBadge>
+                          {isLab ? (
+                            <ClickableStatusBadge
+                              variant={st.variant}
+                              size="sm"
+                              ariaLabel={`Changer le statut du devis ${q.number}`}
+                              onClick={() => setStatusModalQuote({ id: q.id, number: q.number, status: q.status })}
+                            >
+                              {st.label}
+                            </ClickableStatusBadge>
+                          ) : (
+                            <StatusBadge variant={st.variant} size="sm">
+                              {st.label}
+                            </StatusBadge>
+                          )}
                         </td>
                       )}
                       {isLab && visible.bc !== false && (
@@ -332,21 +381,14 @@ export default function Devis() {
                       )}
                       {isLab && visible.pdf !== false && (
                         <td className="data-table__pdf">
-                          <QuotePdfButton
-                            onClick={() => pdfApi.generate('quote', q.id, q.pdf_template_id)}
-                          />
+                          <QuotePdfButton onClick={() => setPdfTarget(q)} />
                         </td>
                       )}
                       {isLab && visible.actions !== false && (
                         <QuoteRowActionCells
-                          quoteId={q.id}
                           quoteNumber={q.number}
                           status={q.status}
                           isAdmin={isAdmin}
-                          onStatus={() => {
-                            setStatusModalId(q.id)
-                            setStatusValue(q.status)
-                          }}
                           onMeta={() => setMetaModalQuote({ id: q.id, number: q.number, meta: q.meta })}
                           onDelete={() => setDeleteTarget({ id: q.id, number: q.number })}
                           onSendEmail={
@@ -364,6 +406,29 @@ export default function Devis() {
                   )
                 })}
               </tbody>
+              <ListTableFootRow
+                columns={[
+                  { id: 'number', kind: 'text' },
+                  { id: 'client', kind: 'text' },
+                  { id: 'date', kind: 'text' },
+                  { id: 'ht', kind: 'money' },
+                  { id: 'ttc', kind: 'money' },
+                  { id: 'travel', kind: 'money' },
+                  { id: 'mode', kind: 'text' },
+                  { id: 'status', kind: 'text' },
+                  ...(isLab
+                    ? [
+                        { id: 'bc', kind: 'text' as const },
+                        { id: 'bl', kind: 'text' as const },
+                        { id: 'invoices', kind: 'text' as const },
+                      ]
+                    : []),
+                  ...(isLab ? [{ id: 'pdf', kind: 'text' as const }] : []),
+                  ...(isLab ? [{ id: 'actions', kind: 'text' as const, span: 3 }] : []),
+                ]}
+                visible={visible}
+                totals={totals}
+              />
             </table>
           </div>
         ) : (
@@ -372,33 +437,16 @@ export default function Devis() {
         <PaginationBar page={data?.current_page ?? 1} lastPage={lastPage} onPage={setPage} />
       </div>
 
-      {statusModalId !== null && (
-        <Modal title="Changer le statut" onClose={() => setStatusModalId(null)}>
-          <div className="form-group">
-            <label>Statut</label>
-            <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)}>
-              {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="crud-actions">
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={statusMutation.isPending}
-              onClick={() => statusMutation.mutate({ id: statusModalId, status: statusValue })}
-            >
-              Enregistrer
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setStatusModalId(null)}>
-              Annuler
-            </button>
-          </div>
-          {statusMutation.isError && <p className="error">{(statusMutation.error as Error).message}</p>}
-        </Modal>
+      {statusModalQuote !== null && (
+        <StatusChangeModal
+          title={`Statut — ${statusModalQuote.number}`}
+          initialValue={statusModalQuote.status}
+          options={statusOptions}
+          isPending={statusMutation.isPending}
+          error={statusMutation.isError ? (statusMutation.error as Error).message : null}
+          onClose={() => setStatusModalQuote(null)}
+          onSave={(status) => statusMutation.mutate({ id: statusModalQuote.id, status })}
+        />
       )}
 
       {metaModalQuote && (
@@ -432,75 +480,43 @@ export default function Devis() {
         />
       ) : null}
 
-      {sendTarget && (
-        <Modal
-          title={`Envoyer le devis ${sendTarget.number}`}
+      {pdfTarget ? (
+        <DocumentPdfPickerModal
+          documentType="quote"
+          documentId={pdfTarget.id}
+          documentLabel={pdfTarget.number}
+          onClose={() => setPdfTarget(null)}
+        />
+      ) : null}
+
+      {sendTarget ? (
+        <DocumentPdfPickerModal
+          documentType="quote"
+          documentId={sendTarget.id}
+          documentLabel={sendTarget.number}
           onClose={() => {
             if (!sendEmailMutation.isPending) {
               setSendTarget(null)
               setSendError('')
             }
           }}
-        >
-          {(() => {
+          onEmail={async (templateId) => {
             const recipient = quoteEmailRecipient(sendTarget)
             if (!recipient) {
-              return (
-                <>
-                  <p className="text-muted" style={{ marginTop: 0 }}>
-                    Aucun email trouvé pour ce devis. Ajoutez un contact avec email sur la fiche client ou renseignez
-                    l&apos;email du client, puis réessayez.
-                  </p>
-                  <div className="crud-actions">
-                    <Link to={`/devis/${sendTarget.id}/editer`} className="btn btn-primary">
-                      Ouvrir le devis
-                    </Link>
-                    <button type="button" className="btn btn-secondary" onClick={() => setSendTarget(null)}>
-                      Fermer
-                    </button>
-                  </div>
-                </>
-              )
+              setSendError('Destinataire email introuvable.')
+              return
             }
-            return (
-              <>
-                <p style={{ marginTop: 0 }}>
-                  Envoyer le devis <strong>{sendTarget.number}</strong> à{' '}
-                  <strong>{recipient.name}</strong> — <a href={`mailto:${recipient.email}`}>{recipient.email}</a> ?
-                </p>
-                <p className="text-muted" style={{ fontSize: '0.88rem' }}>
-                  Le PDF du devis sera joint à l&apos;email. Le statut passera à <strong>Envoyé</strong>.
-                </p>
-                <div className="crud-actions">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={sendEmailMutation.isPending}
-                    onClick={() =>
-                      sendEmailMutation.mutate({
-                        id: sendTarget.id,
-                        email: recipient.email,
-                        name: recipient.name,
-                      })
-                    }
-                  >
-                    {sendEmailMutation.isPending ? 'Envoi…' : 'Envoyer par email'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    disabled={sendEmailMutation.isPending}
-                    onClick={() => setSendTarget(null)}
-                  >
-                    Annuler
-                  </button>
-                </div>
-                {sendError ? <p className="error">{sendError}</p> : null}
-              </>
-            )
-          })()}
-        </Modal>
-      )}
+            await sendEmailMutation.mutateAsync({
+              id: sendTarget.id,
+              email: recipient.email,
+              name: recipient.name,
+              pdf_template_id: templateId,
+            })
+          }}
+        />
+      ) : null}
+
+      {sendError && !sendTarget && !pdfTarget ? <p className="error">{sendError}</p> : null}
     </ModuleEntityShell>
   )
 }

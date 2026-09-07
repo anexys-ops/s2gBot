@@ -12,6 +12,7 @@ import Modal from '../../components/Modal'
 import { useAuth } from '../../contexts/AuthContext'
 import { canManageUsers } from '../../lib/settingsAccess'
 import ListTableToolbar, { PaginationBar } from '../../components/ListTableToolbar'
+import { ListTablePanelHeader } from '../../components/ListTablePanel'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 
 const ROLES: { value: string; label: string }[] = [
@@ -179,8 +180,10 @@ export default function SettingsUsersPage() {
       />
       {isLoading && !data && <p>Chargement…</p>}
       {error && <p className="error">{(error as Error).message}</p>}
-      <div className="card">
-        <table>
+      <div className="card dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title="Utilisateurs" count={rows.length} />
+        <div className="table-wrap">
+        <table className="data-table data-table--compact">
           <thead>
             <tr>
               <th>Nom</th>
@@ -220,6 +223,7 @@ export default function SettingsUsersPage() {
             ))}
           </tbody>
         </table>
+        </div>
         <PaginationBar page={data?.current_page ?? 1} lastPage={lastPage} onPage={setPage} />
       </div>
 

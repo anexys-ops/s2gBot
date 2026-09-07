@@ -27,24 +27,28 @@ function IconTrash() {
 }
 
 type Props = {
-  onEdit: () => void
+  onEdit?: () => void
   onDelete?: () => void
   editLabel?: string
   deleteLabel?: string
 }
 
-/** Actions compactes (icônes) pour lignes de tableaux CRM. */
+/** Actions compactes (icônes) pour lignes de tableaux CRM — suppression seule par défaut (édition via clic ligne). */
 export default function TableRowActions({
   onEdit,
   onDelete,
   editLabel = 'Modifier',
   deleteLabel = 'Supprimer',
 }: Props) {
+  if (!onEdit && !onDelete) return null
+
   return (
     <div className="data-table__actions-inner">
-      <button type="button" className="ds-icon-btn" title={editLabel} aria-label={editLabel} onClick={onEdit}>
-        <IconPencil />
-      </button>
+      {onEdit ? (
+        <button type="button" className="ds-icon-btn" title={editLabel} aria-label={editLabel} onClick={onEdit}>
+          <IconPencil />
+        </button>
+      ) : null}
       {onDelete ? (
         <button
           type="button"

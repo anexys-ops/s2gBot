@@ -5,9 +5,10 @@ import {
   clientAddressesApi,
   attachmentsApi,
   commercialLinksApi,
-  pdfApi,
   type ClientAddress,
 } from '../../api/client'
+import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
+import type { PdfGenerateType } from '../../lib/documentPdfTypes'
 import { useAuth } from '../../contexts/AuthContext'
 import { INVOICE_STATUS_LABELS, QUOTE_STATUS_LABELS } from '../../lib/commercialStatusLabels'
 import { formatMoney } from '../../lib/appLocale'
@@ -51,6 +52,7 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
     target_id: 0,
     relation: 'related',
   })
+  const [pdfTarget, setPdfTarget] = useState<{ type: PdfGenerateType; id: number; label: string } | null>(null)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['client-commercial', id],
@@ -303,7 +305,7 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
                 <td>{q.status}</td>
                 <td>{formatMoney(Number(q.amount_ttc))}</td>
                 <td>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => pdfApi.generate('quote', q.id, q.pdf_template_id)}>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPdfTarget({ type: 'quote', id: q.id, label: q.number })}>
                     Télécharger
                   </button>
                 </td>
@@ -336,7 +338,7 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
-                    onClick={() => pdfApi.generate('invoice', inv.id, inv.pdf_template_id)}
+                    onClick={() => setPdfTarget({ type: 'invoice', id: inv.id, label: inv.number })}
                   >
                     Télécharger
                   </button>
@@ -404,6 +406,15 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
           </div>
         )}
       </div>
+
+      {pdfTarget ? (
+        <DocumentPdfPickerModal
+          documentType={pdfTarget.type}
+          documentId={pdfTarget.id}
+          documentLabel={pdfTarget.label}
+          onClose={() => setPdfTarget(null)}
+        />
+      ) : null}
     </>
   )
 }

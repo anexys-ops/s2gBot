@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import TableIconHeader from '../TableIconHeader'
 
 const stroke = {
   fill: 'none',
@@ -14,24 +14,6 @@ function IconPdf() {
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" {...stroke} />
       <path d="M14 2v6h6M9 13h6M9 17h4M9 9h1" {...stroke} />
-    </svg>
-  )
-}
-
-function IconPencil() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-      <path d="M12 20h9" {...stroke} />
-      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" {...stroke} />
-    </svg>
-  )
-}
-
-function IconStatus() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-      <path d="M4 7h16M4 12h10M4 17h7" {...stroke} />
-      <path d="M18 10v6l2-2" {...stroke} />
     </svg>
   )
 }
@@ -89,24 +71,20 @@ export function QuotePdfButton({ onClick, label = 'Télécharger le PDF' }: PdfB
 }
 
 type RowActionCellsProps = {
-  quoteId: number
   quoteNumber: string
   status: string
   isAdmin: boolean
-  onStatus: () => void
   onMeta: () => void
   onDelete: () => void
   onSendEmail?: () => void
   sendEmailLoading?: boolean
 }
 
-/** Une colonne par action — l’emplacement email reste réservé après envoi. */
+/** Colonnes d’actions secondaires — édition et statut via clic ligne / badge. */
 export function QuoteRowActionCells({
-  quoteId,
   quoteNumber,
   status,
   isAdmin,
-  onStatus,
   onMeta,
   onDelete,
   onSendEmail,
@@ -116,18 +94,6 @@ export function QuoteRowActionCells({
 
   return (
     <>
-      <td className="data-table__action-cell">
-        <ActionSlot>
-          <Link
-            to={`/devis/${quoteId}/editer`}
-            className="ds-icon-btn"
-            title={status === 'draft' ? 'Modifier le devis' : 'Ouvrir le devis'}
-            aria-label={`${status === 'draft' ? 'Modifier' : 'Ouvrir'} le devis ${quoteNumber}`}
-          >
-            <IconPencil />
-          </Link>
-        </ActionSlot>
-      </td>
       <td className="data-table__action-cell">
         <ActionSlot>
           {canSendEmail ? (
@@ -142,19 +108,6 @@ export function QuoteRowActionCells({
               <IconMail />
             </button>
           ) : null}
-        </ActionSlot>
-      </td>
-      <td className="data-table__action-cell">
-        <ActionSlot>
-          <button
-            type="button"
-            className="ds-icon-btn"
-            title="Changer le statut"
-            aria-label={`Changer le statut du devis ${quoteNumber}`}
-            onClick={onStatus}
-          >
-            <IconStatus />
-          </button>
         </ActionSlot>
       </td>
       <td className="data-table__action-cell">
@@ -192,21 +145,9 @@ export function QuoteRowActionCells({
 export function QuoteRowActionHeaders() {
   return (
     <>
-      <th className="data-table__action-cell" title="Modifier / ouvrir">
-        Éd.
-      </th>
-      <th className="data-table__action-cell" title="Envoyer par email">
-        Mail
-      </th>
-      <th className="data-table__action-cell" title="Changer le statut">
-        Stat.
-      </th>
-      <th className="data-table__action-cell" title="Métadonnées">
-        Meta
-      </th>
-      <th className="data-table__action-cell" title="Supprimer">
-        Suppr.
-      </th>
+      <TableIconHeader icon={<IconMail />} label="Envoyer par email" />
+      <TableIconHeader icon={<IconMeta />} label="Métadonnées" />
+      <TableIconHeader icon={<IconTrash />} label="Supprimer" />
     </>
   )
 }

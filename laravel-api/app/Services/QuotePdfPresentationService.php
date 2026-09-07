@@ -22,10 +22,14 @@ class QuotePdfPresentationService
     ];
 
     /**
+     * @param  array<string, mixed>|null  $layoutConfig
      * @return list<array<string, mixed>>
      */
-    public function buildItemRows(Quote $quote): array
+    public function buildItemRows(Quote $quote, ?array $layoutConfig = null): array
     {
+        $linesCfg = is_array($layoutConfig['lines'] ?? null) ? $layoutConfig['lines'] : [];
+        $hideAllPrices = ($linesCfg['show_prices'] ?? true) === false;
+
         $meta = is_array($quote->meta) ? $quote->meta : [];
         $jalons = $meta['devis_jalons'] ?? [];
         $parcours = $meta['devis_parcours'] ?? [];
@@ -69,7 +73,7 @@ class QuotePdfPresentationService
                         if ($entry === null) {
                             continue;
                         }
-                        $hidePrices = $documentForfait || $jalonForfait;
+                        $hidePrices = $hideAllPrices || $documentForfait || $jalonForfait;
                         $mask = $hidePrices || ($maskPrices[$entry['index']] ?? false) === true;
                         $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, true, $hidePrices);
                         $seenLineIds[$entry['line']->id] = true;
@@ -83,7 +87,7 @@ class QuotePdfPresentationService
                     if ($entry === null) {
                         continue;
                     }
-                    $mask = $documentForfait || ($maskPrices[$entry['index']] ?? false) === true;
+                    $mask = $hideAllPrices || $documentForfait || ($maskPrices[$entry['index']] ?? false) === true;
                     $rows[] = $this->formatProductRow($entry['line'], ++$itemNum, $mask, false, $documentForfait);
                     $seenLineIds[$entry['line']->id] = true;
                 }
@@ -112,7 +116,7 @@ class QuotePdfPresentationService
             if (isset($seenLineIds[$line->id])) {
                 continue;
             }
-            $mask = $documentForfait || ($maskPrices[$index] ?? false) === true;
+            $mask = $hideAllPrices || $documentForfait || ($maskPrices[$index] ?? false) === true;
             $rows[] = $this->formatProductRow($line, ++$itemNum, $mask, false, $documentForfait);
             $seenLineIds[$line->id] = true;
         }
@@ -128,9 +132,18 @@ class QuotePdfPresentationService
                 'label' => 'Prestation forfaitaire',
                 'unite' => $forfaitUnite,
                 'qte' => 1,
-                'pu' => $forfaitHt,
-                'pt' => $forfaitHt,
+                'pu' => $hideAllPrices ? null : $forfaitHt,
+                'pt' => $hideAllPrices ? null : $forfaitHt,
             ]);
+        }
+
+        if ($hideAllPrices) {
+            foreach ($rows as $i => $row) {
+                if (($row['type'] ?? '') === 'forfait_total') {
+                    $rows[$i]['pu'] = null;
+                    $rows[$i]['pt'] = null;
+                }
+            }
         }
 
         return $rows;

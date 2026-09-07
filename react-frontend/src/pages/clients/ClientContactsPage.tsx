@@ -10,11 +10,13 @@ import ClientContactFormFields, {
 import ConfirmDialog from '../../components/ConfirmDialog'
 import StatusBadge, { type StatusBadgeVariant } from '../../components/ds/StatusBadge'
 import ListTableToolbar from '../../components/ListTableToolbar'
+import { ListTablePanelHeader } from '../../components/ListTablePanel'
 import Modal from '../../components/Modal'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import TableRowActions from '../../components/TableRowActions'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
+import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
 
 const CONTACT_TYPE_BADGE: Record<ContactType, StatusBadgeVariant> = {
   facturation: 'info',
@@ -333,6 +335,7 @@ export default function ClientContactsPage() {
       />
 
       <div className="card dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title="Contacts" count={contacts.length} />
         {contacts.length > 0 ? (
           <div className="table-wrap">
             <table className="data-table data-table--compact">
@@ -353,7 +356,14 @@ export default function ClientContactsPage() {
                   const name = contactName(contact.prenom, contact.nom)
                   const role = [contact.poste, contact.departement].filter(Boolean).join(' — ')
                   return (
-                    <tr key={contact.id}>
+                    <tr
+                      key={contact.id}
+                      className="table-row-link"
+                      onClick={(e) => {
+                        if (shouldIgnoreTableRowClick(e.target)) return
+                        openEdit(contact)
+                      }}
+                    >
                       {visible.name !== false && (
                         <td>
                           <strong>{name}</strong>
@@ -415,11 +425,9 @@ export default function ClientContactsPage() {
                         </td>
                       )}
                       {visible.actions !== false && (
-                        <td className="data-table__actions">
+                        <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
                           <TableRowActions
-                            editLabel={`Modifier ${name}`}
                             deleteLabel={`Supprimer ${name}`}
-                            onEdit={() => openEdit(contact)}
                             onDelete={() => setDeleteTarget(contact)}
                           />
                         </td>

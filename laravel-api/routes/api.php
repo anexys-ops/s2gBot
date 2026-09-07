@@ -308,6 +308,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('commercial-links/{commercial_document_link}', [CommercialDocumentLinkController::class, 'destroy']);
 
     Route::get('document-pdf-templates', [DocumentPdfTemplateController::class, 'index']);
+    Route::get('document-pdf-templates/{document_pdf_template}', [DocumentPdfTemplateController::class, 'show']);
     Route::put('document-pdf-templates/{document_pdf_template}', [DocumentPdfTemplateController::class, 'update']);
 
     Route::get('extrafield-definitions', [ExtrafieldDefinitionController::class, 'index']);

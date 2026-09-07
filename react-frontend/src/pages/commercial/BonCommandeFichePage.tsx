@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { bonsCommandeApi, planningTerrainApi, type BonCommandeLigne } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import CommercialDocumentActions from '../../components/crm/CommercialDocumentActions'
 import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
 import StatusBadge, { bonCommandeStatutBadgeProps, bonLivraisonStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
@@ -277,6 +278,8 @@ export default function BonCommandeFichePage() {
 
   const canConfirmer = lab && bc.statut === 'brouillon'
   const canGenerateBl = lab && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
+  const hasBonLivraison = (bc.bons_livraison?.length ?? 0) > 0
+  const isAdmin = user?.role === 'lab_admin'
 
   return (
     <ModuleEntityShell
@@ -313,6 +316,22 @@ export default function BonCommandeFichePage() {
       actions={
         lab ? (
           <div className="bc-fiche__header-actions">
+            <CommercialDocumentActions
+              documentType="bon_commande"
+              entityId={bc.id}
+              entityLabel={bc.numero}
+              status={bc.statut}
+              isLab={lab}
+              isAdmin={isAdmin}
+              hasBonLivraison={hasBonLivraison}
+              onDeleted={() => navigate('/bons-commande')}
+              onStatusChanged={() => {
+                void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
+              }}
+              onCancelled={() => {
+                void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
+              }}
+            />
             {canConfirmer ? (
               <button
                 type="button"

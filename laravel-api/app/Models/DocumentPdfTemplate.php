@@ -13,6 +13,7 @@ class DocumentPdfTemplate extends Model
         'name',
         'blade_view',
         'is_default',
+        'is_active',
         'layout_config',
     ];
 
@@ -20,6 +21,7 @@ class DocumentPdfTemplate extends Model
     {
         return [
             'is_default' => 'boolean',
+            'is_active' => 'boolean',
             'layout_config' => 'array',
         ];
     }

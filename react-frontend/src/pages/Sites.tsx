@@ -1,19 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { sitesApi, clientsApi, type Client, type Site } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
+import { ListTableFootRow, ListTablePanelHeader } from '../components/ListTablePanel'
+import { sumNumeric } from '../lib/listTableTotals'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import TableRowActions from '../components/TableRowActions'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ClientSelectField from '../components/clients/ClientSelectField'
-import { MONEY_UNIT_LABEL } from '../lib/appLocale'
+import { formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
 import SiteStatusPill from '../components/SiteStatusPill'
+import ClickableStatusBadge from '../components/ds/ClickableStatusBadge'
+import { siteStatutBadgeProps } from '../components/ds/StatusBadge'
 import { SITE_STATUS_KEYS, SITE_STATUS_LABELS } from '../lib/siteStatusPresentation'
+import { shouldIgnoreTableRowClick } from '../lib/tableRowInteraction'
 
 function normalizeClientsList(data: unknown): Client[] {
   if (Array.isArray(data)) return data
@@ -164,6 +169,13 @@ export default function Sites() {
   }
 
   const list = data?.data ?? []
+  const totals = useMemo(
+    () => ({
+      travelQuote: sumNumeric(list, (s) => s.travel_fee_quote_ht ?? 0),
+      travelInvoice: sumNumeric(list, (s) => s.travel_fee_invoice_ht ?? 0),
+    }),
+    [list],
+  )
   const total = data?.total ?? 0
   const lastPage = data?.last_page ?? 1
   const currentPage = data?.current_page ?? page
@@ -261,7 +273,8 @@ export default function Sites() {
           </label>
         }
       />
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title="Chantiers" count={list.length} />
         <div className="table-wrap">
           <table className="data-table data-table--compact">
             <thead>
@@ -283,8 +296,7 @@ export default function Sites() {
                 key={s.id}
                 className="table-row-link"
                 onClick={(e) => {
-                  const t = e.target as HTMLElement
-                  if (t.closest('a, button')) return
+                  if (shouldIgnoreTableRowClick(e.target)) return
                   navigate(`/sites/${s.id}/fiche`)
                 }}
               >
@@ -298,7 +310,23 @@ export default function Sites() {
                 {visible.client !== false && <td>{s.client?.name}</td>}
                 {visible.status !== false && (
                   <td className="data-table__status">
-                    <SiteStatusPill status={s.status} size="sm" />
+                    {isAdmin ? (
+                      (() => {
+                        const st = siteStatutBadgeProps(s.status)
+                        return (
+                          <ClickableStatusBadge
+                            variant={st.variant}
+                            size="sm"
+                            ariaLabel={`Changer le statut du chantier ${s.name}`}
+                            onClick={() => openEdit(s)}
+                          >
+                            {st.label}
+                          </ClickableStatusBadge>
+                        )
+                      })()
+                    ) : (
+                      <SiteStatusPill status={s.status} size="sm" />
+                    )}
                   </td>
                 )}
                 {visible.created !== false && (
@@ -306,14 +334,16 @@ export default function Sites() {
                 )}
                 {visible.reference !== false && <td>{s.reference ?? '-'}</td>}
                 {visible.address !== false && <td>{s.address ?? '-'}</td>}
-                {visible.travelQuote !== false && <td>{Number(s.travel_fee_quote_ht ?? 0).toFixed(2)}</td>}
-                {visible.travelInvoice !== false && <td>{Number(s.travel_fee_invoice_ht ?? 0).toFixed(2)}</td>}
+                {visible.travelQuote !== false && (
+                  <td className="data-table__num">{formatMoney(Number(s.travel_fee_quote_ht ?? 0))}</td>
+                )}
+                {visible.travelInvoice !== false && (
+                  <td className="data-table__num">{formatMoney(Number(s.travel_fee_invoice_ht ?? 0))}</td>
+                )}
                 {isAdmin && visible.actions !== false && (
                   <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
                     <TableRowActions
-                      editLabel="Modifier le chantier"
                       deleteLabel="Supprimer le chantier"
-                      onEdit={() => openEdit(s)}
                       onDelete={() => setSiteToDelete(s)}
                     />
                   </td>
@@ -321,9 +351,24 @@ export default function Sites() {
               </tr>
             ))}
           </tbody>
+          <ListTableFootRow
+            columns={[
+              { id: 'name', kind: 'text' },
+              { id: 'client', kind: 'text' },
+              { id: 'status', kind: 'text' },
+              { id: 'created', kind: 'text' },
+              { id: 'reference', kind: 'text' },
+              { id: 'address', kind: 'text' },
+              { id: 'travelQuote', kind: 'money' },
+              { id: 'travelInvoice', kind: 'money' },
+              ...(isAdmin ? [{ id: 'actions', kind: 'text' as const }] : []),
+            ]}
+            visible={visible}
+            totals={totals}
+          />
           </table>
         </div>
-        {!list.length && <p style={{ padding: '1rem' }}>Aucun chantier pour cette vue.</p>}
+        {!list.length && <p className="dossier-tab-empty">Aucun chantier pour cette vue.</p>}
         <PaginationBar page={currentPage} lastPage={lastPage} onPage={setPage} />
       </div>
 

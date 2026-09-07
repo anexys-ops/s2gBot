@@ -187,6 +187,11 @@ class AppBranding
                 'show_total_tva' => true,
                 'show_total_ttc' => true,
             ],
+            /** Colonnes et montants des lignes (devis / factures). */
+            'lines' => [
+                'show_prices' => true,
+                'show_pu_pt_columns' => true,
+            ],
         ];
     }
 

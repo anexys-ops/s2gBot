@@ -27,6 +27,11 @@ export interface PdfLayoutConfigForm {
     show_total_tva: boolean
     show_total_ttc: boolean
   }
+  /** Colonnes et montants des lignes (devis / factures / BC / BL). */
+  lines: {
+    show_prices: boolean
+    show_pu_pt_columns: boolean
+  }
 }
 
 function clampPhotoSlots(n: number): number {
@@ -39,6 +44,7 @@ export function layoutConfigToForm(raw: PdfLayoutConfig | undefined | null): Pdf
   const r = raw ?? {}
   const h = (r.header as Record<string, unknown> | undefined) ?? {}
   const t = (r.totals as Record<string, unknown> | undefined) ?? {}
+  const l = (r.lines as Record<string, unknown> | undefined) ?? {}
   const rawFields = r.extra_fields
   const fields: PdfLayoutExtraFieldRow[] = Array.isArray(rawFields)
     ? rawFields
@@ -67,6 +73,10 @@ export function layoutConfigToForm(raw: PdfLayoutConfig | undefined | null): Pdf
       show_total_ht: t.show_total_ht !== false,
       show_total_tva: t.show_total_tva !== false,
       show_total_ttc: t.show_total_ttc !== false,
+    },
+    lines: {
+      show_prices: l.show_prices !== false,
+      show_pu_pt_columns: l.show_pu_pt_columns !== false,
     },
   }
 }
@@ -100,6 +110,10 @@ export function formToLayoutConfigPayload(form: PdfLayoutConfigForm): PdfLayoutC
       show_total_ht: form.totals.show_total_ht,
       show_total_tva: form.totals.show_total_tva,
       show_total_ttc: form.totals.show_total_ttc,
+    },
+    lines: {
+      show_prices: form.lines.show_prices,
+      show_pu_pt_columns: form.lines.show_pu_pt_columns,
     },
   }
 }

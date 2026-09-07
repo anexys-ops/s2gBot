@@ -6,6 +6,7 @@ use App\Models\DocumentPdfTemplate;
 use App\Models\Quote;
 use App\Support\AppBranding;
 use App\Support\FrenchAmountInWords;
+use App\Support\PdfTemplateResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class QuotePdfGenerator
@@ -17,7 +18,7 @@ class QuotePdfGenerator
     /**
      * @return array{0: string, 1: string} PDF binary and download filename
      */
-    public function generate(Quote $quote): array
+    public function generate(Quote $quote, ?int $requestTemplateId = null): array
     {
         $quote->loadMissing([
             'client',
@@ -30,11 +31,11 @@ class QuotePdfGenerator
             'pdfTemplate',
         ]);
 
-        $template = $this->resolvePdfTemplate('quote', null, $quote->pdf_template_id);
+        $template = PdfTemplateResolver::resolve('quote', $requestTemplateId, $quote->pdf_template_id);
         $view = $template?->blade_view ?? 'pdf.quote';
-        $layoutConfig = AppBranding::mergeLayoutConfig($template?->layout_config);
+        $layoutConfig = PdfTemplateResolver::layoutConfig($template);
         $pdfContext = $this->presentation->buildContext($quote);
-        $itemRows = $this->presentation->buildItemRows($quote);
+        $itemRows = $this->presentation->buildItemRows($quote, $layoutConfig);
         $amountInWords = FrenchAmountInWords::format($pdfContext['total_ttc']);
 
         $html = view($view, [
@@ -52,28 +53,6 @@ class QuotePdfGenerator
         $pdf = Pdf::loadHTML($html);
         $pdf->getDomPDF()->setPaper('A4', 'portrait');
 
-        return [$pdf->output(), 'devis-' . $quote->number . '.pdf'];
-    }
-
-    private function resolvePdfTemplate(string $documentType, ?int $requestTemplateId, ?int $modelTemplateId): ?DocumentPdfTemplate
-    {
-        if ($requestTemplateId) {
-            return DocumentPdfTemplate::query()
-                ->where('id', $requestTemplateId)
-                ->where('document_type', $documentType)
-                ->first();
-        }
-
-        if ($modelTemplateId) {
-            $t = DocumentPdfTemplate::find($modelTemplateId);
-            if ($t && $t->document_type === $documentType) {
-                return $t;
-            }
-        }
-
-        return DocumentPdfTemplate::query()
-            ->where('document_type', $documentType)
-            ->where('is_default', true)
-            ->first();
+        return [$pdf->output(), 'devis-'.$quote->number.'.pdf'];
     }
 }

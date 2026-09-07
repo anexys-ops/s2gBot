@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { ordersApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
+import { ListTablePanelHeader } from '../components/ListTablePanel'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 
@@ -86,8 +87,10 @@ export default function Orders() {
         visibleColumns={visible}
         onToggleColumn={toggle}
       />
-      <div className="card">
-        <table>
+      <div className="card dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title="Commandes" count={orders.length} />
+        <div className="table-wrap">
+        <table className="data-table data-table--compact">
           <thead>
             <tr>
               {visible.reference !== false && <th>Référence</th>}
@@ -130,7 +133,8 @@ export default function Orders() {
             ))}
           </tbody>
         </table>
-        {orders.length === 0 && <p style={{ padding: '1rem' }}>Aucune commande.</p>}
+        </div>
+        {orders.length === 0 && <p className="dossier-tab-empty">Aucune commande.</p>}
         <PaginationBar page={data?.current_page ?? 1} lastPage={lastPage} onPage={setPage} />
       </div>
     </div>

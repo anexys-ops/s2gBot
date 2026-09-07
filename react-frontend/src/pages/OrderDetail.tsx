@@ -7,7 +7,7 @@ import {
   ordersApi,
   reportsApi,
   samplesApi,
-  reportPdfTemplatesApi,
+  documentPdfTemplatesApi,
   reportFormDefinitionsApi,
   type Borehole,
   type EntityMetaPayload,
@@ -107,7 +107,7 @@ export default function OrderDetail() {
 
   const { data: tplRes } = useQuery({
     queryKey: ['report-pdf-templates'],
-    queryFn: () => reportPdfTemplatesApi.list(),
+    queryFn: () => documentPdfTemplatesApi.list('report', true),
     enabled: !!id && id !== 'new' && isLab,
   })
 
@@ -477,7 +477,7 @@ export default function OrderDetail() {
           )}
           {pdfTemplates.length === 0 && (
             <p className="error" style={{ fontSize: '0.9rem' }}>
-              Aucun modèle PDF configuré (migrations / table <code>report_pdf_templates</code>).
+              Aucun modèle PDF actif (Back office → Modèles PDF → Rapports).
             </p>
           )}
           <button

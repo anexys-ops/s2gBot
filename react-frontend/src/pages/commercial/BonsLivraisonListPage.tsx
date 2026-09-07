@@ -3,14 +3,18 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { bonsCommandeApi, bonsLivraisonApi, type BonCommande, type BonLivraison } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import ClickableStatusBadge from '../../components/ds/ClickableStatusBadge'
 import StatusBadge, { bonLivraisonStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ListTableToolbar from '../../components/ListTableToolbar'
+import { ListTablePanelHeader } from '../../components/ListTablePanel'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import StatusChangeModal from '../../components/StatusChangeModal'
 import TableRowActions from '../../components/TableRowActions'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
 import { formatAppDate } from '../../lib/appLocale'
+import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
 
 const STATUT_LABELS: Record<string, string> = {
   brouillon: 'Brouillon',
@@ -182,6 +186,7 @@ export default function BonsLivraisonListPage() {
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statutFilter, setStatutFilter] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<BonLivraison | null>(null)
+  const [statusModalBl, setStatusModalBl] = useState<{ id: number; numero: string; statut: string } | null>(null)
 
   const { visible, toggle } = usePersistedColumnVisibility('bons-livraison', {
     number: true,
@@ -208,6 +213,14 @@ export default function BonsLivraisonListPage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['bons-livraison'] })
       setDeleteTarget(null)
+    },
+  })
+
+  const statusMut = useMutation({
+    mutationFn: ({ id, statut }: { id: number; statut: string }) => bonsLivraisonApi.update(id, { statut }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['bons-livraison'] })
+      setStatusModalBl(null)
     },
   })
 
@@ -302,6 +315,7 @@ export default function BonsLivraisonListPage() {
       />
 
       <div className="card dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title="Bons de livraison" count={bls.length} />
         {bls.length > 0 ? (
           <div className="table-wrap">
             <table className="data-table data-table--compact">
@@ -313,7 +327,7 @@ export default function BonsLivraisonListPage() {
                   {visible.bc !== false && <th>BC source</th>}
                   {visible.date !== false && <th>Date livraison</th>}
                   {visible.status !== false && <th>Statut</th>}
-                  {visible.actions !== false && <th className="data-table__actions">Actions</th>}
+                  {visible.actions !== false && isLab && <th className="data-table__actions">Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -325,8 +339,7 @@ export default function BonsLivraisonListPage() {
                       key={bl.id}
                       className="table-row-link"
                       onClick={(e) => {
-                        const t = e.target as HTMLElement
-                        if (t.closest('a, button')) return
+                        if (shouldIgnoreTableRowClick(e.target)) return
                         navigate(`/bons-livraison/${bl.id}`)
                       }}
                     >
@@ -377,27 +390,32 @@ export default function BonsLivraisonListPage() {
                       {visible.date !== false && <td>{formatAppDate(bl.date_livraison)}</td>}
                       {visible.status !== false && (
                         <td className="data-table__status">
-                          <StatusBadge variant={st.variant} size="sm">
-                            {st.label}
-                          </StatusBadge>
-                        </td>
-                      )}
-                      {visible.actions !== false && (
-                        <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
                           {isLab ? (
-                            <TableRowActions
-                              onEdit={() => navigate(`/bons-livraison/${bl.id}`)}
-                              onDelete={canDelete ? () => setDeleteTarget(bl) : undefined}
-                              editLabel={`Ouvrir le bon ${bl.numero}`}
-                              deleteLabel={`Supprimer le bon ${bl.numero}`}
-                            />
+                            <ClickableStatusBadge
+                              variant={st.variant}
+                              size="sm"
+                              ariaLabel={`Changer le statut du bon ${bl.numero}`}
+                              onClick={() => setStatusModalBl({ id: bl.id, numero: bl.numero, statut: bl.statut })}
+                            >
+                              {st.label}
+                            </ClickableStatusBadge>
                           ) : (
-                            <Link to={`/bons-livraison/${bl.id}`} className="btn btn-secondary btn-sm">
-                              Ouvrir
-                            </Link>
+                            <StatusBadge variant={st.variant} size="sm">
+                              {st.label}
+                            </StatusBadge>
                           )}
                         </td>
                       )}
+                      {visible.actions !== false && isLab ? (
+                        <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
+                          {canDelete ? (
+                            <TableRowActions
+                              onDelete={() => setDeleteTarget(bl)}
+                              deleteLabel={`Supprimer le bon ${bl.numero}`}
+                            />
+                          ) : null}
+                        </td>
+                      ) : null}
                     </tr>
                   )
                 })}
@@ -412,6 +430,18 @@ export default function BonsLivraisonListPage() {
           </p>
         )}
       </div>
+
+      {statusModalBl ? (
+        <StatusChangeModal
+          title={`Statut — ${statusModalBl.numero}`}
+          initialValue={statusModalBl.statut}
+          options={statusOptions}
+          isPending={statusMut.isPending}
+          error={statusMut.isError ? (statusMut.error as Error).message : null}
+          onClose={() => setStatusModalBl(null)}
+          onSave={(statut) => statusMut.mutate({ id: statusModalBl.id, statut })}
+        />
+      ) : null}
 
       {deleteTarget ? (
         <ConfirmDialog

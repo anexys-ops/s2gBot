@@ -22,6 +22,7 @@ class QuoteEmailMailable extends Mailable
         public readonly string $recipientName,
         public readonly ?string $customMessage = null,
         public readonly ?string $senderName = null,
+        public readonly ?int $pdfTemplateId = null,
     ) {}
 
     public function envelope(): Envelope
@@ -56,7 +57,7 @@ class QuoteEmailMailable extends Mailable
      */
     public function attachments(): array
     {
-        [$bytes, $filename] = app(QuotePdfGenerator::class)->generate($this->quote);
+        [$bytes, $filename] = app(QuotePdfGenerator::class)->generate($this->quote, $this->pdfTemplateId);
 
         return [
             Attachment::fromData(fn () => $bytes, $filename)->withMime('application/pdf'),

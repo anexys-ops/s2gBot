@@ -414,10 +414,19 @@ export default function QuoteEditorPage() {
           delete meta.devis_parcours
         }
         if (meta.devis_jalons?.length) {
-          meta.devis_jalons = meta.devis_jalons.map((j) => ({
-            ...j,
-            product_line_keys: (j.product_line_keys ?? []).filter((k) => k !== lineKey),
-          }))
+          const removedRefId = removed?.ref_article_id
+          meta.devis_jalons = meta.devis_jalons.map((j) => {
+            const nextKeys = (j.product_line_keys ?? []).filter((k) => k !== lineKey)
+            const nextRefs =
+              removedRefId != null
+                ? (j.product_ref_article_ids ?? []).filter((id) => id !== removedRefId)
+                : j.product_ref_article_ids
+            return {
+              ...j,
+              product_line_keys: nextKeys,
+              product_ref_article_ids: nextRefs,
+            }
+          })
         }
       }
       return { ...f, lines: nextLines, meta }
@@ -859,9 +868,13 @@ export default function QuoteEditorPage() {
         (() => {
           const j = form.meta.devis_jalons?.find((x) => x.id === s2gAppendJalonId)
           if (!j?.ref_article_id) return null
-          const exclude = new Set<number>(j.product_ref_article_ids ?? [])
-          form.lines.forEach((line) => {
-            if (line.parent_jalon_id === s2gAppendJalonId && line.ref_article_id != null) {
+          const childKeys = new Set(j.product_line_keys ?? [])
+          const exclude = new Set<number>()
+          form.lines.forEach((line, index) => {
+            const key = lineKeyForRow(line, index)
+            const belongsToJalon =
+              line.parent_jalon_id === s2gAppendJalonId || childKeys.has(key)
+            if (belongsToJalon && line.ref_article_id != null) {
               exclude.add(line.ref_article_id)
             }
           })

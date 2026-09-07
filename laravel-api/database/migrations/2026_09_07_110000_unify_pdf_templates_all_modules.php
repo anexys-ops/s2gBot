@@ -101,7 +101,7 @@ return new class extends Migration
             return;
         }
 
-        if (DB::table('document_pdf_templates')->where('document_type', 'report')->exists()) {
+        if ($this->reportsTemplateFkPointsToDocumentPdfTemplates()) {
             return;
         }
 
@@ -109,6 +109,15 @@ return new class extends Migration
         $idMap = [];
 
         foreach (DB::table('report_pdf_templates')->orderBy('id')->get() as $row) {
+            $existing = DB::table('document_pdf_templates')
+                ->where('document_type', 'report')
+                ->where('slug', $row->slug)
+                ->first();
+            if ($existing) {
+                $idMap[(int) $row->id] = (int) $existing->id;
+                continue;
+            }
+
             $layout = property_exists($row, 'layout_config') ? $row->layout_config : null;
             $newId = DB::table('document_pdf_templates')->insertGetId([
                 'document_type' => 'report',
@@ -124,17 +133,23 @@ return new class extends Migration
             $idMap[(int) $row->id] = $newId;
         }
 
-        if ($idMap === []) {
+        if ($idMap !== []) {
+            foreach ($idMap as $oldId => $newId) {
+                DB::table('reports')->where('pdf_template_id', $oldId)->update(['pdf_template_id' => $newId]);
+            }
+        }
+
+        if (! Schema::hasColumn('reports', 'pdf_template_id')) {
             return;
         }
 
-        foreach ($idMap as $oldId => $newId) {
-            DB::table('reports')->where('pdf_template_id', $oldId)->update(['pdf_template_id' => $newId]);
+        try {
+            Schema::table('reports', function (Blueprint $table) {
+                $table->dropForeign(['pdf_template_id']);
+            });
+        } catch (\Throwable) {
+            // FK déjà absente ou renommée — on tente la recréation ci-dessous.
         }
-
-        Schema::table('reports', function (Blueprint $table) {
-            $table->dropForeign(['pdf_template_id']);
-        });
 
         Schema::table('reports', function (Blueprint $table) {
             $table->foreign('pdf_template_id')
@@ -142,5 +157,26 @@ return new class extends Migration
                 ->on('document_pdf_templates')
                 ->nullOnDelete();
         });
+    }
+
+    private function reportsTemplateFkPointsToDocumentPdfTemplates(): bool
+    {
+        if (! Schema::hasTable('reports') || ! Schema::hasColumn('reports', 'pdf_template_id')) {
+            return true;
+        }
+
+        $database = DB::getDatabaseName();
+        $row = DB::selectOne(
+            'SELECT REFERENCED_TABLE_NAME AS ref_table
+             FROM information_schema.KEY_COLUMN_USAGE
+             WHERE TABLE_SCHEMA = ?
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = ?
+               AND REFERENCED_TABLE_NAME IS NOT NULL
+             LIMIT 1',
+            [$database, 'reports', 'pdf_template_id'],
+        );
+
+        return ($row->ref_table ?? null) === 'document_pdf_templates';
     }
 };

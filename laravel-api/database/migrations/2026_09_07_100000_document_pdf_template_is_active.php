@@ -9,9 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('document_pdf_templates', function (Blueprint $table) {
-            $table->boolean('is_active')->default(true)->after('is_default');
-        });
+        if (! Schema::hasColumn('document_pdf_templates', 'is_active')) {
+            Schema::table('document_pdf_templates', function (Blueprint $table) {
+                $table->boolean('is_active')->default(true)->after('is_default');
+            });
+        }
 
         $now = now();
         $presets = [

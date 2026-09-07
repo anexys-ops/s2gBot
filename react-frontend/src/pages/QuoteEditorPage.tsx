@@ -9,6 +9,7 @@ import StatusBadge, { quoteStatutBadgeProps } from '../components/ds/StatusBadge
 import { type QuoteFormState, type QuoteLineDraft, type ContextMode } from '../components/quotes/QuoteFormFields'
 import QuoteWizard from '../components/quotes/wizard/QuoteWizard'
 import S2gCataloguePickerModal from '../components/quotes/S2gCataloguePickerModal'
+import S2gAppendArticlesModal from '../components/quotes/S2gAppendArticlesModal'
 import {
   quotesApi,
   clientsApi,
@@ -838,28 +839,8 @@ export default function QuoteEditorPage() {
         )}
       </form>
 
-      {s2gPickOpen && (
+      {s2gPickOpen && !s2gAppendJalonId && (
         <S2gCataloguePickerModal
-          appendToJalon={
-            s2gAppendJalonId
-              ? (() => {
-                  const j = form.meta.devis_jalons?.find((x) => x.id === s2gAppendJalonId)
-                  if (!j?.ref_article_id) return null
-                  const exclude = new Set<number>(j.product_ref_article_ids ?? [])
-                  form.lines.forEach((line) => {
-                    if (line.parent_jalon_id === s2gAppendJalonId && line.ref_article_id != null) {
-                      exclude.add(line.ref_article_id)
-                    }
-                  })
-                  return {
-                    devisJalonId: s2gAppendJalonId,
-                    refArticleId: j.ref_article_id,
-                    libelle: j.libelle,
-                    excludeProductIds: [...exclude],
-                  }
-                })()
-              : null
-          }
           onClose={closeS2gCatalog}
           onPick={async (result) => {
             try {
@@ -872,6 +853,38 @@ export default function QuoteEditorPage() {
           }}
         />
       )}
+
+      {s2gPickOpen &&
+        s2gAppendJalonId &&
+        (() => {
+          const j = form.meta.devis_jalons?.find((x) => x.id === s2gAppendJalonId)
+          if (!j?.ref_article_id) return null
+          const exclude = new Set<number>(j.product_ref_article_ids ?? [])
+          form.lines.forEach((line) => {
+            if (line.parent_jalon_id === s2gAppendJalonId && line.ref_article_id != null) {
+              exclude.add(line.ref_article_id)
+            }
+          })
+          return (
+            <S2gAppendArticlesModal
+              libelle={j.libelle}
+              refArticleId={j.ref_article_id}
+              excludeProductIds={[...exclude]}
+              onClose={closeS2gCatalog}
+              onPick={async (result) => {
+                try {
+                  await applyS2gCataloguePick(result)
+                  setSubmitError(null)
+                } catch (err) {
+                  setSubmitError(
+                    err instanceof Error ? err.message : 'Impossible d’ajouter depuis le catalogue S2G.',
+                  )
+                  throw err
+                }
+              }}
+            />
+          )
+        })()}
 
       {catalogPick !== null && (
         <Modal

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { catalogueApi, type RefArticleKind } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
@@ -26,6 +26,7 @@ export default function CatalogueListePage() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'lab_admin'
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -51,6 +52,14 @@ export default function CatalogueListePage() {
   useEffect(() => {
     setViewMode(parseViewMode(searchParams.get('vue')))
   }, [searchParams])
+
+  useEffect(() => {
+    const st = location.state as { openCreate?: boolean } | null
+    if (st?.openCreate && isAdmin) {
+      setShowCreateModal(true)
+      navigate(`${location.pathname}${location.search}`, { replace: true, state: {} })
+    }
+  }, [location.pathname, location.search, location.state, isAdmin, navigate])
 
   const { data: familles } = useQuery({
     queryKey: ['catalogue-familles', withInactif],
@@ -119,9 +128,11 @@ export default function CatalogueListePage() {
       subtitle={viewSubtitle}
       actions={
         isAdmin ? (
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>
-            Nouvel article
-          </button>
+          <div className="crud-actions">
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>
+              Nouveau
+            </button>
+          </div>
         ) : null
       }
     >

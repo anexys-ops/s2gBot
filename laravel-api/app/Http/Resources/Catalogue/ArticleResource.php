@@ -34,6 +34,7 @@ class ArticleResource extends JsonResource
             'duree_estimee' => $this->duree_estimee,
             'normes' => $this->normes,
             'actif' => $this->actif,
+            'is_multi_site' => (bool) ($this->is_multi_site ?? true),
             'kind' => $this->kind ?? Article::KIND_LEGACY,
             'famille_label' => $this->famille_label,
             'created_at' => $this->created_at,
@@ -95,6 +96,12 @@ class ArticleResource extends JsonResource
                     'kind' => $link->jalon->kind,
                     'actif' => $link->jalon->actif,
                 ] : null,
+            ])),
+            'visible_lab_agencies' => $this->whenLoaded('visibleLabAgencies', fn () => $this->visibleLabAgencies->map(fn ($a) => [
+                'id' => $a->id,
+                'name' => $a->name,
+                'code' => $a->code,
+                'is_siege' => (bool) $a->is_siege,
             ])),
         ];
     }

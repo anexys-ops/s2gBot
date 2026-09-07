@@ -3,9 +3,15 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { catalogueApi, type RefArticleRow } from '../../api/client'
 
+export type ArticleProlabEditorSection = 'overview' | 'descriptions' | 'none' | 'all'
+
 type Props = {
   article: RefArticleRow
   onUpdated: () => void
+  section?: ArticleProlabEditorSection
+  hideActions?: boolean
+  formId?: string
+  onPendingChange?: (pending: boolean) => void
 }
 
 function safeNum(v: unknown, fallback: number): number {
@@ -61,7 +67,14 @@ function formFromArticle(article: RefArticleRow): FormState {
   }
 }
 
-export default function ArticleProlabEditor({ article, onUpdated }: Props) {
+export default function ArticleProlabEditor({
+  article,
+  onUpdated,
+  section = 'all',
+  hideActions = false,
+  formId = 'article-prolab-edit-form',
+  onPendingChange,
+}: Props) {
   const [form, setForm] = useState<FormState>(() => formFromArticle(article))
   const [saved, setSaved] = useState(false)
 
@@ -87,6 +100,10 @@ export default function ArticleProlabEditor({ article, onUpdated }: Props) {
   useEffect(() => {
     setForm(formFromArticle(article))
   }, [article])
+
+  useEffect(() => {
+    onPendingChange?.(mut.isPending)
+  }, [mut.isPending, onPendingChange])
 
   function buildPayload() {
     const prix = Number(form.prix_unitaire_ht)
@@ -116,267 +133,297 @@ export default function ArticleProlabEditor({ article, onUpdated }: Props) {
     }
   }
 
+  const showOverview = section === 'all' || section === 'overview'
+  const showDescriptions = section === 'all' || section === 'descriptions'
+  const showIntro = section === 'all' || section === 'overview'
+
+  if (section === 'none') {
+    return (
+      <form
+        id={formId}
+        className="article-edit article-edit--hidden"
+        hidden
+        aria-hidden
+        onSubmit={(e) => {
+          e.preventDefault()
+          mut.mutate(buildPayload())
+        }}
+      />
+    )
+  }
+
   return (
     <div className="article-edit">
-      <section className="card dossier-tab-panel">
-        <h2 className="ds-form-section__title">Modifier l&apos;article</h2>
-        <p className="dossier-tab-panel__intro">
-          Mise à jour des champs commerciaux, tarifaires et pédagogiques. Le code article et la famille ne sont pas
-          modifiables ici.
-        </p>
-        <dl className="article-edit__meta">
-          <div>
-            <dt>Code article</dt>
-            <dd>
-              <code className="code-badge">{article.code}</code>
-            </dd>
-          </div>
-          <div>
-            <dt>Famille</dt>
-            <dd>
-              {article.famille ? (
-                <>
-                  <span className="article-edit__family-code">{article.famille.code}</span>
-                  <span className="text-muted"> — {article.famille.libelle}</span>
-                </>
-              ) : (
-                '—'
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>Statut</dt>
-            <dd>
-              {article.actif ? (
-                <span className="status-pill status-pill--ok">Actif</span>
-              ) : (
-                <span className="status-pill status-pill--muted">Inactif</span>
-              )}
-            </dd>
-          </div>
-          {article.article_lie ? (
+      {showIntro && (
+        <section className="card dossier-tab-panel">
+          <h2 className="ds-form-section__title">Fiche article</h2>
+          <p className="dossier-tab-panel__intro">
+            Champs commerciaux, tarifaires et pédagogiques. Le code et la famille ne sont pas modifiables — enregistrez via
+            le bouton <strong>Enregistrer</strong> en haut à droite.
+          </p>
+          <dl className="article-edit__meta">
             <div>
-              <dt>Regroupement actuel</dt>
+              <dt>Code article</dt>
               <dd>
-                <Link to={`/catalogue/articles/${article.article_lie.id}`} className="link-inline">
-                  {article.article_lie.code} — {article.article_lie.libelle}
-                </Link>
+                <code className="code-badge">{article.code}</code>
               </dd>
             </div>
-          ) : null}
-        </dl>
-      </section>
+            <div>
+              <dt>Famille</dt>
+              <dd>
+                {article.famille ? (
+                  <>
+                    <span className="article-edit__family-code">{article.famille.code}</span>
+                    <span className="text-muted"> — {article.famille.libelle}</span>
+                  </>
+                ) : (
+                  '—'
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>Statut</dt>
+              <dd>
+                {article.actif ? (
+                  <span className="status-pill status-pill--ok">Actif</span>
+                ) : (
+                  <span className="status-pill status-pill--muted">Inactif</span>
+                )}
+              </dd>
+            </div>
+            {article.article_lie ? (
+              <div>
+                <dt>Regroupement actuel</dt>
+                <dd>
+                  <Link to={`/catalogue/articles/${article.article_lie.id}`} className="link-inline">
+                    {article.article_lie.code} — {article.article_lie.libelle}
+                  </Link>
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        </section>
+      )}
 
       <section className="card dossier-tab-panel article-edit__form-panel">
         <form
+          id={formId}
           className="catalogue-article-new-form"
           onSubmit={(e) => {
             e.preventDefault()
             mut.mutate(buildPayload())
           }}
         >
-          <section className="catalogue-article-new-form__section">
-            <h3 className="catalogue-article-new-form__section-title">Identité</h3>
-            <div className="catalogue-article-new-form__grid">
-              <label className="catalogue-article-new-form__col-12">
-                Libellé *
-                <input
-                  value={form.libelle}
-                  onChange={(e) => setForm((f) => ({ ...f, libelle: e.target.value }))}
-                  required
-                  maxLength={255}
-                />
-              </label>
-              <label className="catalogue-article-new-form__col-4">
-                Code interne
-                <input
-                  value={form.code_interne}
-                  onChange={(e) => setForm((f) => ({ ...f, code_interne: e.target.value }))}
-                  placeholder="Réf. interne labo"
-                  maxLength={64}
-                />
-              </label>
-              <label className="catalogue-article-new-form__col-4">
-                SKU
-                <input
-                  value={form.sku}
-                  onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
-                  maxLength={64}
-                />
-              </label>
-              <label className="catalogue-article-new-form__col-4">
-                Regroupement
-                <select
-                  value={form.ref_article_lie_id}
-                  onChange={(e) => setForm((f) => ({ ...f, ref_article_lie_id: e.target.value }))}
-                >
-                  <option value="">— Aucun —</option>
-                  {lieOptions.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {shortOptionLabel(a.code, a.libelle)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="catalogue-article-new-form__col-12">
-                Tags (séparés par virgules)
-                <input
-                  value={form.tags}
-                  onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
-                  placeholder="Béton, Urgent, Dalle…"
-                />
-              </label>
-            </div>
-          </section>
-
-          <section className="catalogue-article-new-form__section">
-            <h3 className="catalogue-article-new-form__section-title">Tarification &amp; unités</h3>
-            <div className="catalogue-article-new-form__grid">
-              <label className="catalogue-article-new-form__col-4">
-                Unité (cotation)
-                <input
-                  value={form.unite}
-                  onChange={(e) => setForm((f) => ({ ...f, unite: e.target.value }))}
-                  placeholder="U, m², forfait…"
-                  maxLength={32}
-                  title="Unité utilisée dans les devis et cotations."
-                />
-              </label>
-              <label className="catalogue-article-new-form__col-4">
-                Unité HFSQL
-                <input
-                  value={form.hfsql_unite}
-                  onChange={(e) => setForm((f) => ({ ...f, hfsql_unite: e.target.value }))}
-                  placeholder="ex. m³, u, h"
-                  maxLength={64}
-                />
-              </label>
-              <label className="catalogue-article-new-form__col-4">
-                Durée estimée (min)
-                <input
-                  type="number"
-                  min={0}
-                  value={form.duree_estimee ?? 0}
-                  onChange={(e) => {
-                    const n = parseInt(e.target.value, 10)
-                    setForm((f) => ({ ...f, duree_estimee: Number.isFinite(n) ? n : 0 }))
-                  }}
-                />
-              </label>
-              <label className="catalogue-article-new-form__col-3">
-                Prix unitaire HT
-                <input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={Number.isFinite(form.prix_unitaire_ht) ? form.prix_unitaire_ht : ''}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    if (v === '') {
-                      setForm((f) => ({ ...f, prix_unitaire_ht: 0 }))
-                      return
-                    }
-                    const n = Number(v)
-                    setForm((f) => ({ ...f, prix_unitaire_ht: Number.isFinite(n) ? n : 0 }))
-                  }}
-                />
-              </label>
-              <label className="catalogue-article-new-form__col-3">
-                Prix de revient HT
-                <input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={form.prix_revient_ht === undefined ? '' : form.prix_revient_ht}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    if (v === '') {
-                      setForm((f) => ({ ...f, prix_revient_ht: undefined }))
-                      return
-                    }
-                    const n = Number(v)
-                    setForm((f) => ({ ...f, prix_revient_ht: Number.isFinite(n) ? n : undefined }))
-                  }}
-                />
-              </label>
-              <label className="catalogue-article-new-form__col-3">
-                TVA (%)
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={0.01}
-                  value={Number.isFinite(form.tva_rate) ? form.tva_rate : ''}
-                  onChange={(e) => {
-                    const n = Number(e.target.value)
-                    setForm((f) => ({ ...f, tva_rate: Number.isFinite(n) ? n : 20 }))
-                  }}
-                />
-              </label>
-              <label className="catalogue-article-new-form__col-3 catalogue-article-new-form__checkbox-field">
-                <span>Statut</span>
-                <span className="catalogue-article-new-form__checkbox-control">
+          {showOverview && (
+            <section className="catalogue-article-new-form__section">
+              <h3 className="catalogue-article-new-form__section-title">Identité</h3>
+              <div className="catalogue-article-new-form__grid">
+                <label className="catalogue-article-new-form__col-12">
+                  Libellé *
                   <input
-                    type="checkbox"
-                    checked={form.actif}
-                    onChange={(e) => setForm((f) => ({ ...f, actif: e.target.checked }))}
+                    value={form.libelle}
+                    onChange={(e) => setForm((f) => ({ ...f, libelle: e.target.value }))}
+                    required
+                    maxLength={255}
                   />
-                  <span>Article actif</span>
-                </span>
-              </label>
-            </div>
-          </section>
+                </label>
+                <label className="catalogue-article-new-form__col-4">
+                  Code interne
+                  <input
+                    value={form.code_interne}
+                    onChange={(e) => setForm((f) => ({ ...f, code_interne: e.target.value }))}
+                    placeholder="Réf. interne labo"
+                    maxLength={64}
+                  />
+                </label>
+                <label className="catalogue-article-new-form__col-4">
+                  SKU
+                  <input
+                    value={form.sku}
+                    onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
+                    maxLength={64}
+                  />
+                </label>
+                <label className="catalogue-article-new-form__col-4">
+                  Regroupement
+                  <select
+                    value={form.ref_article_lie_id}
+                    onChange={(e) => setForm((f) => ({ ...f, ref_article_lie_id: e.target.value }))}
+                  >
+                    <option value="">— Aucun —</option>
+                    {lieOptions.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {shortOptionLabel(a.code, a.libelle)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="catalogue-article-new-form__col-12">
+                  Tags (séparés par virgules)
+                  <input
+                    value={form.tags}
+                    onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
+                    placeholder="Béton, Urgent, Dalle…"
+                  />
+                </label>
+              </div>
+            </section>
+          )}
 
-          <section className="catalogue-article-new-form__section">
-            <h3 className="catalogue-article-new-form__section-title">Descriptions &amp; normes</h3>
-            <div className="catalogue-article-new-form__grid">
-              <label className="catalogue-article-new-form__col-12">
-                Description (legacy)
-                <textarea
-                  rows={2}
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                />
-              </label>
-              <label className="catalogue-article-new-form__col-12">
-                Description commerciale
-                <textarea
-                  rows={3}
-                  value={form.description_commerciale}
-                  onChange={(e) => setForm((f) => ({ ...f, description_commerciale: e.target.value }))}
-                />
-              </label>
-              <label className="catalogue-article-new-form__col-12">
-                Description technique
-                <textarea
-                  rows={4}
-                  value={form.description_technique}
-                  onChange={(e) => setForm((f) => ({ ...f, description_technique: e.target.value }))}
-                />
-              </label>
-              <label className="catalogue-article-new-form__col-12">
-                Normes
-                <input value={form.normes} onChange={(e) => setForm((f) => ({ ...f, normes: e.target.value }))} />
-              </label>
-            </div>
-          </section>
+          {showOverview && (
+            <section className="catalogue-article-new-form__section">
+              <h3 className="catalogue-article-new-form__section-title">Tarification &amp; unités</h3>
+              <div className="catalogue-article-new-form__grid">
+                <label className="catalogue-article-new-form__col-4">
+                  Unité (cotation)
+                  <input
+                    value={form.unite}
+                    onChange={(e) => setForm((f) => ({ ...f, unite: e.target.value }))}
+                    placeholder="U, m², forfait…"
+                    maxLength={32}
+                    title="Unité utilisée dans les devis et cotations."
+                  />
+                </label>
+                <label className="catalogue-article-new-form__col-4">
+                  Unité HFSQL
+                  <input
+                    value={form.hfsql_unite}
+                    onChange={(e) => setForm((f) => ({ ...f, hfsql_unite: e.target.value }))}
+                    placeholder="ex. m³, u, h"
+                    maxLength={64}
+                  />
+                </label>
+                <label className="catalogue-article-new-form__col-4">
+                  Durée estimée (min)
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.duree_estimee ?? 0}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10)
+                      setForm((f) => ({ ...f, duree_estimee: Number.isFinite(n) ? n : 0 }))
+                    }}
+                  />
+                </label>
+                <label className="catalogue-article-new-form__col-3">
+                  Prix unitaire HT
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={Number.isFinite(form.prix_unitaire_ht) ? form.prix_unitaire_ht : ''}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v === '') {
+                        setForm((f) => ({ ...f, prix_unitaire_ht: 0 }))
+                        return
+                      }
+                      const n = Number(v)
+                      setForm((f) => ({ ...f, prix_unitaire_ht: Number.isFinite(n) ? n : 0 }))
+                    }}
+                  />
+                </label>
+                <label className="catalogue-article-new-form__col-3">
+                  Prix de revient HT
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.prix_revient_ht === undefined ? '' : form.prix_revient_ht}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v === '') {
+                        setForm((f) => ({ ...f, prix_revient_ht: undefined }))
+                        return
+                      }
+                      const n = Number(v)
+                      setForm((f) => ({ ...f, prix_revient_ht: Number.isFinite(n) ? n : undefined }))
+                    }}
+                  />
+                </label>
+                <label className="catalogue-article-new-form__col-3">
+                  TVA (%)
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.01}
+                    value={Number.isFinite(form.tva_rate) ? form.tva_rate : ''}
+                    onChange={(e) => {
+                      const n = Number(e.target.value)
+                      setForm((f) => ({ ...f, tva_rate: Number.isFinite(n) ? n : 20 }))
+                    }}
+                  />
+                </label>
+                <label className="catalogue-article-new-form__col-3 catalogue-article-new-form__checkbox-field">
+                  <span>Statut</span>
+                  <span className="catalogue-article-new-form__checkbox-control">
+                    <input
+                      type="checkbox"
+                      checked={form.actif}
+                      onChange={(e) => setForm((f) => ({ ...f, actif: e.target.checked }))}
+                    />
+                    <span>Article actif</span>
+                  </span>
+                </label>
+              </div>
+            </section>
+          )}
+
+          {showDescriptions && (
+            <section className="catalogue-article-new-form__section">
+              <h3 className="catalogue-article-new-form__section-title">Descriptions &amp; normes</h3>
+              <div className="catalogue-article-new-form__grid">
+                <label className="catalogue-article-new-form__col-12">
+                  Description (legacy)
+                  <textarea
+                    rows={2}
+                    value={form.description}
+                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  />
+                </label>
+                <label className="catalogue-article-new-form__col-12">
+                  Description commerciale
+                  <textarea
+                    rows={3}
+                    value={form.description_commerciale}
+                    onChange={(e) => setForm((f) => ({ ...f, description_commerciale: e.target.value }))}
+                  />
+                </label>
+                <label className="catalogue-article-new-form__col-12">
+                  Description technique
+                  <textarea
+                    rows={4}
+                    value={form.description_technique}
+                    onChange={(e) => setForm((f) => ({ ...f, description_technique: e.target.value }))}
+                  />
+                </label>
+                <label className="catalogue-article-new-form__col-12">
+                  Normes
+                  <input value={form.normes} onChange={(e) => setForm((f) => ({ ...f, normes: e.target.value }))} />
+                </label>
+              </div>
+            </section>
+          )}
 
           {mut.isError ? <p className="error">{(mut.error as Error).message}</p> : null}
-          {saved ? <p className="article-edit__saved text-muted">Modifications enregistrées.</p> : null}
+          {saved && !hideActions ? <p className="article-edit__saved text-muted">Modifications enregistrées.</p> : null}
 
-          <div className="crud-actions catalogue-article-new-form__actions article-edit__actions">
-            <button type="submit" className="btn btn-primary" disabled={mut.isPending}>
-              {mut.isPending ? 'Enregistrement…' : 'Enregistrer'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={mut.isPending}
-              onClick={() => setForm(formFromArticle(article))}
-            >
-              Annuler les modifications
-            </button>
-          </div>
+          {!hideActions && (
+            <div className="crud-actions catalogue-article-new-form__actions article-edit__actions">
+              <button type="submit" className="btn btn-primary" disabled={mut.isPending}>
+                {mut.isPending ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={mut.isPending}
+                onClick={() => setForm(formFromArticle(article))}
+              >
+                Annuler les modifications
+              </button>
+            </div>
+          )}
         </form>
       </section>
     </div>

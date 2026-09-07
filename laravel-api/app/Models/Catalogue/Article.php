@@ -46,6 +46,7 @@ class Article extends Model
         'duree_estimee',
         'normes',
         'actif',
+        'is_multi_site',
         'kind',
         'famille_label',
         // v1.2.0 — déclencheurs workflow & ressources
@@ -70,6 +71,7 @@ class Article extends Model
             'tva_rate'                 => 'decimal:2',
             'duree_estimee'            => 'integer',
             'actif'                    => 'boolean',
+            'is_multi_site'            => 'boolean',
             'tags'                     => 'array',
             // v1.2.0 — déclencheurs & ressources
             'triggers_odm_terrain'     => 'boolean',
@@ -210,6 +212,17 @@ class Article extends Model
     public function productJalonLinks(): HasMany
     {
         return $this->hasMany(JalonProduct::class, 'product_article_id')->orderBy('ordre');
+    }
+
+    /** Agences labo autorisées (si is_multi_site = false). */
+    public function visibleLabAgencies(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            \App\Models\Agency::class,
+            'article_lab_agency',
+            'article_id',
+            'agency_id'
+        )->withTimestamps();
     }
 
     public function isJalon(): bool

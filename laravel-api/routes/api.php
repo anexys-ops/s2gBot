@@ -100,6 +100,8 @@ Route::middleware('auth:sanctum')->group(function () {
             ->whereNumber('article');
         Route::delete('catalogue/articles/{article}', [ArticleController::class, 'destroy'])
             ->whereNumber('article');
+        Route::put('catalogue/articles/{article}/lab-visibility', [ArticleController::class, 'syncLabVisibility'])
+            ->whereNumber('article');
         Route::get('catalogue/arbre', CatalogueArbreController::class);
         Route::get('catalogue/qualification-tags', [QualificationTagController::class, 'index']);
         Route::get('catalogue/taches', [TacheController::class, 'index']);
@@ -189,6 +191,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::apiResource('clients', ClientController::class);
+    Route::put('clients/{client}/lab-agencies', [ClientController::class, 'syncLabAgencies']);
     Route::get('clients/{client}/agencies', [AgencyController::class, 'index']);
     Route::post('clients/{client}/agencies', [AgencyController::class, 'store']);
     Route::get('agencies/{agency}', [AgencyController::class, 'show']);

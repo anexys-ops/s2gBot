@@ -166,6 +166,7 @@ export const adminUsersApi = {
     site_id?: number | null
     access_group_ids?: number[]
     agency_ids?: number[]
+    agency_id?: number | null
   }) => api<User>('/admin/users', { method: 'POST', body: JSON.stringify(body) }),
   update: (
     id: number,
@@ -179,6 +180,7 @@ export const adminUsersApi = {
       site_id: number | null
       access_group_ids: number[]
       agency_ids: number[]
+      agency_id?: number | null
     }>,
   ) => api<User>(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/admin/users/${id}`, { method: 'DELETE' }),
@@ -238,6 +240,11 @@ export const clientsApi = {
   create: (body: Partial<Client>) => api<Client>('/clients', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: Partial<Client>) => api<Client>(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/clients/${id}`, { method: 'DELETE' }),
+  syncLabAgencies: (id: number, labAgencyIds: number[]) =>
+    api<Client>(`/clients/${id}/lab-agencies`, {
+      method: 'PUT',
+      body: JSON.stringify({ lab_agency_ids: labAgencyIds }),
+    }),
   commercialOverview: (id: number) => api<ClientCommercialOverview>(`/clients/${id}/commercial-overview`),
 }
 
@@ -576,6 +583,9 @@ export interface RefArticleRow {
   duree_estimee: number
   normes?: string | null
   actif: boolean
+  /** Multi-site : visible par toutes les agences labo. */
+  is_multi_site?: boolean
+  visible_lab_agencies?: Pick<Agency, 'id' | 'name' | 'code' | 'is_siege'>[]
   /** S2G : jalon (regroupement) | product (descriptif) | legacy (PROLAB / hors jeu). */
   kind?: RefArticleKind
   /** Libellé famille legacy S2G (jalons). */
@@ -690,6 +700,14 @@ export const catalogueApi = {
       body: JSON.stringify(body),
     }).then(unwrapCatalogueArticle),
   deleteArticle: (id: number) => api<null>(`/v1/catalogue/articles/${id}`, { method: 'DELETE' }),
+  syncArticleLabVisibility: (
+    id: number,
+    body: { is_multi_site: boolean; lab_agency_ids: number[] },
+  ) =>
+    api<{ id: number; is_multi_site: boolean; visible_lab_agencies?: Pick<Agency, 'id' | 'name' | 'code'>[] }>(
+      `/v1/catalogue/articles/${id}/lab-visibility`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
 }
 
 export type DossierStatut = 'brouillon' | 'en_cours' | 'cloture' | 'archive'
@@ -2278,6 +2296,8 @@ export interface User {
   role: string
   client_id?: number
   site_id?: number
+  agency_id?: number | null
+  agency?: Pick<Agency, 'id' | 'name' | 'code'> | null
   client?: Client
   site?: Site
   access_groups?: AccessGroupRow[]
@@ -2339,6 +2359,8 @@ export interface Client {
   sites?: Site[]
   addresses?: ClientAddress[]
   contacts?: ClientContactRow[]
+  /** Agences labo autorisées (vide = toutes). */
+  visible_lab_agencies?: Pick<Agency, 'id' | 'name' | 'code' | 'is_siege'>[]
 }
 
 export interface Site {

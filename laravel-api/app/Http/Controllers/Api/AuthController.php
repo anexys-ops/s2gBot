@@ -33,7 +33,7 @@ class AuthController extends Controller
         // Keep existing SPA tokens so another tab/device login does not disconnect active sessions.
         $token = $user->createToken($tokenName)->plainTextToken;
 
-        $user->load(['client', 'site', 'accessGroups', 'agencies']);
+        $user->load(['client', 'site', 'agency', 'accessGroups', 'agencies']);
         $payload = $user->toArray();
         $payload['effective_permissions'] = $user->effectivePermissionKeys();
 
@@ -73,7 +73,7 @@ class AuthController extends Controller
 
         $token = $user->createToken('spa')->plainTextToken;
 
-        $user->load(['client', 'site', 'accessGroups', 'agencies']);
+        $user->load(['client', 'site', 'agency', 'accessGroups', 'agencies']);
         $payload = $user->toArray();
         $payload['effective_permissions'] = $user->effectivePermissionKeys();
 

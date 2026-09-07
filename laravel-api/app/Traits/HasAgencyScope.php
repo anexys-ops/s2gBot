@@ -17,7 +17,7 @@ trait HasAgencyScope
             }
 
             // Siège (lab_admin ou agency_id null) voit tout
-            if ($user->agency_id === null || $user->role === 'lab_admin') {
+            if ($user->agency_id === null || $user->isLabAdmin()) {
                 return;
             }
 

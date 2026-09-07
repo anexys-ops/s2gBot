@@ -25,7 +25,7 @@ class StatsController extends Controller
         $user = $request->user();
         $query = Order::query()->with(['orderItems.testType.params', 'orderItems.samples.testResults.testTypeParam']);
 
-        if (! $user->isLab()) {
+        if ($user->isClient() || $user->isSiteContact() || ($user->isInternal() && ! AgencyAccess::isLabSiege($user))) {
             AgencyAccess::applyOrderScope($query, $user);
         }
 
@@ -130,7 +130,9 @@ class StatsController extends Controller
     {
         $user = $request->user();
 
-        $scoped = $user->isClient() || $user->isSiteContact();
+        $scopedPortal = $user->isClient() || $user->isSiteContact();
+        $scopedLabAgency = $user->isInternal() && ! AgencyAccess::isLabSiege($user);
+        $scoped = $scopedPortal || $scopedLabAgency;
 
         $clientsQ = Client::query();
         $sitesQ = Site::query();
@@ -138,8 +140,13 @@ class StatsController extends Controller
         $quotesQ = Quote::query();
         $invoicesQ = Invoice::query();
 
-        if ($scoped) {
+        if ($scopedPortal) {
             $clientsQ->where('id', $user->client_id);
+        } elseif ($scopedLabAgency) {
+            AgencyAccess::applyClientScope($clientsQ, $user);
+        }
+
+        if ($scoped) {
             AgencyAccess::applySiteScope($sitesQ, $user);
             AgencyAccess::applyOrderScope($ordersQ, $user);
             AgencyAccess::applyQuoteScope($quotesQ, $user);

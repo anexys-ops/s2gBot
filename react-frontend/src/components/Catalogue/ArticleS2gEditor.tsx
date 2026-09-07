@@ -7,9 +7,17 @@ import {
 } from '../../api/client'
 import CatalogueMultiPicker, { shortCatalogueOptionLabel } from './CatalogueMultiPicker'
 
+export type ArticleS2gEditorSection = 'overview' | 'descriptions' | 'none' | 'all'
+
 type Props = {
   article: RefArticleRow
   onUpdated: () => void
+  /** Partie affichée — le state du formulaire couvre toujours l’article entier. */
+  section?: ArticleS2gEditorSection
+  /** Masque les boutons Enregistrer / Annuler (barre CRUD en en-tête). */
+  hideActions?: boolean
+  formId?: string
+  onPendingChange?: (pending: boolean) => void
 }
 
 function safeNum(v: unknown, fallback: number): number {
@@ -69,7 +77,14 @@ function formFromArticle(article: RefArticleRow): FormState {
   }
 }
 
-export default function ArticleS2gEditor({ article, onUpdated }: Props) {
+export default function ArticleS2gEditor({
+  article,
+  onUpdated,
+  section = 'all',
+  hideActions = false,
+  formId = 'article-s2g-edit-form',
+  onPendingChange,
+}: Props) {
   const isJalon = article.kind === 'jalon'
   const isProduct = article.kind === 'product'
   const [form, setForm] = useState<FormState>(() => formFromArticle(article))
@@ -154,13 +169,38 @@ export default function ArticleS2gEditor({ article, onUpdated }: Props) {
     setForm(formFromArticle(article))
   }, [article])
 
+  useEffect(() => {
+    onPendingChange?.(mut.isPending)
+  }, [mut.isPending, onPendingChange])
+
+  const showOverview = section === 'all' || section === 'overview'
+  const showDescriptions = section === 'all' || section === 'descriptions'
+  const showIntro = section === 'all' || section === 'overview'
+
+  if (section === 'none') {
+    return (
+      <form
+        id={formId}
+        className="article-edit article-edit--hidden"
+        hidden
+        aria-hidden
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!form.libelle.trim()) return
+          mut.mutate()
+        }}
+      />
+    )
+  }
+
   return (
     <div className="article-edit">
+      {showIntro && (
       <section className="card dossier-tab-panel">
-        <h2 className="ds-form-section__title">Modifier l&apos;article S2G</h2>
+        <h2 className="ds-form-section__title">Fiche article S2G</h2>
         <p className="dossier-tab-panel__intro">
-          Mise à jour du libellé, des tarifs, des descriptions et des liens catalogue. Le code et la famille ne sont pas
-          modifiables ici.
+          Identité, tarifs et liens catalogue. Le code et la famille ne sont pas modifiables ici — utilisez les onglets
+          ci-dessous puis <strong>Enregistrer</strong> en haut à droite.
         </p>
         <dl className="article-edit__meta">
           <div>
@@ -194,9 +234,11 @@ export default function ArticleS2gEditor({ article, onUpdated }: Props) {
           </div>
         </dl>
       </section>
+      )}
 
       <section className="card dossier-tab-panel article-edit__form-panel">
         <form
+          id={formId}
           className="catalogue-article-new-form"
           onSubmit={(e) => {
             e.preventDefault()
@@ -204,6 +246,7 @@ export default function ArticleS2gEditor({ article, onUpdated }: Props) {
             mut.mutate()
           }}
         >
+          {showOverview && (
           <section className="catalogue-article-new-form__section">
             <h3 className="catalogue-article-new-form__section-title">Identité</h3>
             <div className="catalogue-article-new-form__grid">
@@ -251,8 +294,9 @@ export default function ArticleS2gEditor({ article, onUpdated }: Props) {
               </label>
             </div>
           </section>
+          )}
 
-          {isJalon && (
+          {showOverview && isJalon && (
             <section className="catalogue-article-new-form__section">
               <h3 className="catalogue-article-new-form__section-title">Qualification & produits liés</h3>
               <div className="catalogue-article-new-form__grid">
@@ -282,7 +326,7 @@ export default function ArticleS2gEditor({ article, onUpdated }: Props) {
             </section>
           )}
 
-          {isProduct && (
+          {showOverview && isProduct && (
             <section className="catalogue-article-new-form__section">
               <h3 className="catalogue-article-new-form__section-title">Jalons liés</h3>
               <div className="catalogue-article-new-form__grid">
@@ -301,6 +345,7 @@ export default function ArticleS2gEditor({ article, onUpdated }: Props) {
             </section>
           )}
 
+          {showOverview && (
           <section className="catalogue-article-new-form__section">
             <h3 className="catalogue-article-new-form__section-title">Tarification & unités</h3>
             <div className="catalogue-article-new-form__grid">
@@ -336,7 +381,9 @@ export default function ArticleS2gEditor({ article, onUpdated }: Props) {
               </label>
             </div>
           </section>
+          )}
 
+          {showDescriptions && (
           <section className="catalogue-article-new-form__section">
             <h3 className="catalogue-article-new-form__section-title">Descriptions & normes</h3>
             <div className="catalogue-article-new-form__grid">
@@ -362,10 +409,12 @@ export default function ArticleS2gEditor({ article, onUpdated }: Props) {
               </label>
             </div>
           </section>
+          )}
 
           {mut.isError ? <p className="error">{(mut.error as Error).message}</p> : null}
-          {saved ? <p className="article-edit__saved text-muted">Modifications enregistrées.</p> : null}
+          {saved && !hideActions ? <p className="article-edit__saved text-muted">Modifications enregistrées.</p> : null}
 
+          {!hideActions && (
           <div className="crud-actions catalogue-article-new-form__actions article-edit__actions">
             <button type="submit" className="btn btn-primary" disabled={mut.isPending || !form.libelle.trim()}>
               {mut.isPending ? 'Enregistrement…' : 'Enregistrer'}
@@ -379,6 +428,7 @@ export default function ArticleS2gEditor({ article, onUpdated }: Props) {
               Annuler les modifications
             </button>
           </div>
+          )}
         </form>
       </section>
     </div>

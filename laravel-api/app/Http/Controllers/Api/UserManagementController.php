@@ -18,7 +18,7 @@ class UserManagementController extends Controller
     {
         $this->authorizeUsers($request);
 
-        $q = User::query()->with(['client', 'site', 'accessGroups', 'agencies'])->orderBy('name');
+        $q = User::query()->with(['client', 'site', 'agency', 'accessGroups', 'agencies'])->orderBy('name');
 
         if ($search = trim((string) $request->query('search', ''))) {
             $q->where(function ($qq) use ($search) {
@@ -42,11 +42,17 @@ class UserManagementController extends Controller
             'role' => ['required', Rule::in([
                 User::ROLE_LAB_ADMIN,
                 User::ROLE_LAB_TECHNICIAN,
+                User::ROLE_COMMERCIAL,
+                User::ROLE_INGENIEUR,
+                User::ROLE_LABORANTIN,
+                User::ROLE_RESPONSABLE,
+                User::ROLE_RECEPTIONNAIRE,
                 User::ROLE_CLIENT,
                 User::ROLE_SITE_CONTACT,
             ])],
             'client_id' => 'nullable|exists:clients,id',
             'site_id' => 'nullable|exists:sites,id',
+            'agency_id' => 'nullable|exists:agencies,id',
             'access_group_ids' => 'nullable|array',
             'access_group_ids.*' => 'integer|exists:access_groups,id',
             'agency_ids' => 'nullable|array',
@@ -61,6 +67,7 @@ class UserManagementController extends Controller
             'role' => $validated['role'],
             'client_id' => $validated['client_id'] ?? null,
             'site_id' => $validated['site_id'] ?? null,
+            'agency_id' => self::resolveLabAgencyId($validated),
         ]);
 
         if (! empty($validated['access_group_ids'])) {
@@ -71,14 +78,14 @@ class UserManagementController extends Controller
             self::syncAgenciesForUser($user, $validated['agency_ids'] ?? []);
         }
 
-        return response()->json($user->fresh()->load(['client', 'site', 'accessGroups', 'agencies']), 201);
+        return response()->json($user->fresh()->load(['client', 'site', 'agency', 'accessGroups', 'agencies']), 201);
     }
 
     public function show(Request $request, User $user): JsonResponse
     {
         $this->authorizeUsers($request);
 
-        return response()->json($user->load(['client', 'site', 'accessGroups', 'agencies']));
+        return response()->json($user->load(['client', 'site', 'agency', 'accessGroups', 'agencies']));
     }
 
     public function update(Request $request, User $user): JsonResponse
@@ -93,11 +100,17 @@ class UserManagementController extends Controller
             'role' => ['sometimes', Rule::in([
                 User::ROLE_LAB_ADMIN,
                 User::ROLE_LAB_TECHNICIAN,
+                User::ROLE_COMMERCIAL,
+                User::ROLE_INGENIEUR,
+                User::ROLE_LABORANTIN,
+                User::ROLE_RESPONSABLE,
+                User::ROLE_RECEPTIONNAIRE,
                 User::ROLE_CLIENT,
                 User::ROLE_SITE_CONTACT,
             ])],
             'client_id' => 'nullable|exists:clients,id',
             'site_id' => 'nullable|exists:sites,id',
+            'agency_id' => 'nullable|exists:agencies,id',
             'access_group_ids' => 'nullable|array',
             'access_group_ids.*' => 'integer|exists:access_groups,id',
             'agency_ids' => 'nullable|array',
@@ -120,10 +133,14 @@ class UserManagementController extends Controller
             unset($validated['agency_ids']);
         }
 
+        if (array_key_exists('agency_id', $validated)) {
+            $validated['agency_id'] = self::resolveLabAgencyId($validated);
+        }
+
         $user->fill($validated);
         $user->save();
 
-        return response()->json($user->fresh()->load(['client', 'site', 'accessGroups', 'agencies']));
+        return response()->json($user->fresh()->load(['client', 'site', 'agency', 'accessGroups', 'agencies']));
     }
 
     public function destroy(Request $request, User $user): JsonResponse
@@ -171,5 +188,19 @@ class UserManagementController extends Controller
             ->pluck('id')
             ->all();
         $user->agencies()->sync($allowed);
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private static function resolveLabAgencyId(array $validated): ?int
+    {
+        if (! array_key_exists('agency_id', $validated) || $validated['agency_id'] === null || $validated['agency_id'] === '') {
+            return null;
+        }
+
+        $id = (int) $validated['agency_id'];
+
+        return Agency::query()->whereNull('client_id')->where('id', $id)->exists() ? $id : null;
     }
 }

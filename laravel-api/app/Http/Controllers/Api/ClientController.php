@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Support\AgencyAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -26,6 +27,8 @@ class ClientController extends Controller
 
         if ($user->isClient() || $user->isSiteContact()) {
             $query->where('id', $user->client_id);
+        } else {
+            AgencyAccess::applyClientScope($query, $user);
         }
 
         if ($search = trim((string) $request->query('search', ''))) {
@@ -83,10 +86,14 @@ class ClientController extends Controller
         if (($user->isClient() || $user->isSiteContact()) && $client->id !== $user->client_id) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
+        if ($user->isInternal() && ! AgencyAccess::userMayAccessClient($user, $client)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
 
         return response()->json($client->load([
             'sites.agency',
             'agencies',
+            'visibleLabAgencies:id,name,code,is_siege',
             'addresses',
             'contacts',
             ...self::REFERENT_RELATIONS,
@@ -114,6 +121,32 @@ class ClientController extends Controller
         $client->delete();
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * Agences labo autorisées à voir ce client (vide = toutes les agences).
+     */
+    public function syncLabAgencies(Request $request, Client $client): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $validated = $request->validate([
+            'lab_agency_ids' => 'nullable|array',
+            'lab_agency_ids.*' => 'integer|exists:agencies,id',
+        ]);
+
+        $ids = array_map('intval', $validated['lab_agency_ids'] ?? []);
+        $allowed = \App\Models\Agency::query()
+            ->whereNull('client_id')
+            ->whereIn('id', $ids)
+            ->pluck('id')
+            ->all();
+
+        $client->visibleLabAgencies()->sync($allowed);
+
+        return response()->json($client->fresh()->load('visibleLabAgencies:id,name,code,is_siege'));
     }
 
     // ----------------------------------------------------------------

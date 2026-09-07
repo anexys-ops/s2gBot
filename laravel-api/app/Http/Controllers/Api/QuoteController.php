@@ -14,6 +14,7 @@ use App\Models\MailLog;
 use App\Models\Quote;
 use App\Models\QuoteLine;
 use App\Models\Site;
+use App\Models\User;
 use App\Models\DocumentSequence;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\QuotePricingService;
@@ -169,16 +170,7 @@ class QuoteController extends Controller
         }
 
         $cid = (int) $validated['client_id'];
-        $agencyId = null;
-        if (! empty($validated['site_id'])) {
-            $site = Site::query()->find((int) $validated['site_id']);
-            if ($site && (int) $site->client_id === $cid) {
-                $agencyId = $site->agency_id;
-            }
-        }
-        if (! $agencyId) {
-            $agencyId = Agency::query()->where('client_id', $cid)->where('is_headquarters', true)->value('id');
-        }
+        $agencyId = self::resolveLabAgencyIdForQuote($request->user(), $validated['site_id'] ?? null, $cid);
 
         $quote = Quote::create([
             'number' => $number,
@@ -304,13 +296,7 @@ class QuoteController extends Controller
 
         if (array_key_exists('site_id', $fill) || array_key_exists('client_id', $fill)) {
             $cid = (int) $quote->client_id;
-            $agencyId = null;
-            if ($quote->site_id) {
-                $agencyId = Site::query()->whereKey($quote->site_id)->value('agency_id');
-            }
-            if (! $agencyId) {
-                $agencyId = Agency::query()->where('client_id', $cid)->where('is_headquarters', true)->value('id');
-            }
+            $agencyId = self::resolveLabAgencyIdForQuote($request->user(), $quote->site_id, $cid);
             if ($agencyId) {
                 $quote->agency_id = $agencyId;
             }
@@ -627,5 +613,38 @@ class QuoteController extends Controller
             'amount_ht' => $totals['amount_ht'],
             'amount_ttc' => $totals['amount_ttc'],
         ]);
+    }
+
+    /**
+     * Agence labo S2G portée par le devis (pas l'agence filiale du client BTP).
+     */
+    private static function resolveLabAgencyIdForQuote(User $user, ?int $siteId, int $clientId): ?int
+    {
+        if ($user->isInternal() && $user->agency_id) {
+            return (int) $user->agency_id;
+        }
+
+        if ($siteId) {
+            $site = Site::query()->find($siteId);
+            if ($site && (int) $site->client_id === $clientId && $site->agency_id) {
+                $agency = Agency::query()->find($site->agency_id);
+                if ($agency && $agency->client_id === null) {
+                    return (int) $agency->id;
+                }
+            }
+        }
+
+        if ($user->isClient() || $user->isSiteContact()) {
+            if ($siteId) {
+                $site = Site::query()->find($siteId);
+                if ($site && (int) $site->client_id === $clientId) {
+                    return $site->agency_id ? (int) $site->agency_id : null;
+                }
+            }
+
+            return Agency::query()->where('client_id', $clientId)->where('is_headquarters', true)->value('id');
+        }
+
+        return Agency::query()->whereNull('client_id')->where('is_siege', true)->value('id');
     }
 }

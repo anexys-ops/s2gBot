@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\Catalogue;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Catalogue\ArticleResource;
+use App\Models\Agency;
 use App\Models\Catalogue\Article;
 use App\Services\Catalogue\ArticleS2gRelationService;
+use App\Support\AgencyAccess;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,6 +52,8 @@ class ArticleController extends Controller
                     ->orWhere('sku', 'like', '%'.$search.'%');
             });
         }
+
+        AgencyAccess::applyArticleScope($q, $request->user());
 
         $withProductsCount = $request->boolean('with_products_count');
         if ($withProductsCount && $kind === Article::KIND_JALON) {
@@ -102,8 +106,12 @@ class ArticleController extends Controller
         );
     }
 
-    public function show(Article $article): JsonResponse
+    public function show(Request $request, Article $article): JsonResponse
     {
+        if (! AgencyAccess::userMayAccessArticle($request->user(), $article)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
         $loads = [
             'famille',
             'articleLie:id,code,libelle',
@@ -124,6 +132,8 @@ class ArticleController extends Controller
                 'jalon:id,code,libelle,famille_label,kind,actif',
             ]);
         }
+
+        $loads['visibleLabAgencies'] = fn ($q) => $q->select('agencies.id', 'agencies.name', 'agencies.code');
 
         $article->load($loads);
 
@@ -223,6 +233,34 @@ class ArticleController extends Controller
     }
 
     /**
+     * Visibilité agences labo : multi-site ou agences spécifiques.
+     */
+    public function syncLabVisibility(Request $request, Article $article): JsonResponse
+    {
+        $this->authorize('update', $article);
+
+        $validated = $request->validate([
+            'is_multi_site' => 'required|boolean',
+            'lab_agency_ids' => 'nullable|array',
+            'lab_agency_ids.*' => 'integer|exists:agencies,id',
+        ]);
+
+        $article->update(['is_multi_site' => (bool) $validated['is_multi_site']]);
+
+        $ids = array_map('intval', $validated['lab_agency_ids'] ?? []);
+        $allowed = Agency::query()
+            ->whereNull('client_id')
+            ->whereIn('id', $ids)
+            ->pluck('id')
+            ->all();
+        $article->visibleLabAgencies()->sync($validated['is_multi_site'] ? [] : $allowed);
+
+        return response()->json($article->fresh()->load([
+            'visibleLabAgencies:id,name,code,is_siege',
+        ]));
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function rules(?int $ignoreId = null, bool $partial = false): array
@@ -275,6 +313,7 @@ class ArticleController extends Controller
             'duree_estimee' => 'nullable|integer|min:0',
             'normes' => 'nullable|string',
             'actif' => 'boolean',
+            'is_multi_site' => 'sometimes|boolean',
             'kind' => $kindRule,
             'famille_label' => 'nullable|string|max:255',
             'qualification_tag_ids' => 'nullable|array',

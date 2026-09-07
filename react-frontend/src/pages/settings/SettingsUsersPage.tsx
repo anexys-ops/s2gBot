@@ -4,6 +4,7 @@ import {
   accessGroupsApi,
   adminUsersApi,
   agenciesApi,
+  agencesApi,
   clientsApi,
   sitesApi,
   type User,
@@ -18,6 +19,11 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 const ROLES: { value: string; label: string }[] = [
   { value: 'lab_admin', label: 'Administrateur laboratoire' },
   { value: 'lab_technician', label: 'Technicien laboratoire' },
+  { value: 'commercial', label: 'Commercial' },
+  { value: 'ingenieur', label: 'Ingénieur' },
+  { value: 'laborantin', label: 'Laborantin' },
+  { value: 'responsable', label: 'Responsable' },
+  { value: 'receptionnaire', label: 'Réceptionnaire' },
   { value: 'client', label: 'Client' },
   { value: 'site_contact', label: 'Contact chantier' },
 ]
@@ -33,6 +39,7 @@ function emptyForm() {
     site_id: '' as number | '',
     access_group_ids: [] as number[],
     agency_ids: [] as number[],
+    agency_id: '' as number | '',
   }
 }
 
@@ -48,6 +55,7 @@ export default function SettingsUsersPage() {
 
   const needsClient = form.role === 'client' || form.role === 'site_contact'
   const needsSite = form.role === 'site_contact'
+  const needsLabAgency = form.role !== 'client' && form.role !== 'site_contact'
 
   const allowed = canManageUsers(me)
   const { data, isLoading, error } = useQuery({
@@ -77,6 +85,11 @@ export default function SettingsUsersPage() {
     queryFn: () => agenciesApi.listForClient(agencyClientId as number),
     enabled: allowed && (modal === 'create' || modal === 'edit') && needsClient && agencyClientId !== null,
   })
+  const { data: labAgences = [] } = useQuery({
+    queryKey: ['agences', 'settings-users'],
+    queryFn: () => agencesApi.list(),
+    enabled: allowed && (modal === 'create' || modal === 'edit') && needsLabAgency,
+  })
 
   const groups = groupsRes?.data ?? []
 
@@ -92,6 +105,7 @@ export default function SettingsUsersPage() {
         site_id: form.site_id === '' ? undefined : form.site_id,
         access_group_ids: form.access_group_ids,
         ...(needsClient ? { agency_ids: form.agency_ids } : {}),
+        ...(needsLabAgency ? { agency_id: form.agency_id === '' ? null : form.agency_id } : {}),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] })
@@ -112,6 +126,7 @@ export default function SettingsUsersPage() {
         site_id: form.site_id === '' ? null : form.site_id,
         access_group_ids: form.access_group_ids,
         ...(needsClient ? { agency_ids: form.agency_ids } : {}),
+        ...(needsLabAgency ? { agency_id: form.agency_id === '' ? null : form.agency_id } : {}),
       }
       if (form.password.trim()) body.password = form.password
       return adminUsersApi.update(editing.id, body)
@@ -147,6 +162,7 @@ export default function SettingsUsersPage() {
       site_id: u.site_id ?? '',
       access_group_ids: (u.access_groups ?? []).map((g) => g.id),
       agency_ids: (u.agencies ?? []).map((a) => a.id),
+      agency_id: u.agency_id ?? '',
     })
     setModal('edit')
   }
@@ -329,7 +345,7 @@ export default function SettingsUsersPage() {
             )}
             {needsClient && form.client_id !== '' && (
               <div className="form-group">
-                <label>Agences (périmètre)</label>
+                <label>Agences client (périmètre portail)</label>
                 <p className="text-muted" style={{ fontSize: '0.85rem', margin: '0 0 0.5rem' }}>
                   Laissez vide pour accéder à toutes les agences du client. Cochez pour restreindre.
                 </p>
@@ -353,6 +369,33 @@ export default function SettingsUsersPage() {
                     </label>
                   ))}
                 </div>
+              </div>
+            )}
+            {needsLabAgency && (
+              <div className="form-group">
+                <label>Agence labo (rattachement)</label>
+                <p className="text-muted" style={{ fontSize: '0.85rem', margin: '0 0 0.5rem' }}>
+                  Laissez vide pour le siège (accès global). Les agences sont configurées dans Configuration → Agences.
+                </p>
+                <select
+                  value={form.agency_id === '' ? '' : String(form.agency_id)}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      agency_id: e.target.value === '' ? '' : Number(e.target.value),
+                    }))
+                  }
+                >
+                  <option value="">— Siège (toutes agences) —</option>
+                  {labAgences
+                    .filter((a) => a.active !== false)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                        {a.code ? ` (${a.code})` : ''}
+                      </option>
+                    ))}
+                </select>
               </div>
             )}
             <div className="form-group">

@@ -5,7 +5,7 @@
  * Génération depuis un bon de commande.
  */
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { bonsCommandeApi, ordresMissionApi } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
@@ -35,20 +35,39 @@ function TypeBadge({ type }: { type: string }) {
 
 export default function OrdresMissionPage() {
   const qc = useQueryClient()
+  const [searchParams] = useSearchParams()
+  const bcFilterFromUrl = searchParams.get('bon_commande_id')
   const [typeFilter, setTypeFilter] = useState('')
   const [statutFilter, setStatutFilter] = useState('')
-  const [generateBcId, setGenerateBcId] = useState<number | ''>('')
+  const [generateBcId, setGenerateBcId] = useState<number | ''>(() =>
+    bcFilterFromUrl && Number.isFinite(Number(bcFilterFromUrl)) ? Number(bcFilterFromUrl) : '',
+  )
   const [showGeneratePanel, setShowGeneratePanel] = useState(false)
 
   const { data: ordres = [], isLoading } = useQuery({
-    queryKey: ['ordres-mission', typeFilter, statutFilter],
-    queryFn: () => ordresMissionApi.list({ type: typeFilter || undefined, statut: statutFilter || undefined }),
+    queryKey: ['ordres-mission', typeFilter, statutFilter, bcFilterFromUrl],
+    queryFn: () =>
+      ordresMissionApi.list({
+        type: typeFilter || undefined,
+        statut: statutFilter || undefined,
+        bon_commande_id: bcFilterFromUrl ? Number(bcFilterFromUrl) : undefined,
+      }),
     staleTime: 30_000,
   })
 
   const { data: bonsCommande = [] } = useQuery({
     queryKey: ['bons-commande', 'for-om'],
-    queryFn: () => bonsCommandeApi.list({ statut: 'confirme' }),
+    queryFn: async () => {
+      const [confirmes, enCours] = await Promise.all([
+        bonsCommandeApi.list({ statut: 'confirme' }),
+        bonsCommandeApi.list({ statut: 'en_cours' }),
+      ])
+      const byId = new Map<number, (typeof confirmes)[number]>()
+      for (const bc of [...confirmes, ...enCours]) {
+        byId.set(bc.id, bc)
+      }
+      return [...byId.values()].sort((a, b) => b.id - a.id)
+    },
     enabled: showGeneratePanel,
     staleTime: 60_000,
   })
@@ -60,9 +79,13 @@ export default function OrdresMissionPage() {
     },
     onSuccess: (created) => {
       void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
+      void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
       setShowGeneratePanel(false)
       setGenerateBcId('')
-      alert(`${created.length} ordre(s) de mission générés.`)
+      alert(`${created.length} ordre(s) de mission générés (OdM, tâches terrain et planning).`)
+    },
+    onError: (err) => {
+      alert((err as Error).message)
     },
   })
 
@@ -82,7 +105,11 @@ export default function OrdresMissionPage() {
       breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Ordres de mission' }]}
       moduleBarLabel="Commercial — Ordres de mission"
       title="Ordres de mission"
-      subtitle={`${ordres.length} ordre(s) affiché(s)`}
+      subtitle={
+        bcFilterFromUrl
+          ? `${ordres.length} ordre(s) pour le BC #${bcFilterFromUrl}`
+          : `${ordres.length} ordre(s) affiché(s)`
+      }
       actions={
         <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowGeneratePanel((v) => !v)}>
           ⚡ Générer depuis BC
@@ -112,11 +139,12 @@ export default function OrdresMissionPage() {
         <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
           <h4 style={{ margin: '0 0 0.5rem' }}>Générer depuis un bon de commande</h4>
           <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-            Les OMs labo / technicien / ingénieur seront créés selon les actions définies sur chaque article du BC.
+            Les OMs labo / technicien / ingénieur seront créés selon les actions catalogue, les déclencheurs OdM
+            ou la planification terrain (technicien + dates) des lignes BC.
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <label style={{ flex: '1 1 280px' }}>
-              Bon de commande (confirmé)
+              Bon de commande (confirmé ou en cours)
               <select value={generateBcId} onChange={(e) => setGenerateBcId(e.target.value ? Number(e.target.value) : '')}>
                 <option value="">Choisir…</option>
                 {bonsCommande.map((bc) => (

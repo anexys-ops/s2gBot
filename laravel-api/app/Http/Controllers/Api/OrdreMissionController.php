@@ -4,13 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\BonCommande;
-use App\Models\BonCommandeLigne;
 use App\Models\FraisDeplacement;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
+use App\Services\OrdreMissionFromBonCommandeService;
+use App\Support\AgencyAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class OrdreMissionController extends Controller
 {
@@ -23,7 +23,12 @@ class OrdreMissionController extends Controller
         'lignes.equipment:id,name,code',
         'lignes.articleAction',
         'lignes.article:id,code,libelle',
+        'lignes.bonCommandeLigne:id,libelle,technicien_id,date_debut_prevue,date_fin_prevue',
     ];
+
+    public function __construct(
+        private readonly OrdreMissionFromBonCommandeService $generator,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -58,68 +63,35 @@ class OrdreMissionController extends Controller
     }
 
     /**
-     * Génère automatiquement les 3 ordres de mission depuis un bon de commande.
-     * Si des OMs existent déjà pour ce BC, on les recrée (sync).
+     * Génère / resynchronise les ordres de mission depuis un bon de commande.
      */
     public function generateFromBC(Request $request, BonCommande $bonCommande): JsonResponse
     {
         if (! $request->user()->isLabAdmin()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
+        if (! AgencyAccess::userMayAccessBonCommande($request->user(), $bonCommande)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
 
-        $bc = $bonCommande->load(['lignes.article.actions', 'lignes.article.equipmentRequirements']);
+        if (! in_array($bonCommande->statut, [
+            BonCommande::STATUT_CONFIRME,
+            BonCommande::STATUT_EN_COURS,
+            BonCommande::STATUT_LIVRE,
+        ], true)) {
+            return response()->json([
+                'message' => 'Le bon de commande doit être confirmé ou en cours pour générer des ordres de mission.',
+            ], 422);
+        }
 
-        $orders = DB::transaction(function () use ($bc, $request) {
-            $created = [];
+        $orders = $this->generator->generate($bonCommande, $request->user());
 
-            foreach ([OrdreMission::TYPE_LABO, OrdreMission::TYPE_TECHNICIEN, OrdreMission::TYPE_INGENIEUR] as $type) {
-                // Filtrer les lignes qui ont des actions pour ce type
-                $lignesAvecActions = $bc->lignes->filter(function (BonCommandeLigne $ligne) use ($type) {
-                    if (! $ligne->article) {
-                        return false;
-                    }
-
-                    return $ligne->article->actions->where('type', $type)->isNotEmpty();
-                });
-
-                if ($lignesAvecActions->isEmpty()) {
-                    continue; // Pas d'actions de ce type → pas d'OM
-                }
-
-                /** @var OrdreMission $om */
-                $om = OrdreMission::create([
-                    'numero'          => OrdreMission::nextNumero($type),
-                    'bon_commande_id' => $bc->id,
-                    'dossier_id'      => $bc->dossier_id,
-                    'client_id'       => $bc->client_id,
-                    'site_id'         => $bc->dossier?->site_id,
-                    'type'            => $type,
-                    'statut'          => OrdreMission::STATUT_BROUILLON,
-                    'date_prevue'     => $bc->date_livraison_prevue,
-                    'created_by'      => $request->user()->id,
-                ]);
-
-                $ordre = 0;
-                foreach ($lignesAvecActions as $ligne) {
-                    foreach ($ligne->article->actions->where('type', $type) as $action) {
-                        OrdreMissionLigne::create([
-                            'ordre_mission_id'      => $om->id,
-                            'bon_commande_ligne_id' => $ligne->id,
-                            'ref_article_id'        => $ligne->ref_article_id,
-                            'article_action_id'     => $action->id,
-                            'libelle'               => $action->libelle,
-                            'quantite'              => $ligne->quantite,
-                            'statut'                => 'a_faire',
-                            'ordre'                 => $ordre++,
-                        ]);
-                    }
-                }
-
-                $created[] = $om->load(self::WITH);
-            }
-
-            return $created;
-        });
+        if ($orders === []) {
+            return response()->json([
+                'message' => 'Aucun ordre de mission généré : vérifiez les actions catalogue sur les articles du BC, ou renseignez technicien + dates sur les lignes.',
+                'data' => [],
+            ], 422);
+        }
 
         return response()->json($orders, 201);
     }
@@ -155,8 +127,6 @@ class OrdreMissionController extends Controller
         return response()->json(null, 204);
     }
 
-    // ── Lignes ───────────────────────────────────────────────────────────────
-
     public function updateLigne(Request $request, OrdreMission $ordreMission, OrdreMissionLigne $ligne): JsonResponse
     {
         abort_if($ligne->ordre_mission_id !== $ordreMission->id, 404);
@@ -173,16 +143,18 @@ class OrdreMissionController extends Controller
 
         $ligne->update($validated);
 
+        if (array_key_exists('assigned_user_id', $validated)) {
+            $ligne->ensureTaskExists();
+        }
+
         return response()->json($ligne->fresh()->load(['assignedUser:id,name', 'equipment:id,name,code']));
     }
-
-    // ── Planning ─────────────────────────────────────────────────────────────
 
     public function planning(Request $request): JsonResponse
     {
         $from = $request->query('from', now()->startOfMonth()->toDateString());
         $to   = $request->query('to', now()->endOfMonth()->toDateString());
-        $type = $request->query('type'); // labo|technicien|ingenieur
+        $type = $request->query('type');
 
         $q = OrdreMission::with([
             'client:id,name',
@@ -199,8 +171,6 @@ class OrdreMissionController extends Controller
 
         return response()->json($q->orderBy('date_prevue')->get());
     }
-
-    // ── Frais de déplacement ─────────────────────────────────────────────────
 
     public function fraisIndex(OrdreMission $ordreMission): JsonResponse
     {

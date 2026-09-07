@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { bonsCommandeApi, planningTerrainApi, type BonCommandeLigne } from '../../api/client'
+import { bonsCommandeApi, ordresMissionApi, planningTerrainApi, type BonCommandeLigne } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import CommercialDocumentActions from '../../components/crm/CommercialDocumentActions'
 import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
@@ -12,6 +12,8 @@ import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ClientContactPicker from '../../components/clients/ClientContactPicker'
 import { buildBcLigneDisplayRows, resolveDevisDisplayMeta } from '../../lib/bcLigneDisplay'
 import { dateInputFromApi, formatAppDate, formatMoney, formatQuantity, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import PlanningMassActionsBar from '../../components/planning/PlanningMassActionsBar'
+import { formatTechnicienOption } from '../../lib/userRolePresentation'
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
 
@@ -41,6 +43,9 @@ export default function BonCommandeFichePage() {
   const [qtyEdits, setQtyEdits] = useState<Record<number, string>>({})
   const [confirmAction, setConfirmAction] = useState<'confirmer' | 'bl' | null>(null)
   const [planningToast, setPlanningToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
+  const [massTechnicienId, setMassTechnicienId] = useState<number | ''>('')
+  const [massDebut, setMassDebut] = useState('')
+  const [massFin, setMassFin] = useState('')
 
   const { data: bc, isLoading, error } = useQuery({
     queryKey: ['bon-commande', bcId],
@@ -172,10 +177,27 @@ export default function BonCommandeFichePage() {
       }
     },
     onSuccess: () => {
-      setPlanningToast({ message: 'Planification enregistrée.', variant: 'success' })
       void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
       void qc.invalidateQueries({ queryKey: ['planning-terrain'] })
       void qc.invalidateQueries({ queryKey: ['planning-overview'] })
+      if (user?.role === 'lab_admin' && bc && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')) {
+        mutGenerateOm.mutate(undefined, {
+          onSuccess: (created) => {
+            setPlanningToast({
+              message: `Planification enregistrée — ${created.length} ordre(s) de mission généré(s).`,
+              variant: 'success',
+            })
+          },
+          onError: (err) => {
+            setPlanningToast({
+              message: `Planification enregistrée, mais OdM non générés : ${toastErrorMessage(err, 'erreur inconnue')}`,
+              variant: 'error',
+            })
+          },
+        })
+      } else {
+        setPlanningToast({ message: 'Planification enregistrée.', variant: 'success' })
+      }
     },
     onError: (err) => {
       setPlanningToast({
@@ -194,7 +216,58 @@ export default function BonCommandeFichePage() {
     },
   })
 
+  const mutGenerateOm = useMutation({
+    mutationFn: () => ordresMissionApi.generateFromBC(bcId),
+    onSuccess: (created) => {
+      setPlanningToast({
+        message: `${created.length} ordre(s) de mission généré(s) — visible(s) dans OdM terrain, tâches et planning.`,
+        variant: 'success',
+      })
+      void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
+      void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+    },
+    onError: (err) => {
+      setPlanningToast({
+        message: toastErrorMessage(err, 'Impossible de générer les ordres de mission.'),
+        variant: 'error',
+      })
+    },
+  })
+
   const ligneCount = bc?.lignes?.length ?? 0
+
+  function applyMassPlanning() {
+    if (!bc?.lignes?.length) return
+    const hasTech = massTechnicienId !== ''
+    const hasDebut = Boolean(massDebut)
+    const hasFin = Boolean(massFin)
+    if (!hasTech && !hasDebut && !hasFin) return
+    mutLignes.reset()
+    setLigneEdits((prev) => {
+      const next = { ...prev }
+      for (const l of bc.lignes!) {
+        next[l.id] = {
+          debut: hasDebut ? massDebut : (prev[l.id]?.debut ?? ''),
+          fin: hasFin ? massFin : (prev[l.id]?.fin ?? ''),
+        }
+      }
+      return next
+    })
+    if (hasTech) {
+      setLigneExtraEdits((prev) => {
+        const next = { ...prev }
+        for (const l of bc.lignes!) {
+          next[l.id] = {
+            technicien_id: massTechnicienId,
+            date_livraison: prev[l.id]?.date_livraison ?? '',
+            notes_ligne: prev[l.id]?.notes_ligne ?? '',
+          }
+        }
+        return next
+      })
+    }
+  }
+
   const ligneDisplayRows = useMemo(
     () => buildBcLigneDisplayRows(bc?.lignes ?? [], resolveDevisDisplayMeta(bc)),
     [bc],
@@ -276,10 +349,11 @@ export default function BonCommandeFichePage() {
     )
   }
 
+  const isAdmin = user?.role === 'lab_admin'
   const canConfirmer = lab && bc.statut === 'brouillon'
   const canGenerateBl = lab && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
+  const canGenerateOm = lab && isAdmin && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
   const hasBonLivraison = (bc.bons_livraison?.length ?? 0) > 0
-  const isAdmin = user?.role === 'lab_admin'
 
   return (
     <ModuleEntityShell
@@ -351,6 +425,24 @@ export default function BonCommandeFichePage() {
               >
                 Générer un BL
               </button>
+            ) : null}
+            {canGenerateOm ? (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setPlanningToast(null)
+                  mutGenerateOm.mutate()
+                }}
+                disabled={mutGenerateOm.isPending}
+              >
+                {mutGenerateOm.isPending ? 'Génération OdM…' : 'Générer OdM terrain'}
+              </button>
+            ) : null}
+            {canGenerateOm ? (
+              <Link to={`/ordres-mission?bon_commande_id=${bc.id}`} className="btn btn-secondary btn-sm">
+                Voir OdM
+              </Link>
             ) : null}
           </div>
         ) : null
@@ -588,6 +680,21 @@ export default function BonCommandeFichePage() {
                   <p className="error bc-fiche__planning-error">{(mutLignes.error as Error).message}</p>
                 ) : null}
 
+                <PlanningMassActionsBar
+                  assignees={techniciens}
+                  assigneeId={massTechnicienId}
+                  onAssigneeChange={setMassTechnicienId}
+                  dateDebut={massDebut}
+                  onDateDebutChange={setMassDebut}
+                  dateFin={massFin}
+                  onDateFinChange={setMassFin}
+                  onApply={applyMassPlanning}
+                  applyLabel="Appliquer à toutes les lignes"
+                  totalCount={ligneCount}
+                  selectedCount={ligneCount}
+                  hint="Renseignez au moins un champ puis appliquez — enregistrez ensuite la planification."
+                />
+
                 <div className="bc-fiche__ligne-cards">
                   {bc.lignes!.map((l) => (
                     <article key={l.id} className="bc-fiche__ligne-card">
@@ -645,7 +752,7 @@ export default function BonCommandeFichePage() {
                             <option value="">— Non assigné —</option>
                             {techniciens.map((t) => (
                               <option key={t.id} value={t.id}>
-                                {t.name}
+                                {formatTechnicienOption(t)}
                               </option>
                             ))}
                           </select>

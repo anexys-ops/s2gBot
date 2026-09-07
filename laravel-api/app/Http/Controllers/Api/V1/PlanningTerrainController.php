@@ -7,6 +7,7 @@ use App\Models\BcLignePlanningAffectation;
 use App\Models\BonCommandeLigne;
 use App\Models\User;
 use App\Support\AgencyAccess;
+use App\Support\UserPresentation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,12 +21,28 @@ class PlanningTerrainController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $users = User::query()
-            ->whereIn('role', [User::ROLE_LAB_ADMIN, User::ROLE_LAB_TECHNICIAN])
-            ->orderBy('name')
-            ->get(['id', 'name', 'email', 'role']);
+        $context = (string) $request->query('context', 'terrain');
+        $roles = match ($context) {
+            'labo' => [
+                User::ROLE_LAB_ADMIN,
+                User::ROLE_LAB_TECHNICIAN,
+                User::ROLE_LABORANTIN,
+                User::ROLE_RECEPTIONNAIRE,
+            ],
+            'ingenieur' => [
+                User::ROLE_LAB_ADMIN,
+                User::ROLE_INGENIEUR,
+                User::ROLE_RESPONSABLE,
+            ],
+            default => [User::ROLE_LAB_ADMIN, User::ROLE_LAB_TECHNICIAN],
+        };
 
-        return response()->json($users);
+        $users = User::query()
+            ->whereIn('role', $roles)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'role', 'poste']);
+
+        return response()->json($users->map(fn (User $u) => UserPresentation::technicienPayload($u)));
     }
 
     public function index(Request $request): JsonResponse

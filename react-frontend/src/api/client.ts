@@ -1,4 +1,5 @@
 import { enqueueOfflineRequest } from '../lib/offlineQueue'
+import { parseApiErrorResponse } from '../lib/errors'
 
 const API_BASE = '/api'
 
@@ -62,21 +63,15 @@ export async function api<T>(
   if (res.status === 401) {
     handleApiUnauthorized(path, hadToken)
   }
-  const data = await res.json().catch(() => ({}))
+  const contentType = res.headers.get('content-type') ?? ''
+  let data: unknown = {}
+  if (contentType.includes('application/json')) {
+    data = await res.json().catch(() => ({}))
+  } else if (!res.ok) {
+    throw await parseApiErrorResponse(res)
+  }
   if (!res.ok) {
-    let msg =
-      typeof data.message === 'string' && data.message.trim() !== ''
-        ? data.message
-        : `Erreur ${res.status}`
-    if (data.errors && typeof data.errors === 'object') {
-      const parts = Object.values(data.errors)
-        .flat(2)
-        .filter((x): x is string => typeof x === 'string' && x.trim() !== '')
-      if (parts.length) {
-        msg = parts.join(' ')
-      }
-    }
-    throw new Error(msg)
+    throw await parseApiErrorResponse(res, data)
   }
   return data as T
 }
@@ -958,8 +953,11 @@ export type PlanningTerrainAffectationRow = BcLignePlanningAffectation & {
   }
 }
 
+import type { TechnicienOption } from '../lib/userRolePresentation'
+
 export const planningTerrainApi = {
-  techniciens: () => api<Array<{ id: number; name: string; email: string; role: string }>>(`/v1/planning-terrain/techniciens`),
+  techniciens: (context: 'terrain' | 'labo' | 'ingenieur' = 'terrain') =>
+    api<TechnicienOption[]>(`/v1/planning-terrain/techniciens?context=${context}`),
   list: (params: { from: string; to: string; user_id?: number }) => {
     const q = new URLSearchParams()
     q.set('from', params.from)
@@ -1668,6 +1666,7 @@ export type LabReceptionAttendusResponse = {
 export type ReceptionSample = {
   id: number
   fold_number?: string | null
+  transco_number?: string | null
   status: string
   sample_type?: string | null
   dossier_id?: number | null
@@ -1676,10 +1675,64 @@ export type ReceptionSample = {
   collected_at?: string | null
   received_at?: string | null
   condition_state?: string | null
+  storage_location?: string | null
+  photo_path?: string | null
+  weight_g?: number | null
+  quantity?: number | null
+  notes?: string | null
   dossier?: { id: number; reference: string; titre: string } | null
   product?: { id: number; code: string; libelle: string } | null
-  collectedBy?: { id: number; name: string } | null
-  bonCommandeLigne?: { id: number; libelle: string; bon_commande_id: number } | null
+  collected_by?: { id: number; name: string } | null
+  received_by?: { id: number; name: string } | null
+  bon_commande_ligne?: { id: number; libelle: string; bon_commande_id: number } | null
+}
+
+export type SampleLabelPayload = {
+  fold?: string | null
+  transco?: string | null
+  received_at?: string | null
+  received_by?: string | null
+  from?: string | null
+  product?: string | null
+  product_code?: string | null
+  dossier?: string | null
+  dossier_titre?: string | null
+  bc?: string | null
+  devis?: string | null
+  sample_type?: string | null
+  condition_state?: string | null
+  storage_location?: string | null
+  weight_g?: number | null
+  quantity?: number | null
+}
+
+export type SampleLabelData = {
+  payload: SampleLabelPayload
+  qr_json: string
+  barcode: string | null
+}
+
+export type ReceiveFromLineBody = {
+  bon_commande_ligne_id: number
+  condition_state: 'bon' | 'endommage' | 'insuffisant'
+  storage_location?: string
+  collected_by?: number
+  sample_type?: string
+  origin_location?: string
+  depth_m?: number
+  weight_g?: number
+  quantity?: number
+  notes?: string
+  description?: string
+}
+
+export type ReceiveSampleBody = {
+  condition_state: 'bon' | 'endommage' | 'insuffisant'
+  storage_location?: string
+  collected_by?: number
+  weight_g?: number
+  quantity?: number
+  notes?: string
 }
 
 export const labReceptionApi = {
@@ -1703,18 +1756,47 @@ export const labReceptionApi = {
 }
 
 export const samplesReceptionApi = {
-  list: (params?: { status?: string; fold?: string; per_page?: number }) => {
+  list: (params?: {
+    status?: string
+    fold?: string
+    per_page?: number
+    bon_commande_ligne_id?: number
+  }) => {
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)
     if (params?.fold) q.set('fold', params.fold)
     if (params?.per_page) q.set('per_page', String(params.per_page))
+    if (params?.bon_commande_ligne_id) q.set('bon_commande_ligne_id', String(params.bon_commande_ligne_id))
     const s = q.toString()
     return api<LaravelPaginator<ReceptionSample>>(`/v1/samples${s ? `?${s}` : ''}`)
   },
-  receive: (
-    id: number,
-    body: { condition_state: 'bon' | 'endommage' | 'insuffisant'; storage_location?: string; notes?: string },
-  ) => api<ReceptionSample>(`/v1/samples/${id}/receive`, { method: 'PATCH', body: JSON.stringify(body) }),
+  get: (id: number) => api<ReceptionSample>(`/v1/samples/${id}`),
+  search: (fold: string) => api<{ data: ReceptionSample[] }>(`/v1/samples/search?fold=${encodeURIComponent(fold)}`),
+  receiveFromLine: (body: ReceiveFromLineBody) =>
+    api<ReceptionSample>('/v1/lab/reception/receive-from-line', { method: 'POST', body: JSON.stringify(body) }),
+  receive: (id: number, body: ReceiveSampleBody) =>
+    api<ReceptionSample>(`/v1/samples/${id}/receive`, { method: 'PATCH', body: JSON.stringify(body) }),
+  update: (id: number, body: Partial<ReceiveFromLineBody>) =>
+    api<ReceptionSample>(`/v1/samples/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/v1/samples/${id}`, { method: 'DELETE' }),
+  labelData: (id: number) => api<SampleLabelData>(`/v1/samples/${id}/label`),
+  photoUrl: (id: number) => `/api/v1/samples/${id}/photo`,
+  async uploadPhoto(id: number, file: File): Promise<{ photo_path: string; photo_url: string }> {
+    const token = getToken()
+    const fd = new FormData()
+    fd.append('photo', file)
+    const res = await fetch(`${API_BASE}/v1/samples/${id}/photo`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}`, Accept: 'application/json' } : { Accept: 'application/json' },
+      body: fd,
+    })
+    if (res.status === 401) {
+      handleApiUnauthorized(`/v1/samples/${id}/photo`, Boolean(token))
+    }
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error((data as { message?: string }).message || `Erreur ${res.status}`)
+    return data as { photo_path: string; photo_url: string }
+  },
 }
 
 export const samplesApi = {
@@ -1922,6 +2004,7 @@ export interface StatsEssaisPayload {
 export const statsApi = {
   essais: () => api<StatsEssaisPayload>('/stats/essais'),
   dashboard: () => api<DashboardStatsPayload>('/stats/dashboard'),
+  kpi: () => api<KpiStatsPayload>('/stats/kpi'),
 }
 
 /** Métadonnées métier : indicateurs (valeurs suivies) et champs libres. */
@@ -2015,6 +2098,80 @@ export interface DashboardStatsPayload {
     sample_reception_sample_size: number
   }
   ca_par_mois: Array<{ mois: string; ca_ttc: number }>
+}
+
+export interface KpiDelayMetric {
+  avg: number | null
+  median: number | null
+  sample_size: number
+}
+
+export interface KpiStatsPayload {
+  devis_ouverts: {
+    count: number
+    montant_ttc: number
+    par_statut: Record<string, number>
+    liste: Array<{
+      id: number
+      number: string | null
+      status: string
+      quote_date: string | null
+      valid_until: string | null
+      amount_ttc: number
+      client_name: string | null | undefined
+    }>
+  }
+  equipes: {
+    terrain: { actifs: number; personnes: KpiTeamPerson[] }
+    labo: { actifs: number; personnes: KpiTeamPerson[] }
+    ingenieurs: { actifs: number; personnes: KpiTeamPerson[] }
+  }
+  volumes: {
+    dossiers: number
+    chantiers: number
+    bons_commande: number
+    bons_livraison: number
+    rapports_labo: number
+  }
+  delais_chaine: {
+    dossier_bc: KpiDelayMetric
+    devis_bc: KpiDelayMetric
+    bc_bl: KpiDelayMetric
+    bl_facture: KpiDelayMetric
+    facture_paiement: KpiDelayMetric
+    bc_rapport: KpiDelayMetric
+    devis_livraison_chantier: KpiDelayMetric
+  }
+  essais: {
+    duree_moyenne_jours: number | null
+    duree_mediane_jours: number | null
+    sample_size: number
+    depassant_2j: number
+    depassant_7j: number
+    en_cours_depasse_2j: number
+    en_cours_depasse_7j: number
+    alertes: Array<{
+      sample_id: number
+      reference: string | null
+      fold_number: string | null
+      transco_number: string | null
+      dossier_reference: string | null | undefined
+      status: string
+      jours: number
+      niveau: 'warning' | 'critical'
+      en_cours: boolean
+    }>
+  }
+}
+
+export interface KpiTeamPerson {
+  id: number
+  name: string
+  email: string
+  role: string
+  poste: string | null
+  poste_label: string
+  affectations_count?: number
 }
 
 export interface CommercialOffering {
@@ -2293,6 +2450,7 @@ export interface User {
   name: string
   email: string
   phone?: string | null
+  poste?: string | null
   role: string
   client_id?: number
   site_id?: number

@@ -8,8 +8,11 @@ import {
   type BonCommandeLigne,
 } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import PlanningMassActionsBar from '../../components/planning/PlanningMassActionsBar'
 import { useAuth } from '../../contexts/AuthContext'
 import { dateInputFromApi } from '../../lib/appLocale'
+import { applyMassToLineIds, toggleAllSelection } from '../../lib/planningMassApply'
+import { formatTechnicienOption } from '../../lib/userRolePresentation'
 
 function toYmd(d: Date) {
   return d.toISOString().slice(0, 10)
@@ -73,6 +76,10 @@ export default function PlanningTechniciensPage() {
   const [unposDebugMap, setUnposDebugMap] = useState<Record<number, string>>({})
   const [unposFinMap, setUnposFinMap] = useState<Record<number, string>>({})
   const [unposNotesMap, setUnposNotesMap] = useState<Record<number, string>>({})
+  const [selectedUnposIds, setSelectedUnposIds] = useState<Set<number>>(new Set())
+  const [massUserId, setMassUserId] = useState<number | ''>('')
+  const [massDebut, setMassDebut] = useState(() => toYmd(new Date()))
+  const [massFin, setMassFin] = useState(() => toYmd(new Date()))
 
   const { data: affectations, isLoading, error } = useQuery({
     queryKey: ['planning-terrain', from, to, userFilter],
@@ -165,6 +172,52 @@ export default function PlanningTechniciensPage() {
     },
   })
 
+  const bulkCreateUnposMut = useMutation({
+    mutationFn: async (ligneIds: number[]) => {
+      for (const ligneId of ligneIds) {
+        const userId = unposUserIdMap[ligneId]
+        if (userId === '' || userId === undefined) continue
+        await planningTerrainApi.create({
+          bon_commande_ligne_id: ligneId,
+          user_id: userId,
+          date_debut: unposDebugMap[ligneId] || massDebut,
+          date_fin: unposFinMap[ligneId] || massFin,
+          notes: unposNotesMap[ligneId] || undefined,
+        })
+      }
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['planning-terrain'] })
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+      setUnposUserIdMap({})
+      setUnposDebugMap({})
+      setUnposFinMap({})
+      setUnposNotesMap({})
+      setSelectedUnposIds(new Set())
+    },
+  })
+
+  function applyMassToUnpositioned() {
+    const targetIds =
+      selectedUnposIds.size > 0 ? [...selectedUnposIds] : unpositionedLignes.map((l) => l.id)
+    applyMassToLineIds(targetIds, {
+      assigneeId: massUserId,
+      dateDebut: massDebut,
+      dateFin: massFin,
+      setAssignee: (id, userId) => setUnposUserIdMap((m) => ({ ...m, [id]: userId })),
+      setDateDebut: (id, value) => setUnposDebugMap((m) => ({ ...m, [id]: value })),
+      setDateFin: (id, value) => setUnposFinMap((m) => ({ ...m, [id]: value })),
+    })
+  }
+
+  const bulkCreateTargets = useMemo(() => {
+    const pool =
+      selectedUnposIds.size > 0
+        ? unpositionedLignes.filter((l) => selectedUnposIds.has(l.id))
+        : unpositionedLignes
+    return pool.filter((l) => unposUserIdMap[l.id] !== '' && unposUserIdMap[l.id] !== undefined)
+  }, [unpositionedLignes, selectedUnposIds, unposUserIdMap])
+
   return (
     <ModuleEntityShell
       shellClassName="module-shell--crm"
@@ -206,10 +259,58 @@ export default function PlanningTechniciensPage() {
             <p className="text-muted">Aucune ligne non affectée.</p>
           )}
           {unpositionedLignes.length > 0 && (
+            <>
+              <PlanningMassActionsBar
+                assignees={techniciens ?? []}
+                assigneeId={massUserId}
+                onAssigneeChange={setMassUserId}
+                dateDebut={massDebut}
+                onDateDebutChange={setMassDebut}
+                dateFin={massFin}
+                onDateFinChange={setMassFin}
+                onApply={applyMassToUnpositioned}
+                applyLabel="Appliquer aux lignes"
+                selectedCount={selectedUnposIds.size > 0 ? selectedUnposIds.size : unpositionedLignes.length}
+                totalCount={unpositionedLignes.length}
+                hint="Cochez des lignes ou laissez la sélection vide pour cibler toutes les lignes visibles."
+              />
+              <div className="planning-mass-actions__save-row">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  disabled={bulkCreateUnposMut.isPending || bulkCreateTargets.length === 0}
+                  onClick={() => bulkCreateUnposMut.mutate(bulkCreateTargets.map((l) => l.id))}
+                >
+                  {bulkCreateUnposMut.isPending
+                    ? 'Création…'
+                    : `Créer les affectations (${bulkCreateTargets.length})`}
+                </button>
+              </div>
+            </>
+          )}
+          {unpositionedLignes.length > 0 && (
             <div className="table-wrap">
               <table className="data-table data-table--compact" style={{ width: '100%' }}>
                 <thead>
                   <tr>
+                    <th style={{ width: 36 }}>
+                      <input
+                        type="checkbox"
+                        aria-label="Tout sélectionner"
+                        checked={
+                          unpositionedLignes.length > 0 && selectedUnposIds.size === unpositionedLignes.length
+                        }
+                        onChange={(e) =>
+                          setSelectedUnposIds(
+                            toggleAllSelection(
+                              selectedUnposIds,
+                              unpositionedLignes.map((l) => l.id),
+                              e.target.checked,
+                            ),
+                          )
+                        }
+                      />
+                    </th>
                     <th>BC</th>
                     <th>Ligne</th>
                     <th>Technicien</th>
@@ -222,6 +323,20 @@ export default function PlanningTechniciensPage() {
                 <tbody>
                   {unpositionedLignes.map((ligne) => (
                     <tr key={ligne.id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedUnposIds.has(ligne.id)}
+                          onChange={(e) => {
+                            setSelectedUnposIds((prev) => {
+                              const next = new Set(prev)
+                              if (e.target.checked) next.add(ligne.id)
+                              else next.delete(ligne.id)
+                              return next
+                            })
+                          }}
+                        />
+                      </td>
                       <td>
                         <Link to={`/bons-commande/${ligne.bc_id}`} className="link-inline">
                           {ligne.bc_numero}
@@ -242,7 +357,7 @@ export default function PlanningTechniciensPage() {
                           <option value="">—</option>
                           {techniciens?.map((t) => (
                             <option key={t.id} value={t.id}>
-                              {t.name}
+                              {formatTechnicienOption(t)}
                             </option>
                           )) ?? null}
                         </select>
@@ -307,11 +422,11 @@ export default function PlanningTechniciensPage() {
               </table>
             </div>
           )}
-          {createUnposMut.isError && (
+          {createUnposMut.isError || bulkCreateUnposMut.isError ? (
             <p className="error" style={{ marginTop: '0.75rem' }}>
-              {(createUnposMut.error as Error).message}
+              {((bulkCreateUnposMut.error ?? createUnposMut.error) as Error).message}
             </p>
-          )}
+          ) : null}
         </section>
       )}
 
@@ -348,7 +463,7 @@ export default function PlanningTechniciensPage() {
             {lab
               ? (techniciens ?? []).map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name}
+                    {formatTechnicienOption(t)}
                   </option>
                 ))
               : null}
@@ -515,7 +630,7 @@ export default function PlanningTechniciensPage() {
                 <option value="">—</option>
                 {techniciens.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name}
+                    {formatTechnicienOption(t)}
                   </option>
                 ))}
               </select>

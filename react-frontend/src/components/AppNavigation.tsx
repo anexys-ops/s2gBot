@@ -192,7 +192,7 @@ export default function AppNavigation() {
         items: filterItems([
           { to: '/rapports/ventes', label: 'Ventes' },
           { to: '/rapports/compta', label: 'Comptabilité' },
-          { to: '/rapports/delais', label: 'Délais chantier' },
+          { to: '/rapports/kpi', label: 'KPI' },
         ]),
       },
     ]

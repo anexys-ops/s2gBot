@@ -299,6 +299,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('activity-logs', [ActivityLogController::class, 'index']);
     Route::get('stats/essais', [StatsController::class, 'essais']);
     Route::get('stats/dashboard', [StatsController::class, 'dashboard']);
+    Route::get('stats/kpi', [StatsController::class, 'kpi']);
     Route::get('accounting/exports', [AccountingExportController::class, 'export']);
 
     Route::get('attachments', [AttachmentController::class, 'index']);
@@ -408,13 +409,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('v1')->group(function () {
         Route::get('lab/reception/attendus', [LabReceptionController::class, 'attendus']);
         Route::get('lab/reception/stats',    [LabReceptionController::class, 'stats']);
+        Route::post('lab/reception/receive-from-line', [SampleReceptionController::class, 'receiveFromLine'])
+            ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur');
         Route::get('samples',                 [SampleReceptionController::class, 'index']);
         Route::get('samples/stats',           [SampleReceptionController::class, 'stats']);
         Route::get('samples/search',          [SampleReceptionController::class, 'searchByFold']);
         Route::get('samples/{sample}',        [SampleReceptionController::class, 'show'])->whereNumber('sample');
+        Route::get('samples/{sample}/label',  [SampleReceptionController::class, 'labelData'])->whereNumber('sample');
+        Route::get('samples/{sample}/photo',  [SampleReceptionController::class, 'downloadPhoto'])->whereNumber('sample');
         Route::post('samples',                [SampleReceptionController::class, 'store'])
             ->middleware('role:lab_technician,receptionnaire,laborantin,ingenieur');
+        Route::post('samples/{sample}/photo', [SampleReceptionController::class, 'uploadPhoto'])
+            ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur')->whereNumber('sample');
         Route::put('samples/{sample}',        [SampleReceptionController::class, 'update'])->whereNumber('sample');
+        Route::delete('samples/{sample}',     [SampleReceptionController::class, 'destroy'])
+            ->middleware('role:responsable,receptionnaire')->whereNumber('sample');
         Route::patch('samples/{sample}/receive',     [SampleReceptionController::class, 'receive'])
             ->middleware('role:receptionnaire,responsable,laborantin')->whereNumber('sample');
         Route::patch('samples/{sample}/start-test',  [SampleReceptionController::class, 'startTest'])

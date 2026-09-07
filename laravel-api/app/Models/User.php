@@ -41,6 +41,7 @@ class User extends Authenticatable
         'name',
         'email',
         'phone',
+        'poste',
         'password',
         'role',
         'client_id',
@@ -164,6 +165,11 @@ class User extends Authenticatable
     public function isLab(): bool
     {
         return in_array($this->role, [self::ROLE_LAB_ADMIN, self::ROLE_LAB_TECHNICIAN], true);
+    }
+
+    public function posteLabel(): string
+    {
+        return \App\Support\UserPresentation::posteLabel($this->poste, $this->role);
     }
 
     public function isClient(): bool

@@ -1,8 +1,16 @@
+import OrdreMissionPlanningEditorPage from '../planning/OrdreMissionPlanningEditorPage'
+
 export default function PlanningIngenieurPage() {
   return (
-    <div className="container">
-      <h1>Planning ingénieur</h1>
-      <p className="text-muted">Planning des interventions ingénieur. Disponible après le déploiement du module ingénierie.</p>
-    </div>
+    <OrdreMissionPlanningEditorPage
+      kind="ingenieur"
+      hubTo="/ingenierie"
+      hubLabel="Ingénierie"
+      moduleBarLabel="Ingénierie — Planning"
+      title="Planning ingénieur"
+      subtitle="Affectez un ingénieur et une date prévue à toutes les prestations en une action."
+      assigneeLabel="Ingénieur"
+      emptyMessage="Aucune prestation ingénieur sur cette période. Générez les OdM depuis un bon de commande."
+    />
   )
 }

@@ -466,8 +466,8 @@ function renderKpiDetail(id: KpiId, dash: DashboardStatsPayload) {
               : '—'}
             ).
           </p>
-          <Link to="/rapports/delai-chantier" className="btn btn-secondary btn-sm">
-            Délais chantier & planning
+          <Link to="/rapports/kpi" className="btn btn-secondary btn-sm">
+            Tableau KPI
           </Link>
         </KpiDetail>
       )
@@ -772,8 +772,8 @@ export default function Dashboard() {
                 <Link to="/rapports/delai-traitement" className="dashboard-report-link">
                   Délais de traitement labo
                 </Link>
-                <Link to="/rapports/delai-chantier" className="dashboard-report-link">
-                  Délais chantier
+                <Link to="/rapports/kpi" className="dashboard-report-link">
+                  Tableau KPI
                 </Link>
                 <Link to="/graphiques-essais" className="dashboard-report-link">
                   Graphiques essais

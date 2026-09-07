@@ -48,6 +48,7 @@ class Sample extends Model
         'depth_bottom_m',
         // v1.2.0 réception
         'fold_number',
+        'transco_number',
         'dossier_id',
         'mission_order_id',
         'task_id',

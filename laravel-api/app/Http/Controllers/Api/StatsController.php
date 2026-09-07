@@ -3,14 +3,22 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\BcLignePlanningAffectation;
+use App\Models\BonCommande;
+use App\Models\BonLivraison;
 use App\Models\Client;
+use App\Models\Dossier;
 use App\Models\Invoice;
+use App\Models\LabReport;
 use App\Models\Order;
 use App\Models\Quote;
+use App\Models\Reglement;
 use App\Models\Report;
 use App\Models\Sample;
 use App\Models\Site;
+use App\Models\User;
 use App\Support\AgencyAccess;
+use App\Support\UserPresentation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -324,6 +332,353 @@ class StatsController extends Controller
                 'sample_reception_sample_size' => count($sampleReceptionDays),
             ],
             'ca_par_mois' => $caParMois,
+        ]);
+    }
+
+    /**
+     * KPI consolidés : devis ouverts, équipes, délais chaîne documentaire, essais.
+     */
+    public function kpi(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $scopedPortal = $user->isClient() || $user->isSiteContact();
+        $scopedLabAgency = $user->isInternal() && ! AgencyAccess::isLabSiege($user);
+        $scoped = $scopedPortal || $scopedLabAgency;
+
+        $avg = static function (array $vals): ?float {
+            $vals = array_values(array_filter($vals, static fn ($v) => $v !== null && $v >= 0));
+            if (count($vals) === 0) {
+                return null;
+            }
+
+            return round(array_sum($vals) / count($vals), 1);
+        };
+
+        $median = static function (array $vals): ?float {
+            $vals = array_values(array_filter($vals, static fn ($v) => $v !== null && $v >= 0));
+            sort($vals);
+            $n = count($vals);
+            if ($n === 0) {
+                return null;
+            }
+            $mid = (int) floor(($n - 1) / 2);
+            if ($n % 2 === 1) {
+                return round($vals[$mid], 1);
+            }
+
+            return round(($vals[$mid] + $vals[$mid + 1]) / 2, 1);
+        };
+
+        $delayMetric = static function (array $days) use ($avg, $median): array {
+            return [
+                'avg' => $avg($days),
+                'median' => $median($days),
+                'sample_size' => count($days),
+            ];
+        };
+
+        $openQuoteStatuses = [
+            Quote::STATUS_INVOICED,
+            Quote::STATUS_LOST,
+            Quote::STATUS_REJECTED,
+        ];
+
+        $quotesQ = Quote::query()->with('client:id,name');
+        if ($scoped) {
+            AgencyAccess::applyQuoteScope($quotesQ, $user);
+        }
+
+        $quotesOpenQ = (clone $quotesQ)->whereNotIn('status', $openQuoteStatuses);
+        $quotesOpenCount = (clone $quotesOpenQ)->count();
+        $quotesOpenTtc = (float) (clone $quotesOpenQ)->sum('amount_ttc');
+        $quotesOpenByStatus = (clone $quotesOpenQ)
+            ->selectRaw('status, count(*) as c')
+            ->groupBy('status')
+            ->pluck('c', 'status')
+            ->all();
+
+        $quotesOpenList = (clone $quotesOpenQ)
+            ->orderByDesc('quote_date')
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get(['id', 'number', 'status', 'quote_date', 'amount_ttc', 'client_id', 'valid_until'])
+            ->map(fn (Quote $q) => [
+                'id' => $q->id,
+                'number' => $q->number,
+                'status' => $q->status,
+                'quote_date' => $q->quote_date?->format('Y-m-d'),
+                'valid_until' => $q->valid_until?->format('Y-m-d'),
+                'amount_ttc' => (float) $q->amount_ttc,
+                'client_name' => $q->client?->name,
+            ])
+            ->values()
+            ->all();
+
+        $bcQ = BonCommande::query()->with([
+            'quote:id,quote_date',
+            'dossier:id,date_debut,site_id',
+            'bonsLivraison:id,bon_commande_id,date_livraison',
+            'invoices:id,invoice_date',
+        ]);
+        if ($scoped) {
+            $bcQ->whereHas('dossier', fn ($d) => AgencyAccess::applyDossierScope($d, $user));
+        }
+
+        $bcCount = (clone $bcQ)->count();
+
+        $devisBcDays = [];
+        $dossierBcDays = [];
+        $bcBlDays = [];
+        $blFactureDays = [];
+        $facturePaiementDays = [];
+        $bcRapportDays = [];
+
+        foreach ($bcQ->get(['id', 'quote_id', 'dossier_id', 'date_commande', 'created_at']) as $bc) {
+            $bcDate = $bc->date_commande ?? $bc->created_at?->startOfDay();
+            if (! $bcDate) {
+                continue;
+            }
+
+            if ($bc->quote?->quote_date) {
+                $devisBcDays[] = $bc->quote->quote_date->diffInDays($bcDate);
+            }
+
+            if ($bc->dossier?->date_debut) {
+                $dossierBcDays[] = $bc->dossier->date_debut->diffInDays($bcDate);
+            }
+
+            $firstBl = $bc->bonsLivraison
+                ->filter(fn (BonLivraison $bl) => $bl->date_livraison !== null)
+                ->sortBy('date_livraison')
+                ->first();
+            if ($firstBl?->date_livraison) {
+                $bcBlDays[] = $bcDate->diffInDays($firstBl->date_livraison);
+            }
+
+            $firstInvoice = $bc->invoices
+                ->filter(fn (Invoice $inv) => $inv->invoice_date !== null)
+                ->sortBy('invoice_date')
+                ->first();
+            if ($firstInvoice?->invoice_date) {
+                if ($firstBl?->date_livraison) {
+                    $blFactureDays[] = $firstBl->date_livraison->diffInDays($firstInvoice->invoice_date);
+                }
+
+                $firstPayment = Reglement::query()
+                    ->where('invoice_id', $firstInvoice->id)
+                    ->whereNotNull('payment_date')
+                    ->orderBy('payment_date')
+                    ->value('payment_date');
+                if ($firstPayment) {
+                    $facturePaiementDays[] = $firstInvoice->invoice_date->diffInDays($firstPayment);
+                }
+            }
+
+            $firstReport = LabReport::query()
+                ->where('bc_id', $bc->id)
+                ->where(function ($q) {
+                    $q->whereNotNull('emitted_at')->orWhereNotNull('signed_at');
+                })
+                ->orderByRaw('COALESCE(emitted_at, signed_at) ASC')
+                ->first(['emitted_at', 'signed_at']);
+            if ($firstReport) {
+                $reportDate = $firstReport->emitted_at ?? $firstReport->signed_at;
+                if ($reportDate) {
+                    $bcRapportDays[] = $bcDate->diffInDays($reportDate);
+                }
+            }
+        }
+
+        $quotePlanningDays = [];
+        $quotesPlanning = Quote::query()
+            ->whereNotNull('site_delivery_date')
+            ->whereNotNull('quote_date')
+            ->when($scoped, fn ($q) => AgencyAccess::applyQuoteScope($q, $user))
+            ->get(['quote_date', 'site_delivery_date']);
+        foreach ($quotesPlanning as $q) {
+            if ($q->quote_date && $q->site_delivery_date) {
+                $quotePlanningDays[] = $q->quote_date->diffInDays($q->site_delivery_date);
+            }
+        }
+
+        $samplesQ = Sample::query()->with('dossier:id,reference');
+        if ($scoped) {
+            $samplesQ->where(function ($q) use ($user) {
+                $q->whereHas('dossier', fn ($d) => AgencyAccess::applyDossierScope($d, $user))
+                    ->orWhereHas('orderItem.order', fn ($oq) => AgencyAccess::applyOrderScope($oq, $user));
+            });
+        }
+
+        $essaiDurees = [];
+        $depassant2j = 0;
+        $depassant7j = 0;
+        $enCoursDepassant2j = 0;
+        $enCoursDepassant7j = 0;
+        $alertesEssais = [];
+
+        $samplesForEssais = (clone $samplesQ)
+            ->whereNotNull('received_at')
+            ->whereIn('status', [Sample::STATUS_EN_ESSAI, Sample::STATUS_TERMINE, Sample::STATUS_TESTED, Sample::STATUS_VALIDATED])
+            ->get(['id', 'reference', 'fold_number', 'transco_number', 'status', 'received_at', 'updated_at', 'dossier_id']);
+
+        foreach ($samplesForEssais as $sample) {
+            $end = $sample->status === Sample::STATUS_EN_ESSAI
+                ? now()
+                : ($sample->updated_at ?? now());
+            $days = (int) $sample->received_at->diffInDays($end);
+
+            if ($sample->status !== Sample::STATUS_EN_ESSAI) {
+                $essaiDurees[] = $days;
+            }
+
+            if ($days > 2) {
+                if ($sample->status === Sample::STATUS_EN_ESSAI) {
+                    $enCoursDepassant2j++;
+                } else {
+                    $depassant2j++;
+                }
+            }
+            if ($days > 7) {
+                if ($sample->status === Sample::STATUS_EN_ESSAI) {
+                    $enCoursDepassant7j++;
+                } else {
+                    $depassant7j++;
+                }
+            }
+
+            if ($days > 2 && ($sample->status === Sample::STATUS_EN_ESSAI || $days > 7)) {
+                $niveau = $days > 7 ? 'critical' : 'warning';
+                if ($sample->status === Sample::STATUS_EN_ESSAI || $niveau === 'critical') {
+                    $alertesEssais[] = [
+                        'sample_id' => $sample->id,
+                        'reference' => $sample->reference,
+                        'fold_number' => $sample->fold_number,
+                        'transco_number' => $sample->transco_number,
+                        'dossier_reference' => $sample->dossier?->reference,
+                        'status' => $sample->status,
+                        'jours' => $days,
+                        'niveau' => $niveau,
+                        'en_cours' => $sample->status === Sample::STATUS_EN_ESSAI,
+                    ];
+                }
+            }
+        }
+
+        usort($alertesEssais, fn ($a, $b) => $b['jours'] <=> $a['jours']);
+        $alertesEssais = array_slice($alertesEssais, 0, 30);
+
+        $today = now()->toDateString();
+        $planningRows = BcLignePlanningAffectation::query()
+            ->with('user:id,name,role,poste')
+            ->where('date_debut', '<=', $today)
+            ->where('date_fin', '>=', $today)
+            ->when($scoped, fn ($q) => $q->whereHas(
+                'bonCommandeLigne.bonCommande.dossier',
+                fn ($d) => AgencyAccess::applyDossierScope($d, $user)
+            ))
+            ->get();
+
+        $equipeTerrain = [];
+        $equipeLabo = [];
+        $equipeIngenieurs = [];
+        $rolesTerrain = [User::ROLE_LAB_ADMIN, User::ROLE_LAB_TECHNICIAN];
+        $rolesLabo = [User::ROLE_LAB_ADMIN, User::ROLE_LAB_TECHNICIAN, User::ROLE_LABORANTIN, User::ROLE_RECEPTIONNAIRE];
+        $rolesIngenieur = [User::ROLE_LAB_ADMIN, User::ROLE_INGENIEUR, User::ROLE_RESPONSABLE];
+
+        $registerPerson = static function (array &$equipe, User $u): void {
+            if (! isset($equipe[$u->id])) {
+                $equipe[$u->id] = UserPresentation::technicienPayload($u);
+                $equipe[$u->id]['affectations_count'] = 0;
+            }
+            $equipe[$u->id]['affectations_count']++;
+        };
+
+        foreach ($planningRows as $aff) {
+            $u = $aff->user;
+            if (! $u) {
+                continue;
+            }
+            if (in_array($u->role, $rolesTerrain, true)) {
+                $registerPerson($equipeTerrain, $u);
+            }
+            if (in_array($u->role, $rolesLabo, true)) {
+                $registerPerson($equipeLabo, $u);
+            }
+            if (in_array($u->role, $rolesIngenieur, true)) {
+                $registerPerson($equipeIngenieurs, $u);
+            }
+        }
+
+        $dossiersQ = Dossier::query();
+        if ($scoped) {
+            AgencyAccess::applyDossierScope($dossiersQ, $user);
+        }
+
+        $sitesQ = Site::query();
+        if ($scoped) {
+            AgencyAccess::applySiteScope($sitesQ, $user);
+        }
+
+        $blQ = BonLivraison::query();
+        if ($scoped) {
+            $blQ->whereHas('dossier', fn ($d) => AgencyAccess::applyDossierScope($d, $user));
+        }
+
+        $labReportsQ = LabReport::query();
+        if ($scoped) {
+            $labReportsQ->where(function ($q) use ($user) {
+                $q->whereHas('dossier', fn ($d) => AgencyAccess::applyDossierScope($d, $user))
+                    ->orWhereHas('site', fn ($s) => AgencyAccess::applySiteScope($s, $user));
+            });
+        }
+
+        return response()->json([
+            'devis_ouverts' => [
+                'count' => $quotesOpenCount,
+                'montant_ttc' => $quotesOpenTtc,
+                'par_statut' => $quotesOpenByStatus,
+                'liste' => $quotesOpenList,
+            ],
+            'equipes' => [
+                'terrain' => [
+                    'actifs' => count($equipeTerrain),
+                    'personnes' => array_values($equipeTerrain),
+                ],
+                'labo' => [
+                    'actifs' => count($equipeLabo),
+                    'personnes' => array_values($equipeLabo),
+                ],
+                'ingenieurs' => [
+                    'actifs' => count($equipeIngenieurs),
+                    'personnes' => array_values($equipeIngenieurs),
+                ],
+            ],
+            'volumes' => [
+                'dossiers' => $dossiersQ->count(),
+                'chantiers' => $sitesQ->count(),
+                'bons_commande' => $bcCount,
+                'bons_livraison' => $blQ->count(),
+                'rapports_labo' => $labReportsQ->count(),
+            ],
+            'delais_chaine' => [
+                'dossier_bc' => $delayMetric($dossierBcDays),
+                'devis_bc' => $delayMetric($devisBcDays),
+                'bc_bl' => $delayMetric($bcBlDays),
+                'bl_facture' => $delayMetric($blFactureDays),
+                'facture_paiement' => $delayMetric($facturePaiementDays),
+                'bc_rapport' => $delayMetric($bcRapportDays),
+                'devis_livraison_chantier' => $delayMetric($quotePlanningDays),
+            ],
+            'essais' => [
+                'duree_moyenne_jours' => $avg($essaiDurees),
+                'duree_mediane_jours' => $median($essaiDurees),
+                'sample_size' => count($essaiDurees),
+                'depassant_2j' => $depassant2j,
+                'depassant_7j' => $depassant7j,
+                'en_cours_depasse_2j' => $enCoursDepassant2j,
+                'en_cours_depasse_7j' => $enCoursDepassant7j,
+                'alertes' => $alertesEssais,
+            ],
         ]);
     }
 }

@@ -66,7 +66,7 @@ import ModuleConfigurationPage from './pages/back-office/ModuleConfigurationPage
 import ReportComptaPage from './pages/reports/ReportComptaPage'
 import ReportVentesPage from './pages/reports/ReportVentesPage'
 import ReportDelaiTraitementPage from './pages/reports/ReportDelaiTraitementPage'
-import ReportDelaiChantierPage from './pages/reports/ReportDelaiChantierPage'
+import ReportKpiPage from './pages/reports/ReportKpiPage'
 import QuoteEditorPage from './pages/QuoteEditorPage'
 import CommercialCatalogPage from './pages/CommercialCatalogPage'
 import SettingsLayout from './pages/settings/SettingsLayout'
@@ -135,7 +135,9 @@ function AppRoutes() {
           <Route path="compta" element={<ReportComptaPage />} />
           <Route path="ventes" element={<ReportVentesPage />} />
           <Route path="delai-traitement" element={<ReportDelaiTraitementPage />} />
-          <Route path="delai-chantier" element={<ReportDelaiChantierPage />} />
+          <Route path="kpi" element={<ReportKpiPage />} />
+          <Route path="delai-chantier" element={<Navigate to="/rapports/kpi" replace />} />
+          <Route path="delais" element={<Navigate to="/rapports/kpi" replace />} />
         </Route>
         <Route path="crm" element={<CrmHub />} />
         <Route path="crm/documents" element={<CrmDocuments />} />

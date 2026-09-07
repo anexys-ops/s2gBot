@@ -117,6 +117,39 @@ class LabReceptionTest extends TestCase
         $this->assertFalse($row['reception_complete']);
     }
 
+    public function test_receive_from_line_creates_sample_with_transco_and_label(): void
+    {
+        [$labLine, , , $client, $technicien] = $this->seedBcWithLabAndReportLines();
+        $this->legacyOrderItemId($client);
+        $receptionnaire = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+
+        $res = $this->actingAs($receptionnaire, 'sanctum')->postJson('/api/v1/lab/reception/receive-from-line', [
+            'bon_commande_ligne_id' => $labLine->id,
+            'condition_state' => 'bon',
+            'storage_location' => 'Salle A / Étagère 1',
+            'collected_by' => $technicien->id,
+            'sample_type' => 'sol',
+            'quantity' => 1,
+        ]);
+
+        $res->assertCreated();
+        $res->assertJsonPath('status', Sample::STATUS_RECEPTIONNE);
+        $this->assertNotEmpty($res->json('fold_number'));
+        $this->assertNotEmpty($res->json('transco_number'));
+        $this->assertNotNull($res->json('received_at'));
+        $sampleId = (int) $res->json('id');
+        $this->assertDatabaseHas('samples', [
+            'id' => $sampleId,
+            'received_by' => $receptionnaire->id,
+            'status' => Sample::STATUS_RECEPTIONNE,
+        ]);
+        $res->assertJsonPath('received_by.id', $receptionnaire->id);
+        $label = $this->actingAs($receptionnaire, 'sanctum')->getJson("/api/v1/samples/{$sampleId}/label");
+        $label->assertOk();
+        $label->assertJsonPath('barcode', $res->json('transco_number'));
+        $this->assertStringContainsString($res->json('fold_number'), $label->json('qr_json'));
+    }
+
     private function legacyOrderItemId(Client $client): int
     {
         $agency = Agency::query()->create([

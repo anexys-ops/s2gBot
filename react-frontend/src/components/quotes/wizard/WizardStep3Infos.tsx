@@ -15,7 +15,7 @@ export default function WizardStep3Infos({
   setForm,
   clientContacts,
   addresses,
-  quoteTemplates,
+  quoteTemplates: _quoteTemplates,
 }: Props) {
   const set = <K extends keyof QuoteFormState>(field: K, value: QuoteFormState[K]) =>
     setForm((f) => ({ ...f, [field]: value }))

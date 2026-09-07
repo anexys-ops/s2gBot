@@ -40,7 +40,20 @@ describe('s2gCataloguePickerUtils', () => {
     expect(hasPrice('12.5')).toBe(true)
     expect(hasPrice('0')).toBe(false)
     expect(
-      formatStockBadge({ track_stock: true, stock_quantity: 3, code: 'X', name: 'X', kind: 'product', active: true, unit: 'U', purchase_price_ht: 0, sale_price_ht: 0, default_tva_rate: 20 }),
+      formatStockBadge({
+        id: 1,
+        description: '',
+        track_stock: true,
+        stock_quantity: 3,
+        code: 'X',
+        name: 'X',
+        kind: 'product',
+        active: true,
+        unit: 'U',
+        purchase_price_ht: 0,
+        sale_price_ht: 0,
+        default_tva_rate: 20,
+      }),
     ).toBe('Stock 3')
   })
 })

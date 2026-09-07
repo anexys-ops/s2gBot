@@ -26,7 +26,7 @@ describe('quoteForfaitJalon', () => {
   })
 
   it('uses global tarif when jalons have no prices', () => {
-    expect(effectiveForfaitDocumentHt([{ id: 'j1' }], 2500)).toBe(2500)
+    expect(effectiveForfaitDocumentHt([{}], 2500)).toBe(2500)
     expect(effectiveForfaitDocumentHt([], 1800)).toBe(1800)
   })
 

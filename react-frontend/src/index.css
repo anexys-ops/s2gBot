@@ -2794,8 +2794,8 @@ a.ds-icon-btn {
   display: none;
 }
 
-/* ——— Tablette & mobile ——— */
-@media (max-width: 900px) {
+/* ——— Tablette & mobile (menu drawer) ——— */
+@media (max-width: 1100px) {
   .app-header-inner::before {
     display: none;
   }
@@ -2911,6 +2911,12 @@ a.ds-icon-btn {
   .nav-dropdown-panel {
     max-height: min(70vh, 420px);
     overflow-y: auto;
+  }
+}
+
+@media (min-width: 1101px) {
+  .nav-shell {
+    display: flex;
   }
 }
 
@@ -5774,9 +5780,15 @@ a.ds-icon-btn {
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   :root {
     --app-header-sticky-offset: 56px;
+  }
+  .app-brand__logo {
+    width: auto;
+    max-width: min(42vw, 180px);
+    height: auto;
+    max-height: 44px;
   }
 }
 
@@ -9508,6 +9520,12 @@ a.catalogue-tree__link-article:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+}
+
+@media (max-width: 900px) {
+  .terrain-tasks-table {
+    min-width: 52rem;
+  }
 }
 
 .terrain-tasks-detail td {

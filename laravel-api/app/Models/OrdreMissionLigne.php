@@ -108,18 +108,20 @@ class OrdreMissionLigne extends Model
         return $task->fresh();
     }
 
-    /** Crée les mission_tasks manquantes pour les lignes OdM terrain / ingénieur. */
+    /** Crée ou resynchronise les mission_tasks pour les lignes OdM terrain / ingénieur. */
     public static function syncMissingMissionTasks(array $omTypes = ['technicien', 'ingenieur']): int
     {
         $created = 0;
 
         static::query()
             ->whereHas('ordreMission', fn ($q) => $q->whereIn('type', $omTypes))
-            ->whereDoesntHave('missionTasks')
             ->orderBy('id')
             ->each(function (self $ligne) use (&$created) {
+                $hadTask = $ligne->missionTasks()->exists();
                 $ligne->ensureTaskExists();
-                $created++;
+                if (! $hadTask) {
+                    $created++;
+                }
             });
 
         return $created;

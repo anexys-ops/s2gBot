@@ -2925,9 +2925,9 @@ export interface OrdreMission {
   created_at?: string
   client?: { id: number; name: string } | null
   site?: { id: number; name: string } | null
-  dossier?: { id: number; reference: string; titre?: string | null } | null
+  dossier?: { id: number; reference: string; titre?: string | null; date_debut?: string | null; date_fin_prevue?: string | null } | null
   responsable?: { id: number; name: string } | null
-  bonCommande?: { id: number; numero: string } | null
+  bonCommande?: { id: number; numero: string; dossier?: { id: number; reference: string; titre?: string | null } | null } | null
   lignes?: OrdreMissionLigne[]
 }
 
@@ -3060,7 +3060,7 @@ export interface MissionTask {
   unique_number?: string
   ordre_mission_ligne_id: number
   assigned_user_id?: number | null
-  statut: 'todo' | 'in_progress' | 'done' | 'validated' | 'rejected'
+  statut: 'todo' | 'in_progress' | 'paused' | 'frozen' | 'done' | 'validated' | 'rejected'
   planned_date?: string | null
   due_date?: string | null
   started_at?: string | null
@@ -3079,20 +3079,105 @@ export interface MissionTask {
   result?: TaskResult | null
 }
 
+type MissionTaskApiRaw = Record<string, unknown>
+
+function asRecord(value: unknown): MissionTaskApiRaw | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as MissionTaskApiRaw)
+    : undefined
+}
+
+/** Laravel sérialise les relations en snake_case — normalise pour le front camelCase. */
+export function normalizeMissionTask(raw: MissionTaskApiRaw): MissionTask {
+  const ligneRaw = asRecord(raw.ordreMissionLigne ?? raw.ordre_mission_ligne)
+  let ordreMissionLigne: MissionTask['ordreMissionLigne']
+
+  if (ligneRaw) {
+    const omRaw = asRecord(ligneRaw.ordreMission ?? ligneRaw.ordre_mission)
+    const articleActionRaw = asRecord(ligneRaw.articleAction ?? ligneRaw.article_action)
+    const articleRaw = asRecord(ligneRaw.article)
+
+    ordreMissionLigne = {
+      ...(ligneRaw as unknown as OrdreMissionLigne),
+      ordreMission: omRaw
+        ? ({
+            ...(omRaw as unknown as OrdreMission),
+            client: asRecord(omRaw.client) as OrdreMission['client'],
+            site: asRecord(omRaw.site) as OrdreMission['site'],
+            dossier: asRecord(omRaw.dossier) as OrdreMission['dossier'],
+            bonCommande: (() => {
+              const bc = asRecord(omRaw.bonCommande ?? omRaw.bon_commande)
+              if (!bc) return undefined
+              return {
+                ...(bc as unknown as NonNullable<OrdreMission['bonCommande']>),
+                dossier: asRecord(bc.dossier) as OrdreMission['dossier'],
+              }
+            })(),
+          } as OrdreMission)
+        : undefined,
+      article: articleRaw as { id: number; code: string; libelle: string } | undefined,
+      articleAction: articleActionRaw
+        ? ({
+            ...(articleActionRaw as unknown as ArticleAction),
+            measure_configs: (articleActionRaw.measure_configs
+              ?? articleActionRaw.measureConfigs) as ActionMeasureConfig[] | undefined,
+          })
+        : undefined,
+    }
+  }
+
+  const measuresRaw = Array.isArray(raw.measures) ? raw.measures : []
+  const measures = measuresRaw.map((m) => {
+    const row = asRecord(m) ?? {}
+    const cfg = asRecord(row.measure_config ?? row.measureConfig)
+    return {
+      ...(row as unknown as TaskMeasure),
+      measure_config: cfg as ActionMeasureConfig | undefined,
+    }
+  })
+
+  const resultRaw = asRecord(raw.result)
+  const validatedBy = resultRaw
+    ? asRecord(resultRaw.validatedBy ?? resultRaw.validated_by)
+    : undefined
+
+  return {
+    ...(raw as unknown as MissionTask),
+    assignedUser: (asRecord(raw.assignedUser ?? raw.assigned_user) ?? undefined) as MissionTask['assignedUser'],
+    ordreMissionLigne,
+    measures,
+    result: resultRaw
+      ? ({
+          ...(resultRaw as unknown as TaskResult),
+          validatedBy: validatedBy as TaskResult['validatedBy'],
+        })
+      : raw.result === null
+        ? null
+        : undefined,
+  }
+}
+
+function normalizeMissionTasks(rows: MissionTaskApiRaw[]): MissionTask[] {
+  return rows.map(normalizeMissionTask)
+}
+
 export const missionTasksApi = {
-  list: (params?: { assigned_user_id?: number; statut?: string; type?: string; ordre_mission_id?: number; dossier_id?: number; date_from?: string; date_to?: string }) => {
+  list: async (params?: { assigned_user_id?: number; statut?: string; type?: string; ordre_mission_id?: number; dossier_id?: number; date_from?: string; date_to?: string }) => {
     const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
-    return api<MissionTask[]>(`/mission-tasks${s ? `?${s}` : ''}`)
+    const rows = await api<MissionTaskApiRaw[]>(`/mission-tasks${s ? `?${s}` : ''}`)
+    return normalizeMissionTasks(rows)
   },
-  laboBoard: (params?: { user_id?: number; statut?: string }) => {
+  laboBoard: async (params?: { user_id?: number; statut?: string }) => {
     const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
-    return api<MissionTask[]>(`/mission-tasks/labo${s ? `?${s}` : ''}`)
+    const rows = await api<MissionTaskApiRaw[]>(`/mission-tasks/labo${s ? `?${s}` : ''}`)
+    return normalizeMissionTasks(rows)
   },
-  terrainBoard: (params?: { user_id?: number; type?: string; statut?: string }) => {
+  terrainBoard: async (params?: { user_id?: number; type?: string; statut?: string }) => {
     const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
-    return api<MissionTask[]>(`/mission-tasks/terrain${s ? `?${s}` : ''}`)
+    const rows = await api<MissionTaskApiRaw[]>(`/mission-tasks/terrain${s ? `?${s}` : ''}`)
+    return normalizeMissionTasks(rows)
   },
-  terrainHistory: (params?: {
+  terrainMeasuresBoard: async (params?: {
     user_id?: number
     type?: string
     statut?: string
@@ -3102,15 +3187,29 @@ export const missionTasksApi = {
     search?: string
   }) => {
     const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString() : ''
-    return api<MissionTask[]>(`/mission-tasks/terrain/history${s ? `?${s}` : ''}`)
+    const rows = await api<MissionTaskApiRaw[]>(`/mission-tasks/terrain/measures${s ? `?${s}` : ''}`)
+    return normalizeMissionTasks(rows)
   },
-  get: (id: number) => api<MissionTask>(`/mission-tasks/${id}`),
-  update: (id: number, body: Partial<MissionTask>) =>
-    api<MissionTask>(`/mission-tasks/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  submitMeasures: (id: number, measures: Array<{ measure_config_id: number; value?: string; value_numeric?: number; attachment_path?: string }>) =>
-    api<MissionTask>(`/mission-tasks/${id}/measures`, { method: 'POST', body: JSON.stringify({ measures }) }),
-  validate: (id: number, body: { is_conform: boolean; value_final?: number; conclusion?: string; observations?: string; rapport_path?: string }) =>
-    api<MissionTask>(`/mission-tasks/${id}/validate`, { method: 'POST', body: JSON.stringify(body) }),
+  terrainHistory: async (params?: {
+    user_id?: number
+    type?: string
+    statut?: string
+    dossier_id?: number
+    date_from?: string
+    date_to?: string
+    search?: string
+  }) => {
+    const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString() : ''
+    const rows = await api<MissionTaskApiRaw[]>(`/mission-tasks/terrain/history${s ? `?${s}` : ''}`)
+    return normalizeMissionTasks(rows)
+  },
+  get: async (id: number) => normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}`)),
+  update: async (id: number, body: Partial<MissionTask>) =>
+    normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}`, { method: 'PUT', body: JSON.stringify(body) })),
+  submitMeasures: async (id: number, measures: Array<{ measure_config_id: number; value?: string; value_numeric?: number; attachment_path?: string }>) =>
+    normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}/measures`, { method: 'POST', body: JSON.stringify({ measures }) })),
+  validate: async (id: number, body: { is_conform: boolean; value_final?: number; conclusion?: string; observations?: string; rapport_path?: string }) =>
+    normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}/validate`, { method: 'POST', body: JSON.stringify(body) })),
 }
 
 // ── Planning & Stock ───────────────────────────────────────────────────────

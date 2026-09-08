@@ -92,7 +92,7 @@ class MissionTaskController extends Controller
 
         $data = $request->validate([
             'assigned_user_id' => 'nullable|exists:users,id',
-            'statut'           => 'in:todo,in_progress,done,validated,rejected',
+            'statut'           => 'in:'.implode(',', MissionTask::statuts()),
             'planned_date'     => 'nullable|date',
             'due_date'         => 'nullable|date',
             'notes'            => 'nullable|string',
@@ -225,13 +225,13 @@ class MissionTaskController extends Controller
             })
             ->with([
                 'assignedUser:id,name',
-                'ordreMissionLigne:id,ordre_mission_id,libelle,ref_article_id,article_action_id',
-                'ordreMissionLigne.ordreMission:id,numero,type,statut,client_id,site_id,dossier_id',
-                'ordreMissionLigne.ordreMission.client:id,name',
-                'ordreMissionLigne.ordreMission.site:id,name',
-                'ordreMissionLigne.ordreMission.dossier:id,reference,titre',
-                'ordreMissionLigne.article:id,code,libelle',
-                'ordreMissionLigne.articleAction:id,type,libelle,duree_heures',
+                'ordreMissionLigne',
+                'ordreMissionLigne.ordreMission.client',
+                'ordreMissionLigne.ordreMission.site',
+                'ordreMissionLigne.ordreMission.dossier',
+                'ordreMissionLigne.ordreMission.bonCommande:id,numero,dossier_id',
+                'ordreMissionLigne.ordreMission.bonCommande.dossier:id,reference,titre',
+                'ordreMissionLigne.article',
                 'ordreMissionLigne.articleAction.measureConfigs',
                 'measures.measureConfig',
                 'result',
@@ -245,6 +245,68 @@ class MissionTaskController extends Controller
         }
         if ($statut = $this->optionalQueryString($request, 'statut')) {
             $q->where('statut', $statut);
+        }
+
+        return response()->json($q->orderBy('planned_date')->get());
+    }
+
+    /**
+     * GET /mission-tasks/terrain/measures — tâches terrain avec formulaires de mesure
+     *
+     * Paramètres : user_id, type, statut, dossier_id, date_from, date_to, search
+     */
+    public function terrainMeasuresBoard(Request $request): JsonResponse
+    {
+        OrdreMissionLigne::syncMissingMissionTasks(['technicien', 'ingenieur']);
+
+        $q = MissionTask::query()
+            ->whereHas('ordreMissionLigne.ordreMission', function ($sq) {
+                $sq->whereIn('type', ['technicien', 'ingenieur']);
+            })
+            ->whereHas('ordreMissionLigne.articleAction.measureConfigs')
+            ->with([
+                'assignedUser:id,name',
+                'ordreMissionLigne:id,ordre_mission_id,libelle,ref_article_id,article_action_id,statut',
+                'ordreMissionLigne.ordreMission:id,numero,type,statut,client_id,site_id,dossier_id',
+                'ordreMissionLigne.ordreMission.client:id,name',
+                'ordreMissionLigne.ordreMission.site:id,name',
+                'ordreMissionLigne.ordreMission.dossier:id,reference,titre,date_debut,date_fin_prevue',
+                'ordreMissionLigne.article:id,code,libelle',
+                'ordreMissionLigne.articleAction:id,type,libelle,duree_heures',
+                'ordreMissionLigne.articleAction.measureConfigs',
+                'measures.measureConfig',
+                'measures.createdBy:id,name',
+                'result',
+            ]);
+
+        if ($uid = $request->integer('user_id')) {
+            $q->where('assigned_user_id', $uid);
+        }
+        if ($type = $this->optionalQueryString($request, 'type')) {
+            $q->whereHas('ordreMissionLigne.ordreMission', fn ($sq) => $sq->where('type', $type));
+        }
+        if ($statut = $this->optionalQueryString($request, 'statut')) {
+            $q->where('statut', $statut);
+        }
+        if ($dossierId = $request->integer('dossier_id')) {
+            $q->whereHas('ordreMissionLigne.ordreMission', fn ($sq) => $sq->where('dossier_id', $dossierId));
+        }
+        if ($from = $this->optionalQueryString($request, 'date_from')) {
+            $q->where(fn ($sq) => $sq->whereDate('planned_date', '>=', $from)->orWhereDate('due_date', '>=', $from));
+        }
+        if ($to = $this->optionalQueryString($request, 'date_to')) {
+            $q->where(fn ($sq) => $sq->whereDate('planned_date', '<=', $to)->orWhereDate('due_date', '<=', $to));
+        }
+        if ($search = $this->optionalQueryString($request, 'search')) {
+            $term = '%'.addcslashes($search, '%_\\').'%';
+            $q->where(function ($sq) use ($term) {
+                $sq->where('unique_number', 'like', $term)
+                    ->orWhereHas('ordreMissionLigne.ordreMission', fn ($om) => $om->where('numero', 'like', $term))
+                    ->orWhereHas('ordreMissionLigne.ordreMission.dossier', fn ($d) => $d->where('reference', 'like', $term)->orWhere('titre', 'like', $term))
+                    ->orWhereHas('ordreMissionLigne.ordreMission.client', fn ($c) => $c->where('name', 'like', $term))
+                    ->orWhereHas('ordreMissionLigne.article', fn ($a) => $a->where('code', 'like', $term)->orWhere('libelle', 'like', $term))
+                    ->orWhereHas('ordreMissionLigne.articleAction', fn ($a) => $a->where('libelle', 'like', $term));
+            });
         }
 
         return response()->json($q->orderBy('planned_date')->get());
@@ -267,12 +329,13 @@ class MissionTaskController extends Controller
             ->with([
                 'assignedUser:id,name',
                 'validatedBy:id,name',
-                'ordreMissionLigne.ordreMission:id,numero,type,statut,client_id,site_id,dossier_id',
-                'ordreMissionLigne.ordreMission.client:id,name',
-                'ordreMissionLigne.ordreMission.site:id,name',
-                'ordreMissionLigne.ordreMission.dossier:id,reference,titre',
-                'ordreMissionLigne.article:id,code,libelle',
-                'ordreMissionLigne.articleAction:id,type,libelle,duree_heures',
+                'ordreMissionLigne',
+                'ordreMissionLigne.ordreMission.client',
+                'ordreMissionLigne.ordreMission.site',
+                'ordreMissionLigne.ordreMission.dossier',
+                'ordreMissionLigne.ordreMission.bonCommande:id,numero,dossier_id',
+                'ordreMissionLigne.ordreMission.bonCommande.dossier:id,reference,titre',
+                'ordreMissionLigne.article',
                 'ordreMissionLigne.articleAction.measureConfigs',
                 'measures.measureConfig',
                 'measures.createdBy:id,name',

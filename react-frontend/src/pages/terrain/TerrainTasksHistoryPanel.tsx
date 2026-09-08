@@ -46,7 +46,8 @@ export function taskDisplayName(task: MissionTask): string {
 }
 
 function taskDossierLabel(task: MissionTask): string {
-  const dossier = task.ordreMissionLigne?.ordreMission?.dossier
+  const om = task.ordreMissionLigne?.ordreMission
+  const dossier = om?.dossier ?? om?.bonCommande?.dossier
   if (!dossier) return 'Sans dossier'
   return dossier.titre ? `${dossier.reference} — ${dossier.titre}` : dossier.reference
 }
@@ -79,6 +80,7 @@ function compareGroups(a: string, b: string, mode: TerrainHistoryGroupMode): num
 function HistoryTaskRow({ task }: { task: MissionTask }) {
   const [open, setOpen] = useState(false)
   const om = task.ordreMissionLigne?.ordreMission
+  const dossier = om?.dossier ?? om?.bonCommande?.dossier
   const measures = task.measures ?? []
 
   return (
@@ -100,9 +102,9 @@ function HistoryTaskRow({ task }: { task: MissionTask }) {
         </td>
         <td>{taskDisplayName(task)}</td>
         <td>
-          {om?.dossier ? (
-            <Link to={`/dossiers/${om.dossier.id}`} className="link-inline">
-              {om.dossier.reference}
+          {dossier ? (
+            <Link to={`/dossiers/${dossier.id}`} className="link-inline">
+              {dossier.reference}
             </Link>
           ) : (
             <span className="text-muted">—</span>

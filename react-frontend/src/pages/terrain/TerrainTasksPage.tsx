@@ -90,6 +90,7 @@ function TerrainTaskRow({ task }: { task: MissionTask }) {
 
   const configs = task.ordreMissionLigne?.articleAction?.measure_configs ?? []
   const om = task.ordreMissionLigne?.ordreMission
+  const dossier = om?.dossier ?? om?.bonCommande?.dossier
   const type = om?.type ?? 'technicien'
   const typeMeta = TYPE_META[type] ?? TYPE_META.technicien
   const statut = STATUT_META[task.statut] ?? STATUT_META.todo
@@ -123,15 +124,15 @@ function TerrainTaskRow({ task }: { task: MissionTask }) {
     <>
       <tr className={expanded ? 'terrain-tasks-row--open' : undefined}>
         <td>
-          {om?.dossier ? (
-            <Link to={`/dossiers/${om.dossier.id}`} className="link-inline">
-              <strong>{om.dossier.reference}</strong>
+          {dossier ? (
+            <Link to={`/dossiers/${dossier.id}`} className="link-inline">
+              <strong>{dossier.reference}</strong>
             </Link>
           ) : (
             <span className="text-muted">—</span>
           )}
-          {om?.dossier?.titre && (
-            <div className="text-muted terrain-tasks-table__sub">{om.dossier.titre}</div>
+          {dossier?.titre && (
+            <div className="text-muted terrain-tasks-table__sub">{dossier.titre}</div>
           )}
         </td>
         <td>

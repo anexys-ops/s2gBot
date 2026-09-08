@@ -10,10 +10,9 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { canManageAppConfig } from '../../lib/settingsAccess'
 import Modal from '../../components/Modal'
+import ConfigCatalogueProductsPanel from '../../components/config/ConfigCatalogueProductsPanel'
 
 const ENTITY_TABS: { type: ExtrafieldEntityType; label: string }[] = [
-  { type: 'client', label: 'Clients' },
-  { type: 'site', label: 'Chantiers' },
   { type: 'article', label: 'Articles' },
   { type: 'dossier', label: 'Dossiers' },
   { type: 'quote', label: 'Devis' },
@@ -47,14 +46,14 @@ const MODULE_KEYS = [
   { key: 'commercial_catalog', label: 'Catalogue commercial / matériel' },
 ] as const
 
-type MainTab = 'extrafields' | 'modules'
+type MainTab = 'extrafields' | 'modules' | 'catalogue'
 
 export default function ModuleConfigurationPage() {
   const { user } = useAuth()
   const canConfigure = canManageAppConfig(user)
   const queryClient = useQueryClient()
   const [mainTab, setMainTab] = useState<MainTab>('extrafields')
-  const [entityTab, setEntityTab] = useState<ExtrafieldEntityType>('client')
+  const [entityTab, setEntityTab] = useState<ExtrafieldEntityType>('article')
   const [createOpen, setCreateOpen] = useState(false)
   const [editRow, setEditRow] = useState<ExtrafieldDefinitionRow | null>(null)
 
@@ -92,7 +91,16 @@ export default function ModuleConfigurationPage() {
         >
           Listes par module
         </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${mainTab === 'catalogue' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setMainTab('catalogue')}
+        >
+          Catalogue produits
+        </button>
       </div>
+
+      {mainTab === 'catalogue' && <ConfigCatalogueProductsPanel />}
 
       {mainTab === 'extrafields' && (
         <>

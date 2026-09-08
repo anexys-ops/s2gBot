@@ -519,6 +519,13 @@ button.link-inline.invoice-number-btn {
   border-bottom: 1px solid var(--color-border, #e2e8f0);
 }
 
+.config-catalogue-products__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
 .extrafields-form__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
@@ -2522,6 +2529,221 @@ a.ds-icon-btn {
   border-color: var(--color-accent);
 }
 
+.settings-users-page__name {
+  font-weight: 600;
+}
+
+.user-admin-filter-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  font-size: 0.9rem;
+}
+
+.user-role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.user-role-badge--admin {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #93c5fd;
+}
+.user-role-badge--lab {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #86efac;
+}
+.user-role-badge--commercial {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+.user-role-badge--ingenierie {
+  background: #ede9fe;
+  color: #5b21b6;
+  border-color: #c4b5fd;
+}
+.user-role-badge--client {
+  background: #fce7f3;
+  color: #9d174d;
+  border-color: #f9a8d4;
+}
+.user-role-badge--neutral {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.user-admin-form__header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+  border: 1px solid #dbeafe;
+}
+.user-admin-form__avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #1d4ed8;
+  background: #fff;
+  border: 2px solid #93c5fd;
+}
+.user-admin-form__preview-name {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.user-admin-form__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+.user-admin-form__tab {
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  background: #fff;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.user-admin-form__tab:hover {
+  border-color: #93c5fd;
+  color: var(--color-accent);
+}
+.user-admin-form__tab--active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+.user-admin-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+}
+.user-admin-form__grid-span-2 {
+  grid-column: 1 / -1;
+}
+.user-admin-form__section {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+.user-admin-form__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+}
+
+.user-admin-form__panel {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--color-border, #e2e8f0);
+}
+.user-admin-form__panel--lab {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+.user-admin-form__panel--client {
+  background: #fdf2f8;
+  border-color: #fbcfe8;
+}
+.user-admin-form__panel--groups {
+  background: #f8fafc;
+}
+.user-admin-form__panel-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.user-admin-form__checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 180px;
+  overflow: auto;
+}
+.user-admin-form__checkbox-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.88rem;
+}
+
+.user-admin-form__rh-card {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+.user-admin-form__rh-card-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #92400e;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.user-admin-form__rh-dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem 1rem;
+  margin: 0;
+}
+.user-admin-form__rh-dl dt {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #78716c;
+}
+.user-admin-form__rh-dl dd {
+  margin: 0.15rem 0 0;
+  font-weight: 600;
+  color: #1c1917;
+}
+
+.user-admin-form__actions {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+}
+
+@media (max-width: 640px) {
+  .user-admin-form__grid,
+  .user-admin-form__rh-dl {
+    grid-template-columns: 1fr;
+  }
+}
+
 .settings-security-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
@@ -3144,7 +3366,8 @@ a.ds-icon-btn {
 }
 .modal-box:has(.catalogue-article-new-form),
 .modal-box:has(.equipment-create-form),
-.modal-box:has(.client-contact-form) {
+.modal-box:has(.client-contact-form),
+.modal-box:has(.user-admin-form) {
   max-width: min(94vw, 720px);
 }
 .modal-box:has(.catalogue-article-new-form) {

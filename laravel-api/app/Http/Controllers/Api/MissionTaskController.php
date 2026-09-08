@@ -225,9 +225,11 @@ class MissionTaskController extends Controller
             })
             ->with([
                 'assignedUser:id,name',
-                'ordreMissionLigne.ordreMission:id,numero,type,statut,client_id,site_id',
+                'ordreMissionLigne:id,ordre_mission_id,libelle,ref_article_id,article_action_id',
+                'ordreMissionLigne.ordreMission:id,numero,type,statut,client_id,site_id,dossier_id',
                 'ordreMissionLigne.ordreMission.client:id,name',
                 'ordreMissionLigne.ordreMission.site:id,name',
+                'ordreMissionLigne.ordreMission.dossier:id,reference,titre',
                 'ordreMissionLigne.article:id,code,libelle',
                 'ordreMissionLigne.articleAction:id,type,libelle,duree_heures',
                 'ordreMissionLigne.articleAction.measureConfigs',

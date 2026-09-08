@@ -36,10 +36,12 @@ function taskReferenceDate(task: MissionTask): string | null {
 }
 
 export function taskDisplayName(task: MissionTask): string {
-  const article = task.ordreMissionLigne?.article
-  const action = task.ordreMissionLigne?.articleAction
+  const ligne = task.ordreMissionLigne
+  const article = ligne?.article
+  const action = ligne?.articleAction
   if (article && action) return `${article.code} — ${action.libelle}`
   if (article) return `${article.code} — ${article.libelle}`
+  if (ligne?.libelle) return ligne.libelle
   return 'Tâche sans libellé'
 }
 

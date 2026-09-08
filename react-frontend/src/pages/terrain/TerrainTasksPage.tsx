@@ -9,7 +9,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { missionTasksApi, type ActionMeasureConfig, type MissionTask } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
-import TerrainTasksHistoryPanel, { type TerrainHistoryGroupMode } from './TerrainTasksHistoryPanel'
+import TerrainTasksHistoryPanel, { type TerrainHistoryGroupMode, taskDisplayName } from './TerrainTasksHistoryPanel'
 
 const TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
   technicien: { label: 'Technicien', color: '#f59e0b', bg: '#fef3c7' },
@@ -70,15 +70,26 @@ function MeasureInput({
   )
 }
 
-function TerrainTaskCard({ task }: { task: MissionTask }) {
+function startedLabel(task: MissionTask): string {
+  if (task.statut === 'in_progress') {
+    return task.started_at
+      ? `Démarrée le ${new Date(task.started_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`
+      : 'En cours'
+  }
+  if (task.statut === 'todo') return 'Non démarrée'
+  if (task.statut === 'done') return 'Terminée'
+  if (task.statut === 'validated') return 'Validée'
+  if (task.statut === 'rejected') return 'Rejetée'
+  return STATUT_META[task.statut]?.label ?? task.statut
+}
+
+function TerrainTaskRow({ task }: { task: MissionTask }) {
   const [expanded, setExpanded] = useState(false)
   const [measures, setMeasures] = useState<Record<number, string>>({})
   const qc = useQueryClient()
 
   const configs = task.ordreMissionLigne?.articleAction?.measure_configs ?? []
   const om = task.ordreMissionLigne?.ordreMission
-  const article = task.ordreMissionLigne?.article
-  const action = task.ordreMissionLigne?.articleAction
   const type = om?.type ?? 'technicien'
   const typeMeta = TYPE_META[type] ?? TYPE_META.technicien
   const statut = STATUT_META[task.statut] ?? STATUT_META.todo
@@ -109,49 +120,64 @@ function TerrainTaskCard({ task }: { task: MissionTask }) {
   })
 
   return (
-    <div className="card" style={{ padding: '1rem', borderLeft: `4px solid ${typeMeta.color}` }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 6px', borderRadius: 4, color: typeMeta.color, background: typeMeta.bg }}>
-              {typeMeta.label}
-            </span>
-            <span style={{ fontSize: '0.72rem', color: statut.color, fontWeight: 600 }}>{statut.label}</span>
-            {om && (
-              <Link to={`/ordres-mission/${om.id}`} className="link-inline" style={{ fontSize: '0.82rem', fontWeight: 600 }}>
-                {om.numero}
-              </Link>
-            )}
-            {om?.client && <span className="text-muted" style={{ fontSize: '0.82rem' }}>{om.client.name}</span>}
-            {om?.site?.name && <span className="text-muted" style={{ fontSize: '0.82rem' }}>· {om.site.name}</span>}
-          </div>
-          <div style={{ fontWeight: 600 }}>
-            {article ? `${article.code} — ${article.libelle}` : '—'}
-          </div>
-          {action && <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>{action.libelle}</div>}
-          {task.planned_date && (
-            <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>
-              📅 {new Date(task.planned_date).toLocaleDateString('fr-FR')}
-            </div>
+    <>
+      <tr className={expanded ? 'terrain-tasks-row--open' : undefined}>
+        <td>
+          {om?.dossier ? (
+            <Link to={`/dossiers/${om.dossier.id}`} className="link-inline">
+              <strong>{om.dossier.reference}</strong>
+            </Link>
+          ) : (
+            <span className="text-muted">—</span>
           )}
-          {task.assignedUser && (
-            <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-              👤 {task.assignedUser.name}
-            </div>
+          {om?.dossier?.titre && (
+            <div className="text-muted terrain-tasks-table__sub">{om.dossier.titre}</div>
           )}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flexShrink: 0 }}>
+        </td>
+        <td>
+          {om?.client?.name ?? '—'}
+          {om?.site?.name && <div className="text-muted terrain-tasks-table__sub">{om.site.name}</div>}
+        </td>
+        <td>
+          <div className="terrain-tasks-table__task-name">{taskDisplayName(task)}</div>
+          {om && (
+            <Link to={`/ordres-mission/${om.id}`} className="link-inline terrain-tasks-table__sub">
+              {om.numero}
+            </Link>
+          )}
+        </td>
+        <td>
+          <span
+            className="terrain-tasks-table__type"
+            style={{ color: typeMeta.color, background: typeMeta.bg }}
+          >
+            {typeMeta.label}
+          </span>
+        </td>
+        <td>{task.assignedUser?.name ?? <span className="text-muted">Non assigné</span>}</td>
+        <td>
+          <span className="terrain-tasks-table__statut" style={{ color: statut.color }}>
+            {statut.label}
+          </span>
+          <div className="text-muted terrain-tasks-table__sub">{startedLabel(task)}</div>
+        </td>
+        <td className="terrain-tasks-table__actions">
           {task.statut === 'todo' && (
-            <button type="button" className="btn btn-primary btn-sm"
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
               onClick={() => updateMut.mutate({ statut: 'in_progress' })}
-              disabled={updateMut.isPending}>
-              ▶ Démarrer
+              disabled={updateMut.isPending}
+            >
+              Démarrer
             </button>
           )}
           {task.statut === 'in_progress' && (
-            <>
+            <div className="terrain-tasks-table__action-group">
               {configs.length > 0 && (
-                <button type="button" className="btn btn-primary btn-sm"
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
                   onClick={() => {
                     const existing: Record<number, string> = {}
                     for (const m of task.measures ?? []) {
@@ -159,49 +185,61 @@ function TerrainTaskCard({ task }: { task: MissionTask }) {
                     }
                     setMeasures(existing)
                     setExpanded((v) => !v)
-                  }}>
-                  📋 {expanded ? 'Fermer' : 'Mesures'}
+                  }}
+                >
+                  {expanded ? 'Fermer' : 'Mesures'}
                 </button>
               )}
-              <button type="button" className="btn btn-secondary btn-sm"
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
                 onClick={() => updateMut.mutate({ statut: 'done' })}
-                disabled={updateMut.isPending}>
-                ✓ Terminer
+                disabled={updateMut.isPending}
+              >
+                Terminer
               </button>
-            </>
+            </div>
           )}
-          {task.is_conform === true && <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 700 }}>✓ Conforme</span>}
-          {task.is_conform === false && <span style={{ fontSize: '0.72rem', color: '#ef4444', fontWeight: 700 }}>✗ NC</span>}
-        </div>
-      </div>
-
+          {(task.statut === 'done' || task.statut === 'validated') && (
+            <span className="text-muted">—</span>
+          )}
+        </td>
+      </tr>
       {expanded && configs.length > 0 && (
-        <form
-          style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--color-surface)', borderRadius: 6, border: '1px solid var(--color-border)' }}
-          onSubmit={(e) => { e.preventDefault(); submitMeasures.mutate() }}
-        >
-          <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-            Mesures terrain — {configs.length} champ{configs.length > 1 ? 's' : ''}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem' }}>
-            {configs.slice().sort((a, b) => a.ordre - b.ordre).map((c) => (
-              <MeasureInput
-                key={c.id}
-                config={c}
-                value={measures[c.id] ?? ''}
-                onChange={(v) => setMeasures((prev) => ({ ...prev, [c.id]: v }))}
-              />
-            ))}
-          </div>
-          {submitMeasures.isError && <p className="error" style={{ fontSize: '0.82rem', marginTop: '0.5rem' }}>{(submitMeasures.error as Error).message}</p>}
-          <div className="crud-actions" style={{ marginTop: '0.75rem' }}>
-            <button type="submit" className="btn btn-primary btn-sm" disabled={submitMeasures.isPending}>
-              {submitMeasures.isPending ? 'Envoi…' : 'Enregistrer'}
-            </button>
-          </div>
-        </form>
+        <tr className="terrain-tasks-detail">
+          <td colSpan={7}>
+            <form
+              className="terrain-tasks-detail__form"
+              onSubmit={(e) => { e.preventDefault(); submitMeasures.mutate() }}
+            >
+              <div className="terrain-tasks-detail__title">
+                Mesures terrain — {taskDisplayName(task)}
+              </div>
+              <div className="terrain-tasks-detail__grid">
+                {configs.slice().sort((a, b) => a.ordre - b.ordre).map((c) => (
+                  <MeasureInput
+                    key={c.id}
+                    config={c}
+                    value={measures[c.id] ?? ''}
+                    onChange={(v) => setMeasures((prev) => ({ ...prev, [c.id]: v }))}
+                  />
+                ))}
+              </div>
+              {submitMeasures.isError && (
+                <p className="error" style={{ fontSize: '0.82rem', marginTop: '0.5rem' }}>
+                  {(submitMeasures.error as Error).message}
+                </p>
+              )}
+              <div className="crud-actions" style={{ marginTop: '0.75rem' }}>
+                <button type="submit" className="btn btn-primary btn-sm" disabled={submitMeasures.isPending}>
+                  {submitMeasures.isPending ? 'Envoi…' : 'Enregistrer'}
+                </button>
+              </div>
+            </form>
+          </td>
+        </tr>
       )}
-    </div>
+    </>
   )
 }
 
@@ -325,9 +363,26 @@ export default function TerrainTasksPage() {
             </div>
           )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {tasks.map((task) => <TerrainTaskCard key={task.id} task={task} />)}
-          </div>
+          {!isLoading && tasks.length > 0 && (
+            <div className="table-wrap">
+              <table className="data-table data-table--compact terrain-tasks-table">
+                <thead>
+                  <tr>
+                    <th>Dossier</th>
+                    <th>Client / chantier</th>
+                    <th>Tâche</th>
+                    <th>Type</th>
+                    <th>Technicien</th>
+                    <th>Statut</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tasks.map((task) => <TerrainTaskRow key={task.id} task={task} />)}
+                </tbody>
+              </table>
+            </div>
+          )}
         </>
       )}
 

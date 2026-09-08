@@ -6,8 +6,12 @@ describe('parseSampleQrContent', () => {
     expect(parseSampleQrContent('FOLD-10000042')).toBe('FOLD-10000042')
   })
 
-  it('extrait le FOLD depuis un ancien JSON', () => {
-    expect(parseSampleQrContent('{"fold":"FOLD-10000042","transco":"10000099"}')).toBe('FOLD-10000042')
+  it('extrait le FOLD depuis un JSON étiquette réception', () => {
+    expect(
+      parseSampleQrContent(
+        '{"date":"2026-09-08 10:00:00","technicien":"Jean Dupont","fold":"FOLD-10000042","prelevements":4}',
+      ),
+    ).toBe('FOLD-10000042')
   })
 
   it('accepte un numéro transco numérique', () => {

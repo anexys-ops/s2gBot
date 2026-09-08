@@ -19,6 +19,8 @@ const TYPE_META: Record<string, { label: string; color: string; bg: string }> = 
 const STATUT_META: Record<string, { label: string; color: string }> = {
   todo:        { label: 'À faire',  color: '#6b7280' },
   in_progress: { label: 'En cours', color: '#f59e0b' },
+  paused:      { label: 'Pause',    color: '#7c3aed' },
+  frozen:      { label: 'Gelé',     color: '#0891b2' },
   done:        { label: 'Terminé',  color: '#3b82f6' },
   validated:   { label: 'Validé',   color: '#10b981' },
   rejected:    { label: 'Rejeté',   color: '#ef4444' },

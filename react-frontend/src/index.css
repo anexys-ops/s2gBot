@@ -9627,3 +9627,272 @@ a.catalogue-tree__link-article:hover {
   border-color: #dc2626 !important;
   background: #fef2f2;
 }
+
+/* ── Mesures terrain ─────────────────────────────────────────────────────── */
+.terrain-mesures-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.terrain-mesures-filters input,
+.terrain-mesures-filters select {
+  font-size: 0.85rem;
+}
+
+.terrain-mesures-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.terrain-mesures-stat-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 7rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface-2, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.terrain-mesures-stat-card__value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.terrain-mesures-stat-card__label {
+  font-size: 0.78rem;
+  color: var(--color-muted, #6b7280);
+}
+
+.terrain-mesures-table__sub {
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+}
+
+.terrain-mesures-row {
+  cursor: pointer;
+}
+
+.terrain-mesures-row.is-expanded td {
+  background: var(--color-surface-2, #f9fafb);
+}
+
+.terrain-mesures-task-row {
+  cursor: pointer;
+  background: #fafafa;
+}
+
+.terrain-mesures-task-row.is-selected td {
+  background: #eff6ff;
+}
+
+.terrain-mesures-task-row__indent {
+  padding-left: 1.75rem !important;
+}
+
+.terrain-mesures-table__chevron {
+  text-align: center;
+  color: var(--color-muted, #6b7280);
+  width: 2rem;
+}
+
+.terrain-mesures-statut {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.terrain-mesures-statut-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.terrain-mesures-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.terrain-mesures-progress__track {
+  flex: 1;
+  min-width: 4rem;
+  height: 4px;
+  border-radius: 2px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.terrain-mesures-progress__fill {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.terrain-mesures-progress__label {
+  font-size: 0.72rem;
+  color: var(--color-muted, #6b7280);
+  min-width: 2.25rem;
+  text-align: right;
+}
+
+.terrain-mesures-detail {
+  padding: 1rem 1.15rem;
+}
+
+.terrain-mesures-detail__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.terrain-mesures-detail__kicker {
+  margin: 0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted, #6b7280);
+}
+
+.terrain-mesures-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  margin-bottom: 0.85rem;
+}
+
+.terrain-mesures-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.terrain-mesures-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+}
+
+.terrain-mesures-tab {
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.terrain-mesures-tab.is-active {
+  background: var(--color-primary, #2563eb);
+  color: #fff;
+  border-color: var(--color-primary, #2563eb);
+}
+
+.terrain-mesures-tab__count {
+  margin-left: 0.35rem;
+  opacity: 0.85;
+  font-size: 0.75rem;
+}
+
+.terrain-mesures-section {
+  margin-bottom: 1rem;
+}
+
+.terrain-mesures-section__head h3 {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+}
+
+.terrain-mesures-section__head p {
+  margin: 0 0 0.65rem;
+  font-size: 0.82rem;
+}
+
+.terrain-mesures-section__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.65rem;
+}
+
+.terrain-mesures-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.82rem;
+}
+
+.terrain-mesures-field__label {
+  font-weight: 500;
+}
+
+.terrain-mesures-field__req {
+  color: #ef4444;
+}
+
+.terrain-mesures-field__unit {
+  margin-left: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.terrain-mesures-field__help {
+  font-size: 0.72rem;
+}
+
+.terrain-mesures-field__error {
+  color: #ef4444;
+  font-size: 0.72rem;
+}
+
+.terrain-mesures-readonly {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface-2, #f9fafb);
+  font-size: 0.82rem;
+}
+
+.terrain-mesures-readonly__label {
+  color: var(--color-muted, #6b7280);
+  font-size: 0.75rem;
+}
+
+.terrain-mesures-readonly__meta {
+  font-size: 0.72rem;
+}
+
+.terrain-mesures-detail__form {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.terrain-mesures-mobile-hint {
+  font-size: 0.82rem;
+  margin-top: 0.5rem;
+}
+
+.terrain-mesures-footnote {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 900px) {
+  .terrain-mesures-table {
+    min-width: 56rem;
+  }
+}
+

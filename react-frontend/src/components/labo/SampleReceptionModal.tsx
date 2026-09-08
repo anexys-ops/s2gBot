@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, type KeyboardEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Modal from '../Modal'
 import {
@@ -25,6 +25,9 @@ type Props = {
   onClose: () => void
   onSuccess: (samples: ReceptionSample[]) => void
 }
+
+/** Plusieurs échantillons physiques (étiquettes FOLD) par ligne BC, indépendamment de la quantité d'essais commandés. */
+const MAX_ECHANTILLONS_PAR_LOT = 50
 
 type Step = 'forms' | 'done'
 
@@ -53,6 +56,36 @@ function buildDraftsForBatch(
   }
 
   return out
+}
+
+function computeBatchState(
+  raw: string,
+  max: number,
+  prevCancelled: CancelledSlot[],
+  prevDrafts: SampleFormDraft[],
+  prevBatchTotal: number,
+  defaultTechnicienId?: number,
+): { parsed: number; cancelled: CancelledSlot[]; drafts: SampleFormDraft[] } {
+  const parsed = parseCount(raw, max)
+  let cancelled = [...prevCancelled]
+  if (parsed < prevBatchTotal) {
+    for (let i = parsed + 1; i <= prevBatchTotal; i++) {
+      if (!cancelled.some((c) => c.reception_index === i)) {
+        cancelled = [
+          ...cancelled,
+          { reception_index: i, reason: 'Réduction du nombre d\'échantillons' },
+        ]
+      }
+    }
+  } else {
+    cancelled = cancelled.filter((c) => c.reception_index <= parsed)
+  }
+
+  return {
+    parsed,
+    cancelled,
+    drafts: buildDraftsForBatch(parsed, cancelled, prevDrafts, defaultTechnicienId),
+  }
 }
 
 function SampleFormCard({
@@ -182,7 +215,7 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
   const line = isFromLine ? mode.line : null
   const transitSample = !isFromLine ? mode.sample : null
 
-  const maxCount = isFromLine ? Math.max(1, line?.quantite_manquante ?? 1) : 1
+  const maxCount = MAX_ECHANTILLONS_PAR_LOT
   const defaultTechnicienId = line?.technicien?.id ?? transitSample?.collected_by?.id
 
   const [step, setStep] = useState<Step>('forms')
@@ -220,40 +253,29 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
       prevDrafts: SampleFormDraft[],
       prevBatchTotal: number,
     ) => {
-      const parsed = parseCount(raw, maxCount)
-      setCountInput(String(parsed))
-      setBatchTotal(parsed)
-
-      let cancelled = [...prevCancelled]
-      if (parsed < prevBatchTotal) {
-        for (let i = parsed + 1; i <= prevBatchTotal; i++) {
-          if (!cancelled.some((c) => c.reception_index === i)) {
-            cancelled = [
-              ...cancelled,
-              { reception_index: i, reason: 'Réduction du nombre d\'échantillons' },
-            ]
-          }
-        }
-      } else {
-        cancelled = cancelled.filter((c) => c.reception_index <= parsed)
-      }
-
-      setCancelledSlots(cancelled)
-      setDrafts(buildDraftsForBatch(parsed, cancelled, prevDrafts, defaultTechnicienId))
+      const next = computeBatchState(raw, maxCount, prevCancelled, prevDrafts, prevBatchTotal, defaultTechnicienId)
+      setCountInput(String(next.parsed))
+      setBatchTotal(next.parsed)
+      setCancelledSlots(next.cancelled)
+      setDrafts(next.drafts)
+      return next
     },
     [defaultTechnicienId, maxCount],
   )
 
   const handleCountInputChange = (raw: string) => {
-    setCountInput(raw)
-    if (raw === '' || raw === '-') return
-    const parsed = parseInt(raw, 10)
-    if (Number.isNaN(parsed)) return
-    applyBatchCount(raw, cancelledSlots, drafts, batchTotal)
+    setCountInput(raw.replace(/\D/g, ''))
   }
 
-  const handleCountBlur = () => {
-    applyBatchCount(countInput, cancelledSlots, drafts, batchTotal)
+  const commitCountInput = () => {
+    applyBatchCount(countInput || '1', cancelledSlots, drafts, batchTotal)
+  }
+
+  const handleCountKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      commitCountInput()
+    }
   }
 
   const updateDraft = (receptionIndex: number, patch: Partial<SampleFormDraft>) => {
@@ -287,10 +309,10 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
     setDrafts((prev) => prev.filter((d) => d.reception_index !== receptionIndex))
   }
 
-  const uploadPhotos = async (samples: ReceptionSample[]) => {
+  const uploadPhotos = async (samples: ReceptionSample[], sourceDrafts: SampleFormDraft[]) => {
     const out: ReceptionSample[] = []
     for (const sample of samples) {
-      const draft = drafts.find((d) => d.reception_index === sample.reception_index)
+      const draft = sourceDrafts.find((d) => d.reception_index === sample.reception_index)
       let current = sample
       if (draft?.photoFile) {
         await samplesReceptionApi.uploadPhoto(sample.id, draft.photoFile)
@@ -302,7 +324,10 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
   }
 
   const handleSubmit = async () => {
-    if (drafts.length === 0) {
+    const { parsed: effectiveTotal, cancelled: effectiveCancelled, drafts: effectiveDrafts } =
+      applyBatchCount(countInput || '1', cancelledSlots, drafts, batchTotal)
+
+    if (effectiveDrafts.length === 0) {
       setError('Aucun échantillon à réceptionner.')
       return
     }
@@ -315,9 +340,9 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
       if (isFromLine && line) {
         const res = await samplesReceptionApi.receiveBatchFromLine({
           bon_commande_ligne_id: line.id,
-          batch_total: batchTotal,
-          samples: drafts.map((d) => draftToReceiveBody(d, batchTotal)),
-          cancelled_slots: cancelledSlots.length > 0 ? cancelledSlots : undefined,
+          batch_total: effectiveTotal,
+          samples: effectiveDrafts.map((d) => draftToReceiveBody(d, effectiveTotal)),
+          cancelled_slots: effectiveCancelled.length > 0 ? effectiveCancelled : undefined,
         })
         samples = res.data
       } else if (transitSample) {
@@ -329,7 +354,7 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
         throw new Error('Contexte réception invalide.')
       }
 
-      samples = await uploadPhotos(samples)
+      samples = await uploadPhotos(samples, effectiveDrafts)
       setCreatedSamples(samples)
       setStep('done')
     } catch (e) {
@@ -345,7 +370,7 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
 
   const clampedHint =
     isFromLine && parseInt(countInput, 10) > maxCount
-      ? `Limité à ${maxCount} (quantité manquante sur la ligne BC).`
+      ? `Limité à ${maxCount} échantillons par lot.`
       : null
 
   return (
@@ -365,17 +390,25 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
               <label>
                 <span className="sample-reception-count__label">Nombre d&apos;échantillons / étiquettes</span>
                 <input
-                  type="number"
-                  min={1}
-                  max={maxCount}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={countInput}
                   onChange={(e) => handleCountInputChange(e.target.value)}
-                  onBlur={handleCountBlur}
+                  onBlur={commitCountInput}
+                  onKeyDown={handleCountKeyDown}
+                  aria-label="Nombre d'échantillons"
                 />
               </label>
               <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-                {drafts.length} formulaire{drafts.length > 1 ? 's' : ''} actif{drafts.length > 1 ? 's' : ''} sur{' '}
-                {batchTotal} étiquette{batchTotal > 1 ? 's' : ''} (max. {maxCount}).
+                Saisissez le nombre puis cliquez en dehors du champ ou appuyez sur Entrée pour générer les formulaires.
+                {drafts.length > 0 && (
+                  <>
+                    {' '}
+                    {drafts.length} formulaire{drafts.length > 1 ? 's' : ''} actif{drafts.length > 1 ? 's' : ''} sur{' '}
+                    {batchTotal} étiquette{batchTotal > 1 ? 's' : ''} (max. {maxCount}).
+                  </>
+                )}
               </p>
               {clampedHint && <p className="error" style={{ fontSize: '0.85rem' }}>{clampedHint}</p>}
               {cancelledSlots.length > 0 && (

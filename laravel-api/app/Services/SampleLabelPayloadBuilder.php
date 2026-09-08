@@ -48,9 +48,13 @@ class SampleLabelPayloadBuilder
             'quantity' => $sample->quantity,
         ];
 
+        // QR compact (FOLD ou transco) — compatible scanners téléphone / douchette.
+        // L'ancien format JSON complet reste lisible via parseSampleQrContent côté front.
+        $qrValue = $sample->fold_number ?: $sample->transco_number;
+
         return [
             'payload' => $payload,
-            'qr_json' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'qr_json' => $qrValue,
             'barcode' => $sample->transco_number,
         ];
     }

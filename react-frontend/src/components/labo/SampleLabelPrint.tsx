@@ -161,8 +161,9 @@ export default function SampleLabelPrint({ label, format, onFormatChange, onClos
     void (async () => {
       if (qrRef.current) {
         await QRCode.toCanvas(qrRef.current, qr_json, {
-          width: format === 'a6' ? 108 : 140,
-          margin: 1,
+          width: format === 'a6' ? 120 : 148,
+          margin: 2,
+          errorCorrectionLevel: 'M',
           color: { dark: '#1a5276', light: '#ffffff' },
         })
       }
@@ -190,7 +191,15 @@ export default function SampleLabelPrint({ label, format, onFormatChange, onClos
     const w = window.open('', '_blank', 'noopener,noreferrer,width=800,height=600')
     if (!w) return
 
-    const html = node.innerHTML.replace(
+    let html = node.innerHTML
+    if (qrRef.current) {
+      const qrDataUrl = qrRef.current.toDataURL('image/png')
+      html = html.replace(
+        /<canvas[^>]*(?:\/>|><\/canvas>)/,
+        `<img src="${qrDataUrl}" alt="QR code échantillon" style="display:block;margin:0 auto;border-radius:4px;" />`,
+      )
+    }
+    html = html.replace(
       /src="([^"]+)"/,
       (_, src) => `src="${absoluteAssetUrl(src)}"`,
     )

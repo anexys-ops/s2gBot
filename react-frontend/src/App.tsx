@@ -208,6 +208,7 @@ function AppRoutes() {
         <Route path="devis/:quoteId/editer" element={<QuoteEditorPage />} />
         <Route path="devis/:quoteId" element={<QuoteIdRedirect />} />
         <Route path="devis" element={<Devis />} />
+        <Route path="back-office/utilisateurs" element={<Navigate to="/settings/utilisateurs" replace />} />
         <Route path="back-office" element={<Outlet />}>
           <Route path="equipements" element={<BackOfficeEquipementsListRedirect />} />
           <Route path="equipements/:id" element={<BackOfficeEquipementDetailRedirect />} />

@@ -156,6 +156,7 @@ export const adminUsersApi = {
     email: string
     password: string
     phone?: string | null
+    poste?: string | null
     role: string
     client_id?: number | null
     site_id?: number | null
@@ -170,6 +171,7 @@ export const adminUsersApi = {
       email: string
       password: string
       phone: string | null
+      poste: string | null
       role: string
       client_id: number | null
       site_id: number | null

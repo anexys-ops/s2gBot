@@ -39,6 +39,7 @@ class UserManagementController extends Controller
             'email' => 'required|email|max:255|unique:users,email',
             'password' => ['required', Password::defaults()],
             'phone' => 'nullable|string|max:40',
+            'poste' => 'nullable|string|max:128',
             'role' => ['required', Rule::in([
                 User::ROLE_LAB_ADMIN,
                 User::ROLE_LAB_TECHNICIAN,
@@ -64,6 +65,7 @@ class UserManagementController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'phone' => $validated['phone'] ?? null,
+            'poste' => isset($validated['poste']) ? trim((string) $validated['poste']) ?: null : null,
             'role' => $validated['role'],
             'client_id' => $validated['client_id'] ?? null,
             'site_id' => $validated['site_id'] ?? null,
@@ -97,6 +99,7 @@ class UserManagementController extends Controller
             'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['nullable', Password::defaults()],
             'phone' => 'nullable|string|max:40',
+            'poste' => 'nullable|string|max:128',
             'role' => ['sometimes', Rule::in([
                 User::ROLE_LAB_ADMIN,
                 User::ROLE_LAB_TECHNICIAN,
@@ -135,6 +138,10 @@ class UserManagementController extends Controller
 
         if (array_key_exists('agency_id', $validated)) {
             $validated['agency_id'] = self::resolveLabAgencyId($validated);
+        }
+
+        if (array_key_exists('poste', $validated)) {
+            $validated['poste'] = trim((string) ($validated['poste'] ?? '')) ?: null;
         }
 
         $user->fill($validated);

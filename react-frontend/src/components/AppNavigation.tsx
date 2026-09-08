@@ -60,7 +60,8 @@ function isCatalogueActive(pathname: string): boolean {
 
 function isConfigurationActive(pathname: string): boolean {
   if (pathname.startsWith('/config/agences')) return true
-  if (pathname.startsWith('/back-office/utilisateurs')) return true
+  if (pathname.startsWith('/settings/utilisateurs')) return true
+  if (pathname.startsWith('/settings/groupes')) return true
   if (pathname.startsWith('/back-office/modeles-documents-pdf')) return true
   if (pathname.startsWith('/back-office/configuration')) return true
   return false
@@ -178,7 +179,7 @@ export default function AppNavigation() {
         label: 'Configuration',
         items: filterItems([
           { to: '/config/agences', label: 'Agences', labOnly: true },
-          { to: '/back-office/utilisateurs', label: 'Utilisateurs', labOnly: true },
+          { to: '/settings/utilisateurs', label: 'Utilisateurs', labOnly: true },
           { to: '/back-office/modeles-documents-pdf', label: 'PDF devis/factures', labOnly: true },
           { to: '/back-office/configuration', label: 'Modules', labOnly: true },
         ]),

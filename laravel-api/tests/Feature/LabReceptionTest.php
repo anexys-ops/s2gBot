@@ -147,7 +147,7 @@ class LabReceptionTest extends TestCase
         $label = $this->actingAs($receptionnaire, 'sanctum')->getJson("/api/v1/samples/{$sampleId}/label");
         $label->assertOk();
         $label->assertJsonPath('barcode', $res->json('transco_number'));
-        $this->assertStringContainsString($res->json('fold_number'), $label->json('qr_json'));
+        $label->assertJsonPath('qr_json', $res->json('fold_number'));
     }
 
     public function test_receive_batch_from_line_creates_multiple_samples(): void

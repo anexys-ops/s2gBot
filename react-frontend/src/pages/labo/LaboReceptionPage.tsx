@@ -16,6 +16,7 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import SampleReceptionModal, { type ReceptionMode } from '../../components/labo/SampleReceptionModal'
 import SampleEditModal from '../../components/labo/SampleEditModal'
 import SampleLabelPrint, { type LabelFormat } from '../../components/labo/SampleLabelPrint'
+import { parseSampleQrContent } from '../../lib/sampleQr'
 
 type AttenduFilter = 'all' | 'pending' | 'complete'
 
@@ -381,9 +382,17 @@ export default function LaboReceptionPage() {
         <h2 style={{ fontSize: '1.05rem', margin: 0 }}>Échantillons réceptionnés</h2>
         <input
           type="text"
-          placeholder="Rechercher FOLD ou transco…"
+          placeholder="Rechercher FOLD, transco ou coller scan QR…"
           value={foldSearch}
           onChange={(e) => setFoldSearch(e.target.value)}
+          onPaste={(e) => {
+            const pasted = e.clipboardData.getData('text')
+            const parsed = parseSampleQrContent(pasted)
+            if (parsed && parsed !== pasted.trim()) {
+              e.preventDefault()
+              setFoldSearch(parsed)
+            }
+          }}
           style={{ flex: '1 1 200px', maxWidth: 280 }}
           className="btn-sm"
         />

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { agencesApi, type Agency } from '../../api/client'
 import Modal from '../../components/Modal'
@@ -18,21 +19,14 @@ function emptyForm(): Partial<Agency> & { name: string; code: string } {
 
 export default function AgencesPage() {
   const queryClient = useQueryClient()
-  const [modal, setModal] = useState<'create' | 'edit' | 'users' | null>(null)
+  const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [editing, setEditing] = useState<Agency | null>(null)
-  const [selectedAgency, setSelectedAgency] = useState<Agency | null>(null)
   const [form, setForm] = useState<Partial<Agency> & { name: string; code: string }>(emptyForm())
   const [formError, setFormError] = useState<string | null>(null)
 
   const { data: agences = [], isLoading, error } = useQuery({
     queryKey: ['agences'],
     queryFn: () => agencesApi.list(),
-  })
-
-  const { data: agencyUsers = [], isLoading: usersLoading } = useQuery({
-    queryKey: ['agences-users', selectedAgency?.id],
-    queryFn: () => agencesApi.users(selectedAgency!.id),
-    enabled: modal === 'users' && selectedAgency !== null,
   })
 
   const createMut = useMutation({
@@ -84,11 +78,6 @@ export default function AgencesPage() {
     })
     setFormError(null)
     setModal('edit')
-  }
-
-  const openUsers = (a: Agency) => {
-    setSelectedAgency(a)
-    setModal('users')
   }
 
   const setField = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
@@ -146,9 +135,12 @@ export default function AgencesPage() {
                 </td>
                 <td>{a.active ? 'Oui' : 'Non'}</td>
                 <td>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => openUsers(a)}>
+                  <Link
+                    to={`/settings/utilisateurs?agency=${a.id}`}
+                    className="btn btn-secondary btn-sm"
+                  >
                     {a.users_count !== undefined ? `${a.users_count} utilisateur(s)` : 'Voir'}
-                  </button>
+                  </Link>
                 </td>
                 <td>
                   <div className="crud-actions">
@@ -179,7 +171,6 @@ export default function AgencesPage() {
         </table>
       </div>
 
-      {/* Formulaire création / édition */}
       {(modal === 'create' || modal === 'edit') && (
         <Modal
           title={modal === 'create' ? 'Nouvelle agence' : `Modifier — ${editing?.name}`}
@@ -285,44 +276,6 @@ export default function AgencesPage() {
               </button>
             </div>
           </form>
-        </Modal>
-      )}
-
-      {/* Vue utilisateurs de l'agence */}
-      {modal === 'users' && selectedAgency && (
-        <Modal
-          title={`Utilisateurs — ${selectedAgency.name}`}
-          onClose={() => setModal(null)}
-        >
-          {usersLoading && <p>Chargement…</p>}
-          {!usersLoading && agencyUsers.length === 0 && (
-            <p className="text-muted">Aucun utilisateur affecté à cette agence.</p>
-          )}
-          {agencyUsers.length > 0 && (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Nom</th>
-                  <th>Email</th>
-                  <th>Rôle</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agencyUsers.map((u) => (
-                  <tr key={u.id}>
-                    <td>{u.name}</td>
-                    <td>{u.email}</td>
-                    <td>{u.role}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          <div className="crud-actions" style={{ marginTop: '1rem' }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>
-              Fermer
-            </button>
-          </div>
         </Modal>
       )}
     </div>

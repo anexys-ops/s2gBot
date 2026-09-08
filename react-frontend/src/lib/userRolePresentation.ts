@@ -24,6 +24,29 @@ export function userRoleLabel(role?: string | null): string {
   return USER_ROLE_LABELS[role] ?? role
 }
 
+export type UserRoleTone = 'admin' | 'lab' | 'commercial' | 'ingenierie' | 'client' | 'neutral'
+
+export function userRoleTone(role?: string | null): UserRoleTone {
+  switch (role) {
+    case 'lab_admin':
+      return 'admin'
+    case 'lab_technician':
+    case 'laborantin':
+    case 'receptionnaire':
+      return 'lab'
+    case 'commercial':
+      return 'commercial'
+    case 'ingenieur':
+    case 'responsable':
+      return 'ingenierie'
+    case 'client':
+    case 'site_contact':
+      return 'client'
+    default:
+      return 'neutral'
+  }
+}
+
 export function userPosteLabel(user: { poste?: string | null; poste_label?: string; role?: string | null }): string {
   const explicit = user.poste_label?.trim() || user.poste?.trim()
   if (explicit) return explicit

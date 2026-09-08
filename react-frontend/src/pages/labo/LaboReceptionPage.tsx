@@ -543,60 +543,129 @@ function LineSamplesHistory({
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: ['lab-reception', 'line-samples', lineId],
-    queryFn: () => samplesReceptionApi.list({ bon_commande_ligne_id: lineId, per_page: 50 }),
+    queryFn: () =>
+      samplesReceptionApi.list({
+        bon_commande_ligne_id: lineId,
+        per_page: 50,
+        include_cancelled: true,
+      }),
+  })
+  const { data: cancellationsRes } = useQuery({
+    queryKey: ['lab-reception', 'line-cancellations', lineId],
+    queryFn: () => samplesReceptionApi.listCancellations(lineId),
+  })
+  const cancelMut = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
+      samplesReceptionApi.cancel(id, { reason }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['lab-reception'] }),
   })
   const deleteMut = useMutation({
     mutationFn: (id: number) => samplesReceptionApi.delete(id),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['lab-reception'] }),
   })
   const samples = data?.data ?? []
+  const cancellations = cancellationsRes?.data ?? []
 
   if (isLoading) return <p className="text-muted">Chargement…</p>
-  if (samples.length === 0) return <p className="text-muted">Aucun échantillon pour cette ligne.</p>
+  if (samples.length === 0 && cancellations.length === 0) {
+    return <p className="text-muted">Aucun échantillon pour cette ligne.</p>
+  }
+
+  const statusLabel = (status: string) => {
+    if (status === 'annule') return 'Annulé'
+    if (status === 'receptionne') return 'Réceptionné'
+    if (status === 'en_transit') return 'En transit'
+    return status
+  }
 
   return (
-    <table className="data-table data-table--compact" style={{ fontSize: '0.85rem' }}>
-      <thead>
-        <tr>
-          <th>FOLD</th>
-          <th>Transco</th>
-          <th>Statut</th>
-          <th>Réception</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {samples.map((s) => (
-          <tr key={s.id}>
-            <td style={{ fontFamily: 'monospace' }}>{s.fold_number ?? '—'}</td>
-            <td style={{ fontFamily: 'monospace' }}>{s.transco_number ?? '—'}</td>
-            <td>{s.status}</td>
-            <td>{formatDateTime(s.received_at)}</td>
-            <td>
-              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => onEdit(s)}>
-                  Modifier
-                </button>
-                {s.transco_number && (
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => onPrintLabel(s.id)}>
-                    Étiquette
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  disabled={deleteMut.isPending}
-                  onClick={() => {
-                    if (window.confirm(`Supprimer ${s.fold_number} ?`)) deleteMut.mutate(s.id)
-                  }}
-                >
-                  Suppr.
-                </button>
-              </div>
-            </td>
+    <>
+      {cancellations.length > 0 && (
+        <p className="text-muted" style={{ fontSize: '0.82rem', marginBottom: '0.5rem' }}>
+          Étiquettes annulées avant réception :{' '}
+          {cancellations
+            .map((c) => `${c.reception_index}/${c.reception_batch_total}`)
+            .join(', ')}
+        </p>
+      )}
+      <table className="data-table data-table--compact" style={{ fontSize: '0.85rem' }}>
+        <thead>
+          <tr>
+            <th>N°</th>
+            <th>FOLD</th>
+            <th>Transco</th>
+            <th>Statut</th>
+            <th>Réception</th>
+            <th>Actions</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {samples.map((s) => (
+            <tr key={s.id} style={s.status === 'annule' ? { opacity: 0.65 } : undefined}>
+              <td>
+                {s.reception_index && s.reception_batch_total
+                  ? `${s.reception_index}/${s.reception_batch_total}`
+                  : '—'}
+              </td>
+              <td style={{ fontFamily: 'monospace' }}>{s.fold_number ?? '—'}</td>
+              <td style={{ fontFamily: 'monospace' }}>{s.transco_number ?? '—'}</td>
+              <td>{statusLabel(s.status)}</td>
+              <td>{formatDateTime(s.received_at)}</td>
+              <td>
+                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                  {s.status !== 'annule' && (
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => onEdit(s)}>
+                      Modifier
+                    </button>
+                  )}
+                  {s.transco_number && s.status !== 'annule' && (
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => onPrintLabel(s.id)}>
+                      Étiquette
+                    </button>
+                  )}
+                  {s.status === 'en_transit' && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={deleteMut.isPending}
+                      onClick={() => {
+                        if (window.confirm(`Supprimer ${s.fold_number} ?`)) deleteMut.mutate(s.id)
+                      }}
+                    >
+                      Suppr.
+                    </button>
+                  )}
+                  {s.status === 'receptionne' && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={cancelMut.isPending}
+                      onClick={() => {
+                        const reason = window.prompt(`Motif d'annulation de ${s.fold_number} :`)
+                        if (reason === null) return
+                        cancelMut.mutate({ id: s.id, reason: reason.trim() || undefined })
+                      }}
+                    >
+                      Annuler
+                    </button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+          {cancellations.map((c) => (
+            <tr key={`cancel-${c.id}`} style={{ opacity: 0.65 }}>
+              <td>{c.reception_index}/{c.reception_batch_total}</td>
+              <td colSpan={2} className="text-muted">— (non créé)</td>
+              <td>Annulé avant réception</td>
+              <td>{formatDateTime(c.created_at)}</td>
+              <td className="text-muted" style={{ fontSize: '0.8rem' }}>
+                {c.reason ?? '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   )
 }

@@ -1,3 +1,5 @@
+import type { HubIconId } from '../components/OutlineIcons'
+
 export type KpiId =
   | 'clients'
   | 'sites'
@@ -16,21 +18,21 @@ export type KpiId =
 
 export type KpiTone = 'orange' | 'emerald' | 'teal' | 'amber' | 'coral' | 'violet' | 'slate' | 'rose'
 
-export type KpiPresentation = { emoji: string; tone: KpiTone }
+export type KpiPresentation = { icon: HubIconId; tone: KpiTone }
 
 export const KPI_PRESENTATION: Record<KpiId, KpiPresentation> = {
-  clients: { emoji: '👥', tone: 'teal' },
-  sites: { emoji: '🏗️', tone: 'amber' },
-  orders: { emoji: '📦', tone: 'orange' },
-  quotes: { emoji: '📑', tone: 'coral' },
-  invoices_count: { emoji: '🧾', tone: 'emerald' },
-  pipeline_quotes_ttc: { emoji: '💰', tone: 'orange' },
-  ca_ttc: { emoji: '📈', tone: 'emerald' },
-  encaisse: { emoji: '✅', tone: 'emerald' },
-  impayes: { emoji: '⏱️', tone: 'rose' },
-  reports_total: { emoji: '📄', tone: 'teal' },
-  reports_pending: { emoji: '👀', tone: 'amber' },
-  samples: { emoji: '🧪', tone: 'violet' },
-  delay_first_report: { emoji: '⏱️', tone: 'orange' },
-  delay_cycle: { emoji: '🚚', tone: 'teal' },
+  clients: { icon: 'users', tone: 'teal' },
+  sites: { icon: 'building', tone: 'amber' },
+  orders: { icon: 'orders', tone: 'orange' },
+  quotes: { icon: 'quote', tone: 'coral' },
+  invoices_count: { icon: 'invoice', tone: 'emerald' },
+  pipeline_quotes_ttc: { icon: 'wallet', tone: 'orange' },
+  ca_ttc: { icon: 'trend', tone: 'emerald' },
+  encaisse: { icon: 'check', tone: 'emerald' },
+  impayes: { icon: 'clock', tone: 'rose' },
+  reports_total: { icon: 'documents', tone: 'teal' },
+  reports_pending: { icon: 'audit', tone: 'amber' },
+  samples: { icon: 'lab', tone: 'violet' },
+  delay_first_report: { icon: 'clock', tone: 'orange' },
+  delay_cycle: { icon: 'truck', tone: 'teal' },
 }

@@ -4,6 +4,7 @@ export type ConditionState = 'bon' | 'endommage' | 'insuffisant'
 
 export type SampleFormDraft = {
   key: string
+  reception_index: number
   condition_state: ConditionState
   storage_location: string
   collected_by: number | ''
@@ -15,9 +16,15 @@ export type SampleFormDraft = {
   photoPreview: string | null
 }
 
-export function createEmptyDraft(index: number, defaults?: Partial<SampleFormDraft>): SampleFormDraft {
+export type CancelledSlot = {
+  reception_index: number
+  reason?: string
+}
+
+export function createEmptyDraft(receptionIndex: number, defaults?: Partial<SampleFormDraft>): SampleFormDraft {
   return {
-    key: `draft-${Date.now()}-${index}`,
+    key: `draft-${Date.now()}-${receptionIndex}`,
+    reception_index: receptionIndex,
     condition_state: 'bon',
     storage_location: '',
     collected_by: '',
@@ -31,7 +38,10 @@ export function createEmptyDraft(index: number, defaults?: Partial<SampleFormDra
   }
 }
 
-export function draftToReceiveBody(draft: SampleFormDraft): {
+export function draftToReceiveBody(
+  draft: SampleFormDraft,
+  batchTotal?: number,
+): {
   condition_state: ConditionState
   storage_location?: string
   collected_by?: number
@@ -39,6 +49,8 @@ export function draftToReceiveBody(draft: SampleFormDraft): {
   weight_g?: number
   notes?: string
   description?: string
+  reception_index: number
+  reception_batch_total?: number
 } {
   return {
     condition_state: draft.condition_state,
@@ -48,5 +60,7 @@ export function draftToReceiveBody(draft: SampleFormDraft): {
     weight_g: draft.weight_g ? Number(draft.weight_g) : undefined,
     notes: draft.notes || undefined,
     description: draft.description || undefined,
+    reception_index: draft.reception_index,
+    reception_batch_total: batchTotal,
   }
 }

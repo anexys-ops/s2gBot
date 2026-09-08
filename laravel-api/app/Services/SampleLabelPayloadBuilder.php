@@ -27,6 +27,11 @@ class SampleLabelPayloadBuilder
         $payload = [
             'fold' => $sample->fold_number,
             'transco' => $sample->transco_number,
+            'reception_index' => $sample->reception_index,
+            'reception_batch_total' => $sample->reception_batch_total,
+            'label_ref' => ($sample->reception_index && $sample->reception_batch_total)
+                ? "{$sample->reception_index}/{$sample->reception_batch_total}"
+                : null,
             'received_at' => $receivedAt,
             'received_by' => $sample->receivedBy?->name,
             'from' => $sample->collectedBy?->name,

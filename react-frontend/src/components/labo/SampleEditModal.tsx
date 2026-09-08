@@ -71,7 +71,30 @@ export default function SampleEditModal({ sample, onClose, onSaved, onDeleted, o
     }
   }
 
+  const handleCancel = async () => {
+    const reason = window.prompt(
+      `Motif d'annulation de ${sample.fold_number ?? 'l\'échantillon'} (optionnel) :`,
+    )
+    if (reason === null) return
+    setBusy(true)
+    try {
+      const updated = await samplesReceptionApi.cancel(sample.id, {
+        reason: reason.trim() || undefined,
+      })
+      onSaved(updated)
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur lors de l\'annulation')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const handleDelete = async () => {
+    if (sample.status !== 'en_transit') {
+      void handleCancel()
+      return
+    }
     if (!window.confirm(`Supprimer l'échantillon ${sample.fold_number} ?`)) return
     setBusy(true)
     try {
@@ -88,6 +111,9 @@ export default function SampleEditModal({ sample, onClose, onSaved, onDeleted, o
   return (
     <Modal title={`Modifier ${sample.fold_number ?? 'échantillon'}`} onClose={busy ? () => {} : onClose}>
       <p className="text-muted" style={{ fontSize: '0.9rem', marginTop: 0 }}>
+        {sample.reception_index && sample.reception_batch_total && (
+          <>Échantillon {sample.reception_index}/{sample.reception_batch_total} · </>
+        )}
         Transco {sample.transco_number ?? '—'} · {sample.product?.libelle ?? sample.bon_commande_ligne?.libelle ?? '—'}
       </p>
 
@@ -166,8 +192,8 @@ export default function SampleEditModal({ sample, onClose, onSaved, onDeleted, o
       {error && <p className="error" style={{ marginTop: '0.75rem' }}>{error}</p>}
 
       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between', marginTop: '1rem', flexWrap: 'wrap' }}>
-        <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => handleDelete()}>
-          Supprimer
+        <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void handleDelete()}>
+          {sample.status === 'en_transit' ? 'Supprimer' : 'Annuler l\'étiquette'}
         </button>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {onPrintLabel && sample.transco_number && (

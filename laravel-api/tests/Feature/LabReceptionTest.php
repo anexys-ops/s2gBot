@@ -158,17 +158,65 @@ class LabReceptionTest extends TestCase
 
         $res = $this->actingAs($receptionnaire, 'sanctum')->postJson('/api/v1/lab/reception/receive-batch-from-line', [
             'bon_commande_ligne_id' => $labLine->id,
+            'batch_total' => 4,
             'samples' => [
-                ['condition_state' => 'bon', 'collected_by' => $technicien->id, 'sample_type' => 'sol'],
-                ['condition_state' => 'bon', 'collected_by' => $technicien->id, 'sample_type' => 'sol'],
+                ['reception_index' => 1, 'condition_state' => 'bon', 'collected_by' => $technicien->id, 'sample_type' => 'sol'],
+                ['reception_index' => 2, 'condition_state' => 'bon', 'collected_by' => $technicien->id, 'sample_type' => 'sol'],
+                ['reception_index' => 4, 'condition_state' => 'bon', 'collected_by' => $technicien->id, 'sample_type' => 'sol'],
+            ],
+            'cancelled_slots' => [
+                ['reception_index' => 3, 'reason' => 'Échantillon non remis'],
             ],
         ]);
 
         $res->assertCreated();
-        $res->assertJsonCount(2, 'data');
-        $this->assertNotEmpty($res->json('data.0.transco_number'));
-        $this->assertNotEmpty($res->json('data.1.transco_number'));
-        $this->assertNotSame($res->json('data.0.transco_number'), $res->json('data.1.transco_number'));
+        $res->assertJsonCount(3, 'data');
+        $res->assertJsonPath('data.0.reception_index', 1);
+        $res->assertJsonPath('data.0.reception_batch_total', 4);
+        $res->assertJsonPath('data.1.reception_index', 2);
+        $res->assertJsonPath('data.2.reception_index', 4);
+        $this->assertDatabaseHas('sample_reception_cancellations', [
+            'bon_commande_ligne_id' => $labLine->id,
+            'reception_index' => 3,
+            'reception_batch_total' => 4,
+        ]);
+
+        $sampleId = (int) $res->json('data.0.id');
+        $label = $this->actingAs($receptionnaire, 'sanctum')->getJson("/api/v1/samples/{$sampleId}/label");
+        $label->assertOk();
+        $label->assertJsonPath('payload.label_ref', '1/4');
+    }
+
+    public function test_cancel_sample_marks_annule_and_keeps_history(): void
+    {
+        [$labLine, , , $client, $technicien] = $this->seedBcWithLabAndReportLines();
+        $this->legacyOrderItemId($client);
+        $receptionnaire = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+
+        $create = $this->actingAs($receptionnaire, 'sanctum')->postJson('/api/v1/lab/reception/receive-from-line', [
+            'bon_commande_ligne_id' => $labLine->id,
+            'condition_state' => 'bon',
+            'collected_by' => $technicien->id,
+            'reception_index' => 1,
+            'reception_batch_total' => 1,
+        ]);
+        $create->assertCreated();
+        $sampleId = (int) $create->json('id');
+
+        $cancel = $this->actingAs($receptionnaire, 'sanctum')->patchJson("/api/v1/samples/{$sampleId}/cancel", [
+            'reason' => 'Erreur saisie',
+        ]);
+        $cancel->assertOk();
+        $cancel->assertJsonPath('status', Sample::STATUS_ANNULE);
+        $this->assertDatabaseHas('samples', [
+            'id' => $sampleId,
+            'status' => Sample::STATUS_ANNULE,
+            'cancellation_reason' => 'Erreur saisie',
+        ]);
+
+        $list = $this->actingAs($receptionnaire, 'sanctum')->getJson("/api/v1/samples?bon_commande_ligne_id={$labLine->id}&include_cancelled=1");
+        $list->assertOk();
+        $this->assertSame(1, collect($list->json('data'))->where('id', $sampleId)->count());
     }
 
     private function legacyOrderItemId(Client $client): int

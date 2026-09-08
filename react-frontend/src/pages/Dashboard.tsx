@@ -90,7 +90,7 @@ function KpiTile({
   selected: boolean
   onToggle: (id: KpiId) => void
 }) {
-  const { emoji, tone } = KPI_PRESENTATION[id]
+  const { icon, tone } = KPI_PRESENTATION[id]
   return (
     <button
       type="button"
@@ -100,7 +100,7 @@ function KpiTile({
     >
       <span className="dashboard-kpi__head">
         <span className={`dashboard-kpi__bubble dashboard-kpi__bubble--${tone}`} aria-hidden>
-          {emoji}
+          <OutlineIcon id={icon} />
         </span>
         <span className="dashboard-kpi__label">{label}</span>
       </span>
@@ -476,22 +476,41 @@ function renderKpiDetail(id: KpiId, dash: DashboardStatsPayload) {
   }
 }
 
-const METIER_TABS: { id: MetierTab; icon: string; label: string; hint: string }[] = [
+function DashboardReportLink({
+  to,
+  label,
+  icon,
+}: {
+  to: string
+  label: string
+  icon: HubIconId
+}) {
+  return (
+    <Link to={to} className="dashboard-report-link">
+      <span className="dashboard-report-link__icon" aria-hidden>
+        <OutlineIcon id={icon} />
+      </span>
+      <span className="dashboard-report-link__label">{label}</span>
+    </Link>
+  )
+}
+
+const METIER_TABS: { id: MetierTab; icon: HubIconId; label: string; hint: string }[] = [
   {
     id: 'commerce',
-    icon: '🛒',
+    icon: 'handshake',
     label: 'Commerce',
     hint: 'Clients, chantiers, commandes, devis, volume factures',
   },
   {
     id: 'compta',
-    icon: '💼',
+    icon: 'calculator',
     label: 'Compta',
     hint: 'CA, encaissements, impayés, CA mensuel',
   },
   {
     id: 'labo',
-    icon: '🔬',
+    icon: 'lab',
     label: 'Labo',
     hint: 'Rapports, échantillons, délais, volume essais',
   },
@@ -545,6 +564,30 @@ export default function Dashboard() {
         </div>
       )}
 
+      <section className="dashboard-card dashboard-card--shortcuts" aria-labelledby="dashboard-shortcuts-title">
+        <header className="dashboard-shortcuts-header">
+          <h2 id="dashboard-shortcuts-title" className="dashboard-shortcuts-title">
+            Accès rapides
+          </h2>
+          <p className="dashboard-shortcuts-intro text-muted">Commercial, dossiers et facturation.</p>
+        </header>
+        <div className="dashboard-shortcuts-grid">
+          {COMMERCIAL_SHORTCUTS.map((item) => (
+            <DashboardShortcutLink key={item.to} {...item} />
+          ))}
+        </div>
+        {isLab ? (
+          <>
+            <p className="dashboard-shortcuts-subtitle">Laboratoire &amp; outils</p>
+            <div className="dashboard-shortcuts-grid dashboard-shortcuts-grid--secondary">
+              {LAB_SHORTCUTS.map((item) => (
+                <DashboardShortcutLink key={item.to} {...item} />
+              ))}
+            </div>
+          </>
+        ) : null}
+      </section>
+
       {dash && (
         <section className="dashboard-card dashboard-card--metrics dashboard-section dashboard-section--metier">
           <div className="dashboard-card__head">
@@ -562,7 +605,7 @@ export default function Dashboard() {
                 title={t.hint}
               >
                 <span className="dashboard-metier-tab__icon" aria-hidden>
-                  {t.icon}
+                  <OutlineIcon id={t.icon} />
                 </span>
                 <span className="dashboard-metier-tab__text">{t.label}</span>
               </button>
@@ -571,7 +614,7 @@ export default function Dashboard() {
 
           {metier === 'commerce' && (
             <div role="tabpanel" className="dashboard-metier-panel" aria-label="Commerce">
-              <div className="dashboard-kpi-grid">
+              <div className="dashboard-kpi-grid dashboard-kpi-grid--6">
                 <KpiTile
                   id="clients"
                   label="Clients"
@@ -617,23 +660,20 @@ export default function Dashboard() {
                 />
               </div>
               {openKpi && metier === 'commerce' ? renderKpiDetail(openKpi, dash) : null}
-              <div className="dashboard-report-links dashboard-metier-links">
-                <Link to="/rapports/ventes" className="dashboard-report-link">
-                  Stats ventes & rapports
-                </Link>
-                <Link to="/crm" className="dashboard-report-link">
-                  Vue Commercial
-                </Link>
-                <Link to="/devis" className="dashboard-report-link">
-                  Devis
-                </Link>
+              <div className="dashboard-report-section">
+                <h3 className="dashboard-metier-subtitle">Raccourcis &amp; vues</h3>
+                <div className="dashboard-report-links">
+                  <DashboardReportLink to="/rapports/ventes" label="Stats ventes & rapports" icon="chart" />
+                  <DashboardReportLink to="/crm" label="Vue Commercial" icon="handshake" />
+                  <DashboardReportLink to="/devis" label="Devis" icon="quote" />
+                </div>
               </div>
             </div>
           )}
 
           {metier === 'compta' && (
             <div role="tabpanel" className="dashboard-metier-panel" aria-label="Comptabilité">
-              <div className="dashboard-kpi-grid">
+              <div className="dashboard-kpi-grid dashboard-kpi-grid--3">
                 <KpiTile
                   id="ca_ttc"
                   label="CA facturé TTC"
@@ -684,20 +724,19 @@ export default function Dashboard() {
                 )}
               </div>
 
-              <div className="dashboard-report-links dashboard-metier-links">
-                <Link to="/rapports/compta" className="dashboard-report-link">
-                  Rapport compta
-                </Link>
-                <Link to="/invoices" className="dashboard-report-link">
-                  Factures
-                </Link>
+              <div className="dashboard-report-section">
+                <h3 className="dashboard-metier-subtitle">Raccourcis &amp; vues</h3>
+                <div className="dashboard-report-links">
+                  <DashboardReportLink to="/rapports/compta" label="Rapport compta" icon="chart" />
+                  <DashboardReportLink to="/invoices" label="Factures" icon="invoice" />
+                </div>
               </div>
             </div>
           )}
 
           {metier === 'labo' && (
             <div role="tabpanel" className="dashboard-metier-panel" aria-label="Laboratoire">
-              <div className="dashboard-kpi-grid">
+              <div className="dashboard-kpi-grid dashboard-kpi-grid--5">
                 <KpiTile
                   id="reports_total"
                   label="Rapports PDF"
@@ -768,19 +807,14 @@ export default function Dashboard() {
                 )}
               </div>
 
-              <div className="dashboard-report-links dashboard-metier-links">
-                <Link to="/rapports/delai-traitement" className="dashboard-report-link">
-                  Délais de traitement labo
-                </Link>
-                <Link to="/rapports/kpi" className="dashboard-report-link">
-                  Tableau KPI
-                </Link>
-                <Link to="/graphiques-essais" className="dashboard-report-link">
-                  Graphiques essais
-                </Link>
-                <Link to="/back-office" className="dashboard-report-link">
-                  Back office
-                </Link>
+              <div className="dashboard-report-section">
+                <h3 className="dashboard-metier-subtitle">Raccourcis &amp; vues</h3>
+                <div className="dashboard-report-links">
+                  <DashboardReportLink to="/rapports/delai-traitement" label="Délais de traitement labo" icon="clock" />
+                  <DashboardReportLink to="/rapports/kpi" label="Tableau KPI" icon="chart" />
+                  <DashboardReportLink to="/graphiques-essais" label="Graphiques essais" icon="granulo" />
+                  <DashboardReportLink to="/back-office" label="Back office" icon="audit" />
+                </div>
               </div>
             </div>
           )}
@@ -823,30 +857,6 @@ export default function Dashboard() {
           </Link>
         </div>
       </div>
-
-      <section className="dashboard-card dashboard-card--shortcuts" aria-labelledby="dashboard-shortcuts-title">
-        <header className="dashboard-shortcuts-header">
-          <h2 id="dashboard-shortcuts-title" className="dashboard-shortcuts-title">
-            Accès rapides
-          </h2>
-          <p className="dashboard-shortcuts-intro text-muted">Commercial, dossiers et facturation.</p>
-        </header>
-        <div className="dashboard-shortcuts-grid">
-          {COMMERCIAL_SHORTCUTS.map((item) => (
-            <DashboardShortcutLink key={item.to} {...item} />
-          ))}
-        </div>
-        {isLab ? (
-          <>
-            <p className="dashboard-shortcuts-subtitle">Laboratoire &amp; outils</p>
-            <div className="dashboard-shortcuts-grid dashboard-shortcuts-grid--secondary">
-              {LAB_SHORTCUTS.map((item) => (
-                <DashboardShortcutLink key={item.to} {...item} />
-              ))}
-            </div>
-          </>
-        ) : null}
-      </section>
     </div>
   )
 }

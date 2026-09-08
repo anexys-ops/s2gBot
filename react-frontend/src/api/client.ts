@@ -1668,6 +1668,10 @@ export type ReceptionSample = {
   id: number
   fold_number?: string | null
   transco_number?: string | null
+  reception_index?: number | null
+  reception_batch_total?: number | null
+  cancelled_at?: string | null
+  cancellation_reason?: string | null
   status: string
   sample_type?: string | null
   dossier_id?: number | null
@@ -1685,12 +1689,26 @@ export type ReceptionSample = {
   product?: { id: number; code: string; libelle: string } | null
   collected_by?: { id: number; name: string } | null
   received_by?: { id: number; name: string } | null
+  cancelled_by?: { id: number; name: string } | null
   bon_commande_ligne?: { id: number; libelle: string; bon_commande_id: number } | null
+}
+
+export type SampleReceptionCancellation = {
+  id: number
+  bon_commande_ligne_id: number
+  reception_index: number
+  reception_batch_total: number
+  reason?: string | null
+  created_at?: string | null
+  cancelled_by?: { id: number; name: string } | null
 }
 
 export type SampleLabelPayload = {
   fold?: string | null
   transco?: string | null
+  reception_index?: number | null
+  reception_batch_total?: number | null
+  label_ref?: string | null
   received_at?: string | null
   received_by?: string | null
   from?: string | null
@@ -1725,6 +1743,8 @@ export type ReceiveFromLineBody = {
   quantity?: number
   notes?: string
   description?: string
+  reception_index?: number
+  reception_batch_total?: number
 }
 
 export type ReceiveSampleBody = {
@@ -1762,20 +1782,31 @@ export const samplesReceptionApi = {
     fold?: string
     per_page?: number
     bon_commande_ligne_id?: number
+    include_cancelled?: boolean
   }) => {
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)
     if (params?.fold) q.set('fold', params.fold)
     if (params?.per_page) q.set('per_page', String(params.per_page))
     if (params?.bon_commande_ligne_id) q.set('bon_commande_ligne_id', String(params.bon_commande_ligne_id))
+    if (params?.include_cancelled) q.set('include_cancelled', '1')
     const s = q.toString()
     return api<LaravelPaginator<ReceptionSample>>(`/v1/samples${s ? `?${s}` : ''}`)
   },
+  listCancellations: (bon_commande_ligne_id: number) =>
+    api<{ data: SampleReceptionCancellation[] }>(
+      `/v1/lab/reception/cancellations?bon_commande_ligne_id=${bon_commande_ligne_id}`,
+    ),
   get: (id: number) => api<ReceptionSample>(`/v1/samples/${id}`),
   search: (fold: string) => api<{ data: ReceptionSample[] }>(`/v1/samples/search?fold=${encodeURIComponent(fold)}`),
   receiveFromLine: (body: ReceiveFromLineBody) =>
     api<ReceptionSample>('/v1/lab/reception/receive-from-line', { method: 'POST', body: JSON.stringify(body) }),
-  receiveBatchFromLine: (body: { bon_commande_ligne_id: number; samples: Omit<ReceiveFromLineBody, 'bon_commande_ligne_id'>[] }) =>
+  receiveBatchFromLine: (body: {
+    bon_commande_ligne_id: number
+    batch_total: number
+    samples: Omit<ReceiveFromLineBody, 'bon_commande_ligne_id'>[]
+    cancelled_slots?: { reception_index: number; reason?: string }[]
+  }) =>
     api<{ data: ReceptionSample[] }>('/v1/lab/reception/receive-batch-from-line', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -1785,6 +1816,8 @@ export const samplesReceptionApi = {
   update: (id: number, body: Partial<ReceiveFromLineBody>) =>
     api<ReceptionSample>(`/v1/samples/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/v1/samples/${id}`, { method: 'DELETE' }),
+  cancel: (id: number, body?: { reason?: string }) =>
+    api<ReceptionSample>(`/v1/samples/${id}/cancel`, { method: 'PATCH', body: JSON.stringify(body ?? {}) }),
   labelData: (id: number) => api<SampleLabelData>(`/v1/samples/${id}/label`),
   photoUrl: (id: number) => `/api/v1/samples/${id}/photo`,
   async uploadPhoto(id: number, file: File): Promise<{ photo_path: string; photo_url: string }> {

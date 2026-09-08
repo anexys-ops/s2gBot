@@ -415,6 +415,8 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur');
         Route::post('lab/reception/receive-batch-from-line', [SampleReceptionController::class, 'receiveBatchFromLine'])
             ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur');
+        Route::get('lab/reception/cancellations', [SampleReceptionController::class, 'lineCancellations'])
+            ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur,lab_admin');
         Route::get('samples',                 [SampleReceptionController::class, 'index']);
         Route::get('samples/stats',           [SampleReceptionController::class, 'stats']);
         Route::get('samples/search',          [SampleReceptionController::class, 'searchByFold']);
@@ -428,6 +430,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('samples/{sample}',        [SampleReceptionController::class, 'update'])->whereNumber('sample');
         Route::delete('samples/{sample}',     [SampleReceptionController::class, 'destroy'])
             ->middleware('role:responsable,receptionnaire')->whereNumber('sample');
+        Route::patch('samples/{sample}/cancel', [SampleReceptionController::class, 'cancel'])
+            ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur')->whereNumber('sample');
         Route::patch('samples/{sample}/receive',     [SampleReceptionController::class, 'receive'])
             ->middleware('role:receptionnaire,responsable,laborantin')->whereNumber('sample');
         Route::patch('samples/{sample}/start-test',  [SampleReceptionController::class, 'startTest'])

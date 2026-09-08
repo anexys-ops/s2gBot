@@ -133,7 +133,7 @@ class LabReceptionService
         $rows = Sample::query()
             ->selectRaw('bon_commande_ligne_id, status, COUNT(*) as cnt')
             ->whereIn('bon_commande_ligne_id', $lineIds)
-            ->where('status', '!=', Sample::STATUS_REJETE)
+            ->whereNotIn('status', [Sample::STATUS_REJETE, Sample::STATUS_ANNULE])
             ->groupBy('bon_commande_ligne_id', 'status')
             ->get();
 

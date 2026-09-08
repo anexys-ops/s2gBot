@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BonCommandeLigne;
 use App\Models\OrderItem;
 use App\Models\Sample;
+use App\Models\SampleReceptionCancellation;
 use App\Models\Sequence;
 use App\Models\User;
 use App\Services\LabReceptionService;
@@ -34,6 +35,7 @@ class SampleReceptionController extends Controller
         'bonCommandeLigne.bonCommande:id,numero,quote_id',
         'collectedBy:id,name,role',
         'receivedBy:id,name,role',
+        'cancelledBy:id,name,role',
     ];
 
     public function __construct(
@@ -68,6 +70,9 @@ class SampleReceptionController extends Controller
         }
         if ($to = $request->query('to')) {
             $q->where('collected_at', '<=', $to);
+        }
+        if (! $request->boolean('include_cancelled')) {
+            $q->where('status', '!=', Sample::STATUS_ANNULE);
         }
 
         $perPage = min(max((int) $request->query('per_page', 50), 1), 200);
@@ -116,6 +121,8 @@ class SampleReceptionController extends Controller
             'quantity' => ['nullable', 'integer', 'min:1'],
             'notes' => ['nullable', 'string'],
             'description' => ['nullable', 'string'],
+            'reception_index' => ['nullable', 'integer', 'min:1', 'max:999'],
+            'reception_batch_total' => ['nullable', 'integer', 'min:1', 'max:999'],
         ]);
 
         /** @var BonCommandeLigne $ligne */
@@ -127,10 +134,14 @@ class SampleReceptionController extends Controller
             return response()->json(['message' => 'Cette ligne BC n\'est pas éligible à la réception labo.'], 422);
         }
 
-        $bc = $ligne->bonCommande;
-        $createData = $this->buildCreateDataFromLine($ligne, $data);
+        if ($this->receptionService->remainingCapacityForLine($ligne) < 1) {
+            return response()->json(['message' => 'Quota de réception épuisé pour cette ligne.'], 422);
+        }
 
-        $sample = Sample::create($createData);
+        $data['reception_index'] = $data['reception_index'] ?? 1;
+        $data['reception_batch_total'] = $data['reception_batch_total'] ?? 1;
+
+        $sample = Sample::create($this->buildCreateDataFromLine($ligne, $data));
 
         $this->finalizeReception($sample, $user, $data);
 
@@ -147,7 +158,9 @@ class SampleReceptionController extends Controller
         $user = $request->user();
         $payload = $request->validate([
             'bon_commande_ligne_id' => ['required', 'integer', 'exists:bons_commande_lignes,id'],
+            'batch_total' => ['required', 'integer', 'min:1', 'max:999'],
             'samples' => ['required', 'array', 'min:1', 'max:50'],
+            'samples.*.reception_index' => ['required', 'integer', 'min:1', 'max:999'],
             'samples.*.condition_state' => ['required', Rule::in(Sample::CONDITIONS)],
             'samples.*.storage_location' => ['nullable', 'string', 'max:191'],
             'samples.*.collected_by' => ['nullable', 'integer', 'exists:users,id'],
@@ -158,6 +171,9 @@ class SampleReceptionController extends Controller
             'samples.*.quantity' => ['nullable', 'integer', 'min:1'],
             'samples.*.notes' => ['nullable', 'string'],
             'samples.*.description' => ['nullable', 'string'],
+            'cancelled_slots' => ['nullable', 'array'],
+            'cancelled_slots.*.reception_index' => ['required', 'integer', 'min:1', 'max:999'],
+            'cancelled_slots.*.reason' => ['nullable', 'string', 'max:500'],
         ]);
 
         /** @var BonCommandeLigne $ligne */
@@ -169,6 +185,7 @@ class SampleReceptionController extends Controller
             return response()->json(['message' => 'Cette ligne BC n\'est pas éligible à la réception labo.'], 422);
         }
 
+        $batchTotal = (int) $payload['batch_total'];
         $remaining = $this->receptionService->remainingCapacityForLine($ligne);
         $count = count($payload['samples']);
         if ($count > $remaining) {
@@ -177,14 +194,44 @@ class SampleReceptionController extends Controller
             ], 422);
         }
 
+        $userId = $user instanceof User ? $user->id : null;
+        foreach ($payload['cancelled_slots'] ?? [] as $slot) {
+            SampleReceptionCancellation::query()->create([
+                'bon_commande_ligne_id' => $ligne->id,
+                'reception_index' => (int) $slot['reception_index'],
+                'reception_batch_total' => $batchTotal,
+                'cancelled_by' => $userId,
+                'reason' => $slot['reason'] ?? 'Annulé avant réception',
+            ]);
+        }
+
         $created = [];
         foreach ($payload['samples'] as $row) {
+            $row['reception_batch_total'] = $batchTotal;
             $sample = Sample::create($this->buildCreateDataFromLine($ligne, $row));
             $this->finalizeReception($sample, $user, $row);
             $created[] = $sample->load(self::REL);
         }
 
         return response()->json(['data' => $created], 201);
+    }
+
+    /**
+     * Historique des étiquettes annulées avant création (par ligne BC).
+     */
+    public function lineCancellations(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'bon_commande_ligne_id' => ['required', 'integer', 'exists:bons_commande_lignes,id'],
+        ]);
+
+        $rows = SampleReceptionCancellation::query()
+            ->where('bon_commande_ligne_id', $data['bon_commande_ligne_id'])
+            ->with('cancelledBy:id,name')
+            ->orderByDesc('created_at')
+            ->get();
+
+        return response()->json(['data' => $rows]);
     }
 
     public function update(Request $request, Sample $sample): JsonResponse
@@ -255,19 +302,40 @@ class SampleReceptionController extends Controller
         return response()->json($this->labelBuilder->build($sample->load(self::REL)));
     }
 
-    public function destroy(Sample $sample): JsonResponse
+    public function cancel(Request $request, Sample $sample): JsonResponse
     {
         if (! in_array($sample->status, [Sample::STATUS_EN_TRANSIT, Sample::STATUS_RECEPTIONNE], true)) {
-            return response()->json(['message' => 'Seuls les échantillons en transit ou réceptionnés peuvent être supprimés.'], 422);
+            return response()->json(['message' => 'Cet échantillon ne peut pas être annulé.'], 422);
         }
 
-        if ($sample->photo_path && Storage::disk('local')->exists($sample->photo_path)) {
-            Storage::disk('local')->delete($sample->photo_path);
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $user = $request->user();
+        $sample->status = Sample::STATUS_ANNULE;
+        $sample->cancelled_at = now();
+        $sample->cancelled_by = $user instanceof User ? $user->id : null;
+        $sample->cancellation_reason = $data['reason'] ?? 'Annulé par l\'utilisateur';
+        $sample->save();
+
+        return response()->json($sample->load(self::REL));
+    }
+
+    public function destroy(Sample $sample): JsonResponse
+    {
+        if ($sample->status === Sample::STATUS_EN_TRANSIT) {
+            if ($sample->photo_path && Storage::disk('local')->exists($sample->photo_path)) {
+                Storage::disk('local')->delete($sample->photo_path);
+            }
+            $sample->delete();
+
+            return response()->json(null, 204);
         }
 
-        $sample->delete();
-
-        return response()->json(null, 204);
+        return response()->json([
+            'message' => 'Utilisez l\'annulation pour conserver l\'historique des échantillons réceptionnés.',
+        ], 422);
     }
 
     public function startTest(Sample $sample): JsonResponse
@@ -342,6 +410,13 @@ class SampleReceptionController extends Controller
 
         if (empty($sample->transco_number) && Schema::hasColumn('samples', 'transco_number')) {
             $sample->transco_number = Sequence::nextNumeric('TRANSCO');
+        }
+
+        if (isset($data['reception_index'])) {
+            $sample->reception_index = (int) $data['reception_index'];
+        }
+        if (isset($data['reception_batch_total'])) {
+            $sample->reception_batch_total = (int) $data['reception_batch_total'];
         }
 
         $sample->save();

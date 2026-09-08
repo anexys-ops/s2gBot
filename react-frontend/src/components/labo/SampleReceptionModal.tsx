@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Modal from '../Modal'
 import {
@@ -12,6 +12,7 @@ import {
   SAMPLE_TYPES,
   createEmptyDraft,
   draftToReceiveBody,
+  type CancelledSlot,
   type SampleFormDraft,
 } from '../../lib/sampleReceptionForm'
 
@@ -25,19 +26,46 @@ type Props = {
   onSuccess: (samples: ReceptionSample[]) => void
 }
 
-type Step = 'count' | 'forms' | 'done'
+type Step = 'forms' | 'done'
+
+function parseCount(raw: string, max: number): number {
+  const n = parseInt(raw, 10)
+  if (Number.isNaN(n) || n < 1) return 1
+  return Math.min(n, max)
+}
+
+function buildDraftsForBatch(
+  batchTotal: number,
+  cancelled: CancelledSlot[],
+  previous: SampleFormDraft[],
+  defaultTechnicienId?: number,
+): SampleFormDraft[] {
+  const cancelledIndices = new Set(cancelled.map((c) => c.reception_index))
+  const byIndex = new Map(previous.map((d) => [d.reception_index, d]))
+  const out: SampleFormDraft[] = []
+
+  for (let i = 1; i <= batchTotal; i++) {
+    if (cancelledIndices.has(i)) continue
+    out.push(
+      byIndex.get(i) ??
+        createEmptyDraft(i, { collected_by: defaultTechnicienId ?? '' }),
+    )
+  }
+
+  return out
+}
 
 function SampleFormCard({
-  index,
   draft,
+  batchTotal,
   users,
   onChange,
   onRemove,
   canRemove,
   showType,
 }: {
-  index: number
   draft: SampleFormDraft
+  batchTotal: number
   users: { id: number; name: string }[]
   onChange: (patch: Partial<SampleFormDraft>) => void
   onRemove: () => void
@@ -58,10 +86,12 @@ function SampleFormCard({
   return (
     <article className="sample-reception-card">
       <header className="sample-reception-card__head">
-        <h3 className="sample-reception-card__title">Échantillon {index + 1}</h3>
+        <h3 className="sample-reception-card__title">
+          Échantillon {draft.reception_index}/{batchTotal}
+        </h3>
         {canRemove && (
           <button type="button" className="btn btn-secondary btn-sm" onClick={onRemove}>
-            Retirer
+            Annuler cette étiquette
           </button>
         )}
       </header>
@@ -155,10 +185,12 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
   const maxCount = isFromLine ? Math.max(1, line?.quantite_manquante ?? 1) : 1
   const defaultTechnicienId = line?.technicien?.id ?? transitSample?.collected_by?.id
 
-  const [step, setStep] = useState<Step>(isFromLine ? 'count' : 'forms')
-  const [labelCount, setLabelCount] = useState(1)
+  const [step, setStep] = useState<Step>('forms')
+  const [countInput, setCountInput] = useState('1')
+  const [batchTotal, setBatchTotal] = useState(1)
+  const [cancelledSlots, setCancelledSlots] = useState<CancelledSlot[]>([])
   const [drafts, setDrafts] = useState<SampleFormDraft[]>(() => [
-    createEmptyDraft(0, { collected_by: defaultTechnicienId ?? '' }),
+    createEmptyDraft(1, { collected_by: defaultTechnicienId ?? '' }),
   ])
   const [createdSamples, setCreatedSamples] = useState<ReceptionSample[]>([])
   const [busy, setBusy] = useState(false)
@@ -181,8 +213,53 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
     [drafts],
   )
 
-  const updateDraft = (index: number, patch: Partial<SampleFormDraft>) => {
-    setDrafts((prev) => prev.map((d, i) => (i === index ? { ...d, ...patch } : d)))
+  const applyBatchCount = useCallback(
+    (
+      raw: string,
+      prevCancelled: CancelledSlot[],
+      prevDrafts: SampleFormDraft[],
+      prevBatchTotal: number,
+    ) => {
+      const parsed = parseCount(raw, maxCount)
+      setCountInput(String(parsed))
+      setBatchTotal(parsed)
+
+      let cancelled = [...prevCancelled]
+      if (parsed < prevBatchTotal) {
+        for (let i = parsed + 1; i <= prevBatchTotal; i++) {
+          if (!cancelled.some((c) => c.reception_index === i)) {
+            cancelled = [
+              ...cancelled,
+              { reception_index: i, reason: 'Réduction du nombre d\'échantillons' },
+            ]
+          }
+        }
+      } else {
+        cancelled = cancelled.filter((c) => c.reception_index <= parsed)
+      }
+
+      setCancelledSlots(cancelled)
+      setDrafts(buildDraftsForBatch(parsed, cancelled, prevDrafts, defaultTechnicienId))
+    },
+    [defaultTechnicienId, maxCount],
+  )
+
+  const handleCountInputChange = (raw: string) => {
+    setCountInput(raw)
+    if (raw === '' || raw === '-') return
+    const parsed = parseInt(raw, 10)
+    if (Number.isNaN(parsed)) return
+    applyBatchCount(raw, cancelledSlots, drafts, batchTotal)
+  }
+
+  const handleCountBlur = () => {
+    applyBatchCount(countInput, cancelledSlots, drafts, batchTotal)
+  }
+
+  const updateDraft = (receptionIndex: number, patch: Partial<SampleFormDraft>) => {
+    setDrafts((prev) =>
+      prev.map((d) => (d.reception_index === receptionIndex ? { ...d, ...patch } : d)),
+    )
   }
 
   const applyCommonToAll = () => {
@@ -197,51 +274,52 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
     )
   }
 
-  const handlePrepareForms = () => {
-    const count = Math.min(Math.max(1, labelCount), maxCount)
-    setLabelCount(count)
-    setDrafts(
-      Array.from({ length: count }, (_, i) =>
-        createEmptyDraft(i, { collected_by: defaultTechnicienId ?? '' }),
-      ),
+  const handleRemoveDraft = (receptionIndex: number) => {
+    const reason = window.prompt(
+      `Motif d'annulation de l'étiquette ${receptionIndex}/${batchTotal} (optionnel) :`,
     )
-    setStep('forms')
+    const slot: CancelledSlot = {
+      reception_index: receptionIndex,
+      reason: reason?.trim() || 'Annulé avant réception',
+    }
+    const nextCancelled = [...cancelledSlots.filter((c) => c.reception_index !== receptionIndex), slot]
+    setCancelledSlots(nextCancelled)
+    setDrafts((prev) => prev.filter((d) => d.reception_index !== receptionIndex))
   }
 
   const uploadPhotos = async (samples: ReceptionSample[]) => {
     const out: ReceptionSample[] = []
-    for (let i = 0; i < samples.length; i++) {
-      const draft = drafts[i]
-      let sample = samples[i]
+    for (const sample of samples) {
+      const draft = drafts.find((d) => d.reception_index === sample.reception_index)
+      let current = sample
       if (draft?.photoFile) {
         await samplesReceptionApi.uploadPhoto(sample.id, draft.photoFile)
-        sample = await samplesReceptionApi.get(sample.id)
+        current = await samplesReceptionApi.get(sample.id)
       }
-      out.push(sample)
+      out.push(current)
     }
-    return out
+    return out.sort((a, b) => (a.reception_index ?? 0) - (b.reception_index ?? 0))
   }
 
   const handleSubmit = async () => {
+    if (drafts.length === 0) {
+      setError('Aucun échantillon à réceptionner.')
+      return
+    }
+
     setError(null)
     setBusy(true)
     try {
       let samples: ReceptionSample[] = []
 
       if (isFromLine && line) {
-        if (drafts.length === 1) {
-          const one = await samplesReceptionApi.receiveFromLine({
-            bon_commande_ligne_id: line.id,
-            ...draftToReceiveBody(drafts[0]),
-          })
-          samples = [one]
-        } else {
-          const res = await samplesReceptionApi.receiveBatchFromLine({
-            bon_commande_ligne_id: line.id,
-            samples: drafts.map((d) => draftToReceiveBody(d)),
-          })
-          samples = res.data
-        }
+        const res = await samplesReceptionApi.receiveBatchFromLine({
+          bon_commande_ligne_id: line.id,
+          batch_total: batchTotal,
+          samples: drafts.map((d) => draftToReceiveBody(d, batchTotal)),
+          cancelled_slots: cancelledSlots.length > 0 ? cancelledSlots : undefined,
+        })
+        samples = res.data
       } else if (transitSample) {
         const body: ReceiveSampleBody = {
           ...draftToReceiveBody(drafts[0]),
@@ -265,6 +343,11 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
     ? `Réception — ${line?.libelle ?? 'Produit attendu'}`
     : `Réceptionner ${transitSample?.fold_number ?? 'FOLD'}`
 
+  const clampedHint =
+    isFromLine && parseInt(countInput, 10) > maxCount
+      ? `Limité à ${maxCount} (quantité manquante sur la ligne BC).`
+      : null
+
   return (
     <Modal title={title} onClose={busy ? () => {} : onClose}>
       {isFromLine && line && step !== 'done' && (
@@ -275,37 +358,37 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
         </p>
       )}
 
-      {step === 'count' && isFromLine && (
-        <div className="sample-reception-count">
-          <label>
-            <span className="sample-reception-count__label">Nombre d&apos;échantillons / étiquettes</span>
-            <input
-              type="number"
-              min={1}
-              max={maxCount}
-              value={labelCount}
-              onChange={(e) => setLabelCount(Number(e.target.value))}
-            />
-          </label>
-          <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-            Un formulaire et une étiquette FOLD seront générés pour chaque échantillon (max. {maxCount}).
-          </p>
-          <div className="sample-reception-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Annuler</button>
-            <button type="button" className="btn btn-primary" onClick={handlePrepareForms}>
-              Préparer les formulaires
-            </button>
-          </div>
-        </div>
-      )}
-
       {step === 'forms' && (
         <>
+          {isFromLine && (
+            <div className="sample-reception-count">
+              <label>
+                <span className="sample-reception-count__label">Nombre d&apos;échantillons / étiquettes</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={maxCount}
+                  value={countInput}
+                  onChange={(e) => handleCountInputChange(e.target.value)}
+                  onBlur={handleCountBlur}
+                />
+              </label>
+              <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                {drafts.length} formulaire{drafts.length > 1 ? 's' : ''} actif{drafts.length > 1 ? 's' : ''} sur{' '}
+                {batchTotal} étiquette{batchTotal > 1 ? 's' : ''} (max. {maxCount}).
+              </p>
+              {clampedHint && <p className="error" style={{ fontSize: '0.85rem' }}>{clampedHint}</p>}
+              {cancelledSlots.length > 0 && (
+                <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                  Étiquettes annulées (historisées) :{' '}
+                  {cancelledSlots.map((c) => `${c.reception_index}/${batchTotal}`).join(', ')}
+                </p>
+              )}
+            </div>
+          )}
+
           {isFromLine && drafts.length > 1 && (
             <div className="sample-reception-toolbar">
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setStep('count')}>
-                ← Changer le nombre
-              </button>
               <button type="button" className="btn btn-secondary btn-sm" onClick={applyCommonToAll}>
                 Appliquer échantillon 1 à tous
               </button>
@@ -313,19 +396,16 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
           )}
 
           <div className="sample-reception-forms">
-            {drafts.map((draft, index) => (
+            {drafts.map((draft) => (
               <SampleFormCard
                 key={draft.key}
-                index={index}
                 draft={draft}
+                batchTotal={batchTotal}
                 users={users}
                 showType={isFromLine}
-                canRemove={isFromLine && drafts.length > 1}
-                onChange={(patch) => updateDraft(index, patch)}
-                onRemove={() => {
-                  setDrafts((prev) => prev.filter((_, i) => i !== index))
-                  setLabelCount((c) => Math.max(1, c - 1))
-                }}
+                canRemove={isFromLine && batchTotal > 1}
+                onChange={(patch) => updateDraft(draft.reception_index, patch)}
+                onRemove={() => handleRemoveDraft(draft.reception_index)}
               />
             ))}
           </div>
@@ -334,9 +414,14 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
 
           <div className="sample-reception-actions">
             <button type="button" className="btn btn-secondary" disabled={busy} onClick={onClose}>
-              Annuler
+              Fermer
             </button>
-            <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void handleSubmit()}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={busy || drafts.length === 0}
+              onClick={() => void handleSubmit()}
+            >
               {busy ? '…' : `Réceptionner ${drafts.length} échantillon${drafts.length > 1 ? 's' : ''}`}
             </button>
           </div>
@@ -352,6 +437,9 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
             {createdSamples.map((s) => (
               <li key={s.id}>
                 <strong>{s.fold_number}</strong>
+                {s.reception_index && s.reception_batch_total && (
+                  <span className="text-muted"> · {s.reception_index}/{s.reception_batch_total}</span>
+                )}
                 <span className="text-muted"> · Transco {s.transco_number ?? '—'}</span>
               </li>
             ))}

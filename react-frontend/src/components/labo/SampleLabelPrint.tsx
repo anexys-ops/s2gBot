@@ -45,6 +45,7 @@ body { font-family: 'DM Sans', Arial, sans-serif; margin: 0; padding: 0; color: 
 .fold-label__logo { display: block; margin: 0 auto ${compact ? '6px' : '8px'}; max-height: ${compact ? '40px' : '52px'}; max-width: ${compact ? '140px' : '180px'}; object-fit: contain; }
 .fold-label__brand { margin: 0; font-size: ${compact ? '7pt' : '8pt'}; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #6b6966; }
 .fold-label__fold { margin: ${compact ? '10px 0 4px' : '14px 0 6px'}; font-size: ${compact ? '16pt' : '20pt'}; font-weight: 700; font-family: ui-monospace, monospace; letter-spacing: 0.04em; color: #1a5276; }
+.fold-label__index { display: inline-block; margin-bottom: ${compact ? '6px' : '8px'}; padding: 2px 10px; border-radius: 6px; background: #eff6ff; border: 1px solid #bfdbfe; font-size: ${compact ? '8pt' : '9pt'}; font-weight: 700; color: #1d4ed8; }
 .fold-label__transco { display: inline-block; margin-bottom: ${compact ? '8px' : '12px'}; padding: 3px 12px; border-radius: 999px; background: #ecfdf5; border: 1px solid #a7f3d0; font-size: ${compact ? '8pt' : '9pt'}; font-weight: 600; color: #065f46; }
 .fold-label__product { margin: 0 ${compact ? '8px' : '12px'} ${compact ? '10px' : '14px'}; font-size: ${compact ? '9pt' : '10pt'}; font-weight: 600; line-height: 1.35; color: #1a1a18; }
 .fold-label__meta { margin: 0 auto ${compact ? '10px' : '14px'}; padding: 0; list-style: none; max-width: ${compact ? '88mm' : '120mm'}; font-size: ${compact ? '7.5pt' : '8.5pt'}; line-height: 1.45; }
@@ -75,6 +76,9 @@ function LabelBody({ payload, barcode, format, logoSrc, qrRef, barcodeRef }: Lab
       </header>
 
       <div className="fold-label__fold">{payload.fold}</div>
+      {payload.label_ref && (
+        <div className="fold-label__index">Échantillon {payload.label_ref}</div>
+      )}
       {payload.transco && (
         <div className="fold-label__transco">Transco {payload.transco}</div>
       )}

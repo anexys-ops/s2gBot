@@ -367,6 +367,7 @@ export default function S2gCataloguePickerModal({ onClose, onPick }: Props) {
 
   return (
     <Modal title="Catalogue S2G" onClose={onClose}>
+      <div className="s2g-picker-modal">
       <p className="text-muted s2g-picker__intro">
         Parcours guidé : <strong>Qualification → Jalon → Articles</strong>. Vous pouvez enchaîner plusieurs ajouts.
       </p>
@@ -659,6 +660,7 @@ export default function S2gCataloguePickerModal({ onClose, onPick }: Props) {
           </button>
         </div>
       ) : null}
+      </div>
     </Modal>
   )
 }

@@ -3373,6 +3373,28 @@ a.ds-icon-btn {
 .modal-box:has(.catalogue-article-new-form) {
   max-width: min(94vw, 900px);
 }
+.modal-box:has(.s2g-picker-modal) {
+  max-width: min(96vw, 980px);
+  max-height: min(92vh, 880px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-box:has(.sample-reception-modal) {
+  max-width: min(94vw, 760px);
+  max-height: min(92vh, 900px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-box:has(.s2g-picker-modal) .modal-body,
+.modal-box:has(.sample-reception-modal) .modal-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
 .modal-head {
   display: flex;
   align-items: center;
@@ -6182,6 +6204,28 @@ a.ds-icon-btn {
 .s2g-picker__intro {
   font-size: 0.88rem;
   margin-top: 0;
+}
+.s2g-picker-modal {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.s2g-picker-modal .s2g-picker__intro,
+.s2g-picker-modal .s2g-picker__steps,
+.s2g-picker-modal .s2g-picker__success,
+.s2g-picker-modal .s2g-picker__crumbs,
+.s2g-picker-modal .s2g-picker__filters,
+.s2g-picker-modal .s2g-picker__toolbar,
+.s2g-picker-modal .s2g-picker__footer {
+  flex-shrink: 0;
+}
+.modal-box:has(.s2g-picker-modal) .s2g-picker__groups,
+.modal-box:has(.s2g-picker-modal) .catalog-picker-list {
+  flex: 1 1 auto;
+  min-height: 10rem;
+  max-height: none;
+  overflow-y: auto;
 }
 .s2g-picker__steps {
   display: flex;
@@ -9165,6 +9209,19 @@ a.catalogue-tree__link-article:hover {
 }
 
 /* ── Réception multi-échantillons ─────────────────────────────────────── */
+.sample-reception-modal {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.sample-reception-intro,
+.sample-reception-count,
+.sample-reception-toolbar,
+.sample-reception-actions,
+.sample-reception-done {
+  flex-shrink: 0;
+}
 .sample-reception-intro {
   font-size: 0.9rem;
   margin-top: 0;
@@ -9176,7 +9233,8 @@ a.catalogue-tree__link-article:hover {
   font-weight: 600;
 }
 
-.sample-reception-count input[type='number'] {
+.sample-reception-count input[type='number'],
+.sample-reception-count input[type='text'] {
   width: 100%;
   max-width: 120px;
   font-size: 1.25rem;
@@ -9195,10 +9253,13 @@ a.catalogue-tree__link-article:hover {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  max-height: min(52vh, 520px);
+  flex: 1 1 auto;
+  min-height: 12rem;
+  max-height: none;
   overflow-y: auto;
-  padding-right: 0.25rem;
+  padding-right: 0.35rem;
   margin-bottom: 0.75rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .sample-reception-card {

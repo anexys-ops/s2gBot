@@ -375,6 +375,7 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
 
   return (
     <Modal title={title} onClose={busy ? () => {} : onClose}>
+      <div className="sample-reception-modal">
       {isFromLine && line && step !== 'done' && (
         <p className="text-muted sample-reception-intro">
           BC {line.bon_commande?.numero ?? '—'} · {line.chantier?.name ?? '—'} · {line.dossier?.reference ?? '—'}
@@ -489,6 +490,7 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
           </div>
         </div>
       )}
+      </div>
     </Modal>
   )
 }

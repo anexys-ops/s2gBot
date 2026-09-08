@@ -80,7 +80,7 @@ class OrdreMissionLigne extends Model
      */
     public function ensureTaskExists(): MissionTask
     {
-        return $this->missionTasks()->firstOrCreate(
+        $task = $this->missionTasks()->firstOrCreate(
             ['ordre_mission_ligne_id' => $this->id],
             [
                 'assigned_user_id' => $this->assigned_user_id,
@@ -88,5 +88,40 @@ class OrdreMissionLigne extends Model
                 'statut'           => MissionTask::STATUT_TODO,
             ]
         );
+
+        $updates = [];
+        if ($this->assigned_user_id !== null && $task->assigned_user_id !== $this->assigned_user_id) {
+            $updates['assigned_user_id'] = $this->assigned_user_id;
+        }
+        if ($this->date_prevue !== null) {
+            $planned = $this->date_prevue instanceof \DateTimeInterface
+                ? $this->date_prevue->format('Y-m-d')
+                : (string) $this->date_prevue;
+            if ($task->planned_date?->format('Y-m-d') !== $planned) {
+                $updates['planned_date'] = $planned;
+            }
+        }
+        if ($updates !== []) {
+            $task->update($updates);
+        }
+
+        return $task->fresh();
+    }
+
+    /** Crée les mission_tasks manquantes pour les lignes OdM terrain / ingénieur. */
+    public static function syncMissingMissionTasks(array $omTypes = ['technicien', 'ingenieur']): int
+    {
+        $created = 0;
+
+        static::query()
+            ->whereHas('ordreMission', fn ($q) => $q->whereIn('type', $omTypes))
+            ->whereDoesntHave('missionTasks')
+            ->orderBy('id')
+            ->each(function (self $ligne) use (&$created) {
+                $ligne->ensureTaskExists();
+                $created++;
+            });
+
+        return $created;
     }
 }

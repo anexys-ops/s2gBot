@@ -57,6 +57,13 @@ class OrdreMissionController extends Controller
 
     public function show(OrdreMission $ordreMission): JsonResponse
     {
+        if (in_array($ordreMission->type, ['technicien', 'ingenieur'], true)) {
+            OrdreMissionLigne::query()
+                ->where('ordre_mission_id', $ordreMission->id)
+                ->whereDoesntHave('missionTasks')
+                ->each(fn (OrdreMissionLigne $ligne) => $ligne->ensureTaskExists());
+        }
+
         return response()->json(
             $ordreMission->load(self::WITH)
         );
@@ -142,10 +149,8 @@ class OrdreMissionController extends Controller
         ]);
 
         $ligne->update($validated);
-
-        if (array_key_exists('assigned_user_id', $validated)) {
-            $ligne->ensureTaskExists();
-        }
+        $ligne->refresh();
+        $ligne->ensureTaskExists();
 
         return response()->json($ligne->fresh()->load(['assignedUser:id,name', 'equipment:id,name,code']));
     }

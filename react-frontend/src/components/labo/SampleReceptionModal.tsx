@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Modal from '../Modal'
 import {
@@ -263,13 +263,33 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
     [defaultTechnicienId, maxCount],
   )
 
+  const batchStateRef = useRef({ cancelledSlots, drafts, batchTotal })
+  batchStateRef.current = { cancelledSlots, drafts, batchTotal }
+
   const handleCountInputChange = (raw: string) => {
     setCountInput(raw.replace(/\D/g, ''))
   }
 
-  const commitCountInput = () => {
-    applyBatchCount(countInput || '1', cancelledSlots, drafts, batchTotal)
-  }
+  const commitCountInput = useCallback(
+    (raw = countInput) => {
+      const { cancelledSlots: prevCancelled, drafts: prevDrafts, batchTotal: prevBatchTotal } =
+        batchStateRef.current
+      applyBatchCount(raw || '1', prevCancelled, prevDrafts, prevBatchTotal)
+    },
+    [applyBatchCount, countInput],
+  )
+
+  useEffect(() => {
+    if (!isFromLine || !countInput) return
+    const parsed = parseCount(countInput, maxCount)
+    if (parsed === batchTotal) return
+
+    const timer = window.setTimeout(() => {
+      commitCountInput(countInput)
+    }, 350)
+
+    return () => window.clearTimeout(timer)
+  }, [batchTotal, commitCountInput, countInput, isFromLine, maxCount])
 
   const handleCountKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -396,7 +416,7 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
                   pattern="[0-9]*"
                   value={countInput}
                   onChange={(e) => handleCountInputChange(e.target.value)}
-                  onBlur={commitCountInput}
+                  onBlur={() => commitCountInput()}
                   onKeyDown={handleCountKeyDown}
                   aria-label="Nombre d'échantillons"
                 />

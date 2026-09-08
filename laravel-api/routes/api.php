@@ -346,6 +346,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── Tâches de mission ────────────────────────────────────────────────────
     Route::get('mission-tasks/labo', [MissionTaskController::class, 'laboBoard']);
+    Route::get('mission-tasks/terrain/history', [MissionTaskController::class, 'terrainHistory']);
     Route::get('mission-tasks/terrain', [MissionTaskController::class, 'terrainBoard']);
     Route::get('mission-tasks', [MissionTaskController::class, 'index']);
     Route::get('mission-tasks/{task}', [MissionTaskController::class, 'show']);

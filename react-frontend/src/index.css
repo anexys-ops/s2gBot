@@ -9254,7 +9254,7 @@ a.catalogue-tree__link-article:hover {
   flex-direction: column;
   gap: 0.75rem;
   flex: 1 1 auto;
-  min-height: 12rem;
+  min-height: 0;
   max-height: none;
   overflow-y: auto;
   padding-right: 0.35rem;
@@ -9263,6 +9263,7 @@ a.catalogue-tree__link-article:hover {
 }
 
 .sample-reception-card {
+  flex-shrink: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface-2);
@@ -9347,6 +9348,133 @@ a.catalogue-tree__link-article:hover {
   border-radius: var(--radius-sm);
   background: var(--color-surface-2);
   font-family: ui-monospace, monospace;
+  font-size: 0.88rem;
+}
+
+/* ── Tâches terrain — onglets & historique ──────────────────────────────── */
+.terrain-tasks-view-tabs,
+.terrain-history-panel__group-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+}
+
+.terrain-tasks-view-tab,
+.terrain-history-panel__group-tab {
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.75rem;
+  border-radius: calc(var(--radius-md) - 2px);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.terrain-tasks-view-tab.is-active,
+.terrain-history-panel__group-tab.is-active {
+  background: #fff;
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.terrain-history-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.terrain-history-panel__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.terrain-history-panel__summary {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.terrain-history-group {
+  padding: 0;
+  overflow: hidden;
+}
+
+.terrain-history-group__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-surface-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.terrain-history-group__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.terrain-history-group__count {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.terrain-history-row__toggle {
+  min-width: 2rem;
+  padding-inline: 0.45rem;
+}
+
+.terrain-history-detail td {
+  background: #fff;
+  border-top: none;
+}
+
+.terrain-history-detail__body {
+  padding: 0.75rem 1rem 1rem;
+}
+
+.terrain-history-detail__timeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.65rem 1rem;
+  margin: 0 0 0.75rem;
+}
+
+.terrain-history-detail__timeline div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.terrain-history-detail__timeline dt {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.terrain-history-detail__timeline dd {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.terrain-history-detail__measures h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.terrain-history-detail__notes {
+  margin: 0.65rem 0 0;
   font-size: 0.88rem;
 }
 

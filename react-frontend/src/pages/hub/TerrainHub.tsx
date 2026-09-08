@@ -23,6 +23,12 @@ const cards: Card[] = [
     icon: 'map',
   },
   {
+    to: '/terrain/taches',
+    title: 'Tâches terrain',
+    desc: 'Tâches en cours, mesures et historique synthétique par dossier ou par jour.',
+    icon: 'trend',
+  },
+  {
     to: '/terrain/planning',
     title: 'Planning techniciens',
     desc: 'Sorties, retours et temps sur chantier (calendrier — évolution).',

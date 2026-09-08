@@ -2,13 +2,14 @@
  * TerrainTasksPage
  *
  * Tableau de bord des tâches terrain (techniciens / ingénieurs).
- * Formulaires de mesures terrain, affectation, statuts.
+ * Formulaires de mesures terrain, affectation, statuts + historique synthétique.
  */
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { missionTasksApi, type ActionMeasureConfig, type MissionTask } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import TerrainTasksHistoryPanel, { type TerrainHistoryGroupMode } from './TerrainTasksHistoryPanel'
 
 const TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
   technicien: { label: 'Technicien', color: '#f59e0b', bg: '#fef3c7' },
@@ -84,7 +85,10 @@ function TerrainTaskCard({ task }: { task: MissionTask }) {
 
   const updateMut = useMutation({
     mutationFn: (body: Partial<MissionTask>) => missionTasksApi.update(task.id, body),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['terrain-tasks'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+      void qc.invalidateQueries({ queryKey: ['terrain-tasks-history'] })
+    },
   })
 
   const submitMeasures = useMutation({
@@ -99,6 +103,7 @@ function TerrainTaskCard({ task }: { task: MissionTask }) {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+      void qc.invalidateQueries({ queryKey: ['terrain-tasks-history'] })
       setExpanded(false)
     },
   })
@@ -118,7 +123,7 @@ function TerrainTaskCard({ task }: { task: MissionTask }) {
               </Link>
             )}
             {om?.client && <span className="text-muted" style={{ fontSize: '0.82rem' }}>{om.client.name}</span>}
-            {(om as any)?.site?.name && <span className="text-muted" style={{ fontSize: '0.82rem' }}>· {(om as any).site.name}</span>}
+            {om?.site?.name && <span className="text-muted" style={{ fontSize: '0.82rem' }}>· {om.site.name}</span>}
           </div>
           <div style={{ fontWeight: 600 }}>
             {article ? `${article.code} — ${article.libelle}` : '—'}
@@ -201,8 +206,16 @@ function TerrainTaskCard({ task }: { task: MissionTask }) {
 }
 
 export default function TerrainTasksPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const view = searchParams.get('vue') === 'historique' ? 'historique' : 'actives'
+
   const [typeFilter, setTypeFilter] = useState('')
   const [statutFilter, setStatutFilter] = useState('')
+  const [historyStatutFilter, setHistoryStatutFilter] = useState('')
+  const [historySearch, setHistorySearch] = useState('')
+  const [historyDateFrom, setHistoryDateFrom] = useState('')
+  const [historyDateTo, setHistoryDateTo] = useState('')
+  const [groupMode, setGroupMode] = useState<TerrainHistoryGroupMode>('day')
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['terrain-tasks', typeFilter, statutFilter],
@@ -211,38 +224,124 @@ export default function TerrainTasksPage() {
       statut: statutFilter || undefined,
     }),
     staleTime: 30_000,
+    enabled: view === 'actives',
   })
+
+  const setView = (next: 'actives' | 'historique') => {
+    if (next === 'historique') {
+      setSearchParams({ vue: 'historique' })
+    } else {
+      setSearchParams({})
+    }
+  }
 
   return (
     <ModuleEntityShell
       breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Terrain', to: '/terrain' }, { label: 'Tâches' }]}
       moduleBarLabel="Terrain — Tâches"
       title="Tâches terrain"
-      subtitle={`${tasks.length} tâche${tasks.length !== 1 ? 's' : ''}`}
+      subtitle={view === 'actives'
+        ? `${tasks.length} tâche${tasks.length !== 1 ? 's' : ''}`
+        : 'Vue synthétique — toutes les tâches terrain et ingénieur'}
       actions={
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={{ fontSize: '0.85rem' }}>
-            <option value="">— Tous types —</option>
-            {Object.entries(TYPE_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
-          <select value={statutFilter} onChange={(e) => setStatutFilter(e.target.value)} style={{ fontSize: '0.85rem' }}>
-            <option value="">— Tous statuts —</option>
-            {Object.entries(STATUT_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className="terrain-tasks-view-tabs" role="tablist" aria-label="Vue tâches terrain">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'actives'}
+              className={`terrain-tasks-view-tab${view === 'actives' ? ' is-active' : ''}`}
+              onClick={() => setView('actives')}
+            >
+              En cours
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'historique'}
+              className={`terrain-tasks-view-tab${view === 'historique' ? ' is-active' : ''}`}
+              onClick={() => setView('historique')}
+            >
+              Historique
+            </button>
+          </div>
+
+          {view === 'actives' && (
+            <>
+              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={{ fontSize: '0.85rem' }}>
+                <option value="">— Tous types —</option>
+                {Object.entries(TYPE_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+              <select value={statutFilter} onChange={(e) => setStatutFilter(e.target.value)} style={{ fontSize: '0.85rem' }}>
+                <option value="">— Tous statuts —</option>
+                {Object.entries(STATUT_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+            </>
+          )}
+
+          {view === 'historique' && (
+            <>
+              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={{ fontSize: '0.85rem' }}>
+                <option value="">— Tous types —</option>
+                {Object.entries(TYPE_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+              <select value={historyStatutFilter} onChange={(e) => setHistoryStatutFilter(e.target.value)} style={{ fontSize: '0.85rem' }}>
+                <option value="">— Tous statuts —</option>
+                {Object.entries(STATUT_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+              <input
+                type="search"
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                placeholder="Rechercher…"
+                style={{ fontSize: '0.85rem', minWidth: '10rem' }}
+              />
+              <input
+                type="date"
+                value={historyDateFrom}
+                onChange={(e) => setHistoryDateFrom(e.target.value)}
+                aria-label="Date début"
+                style={{ fontSize: '0.85rem' }}
+              />
+              <input
+                type="date"
+                value={historyDateTo}
+                onChange={(e) => setHistoryDateTo(e.target.value)}
+                aria-label="Date fin"
+                style={{ fontSize: '0.85rem' }}
+              />
+            </>
+          )}
         </div>
       }
     >
-      {isLoading && <p className="text-muted">Chargement…</p>}
+      {view === 'actives' && (
+        <>
+          {isLoading && <p className="text-muted">Chargement…</p>}
 
-      {!isLoading && tasks.length === 0 && (
-        <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
-          <p className="text-muted">Aucune tâche terrain.</p>
-        </div>
+          {!isLoading && tasks.length === 0 && (
+            <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
+              <p className="text-muted">Aucune tâche terrain.</p>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {tasks.map((task) => <TerrainTaskCard key={task.id} task={task} />)}
+          </div>
+        </>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        {tasks.map((task) => <TerrainTaskCard key={task.id} task={task} />)}
-      </div>
+      {view === 'historique' && (
+        <TerrainTasksHistoryPanel
+          typeFilter={typeFilter}
+          statutFilter={historyStatutFilter}
+          search={historySearch}
+          dateFrom={historyDateFrom}
+          dateTo={historyDateTo}
+          groupMode={groupMode}
+          onGroupModeChange={setGroupMode}
+        />
+      )}
     </ModuleEntityShell>
   )
 }

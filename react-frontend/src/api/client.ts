@@ -2925,6 +2925,7 @@ export interface OrdreMission {
   created_at?: string
   client?: { id: number; name: string } | null
   site?: { id: number; name: string } | null
+  dossier?: { id: number; reference: string; titre?: string | null } | null
   responsable?: { id: number; name: string } | null
   bonCommande?: { id: number; numero: string } | null
   lignes?: OrdreMissionLigne[]
@@ -3038,6 +3039,7 @@ export interface TaskMeasure {
   attachment_path?: string | null
   measure_config?: ActionMeasureConfig
   created_by?: number | null
+  created_at?: string | null
 }
 
 export interface TaskResult {
@@ -3055,6 +3057,7 @@ export interface TaskResult {
 
 export interface MissionTask {
   id: number
+  unique_number?: string
   ordre_mission_ligne_id: number
   assigned_user_id?: number | null
   statut: 'todo' | 'in_progress' | 'done' | 'validated' | 'rejected'
@@ -3088,6 +3091,18 @@ export const missionTasksApi = {
   terrainBoard: (params?: { user_id?: number; type?: string; statut?: string }) => {
     const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
     return api<MissionTask[]>(`/mission-tasks/terrain${s ? `?${s}` : ''}`)
+  },
+  terrainHistory: (params?: {
+    user_id?: number
+    type?: string
+    statut?: string
+    dossier_id?: number
+    date_from?: string
+    date_to?: string
+    search?: string
+  }) => {
+    const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString() : ''
+    return api<MissionTask[]>(`/mission-tasks/terrain/history${s ? `?${s}` : ''}`)
   },
   get: (id: number) => api<MissionTask>(`/mission-tasks/${id}`),
   update: (id: number, body: Partial<MissionTask>) =>

@@ -7,7 +7,7 @@ import PageBackNav from '../components/PageBackNav'
 import DocumentPdfTemplateCreateModal from '../components/pdf/DocumentPdfTemplateCreateModal'
 import { DOCUMENT_PDF_TYPE_LABELS, documentPdfTypeLabel } from '../lib/documentPdfTypes'
 
-const TYPE_ORDER = ['quote', 'invoice', 'purchase_order', 'delivery_note', 'report']
+const TYPE_ORDER = ['quote', 'invoice', 'purchase_order', 'delivery_note', 'expense_report', 'report']
 
 export default function DocumentPdfTemplates() {
   const { user } = useAuth()

@@ -5,25 +5,21 @@ import { useMemo, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  adminUsersApi,
   expenseReportsApi,
-  EXPENSE_CATEGORIES,
   EXPENSE_PAYMENT_METHOD_LABELS,
-  EXPENSE_PAYMENT_METHODS,
   EXPENSE_STATUT_LABELS,
   EXPENSE_STATUT_OPTIONS,
-  EXPENSE_TRANSPORT_TYPES,
   isExpenseDeplacementLine,
   type ExpenseLine,
   type ExpensePaymentMethod,
   type ExpenseReport,
-  type ExpenseCategory,
   type ExpenseReportStatut,
-  type ExpenseTransportType,
 } from '../../api/client'
 import ListTableToolbar, { PaginationBar } from '../../components/ListTableToolbar'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
-import { useAuth } from '../../contexts/AuthContext'
+import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
+import ExpenseLineModal from './ExpenseLineModal'
+import NdfSendEmailModal from './NdfSendEmailModal'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
 import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
@@ -35,10 +31,6 @@ const STATUT_COLORS: Record<ExpenseReportStatut, string> = {
   valide:    '#10b981',
   rembourse: '#8b5cf6',
   rejete:    '#ef4444',
-}
-
-function computeKmAmount(distanceKm: number, tauxKm: number): number {
-  return Math.round(Math.max(0, distanceKm) * Math.max(0, tauxKm) * 2 * 100) / 100
 }
 
 function paymentLabel(method?: ExpensePaymentMethod | null): string {
@@ -165,69 +157,19 @@ function StatutSelect({
   )
 }
 
-function EmailModal({
-  report,
-  onClose,
-}: {
-  report: ExpenseReport
-  onClose: () => void
-}) {
-  const { user } = useAuth()
-  const [to, setTo] = useState(user?.email ?? '')
-  const [subject, setSubject] = useState(`Note de frais ${report.unique_number}`)
-  const [body, setBody] = useState('')
-
-  const sendMut = useMutation({
-    mutationFn: () => expenseReportsApi.sendEmail(report.id, {
-      to,
-      subject,
-      body: body.trim() || undefined,
-    }),
-    onSuccess: onClose,
-  })
-
-  return (
-    <div className="ndf-email-modal-backdrop ndf-no-print" onClick={onClose} role="presentation">
-      <div className="ndf-email-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <h3>Envoyer la NDF par e-mail</h3>
-        <label>
-          Destinataire
-          <input type="email" value={to} onChange={(e) => setTo(e.target.value)} required />
-        </label>
-        <label>
-          Objet
-          <input value={subject} onChange={(e) => setSubject(e.target.value)} required />
-        </label>
-        <label>
-          Message (optionnel — récap auto si vide)
-          <textarea rows={5} value={body} onChange={(e) => setBody(e.target.value)} />
-        </label>
-        {sendMut.isError ? (
-          <p className="error" style={{ fontSize: '0.85rem' }}>{(sendMut.error as Error).message}</p>
-        ) : null}
-        <div className="crud-actions">
-          <button type="button" className="btn btn-primary btn-sm" disabled={sendMut.isPending || !to} onClick={() => sendMut.mutate()}>
-            {sendMut.isPending ? 'Envoi…' : 'Envoyer'}
-          </button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>Annuler</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function LineRow({
   line,
   reportId,
   canEdit,
   canValidate,
+  onEdit,
 }: {
   line: ExpenseLine
   reportId: number
   canEdit: boolean
   canValidate: boolean
+  onEdit: (line: ExpenseLine) => void
 }) {
-  const [editing, setEditing] = useState(false)
   const qc = useQueryClient()
 
   const deleteMut = useMutation({
@@ -251,16 +193,6 @@ function LineRow({
   })
 
   const fromOm = isExpenseDeplacementLine(line)
-
-  if (editing) {
-    return (
-      <LineForm
-        initial={line}
-        reportId={reportId}
-        onDone={() => setEditing(false)}
-      />
-    )
-  }
 
   return (
     <tr className={line.is_validated ? 'ndf-line-row--validated' : ''}>
@@ -308,7 +240,7 @@ function LineRow({
       {canEdit && (
         <td className="ndf-no-print">
           <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(true)}>✏️</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => onEdit(line)} title="Modifier">✏️</button>
             <button
               type="button"
               className="btn btn-secondary btn-sm btn-danger-outline"
@@ -318,220 +250,6 @@ function LineRow({
           </div>
         </td>
       )}
-    </tr>
-  )
-}
-
-function LineForm({
-  initial,
-  reportId,
-  onDone,
-}: {
-  initial?: Partial<ExpenseLine>
-  reportId: number
-  onDone: () => void
-}) {
-  const { user: authUser } = useAuth()
-  const qc = useQueryClient()
-  const isEdit = !!initial?.id
-  const isVoyage = (initial?.category ?? 'Repas') === 'Voyage' || initial?.distance_km != null
-
-  const { data: usersPage } = useQuery({
-    queryKey: ['admin-users', 'ndf-line'],
-    queryFn: () => adminUsersApi.list({ page: 1 }),
-    staleTime: 120_000,
-  })
-  const users = usersPage?.data ?? []
-
-  const [receiptFile, setReceiptFile] = useState<File | null>(null)
-  const [form, setForm] = useState({
-    user_id:        initial?.user_id ?? authUser?.id ?? 0,
-    category:       (initial?.category ?? 'Repas') as ExpenseCategory,
-    amount:         initial?.amount ?? 0,
-    payment_method: (initial?.payment_method ?? '') as ExpensePaymentMethod | '',
-    date:           initial?.date ?? new Date().toISOString().slice(0, 10),
-    description:    initial?.description ?? '',
-    lieu_depart:    initial?.lieu_depart ?? '',
-    lieu_arrivee:   initial?.lieu_arrivee ?? '',
-    distance_km:    initial?.distance_km ?? '',
-    taux_km:        initial?.taux_km ?? 0.401,
-    type_transport: (initial?.type_transport ?? 'voiture') as ExpenseTransportType,
-    useKmCalc:      isVoyage && initial?.distance_km != null,
-  })
-
-  const showKmFields = form.category === 'Voyage' && (
-    form.useKmCalc ||
-    isExpenseDeplacementLine({ category: initial?.category ?? 'Voyage', distance_km: initial?.distance_km })
-  )
-
-  const computedAmount = showKmFields && form.distance_km !== ''
-    ? computeKmAmount(Number(form.distance_km), Number(form.taux_km))
-    : form.amount
-
-  const mut = useMutation({
-    mutationFn: async () => {
-      const payload = {
-        user_id: form.user_id,
-        category: form.category,
-        amount: showKmFields ? computedAmount : form.amount,
-        payment_method: form.payment_method || undefined,
-        date: form.date,
-        description: form.description || undefined,
-        ...(showKmFields
-          ? {
-              lieu_depart: form.lieu_depart || undefined,
-              lieu_arrivee: form.lieu_arrivee || undefined,
-              distance_km: Number(form.distance_km) || 0,
-              taux_km: Number(form.taux_km) || 0.401,
-              type_transport: form.type_transport,
-            }
-          : {
-              lieu_depart: undefined,
-              lieu_arrivee: undefined,
-              distance_km: undefined,
-              taux_km: undefined,
-              type_transport: undefined,
-            }),
-      }
-
-      const line = isEdit
-        ? await expenseReportsApi.updateLine(reportId, initial!.id!, payload)
-        : await expenseReportsApi.addLine(reportId, payload)
-
-      if (receiptFile) {
-        await expenseReportsApi.uploadLineReceipt(reportId, line.id, receiptFile)
-      }
-
-      return line
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['expense-report', reportId] })
-      onDone()
-    },
-  })
-
-  const colSpan = 9
-
-  return (
-    <tr>
-      <td colSpan={colSpan}>
-        <div className="ndf-line-form">
-          <div className="quote-form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-            <label>
-              Date *
-              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
-            </label>
-            <label>
-              Catégorie *
-              <select
-                value={form.category}
-                onChange={(e) => {
-                  const category = e.target.value as ExpenseCategory
-                  setForm({ ...form, category, useKmCalc: category === 'Voyage' ? form.useKmCalc : false })
-                }}
-              >
-                {EXPENSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </label>
-            <label>
-              Personnel *
-              <select value={form.user_id} onChange={(e) => setForm({ ...form, user_id: Number(e.target.value) })}>
-                <option value={0}>— sélectionner —</option>
-                {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-            </label>
-            <label>
-              Mode de paiement
-              <select
-                value={form.payment_method}
-                onChange={(e) => setForm({ ...form, payment_method: e.target.value as ExpensePaymentMethod | '' })}
-              >
-                <option value="">— non renseigné —</option>
-                {EXPENSE_PAYMENT_METHODS.map((m) => (
-                  <option key={m} value={m}>{EXPENSE_PAYMENT_METHOD_LABELS[m]}</option>
-                ))}
-              </select>
-            </label>
-            {!showKmFields ? (
-              <label>
-                Montant TTC ({MONEY_UNIT_LABEL}) *
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.amount}
-                  onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
-                  required
-                />
-              </label>
-            ) : (
-              <label>
-                Montant calculé ({MONEY_UNIT_LABEL})
-                <input type="text" value={formatMoney(computedAmount)} readOnly disabled />
-              </label>
-            )}
-            <label style={{ gridColumn: 'span 3' }}>
-              Description
-              <textarea
-                className="ndf-desc-input"
-                rows={4}
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="Détail de la dépense, contexte, commentaires…"
-              />
-            </label>
-            <label>
-              Justificatif
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)} />
-              {initial?.receipt_filename && !receiptFile ? (
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Actuel : {initial.receipt_filename}</span>
-              ) : null}
-            </label>
-          </div>
-
-          {form.category === 'Voyage' && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', fontSize: '0.85rem' }}>
-              <input type="checkbox" checked={form.useKmCalc} onChange={(e) => setForm({ ...form, useKmCalc: e.target.checked })} />
-              Déplacement kilométrique (calcul auto A/R)
-            </label>
-          )}
-
-          {showKmFields && (
-            <div className="quote-form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginTop: '0.5rem' }}>
-              <label>Départ<input value={form.lieu_depart} onChange={(e) => setForm({ ...form, lieu_depart: e.target.value })} /></label>
-              <label>Arrivée<input value={form.lieu_arrivee} onChange={(e) => setForm({ ...form, lieu_arrivee: e.target.value })} /></label>
-              <label>
-                Distance (km) *
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  value={form.distance_km}
-                  onChange={(e) => setForm({ ...form, distance_km: e.target.value === '' ? '' : Number(e.target.value) })}
-                />
-              </label>
-              <label>
-                Taux km
-                <input type="number" step="0.001" min="0" value={form.taux_km} onChange={(e) => setForm({ ...form, taux_km: Number(e.target.value) })} />
-              </label>
-              <label>
-                Transport
-                <select value={form.type_transport} onChange={(e) => setForm({ ...form, type_transport: e.target.value as ExpenseTransportType })}>
-                  {EXPENSE_TRANSPORT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </label>
-            </div>
-          )}
-
-          <div className="crud-actions" style={{ marginTop: '0.75rem' }}>
-            <button type="button" className="btn btn-primary btn-sm" disabled={mut.isPending || !form.user_id} onClick={() => mut.mutate()}>
-              {mut.isPending ? '…' : isEdit ? 'Enregistrer' : 'Ajouter'}
-            </button>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={onDone}>Annuler</button>
-            {mut.isError ? <span className="error" style={{ fontSize: '0.82rem' }}>{(mut.error as Error).message}</span> : null}
-          </div>
-        </div>
-      </td>
     </tr>
   )
 }
@@ -586,11 +304,12 @@ function TotalHero({ total, advance }: { total: number; advance: number }) {
 }
 
 function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => void }) {
-  const [addingLine, setAddingLine] = useState(false)
+  const [lineModal, setLineModal] = useState<'new' | ExpenseLine | null>(null)
   const [notesDraft, setNotesDraft] = useState<string | null>(null)
   const [privateNotesDraft, setPrivateNotesDraft] = useState<string | null>(null)
   const [advanceDraft, setAdvanceDraft] = useState<number | null>(null)
   const [emailOpen, setEmailOpen] = useState(false)
+  const [pdfOpen, setPdfOpen] = useState(false)
   const qc = useQueryClient()
 
   const { data: report, isLoading } = useQuery({
@@ -666,7 +385,7 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
       actions={
         <div className="ndf-toolbar-actions ndf-no-print">
           <button type="button" className="btn btn-secondary btn-sm" onClick={onBack}>← Liste</button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.print()}>🖨 Imprimer</button>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPdfOpen(true)}>🖨 Imprimer PDF</button>
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEmailOpen(true)}>✉ Envoyer par mail</button>
         </div>
       }
@@ -783,10 +502,16 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
             </thead>
             <tbody>
               {lines.map((l) => (
-                <LineRow key={l.id} line={l} reportId={reportId} canEdit={canEdit} canValidate={canValidate} />
+                <LineRow
+                  key={l.id}
+                  line={l}
+                  reportId={reportId}
+                  canEdit={canEdit}
+                  canValidate={canValidate}
+                  onEdit={(line) => setLineModal(line)}
+                />
               ))}
-              {addingLine && <LineForm reportId={reportId} onDone={() => setAddingLine(false)} />}
-              {lines.length === 0 && !addingLine && (
+              {lines.length === 0 && (
                 <tr>
                   <td colSpan={colCount} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '1.5rem' }}>
                     Aucune ligne — ajoutez des dépenses ci-dessous
@@ -797,14 +522,32 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
           </table>
         </div>
 
-        {canEdit && !addingLine && (
-          <button type="button" className="btn btn-secondary btn-sm ndf-no-print" style={{ marginTop: '0.75rem' }} onClick={() => setAddingLine(true)}>
+        {canEdit && (
+          <button type="button" className="btn btn-secondary btn-sm ndf-no-print" style={{ marginTop: '0.75rem' }} onClick={() => setLineModal('new')}>
             + Ajouter une ligne
           </button>
         )}
       </div>
 
-      {emailOpen ? <EmailModal report={report} onClose={() => setEmailOpen(false)} /> : null}
+      {lineModal ? (
+        <ExpenseLineModal
+          reportId={reportId}
+          initial={lineModal === 'new' ? undefined : lineModal}
+          onClose={() => setLineModal(null)}
+          onSaved={() => setLineModal(null)}
+        />
+      ) : null}
+
+      {emailOpen ? <NdfSendEmailModal report={report} onClose={() => setEmailOpen(false)} /> : null}
+
+      {pdfOpen ? (
+        <DocumentPdfPickerModal
+          documentType="expense_report"
+          documentId={report.id}
+          documentLabel={report.unique_number}
+          onClose={() => setPdfOpen(false)}
+        />
+      ) : null}
     </ModuleEntityShell>
   )
 }
@@ -1003,7 +746,7 @@ export default function ExpenseReportsPage() {
                       )}
                       {visible.actions !== false && (
                         <td>
-                          <Link to={`/notes-de-frais/${r.id}`} className="btn btn-secondary btn-sm">Ouvrir</Link>
+                          <Link to={`/notes-de-frais/${r.id}`} className="btn btn-secondary btn-sm">Modifier</Link>
                         </td>
                       )}
                     </tr>

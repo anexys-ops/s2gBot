@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ExpenseLine;
 use App\Models\ExpenseReport;
 use App\Models\OrdreMission;
+use App\Mail\ExpenseReportEmailMailable;
 use App\Models\MailLog;
 use App\Services\ExpenseReportService;
 use Illuminate\Http\JsonResponse;
@@ -278,12 +279,13 @@ class ExpenseReportController extends Controller
         return response()->json($line->fresh()->load('user:id,name'));
     }
 
-    public function sendEmail(Request $request, ExpenseReport $expenseReport, ExpenseReportService $expenseReports): JsonResponse
+    public function sendEmail(Request $request, ExpenseReport $expenseReport): JsonResponse
     {
         $validated = $request->validate([
-            'to'      => 'required|email',
-            'subject' => 'required|string|max:255',
-            'body'    => 'nullable|string',
+            'recipient_email' => 'required|email',
+            'recipient_name'  => 'nullable|string|max:100',
+            'message'         => 'nullable|string|max:2000',
+            'pdf_template_id' => 'nullable|integer|exists:document_pdf_templates,id',
         ]);
 
         $mailer = (string) config('mail.default', 'log');
@@ -293,19 +295,26 @@ class ExpenseReportController extends Controller
             ], 503);
         }
 
-        $expenseReport->load(['ordreMission.client', 'ordreMission.dossier', 'ordreMission.site', 'lines.user', 'createdBy']);
-        $expenseReport->append('total');
+        $recipientEmail = trim((string) $validated['recipient_email']);
+        $recipientName = trim((string) ($validated['recipient_name'] ?? ''));
+        if ($recipientName === '') {
+            $recipientName = $recipientEmail;
+        }
 
-        $body = $validated['body'] ?? $expenseReports->buildEmailBody($expenseReport);
+        $expenseReport->load(['ordreMission.client', 'ordreMission.dossier', 'ordreMission.site', 'lines.user', 'createdBy']);
 
         try {
-            Mail::raw($body, function ($message) use ($validated) {
-                $message->to($validated['to'])->subject($validated['subject']);
-            });
+            Mail::to($recipientEmail)->send(new ExpenseReportEmailMailable(
+                $expenseReport,
+                $recipientName,
+                $validated['message'] ?? null,
+                $request->user()->name,
+                isset($validated['pdf_template_id']) ? (int) $validated['pdf_template_id'] : null,
+            ));
 
             MailLog::create([
-                'to'            => $validated['to'],
-                'subject'       => $validated['subject'],
+                'to'            => $recipientEmail,
+                'subject'       => "Note de frais {$expenseReport->unique_number}",
                 'template_name' => 'expense_report',
                 'status'        => 'sent',
                 'user_id'       => $request->user()->id,
@@ -313,8 +322,8 @@ class ExpenseReportController extends Controller
             ]);
         } catch (\Throwable $e) {
             MailLog::create([
-                'to'            => $validated['to'],
-                'subject'       => $validated['subject'],
+                'to'            => $recipientEmail,
+                'subject'       => "Note de frais {$expenseReport->unique_number}",
                 'template_name' => 'expense_report',
                 'status'        => 'failed',
                 'error_message' => $e->getMessage(),
@@ -325,7 +334,7 @@ class ExpenseReportController extends Controller
             return response()->json(['message' => 'Échec envoi : '.$e->getMessage()], 500);
         }
 
-        return response()->json(['message' => 'E-mail envoyé']);
+        return response()->json(['message' => 'E-mail envoyé avec le PDF en pièce jointe']);
     }
 
     private function ensureBrouillon(ExpenseReport $expenseReport): void

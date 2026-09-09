@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\BonCommande;
 use App\Models\BonLivraison;
 use App\Models\DocumentPdfTemplate;
+use App\Models\ExpenseReport;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Quote;
 use App\Services\BonCommandePdfGenerator;
 use App\Services\BonLivraisonPdfGenerator;
+use App\Services\ExpenseReportPdfGenerator;
 use App\Services\QuotePdfGenerator;
 use App\Services\ReportService;
 use App\Support\AppBranding;
@@ -30,6 +32,7 @@ class PdfController extends Controller
         'report',
         'purchase_order',
         'delivery_note',
+        'expense_report',
     ];
 
     public function __construct(
@@ -37,6 +40,7 @@ class PdfController extends Controller
         private QuotePdfGenerator $quotePdfGenerator,
         private BonCommandePdfGenerator $bonCommandePdfGenerator,
         private BonLivraisonPdfGenerator $bonLivraisonPdfGenerator,
+        private ExpenseReportPdfGenerator $expenseReportPdfGenerator,
     ) {}
 
     public function templates(Request $request): JsonResponse
@@ -105,6 +109,7 @@ class PdfController extends Controller
             'report' => $this->streamReportPdf($id, $templateId),
             'purchase_order' => $this->streamPurchaseOrderPdf($id, $templateId),
             'delivery_note' => $this->streamDeliveryNotePdf($id, $templateId),
+            'expense_report' => $this->streamExpenseReportPdf($id, $templateId),
             default => response()->json(['message' => 'Type PDF non pris en charge'], 422),
         };
     }
@@ -179,6 +184,21 @@ class PdfController extends Controller
         );
     }
 
+    private function streamExpenseReportPdf(int $id, ?int $templateId): StreamedResponse|JsonResponse
+    {
+        $report = ExpenseReport::find($id);
+        if (! $report) {
+            return response()->json(['message' => 'Note de frais introuvable'], 404);
+        }
+        [$pdfBytes, $filename] = $this->expenseReportPdfGenerator->generate($report, $templateId);
+
+        return response()->streamDownload(
+            fn () => print($pdfBytes),
+            $filename,
+            ['Content-Type' => 'application/pdf']
+        );
+    }
+
     /**
      * Génère le PDF facture (utilisé par POST /pdf/generate et par l’URL signée portail client).
      */
@@ -215,6 +235,7 @@ class PdfController extends Controller
             'report' => 'Rapport d\'essais',
             'purchase_order' => 'Bon de commande',
             'delivery_note' => 'Bon de livraison',
+            'expense_report' => 'Note de frais',
             default => $type,
         };
     }

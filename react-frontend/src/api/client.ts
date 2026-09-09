@@ -3481,7 +3481,12 @@ export const expenseReportsApi = {
   update: (id: number, body: Partial<Pick<ExpenseReport, 'statut' | 'notes' | 'private_notes' | 'advance_amount'>>) =>
     api<ExpenseReport>(`/expense-reports/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
 
-  sendEmail: (id: number, body: { to: string; subject: string; body?: string }) =>
+  sendEmail: (id: number, body: {
+    recipient_email: string
+    recipient_name?: string
+    message?: string
+    pdf_template_id?: number
+  }) =>
     api<{ message: string }>(`/expense-reports/${id}/send-email`, { method: 'POST', body: JSON.stringify(body) }),
 
   delete: (id: number) => api<void>(`/expense-reports/${id}`, { method: 'DELETE' }),

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\MissionTask;
+use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
 use App\Models\TaskMeasure;
 use App\Models\TaskResult;
@@ -245,6 +246,16 @@ class MissionTaskController extends Controller
         }
         if ($statut = $this->optionalQueryString($request, 'statut')) {
             $q->where('statut', $statut);
+        }
+        if ($request->boolean('active_only')) {
+            $q->whereHas('ordreMissionLigne.ordreMission', fn ($sq) => $sq->whereIn('statut', [
+                OrdreMission::STATUT_PLANIFIE,
+                OrdreMission::STATUT_EN_COURS,
+            ]))->whereNotIn('statut', [
+                MissionTask::STATUT_DONE,
+                MissionTask::STATUT_VALIDATED,
+                MissionTask::STATUT_REJECTED,
+            ]);
         }
 
         return response()->json($q->orderBy('planned_date')->get());

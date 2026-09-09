@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\ArticleAction;
+use App\Models\ArticleSectionProduct;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
 use App\Models\Catalogue\Article;
 use App\Models\Catalogue\FamilleArticle;
 use App\Models\Client;
 use App\Models\Dossier;
+use App\Models\JalonProduct;
 use App\Models\MissionTask;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
@@ -65,6 +67,128 @@ class OrdreMissionFromBonCommandeTest extends TestCase
         $this->actingAs($lab, 'sanctum')
             ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")
             ->assertStatus(422);
+    }
+
+    public function test_generate_from_jalon_bc_creates_one_task_per_sub_product(): void
+    {
+        $client = Client::query()->create(['name' => 'ODM Client jalon']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Chantier jalon']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-ODM-JAL',
+            'titre' => 'Dossier jalon',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_EN_COURS,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $famille = FamilleArticle::query()->create([
+            'code' => 'GEO_JAL',
+            'libelle' => 'Jalons',
+            'ordre' => 1,
+            'actif' => true,
+        ]);
+        $jalon = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
+            'code' => 'JAL-ODM-1',
+            'libelle' => 'Forfait essais',
+            'kind' => Article::KIND_JALON,
+            'actif' => true,
+            'prix_unitaire_ht' => 500,
+            'tva_rate' => 20,
+        ]);
+        $productA = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
+            'code' => 'PRD-ODM-A',
+            'libelle' => 'Prélèvement A',
+            'kind' => Article::KIND_PRODUCT,
+            'actif' => true,
+            'prix_unitaire_ht' => 100,
+            'tva_rate' => 20,
+        ]);
+        $productB = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
+            'code' => 'PRD-ODM-B',
+            'libelle' => 'Prélèvement B',
+            'kind' => Article::KIND_PRODUCT,
+            'actif' => true,
+            'prix_unitaire_ht' => 120,
+            'tva_rate' => 20,
+        ]);
+        JalonProduct::query()->create([
+            'jalon_article_id' => $jalon->id,
+            'product_article_id' => $productA->id,
+            'ordre' => 1,
+        ]);
+        JalonProduct::query()->create([
+            'jalon_article_id' => $jalon->id,
+            'product_article_id' => $productB->id,
+            'ordre' => 2,
+        ]);
+        ArticleSectionProduct::query()->create([
+            'ref_article_id' => $jalon->id,
+            'product_article_id' => $productA->id,
+            'section_type' => ArticleSectionProduct::SECTION_TECHNICIEN,
+            'ordre' => 1,
+        ]);
+        ArticleSectionProduct::query()->create([
+            'ref_article_id' => $jalon->id,
+            'product_article_id' => $productB->id,
+            'section_type' => ArticleSectionProduct::SECTION_TECHNICIEN,
+            'ordre' => 2,
+        ]);
+        $actionA = ArticleAction::query()->create([
+            'ref_article_id' => $productA->id,
+            'type' => ArticleAction::TYPE_TECHNICIEN,
+            'libelle' => 'Prélèvement terrain A',
+            'duree_heures' => 1,
+            'ordre' => 1,
+        ]);
+        $actionB = ArticleAction::query()->create([
+            'ref_article_id' => $productB->id,
+            'type' => ArticleAction::TYPE_TECHNICIEN,
+            'libelle' => 'Prélèvement terrain B',
+            'duree_heures' => 2,
+            'ordre' => 1,
+        ]);
+
+        $bc = BonCommande::query()->create([
+            'numero' => 'BCC-TEST-JAL',
+            'dossier_id' => $dossier->id,
+            'client_id' => $client->id,
+            'statut' => BonCommande::STATUT_EN_COURS,
+            'date_commande' => '2026-03-01',
+            'montant_ht' => 500,
+            'montant_ttc' => 600,
+            'tva_rate' => 20,
+            'created_by' => $lab->id,
+        ]);
+        BonCommandeLigne::query()->create([
+            'bon_commande_id' => $bc->id,
+            'ref_article_id' => $jalon->id,
+            'libelle' => $jalon->libelle,
+            'quantite' => 1,
+            'prix_unitaire_ht' => 500,
+            'tva_rate' => 20,
+            'montant_ht' => 500,
+        ]);
+
+        $res = $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission");
+
+        $res->assertCreated();
+        $res->assertJsonPath('0.type', OrdreMission::TYPE_TECHNICIEN);
+        $this->assertSame(2, OrdreMissionLigne::query()->count());
+        $this->assertSame(2, MissionTask::query()->count());
+        $this->assertDatabaseHas('ordre_mission_lignes', [
+            'ref_article_id' => $productA->id,
+            'article_action_id' => $actionA->id,
+        ]);
+        $this->assertDatabaseHas('ordre_mission_lignes', [
+            'ref_article_id' => $productB->id,
+            'article_action_id' => $actionB->id,
+        ]);
     }
 
     public function test_generate_from_bc_creates_technicien_om_for_libelle_only_line(): void

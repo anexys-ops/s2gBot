@@ -263,6 +263,7 @@ export default function TerrainTasksPage() {
     queryFn: () => missionTasksApi.terrainBoard({
       type: typeFilter || undefined,
       statut: statutFilter || undefined,
+      active_only: true,
     }),
     staleTime: 30_000,
     enabled: view === 'actives',
@@ -362,7 +363,14 @@ export default function TerrainTasksPage() {
 
           {!isLoading && tasks.length === 0 && (
             <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
-              <p className="text-muted">Aucune tâche terrain.</p>
+              <p className="text-muted">Aucune tâche terrain active.</p>
+              <p className="text-muted" style={{ marginTop: '0.5rem', fontSize: '0.88rem' }}>
+                Les tâches apparaissent ici pour les ordres de mission{' '}
+                <strong>technicien</strong> ou <strong>ingénieur</strong> au statut{' '}
+                <strong>planifié</strong> ou <strong>en cours</strong>, avec au moins une ligne de tâche.
+                {' '}Les OdM <strong>laboratoire</strong> sont visibles dans{' '}
+                <Link to="/labo/taches" className="link-inline">Labo → Tâches</Link>.
+              </p>
             </div>
           )}
 

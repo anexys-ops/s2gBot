@@ -8,9 +8,12 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { bonsCommandeApi, ordresMissionApi, type OrdreMission } from '../../api/client'
-import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import ClickableStatusBadge from '../../components/ds/ClickableStatusBadge'
 import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
+import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import StatusChangeModal from '../../components/StatusChangeModal'
 import { useAuth } from '../../contexts/AuthContext'
+import { ordreMissionBonCommande, ordreMissionQuote } from '../../lib/ordreMissionDisplay'
 
 const TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
   labo:       { label: 'Laboratoire', color: '#10b981', bg: '#d1fae5' },
@@ -28,6 +31,8 @@ const STATUT_META: Record<string, string> = {
 
 const STATUTS = ['brouillon', 'planifie', 'en_cours', 'termine', 'annule'] as const
 
+const statusOptions = STATUTS.map((value) => ({ value, label: STATUT_META[value] ?? value }))
+
 function TypeBadge({ type }: { type: string }) {
   const meta = TYPE_META[type] ?? { label: type, color: '#6b7280', bg: '#f3f4f6' }
   return (
@@ -40,8 +45,9 @@ function TypeBadge({ type }: { type: string }) {
 export default function OrdresMissionPage() {
   const qc = useQueryClient()
   const { user } = useAuth()
-  const isAdmin = user?.role === 'lab_admin'
+  const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const [searchParams] = useSearchParams()
+  const [statusModalOm, setStatusModalOm] = useState<{ id: number; numero: string; statut: string } | null>(null)
   const bcFilterFromUrl = searchParams.get('bon_commande_id')
   const [typeFilter, setTypeFilter] = useState('')
   const [statutFilter, setStatutFilter] = useState('')
@@ -103,9 +109,11 @@ export default function OrdresMissionPage() {
   const updateStatutMut = useMutation({
     mutationFn: ({ id, statut }: { id: number; statut: OrdreMission['statut'] }) =>
       ordresMissionApi.update(id, { statut }),
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
+      void qc.invalidateQueries({ queryKey: ['ordres-mission', vars.id] })
       void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+      setStatusModalOm(null)
     },
   })
 
@@ -191,12 +199,6 @@ export default function OrdresMissionPage() {
         </Link>
       </div>
 
-      {updateStatutMut.isError ? (
-        <p className="error" style={{ marginBottom: '0.75rem' }}>
-          {(updateStatutMut.error as Error).message}
-        </p>
-      ) : null}
-
       {isLoading && <p>Chargement…</p>}
       {!isLoading && (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -204,9 +206,10 @@ export default function OrdresMissionPage() {
             <table className="data-table data-table--compact">
               <thead>
                 <tr>
-                  <th className="data-table__code">Numéro</th>
+                  <th className="data-table__code">Numéro OdM</th>
                   <th>Type</th>
                   <th>Client</th>
+                  <th className="data-table__code">Devis</th>
                   <th className="data-table__code">BC</th>
                   <th>Statut</th>
                   <th>Date prévue</th>
@@ -215,34 +218,55 @@ export default function OrdresMissionPage() {
                 </tr>
               </thead>
               <tbody>
-                {ordres.map((om) => (
+                {ordres.map((om) => {
+                  const bc = ordreMissionBonCommande(om)
+                  const quote = ordreMissionQuote(om)
+                  const st = ordreMissionStatutBadgeProps(om.statut)
+                  return (
                   <tr key={om.id}>
                     <td className="data-table__code"><Link to={`/ordres-mission/${om.id}`} className="link-inline" style={{ fontWeight: 600 }}>{om.numero}</Link></td>
                     <td><TypeBadge type={om.type} /></td>
-                    <td>{om.client?.name ?? `#${om.client_id}`}</td>
-                    <td className="data-table__code">{om.bonCommande && <Link to={`/bons-commande/${om.bon_commande_id}`} className="link-inline">{om.bonCommande.numero}</Link>}</td>
                     <td>
-                      {isAdmin ? (
-                        <select
-                          className="om-list__statut-select"
-                          value={om.statut}
-                          disabled={updateStatutMut.isPending && updateStatutMut.variables?.id === om.id}
-                          onChange={(e) =>
-                            updateStatutMut.mutate({
-                              id: om.id,
-                              statut: e.target.value as OrdreMission['statut'],
-                            })
-                          }
-                          aria-label={`Statut de ${om.numero}`}
-                        >
-                          {STATUTS.map((s) => (
-                            <option key={s} value={s}>
-                              {STATUT_META[s] ?? s}
-                            </option>
-                          ))}
-                        </select>
+                      {om.client_id ? (
+                        <Link to={`/clients/${om.client_id}/fiche`} className="link-inline" onClick={(e) => e.stopPropagation()}>
+                          {om.client?.name ?? `#${om.client_id}`}
+                        </Link>
                       ) : (
-                        <StatusBadge {...ordreMissionStatutBadgeProps(om.statut)} size="sm" />
+                        '—'
+                      )}
+                    </td>
+                    <td className="data-table__code">
+                      {quote ? (
+                        <Link to={`/devis/${quote.id}/editer`} className="link-inline" onClick={(e) => e.stopPropagation()}>
+                          <code className="code-badge">{quote.number}</code>
+                        </Link>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                    <td className="data-table__code">
+                      {bc ? (
+                        <Link to={`/bons-commande/${bc.id}`} className="link-inline" onClick={(e) => e.stopPropagation()}>
+                          <code className="code-badge">{bc.numero}</code>
+                        </Link>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                    <td className="data-table__status">
+                      {isLab ? (
+                        <ClickableStatusBadge
+                          variant={st.variant}
+                          size="sm"
+                          ariaLabel={`Changer le statut de ${om.numero}`}
+                          onClick={() => setStatusModalOm({ id: om.id, numero: om.numero, statut: om.statut })}
+                        >
+                          {st.label}
+                        </ClickableStatusBadge>
+                      ) : (
+                        <StatusBadge variant={st.variant} size="sm">
+                          {st.label}
+                        </StatusBadge>
                       )}
                     </td>
                     <td>{om.date_prevue ? new Date(om.date_prevue).toLocaleDateString('fr-FR') : '—'}</td>
@@ -257,13 +281,27 @@ export default function OrdresMissionPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
           {ordres.length === 0 && <p style={{ padding: '1rem' }} className="text-muted">Aucun ordre de mission.</p>}
         </div>
       )}
+
+      {statusModalOm !== null ? (
+        <StatusChangeModal
+          title={`Statut — ${statusModalOm.numero}`}
+          initialValue={statusModalOm.statut}
+          options={statusOptions}
+          isPending={updateStatutMut.isPending}
+          error={updateStatutMut.isError ? (updateStatutMut.error as Error).message : null}
+          onClose={() => setStatusModalOm(null)}
+          onSave={(statut) =>
+            updateStatutMut.mutate({ id: statusModalOm.id, statut: statut as OrdreMission['statut'] })
+          }
+        />
+      ) : null}
     </ModuleEntityShell>
   )
 }

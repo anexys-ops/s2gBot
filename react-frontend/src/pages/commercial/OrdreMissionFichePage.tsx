@@ -10,10 +10,19 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminUsersApi, ordresMissionApi, type FraisDeplacement, type OrdreMission, type OrdreMissionLigne, type User } from '../../api/client'
-import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import ConfirmDialog from '../../components/ConfirmDialog'
+import OmLigneAddPanel from '../../components/ordres-mission/OmLigneAddPanel'
+import SaveButton from '../../components/ds/SaveButton'
 import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
-import { dateInputFromApi } from '../../lib/appLocale'
+import { useAuth } from '../../contexts/AuthContext'
+import { dateInputFromApi, formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import {
+  ordreMissionBonCommande,
+  ordreMissionDossier,
+  ordreMissionDossierId,
+  ordreMissionQuote,
+} from '../../lib/ordreMissionDisplay'
 
 const TYPE_META: Record<string, { label: string; color: string }> = {
   labo: { label: 'Laboratoire', color: '#10b981' },
@@ -69,7 +78,11 @@ function computeIsDirty(om: OrdreMission, omDraft: OmDraft, ligneDrafts: Record<
 export default function OrdreMissionFichePage() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
+  const { user } = useAuth()
+  const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const omId = Number(id)
+  const [showAddLigne, setShowAddLigne] = useState(false)
+  const [deleteLigneTarget, setDeleteLigneTarget] = useState<OrdreMissionLigne | null>(null)
 
   const { data: om, isLoading, error } = useQuery({
     queryKey: ['ordre-mission', omId],
@@ -185,6 +198,16 @@ export default function OrdreMissionFichePage() {
     },
   })
 
+  const deleteLigneMut = useMutation({
+    mutationFn: (ligneId: number) => ordresMissionApi.deleteLigne(omId, ligneId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
+      void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
+      void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+      setDeleteLigneTarget(null)
+    },
+  })
+
   if (isLoading || !omDraft) {
     return (
       <ModuleEntityShell
@@ -219,6 +242,10 @@ export default function OrdreMissionFichePage() {
   }
 
   const typeMeta = TYPE_META[om.type] ?? { label: om.type, color: '#6b7280' }
+  const bc = ordreMissionBonCommande(om)
+  const quote = ordreMissionQuote(om)
+  const dossier = ordreMissionDossier(om)
+  const dossierId = ordreMissionDossierId(om)
   const totalFrais = frais.reduce((s, f) => s + f.montant, 0)
   const expenseReportId = frais[0]?.expense_report_id
   const expenseReportNumber = frais[0]?.expense_report_number
@@ -266,14 +293,12 @@ export default function OrdreMissionFichePage() {
               ))}
             </select>
           </label>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={!isDirty || saveMut.isPending}
+          <SaveButton
+            isPending={saveMut.isPending}
+            isSuccess={saveMut.isSuccess}
+            isDirty={isDirty}
             onClick={() => saveMut.mutate()}
-          >
-            {saveMut.isPending ? 'Enregistrement…' : 'Enregistrer'}
-          </button>
+          />
           <button
             type="button"
             className="btn btn-secondary btn-sm"
@@ -291,32 +316,77 @@ export default function OrdreMissionFichePage() {
         </p>
       ) : null}
 
-      {/* Infos générales */}
-      <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
-        <div className="info-grid">
-          <div>
-            <span className="info-label">Client</span>
-            <span>{om.client?.name ?? `#${om.client_id}`}</span>
-          </div>
-          <div>
-            <span className="info-label">Bon de commande</span>
-            <span>
-              {om.bonCommande
-                ? <Link to={`/bons-commande/${om.bon_commande_id}`} className="link-inline">{om.bonCommande.numero}</Link>
-                : '—'}
+      <section className="card bc-fiche__summary om-fiche__summary" aria-label="Informations ordre de mission">
+        <div className="bc-fiche__summary-grid">
+          <div className="bc-fiche__summary-item">
+            <span className="bc-fiche__summary-label">Client</span>
+            <span className="bc-fiche__summary-value">
+              {om.client_id ? (
+                <Link to={`/clients/${om.client_id}/fiche`} className="link-inline">
+                  {om.client?.name ?? `#${om.client_id}`}
+                </Link>
+              ) : (
+                '—'
+              )}
             </span>
           </div>
-          <div>
-            <span className="info-label">Site</span>
-            <span>{om.site?.name ?? '—'}</span>
+          <div className="bc-fiche__summary-item">
+            <span className="bc-fiche__summary-label">Devis</span>
+            <span className="bc-fiche__summary-value">
+              {quote ? (
+                <Link to={`/devis/${quote.id}/editer`} className="link-inline">
+                  <code className="code-badge">{quote.number}</code>
+                </Link>
+              ) : (
+                '—'
+              )}
+            </span>
           </div>
-          <div>
-            <span className="info-label">Date prévue</span>
-            <span>{om.date_prevue ? new Date(om.date_prevue).toLocaleDateString('fr-FR') : '—'}</span>
+          <div className="bc-fiche__summary-item">
+            <span className="bc-fiche__summary-label">Bon de commande</span>
+            <span className="bc-fiche__summary-value">
+              {bc ? (
+                <Link to={`/bons-commande/${bc.id}`} className="link-inline">
+                  <code className="code-badge">{bc.numero}</code>
+                </Link>
+              ) : (
+                '—'
+              )}
+            </span>
           </div>
-          <div>
-            <span className="info-label">Responsable</span>
-            <span>
+          <div className="bc-fiche__summary-item">
+            <span className="bc-fiche__summary-label">Dossier</span>
+            <span className="bc-fiche__summary-value">
+              {dossierId ? (
+                <Link to={`/dossiers/${dossierId}`} className="link-inline">
+                  {dossier?.reference ?? dossier?.titre ?? `#${dossierId}`}
+                </Link>
+              ) : (
+                '—'
+              )}
+            </span>
+          </div>
+          <div className="bc-fiche__summary-item">
+            <span className="bc-fiche__summary-label">Site / chantier</span>
+            <span className="bc-fiche__summary-value">
+              {om.site_id ? (
+                <Link to={`/sites/${om.site_id}/fiche`} className="link-inline">
+                  {om.site?.name ?? `#${om.site_id}`}
+                </Link>
+              ) : (
+                '—'
+              )}
+            </span>
+          </div>
+          <div className="bc-fiche__summary-item">
+            <span className="bc-fiche__summary-label">Date prévue</span>
+            <span className="bc-fiche__summary-value">
+              {om.date_prevue ? formatAppDate(om.date_prevue) : '—'}
+            </span>
+          </div>
+          <div className="bc-fiche__summary-item">
+            <span className="bc-fiche__summary-label">Responsable</span>
+            <span className="bc-fiche__summary-value">
               <select
                 value={omDraft.responsable_id ?? ''}
                 onChange={(e) =>
@@ -327,22 +397,54 @@ export default function OrdreMissionFichePage() {
                   )
                 }
                 disabled={saveMut.isPending}
-                style={{ fontSize: '0.85rem' }}
+                className="om-fiche__inline-select"
               >
                 <option value="">— Non assigné —</option>
-                {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
               </select>
             </span>
           </div>
         </div>
-        {om.notes && <p style={{ marginTop: '0.5rem', color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>{om.notes}</p>}
-      </div>
+        {om.notes ? <p className="om-fiche__notes">{om.notes}</p> : null}
+      </section>
 
       {/* Lignes */}
       <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '1rem' }}>
-        <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--color-border)', fontWeight: 600 }}>
-          Tâches ({om.lignes?.length ?? 0})
+        <div
+          style={{
+            padding: '0.75rem 1rem',
+            borderBottom: '1px solid var(--color-border)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>Tâches ({om.lignes?.length ?? 0})</span>
+          {isLab ? (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowAddLigne((v) => !v)}>
+              {showAddLigne ? 'Fermer' : '+ Ajouter une tâche'}
+            </button>
+          ) : null}
         </div>
+        {showAddLigne && isLab ? (
+          <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
+            <OmLigneAddPanel
+              om={om}
+              onClose={() => setShowAddLigne(false)}
+              onCreated={() => {
+                void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
+                void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
+                void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+              }}
+            />
+          </div>
+        ) : null}
         <div className="table-wrap">
           <table className="data-table data-table--compact">
             <thead>
@@ -354,6 +456,7 @@ export default function OrdreMissionFichePage() {
                 {om.type === 'labo' && <th>Équipement</th>}
                 <th>Date prévue</th>
                 <th>Statut</th>
+                {isLab ? <th className="data-table__actions">Actions</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -366,7 +469,21 @@ export default function OrdreMissionFichePage() {
                       <div>{ligne.libelle}</div>
                       {ligne.articleAction && <small className="text-muted">{ligne.articleAction.duree_heures}h estimé</small>}
                     </td>
-                    <td>{ligne.article ? `${ligne.article.code} — ${ligne.article.libelle}` : '—'}</td>
+                    <td>
+                      {ligne.article ? (
+                        <Link to={`/catalogue/articles/${ligne.article.id}`} className="link-inline">
+                          <code className="code-badge">{ligne.article.code}</code>
+                          {' '}
+                          {ligne.article.libelle}
+                        </Link>
+                      ) : ligne.ref_article_id ? (
+                        <Link to={`/catalogue/articles/${ligne.ref_article_id}`} className="link-inline">
+                          Produit #{ligne.ref_article_id}
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                     <td>{ligne.quantite}</td>
                     <td>
                       <select
@@ -384,7 +501,15 @@ export default function OrdreMissionFichePage() {
                       </select>
                     </td>
                     {om.type === 'labo' && (
-                      <td>{ligne.equipment ? `${ligne.equipment.code ?? ''} ${ligne.equipment.name}` : '—'}</td>
+                      <td>
+                        {ligne.equipment ? (
+                          <Link to={`/materiel/equipements/${ligne.equipment.id}`} className="link-inline">
+                            {[ligne.equipment.code, ligne.equipment.name].filter(Boolean).join(' — ')}
+                          </Link>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                     )}
                     <td>
                       <input
@@ -409,6 +534,18 @@ export default function OrdreMissionFichePage() {
                         {STATUTS_LIGNE.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
                       </select>
                     </td>
+                    {isLab ? (
+                      <td className="data-table__actions">
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm btn-danger-outline"
+                          disabled={deleteLigneMut.isPending}
+                          onClick={() => setDeleteLigneTarget(ligne)}
+                        >
+                          Supprimer
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 )
               })}
@@ -524,6 +661,25 @@ export default function OrdreMissionFichePage() {
           )}
         </div>
       )}
+
+      {deleteLigneTarget ? (
+        <ConfirmDialog
+          title="Supprimer la tâche"
+          message={
+            <>
+              Supprimer la tâche <strong>{deleteLigneTarget.libelle}</strong> de cet ordre de mission ?
+            </>
+          }
+          confirmLabel="Supprimer"
+          variant="danger"
+          loading={deleteLigneMut.isPending}
+          error={deleteLigneMut.isError ? (deleteLigneMut.error as Error).message : null}
+          onConfirm={() => deleteLigneMut.mutate(deleteLigneTarget.id)}
+          onCancel={() => {
+            if (!deleteLigneMut.isPending) setDeleteLigneTarget(null)
+          }}
+        />
+      ) : null}
     </ModuleEntityShell>
   )
 }

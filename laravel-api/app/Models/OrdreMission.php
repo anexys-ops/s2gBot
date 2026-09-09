@@ -93,6 +93,27 @@ class OrdreMission extends Model
         return $this->hasMany(OrdreMissionLigne::class, 'ordre_mission_id')->orderBy('ordre');
     }
 
+    /** Crée les mission_tasks manquantes pour chaque ligne (labo / terrain / ingénieur). */
+    public function syncMissionTasksFromLignes(): int
+    {
+        if (! in_array($this->type, [self::TYPE_LABO, self::TYPE_TECHNICIEN, self::TYPE_INGENIEUR], true)) {
+            return 0;
+        }
+
+        $this->loadMissing('lignes');
+        $created = 0;
+
+        foreach ($this->lignes as $ligne) {
+            $hadTask = $ligne->missionTasks()->exists();
+            $ligne->ensureTaskExists();
+            if (! $hadTask) {
+                $created++;
+            }
+        }
+
+        return $created;
+    }
+
     public function expenseReports(): HasMany
     {
         return $this->hasMany(ExpenseReport::class, 'ordre_mission_id');

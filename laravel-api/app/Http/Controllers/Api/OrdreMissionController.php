@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ArticleAction;
 use App\Models\BonCommande;
+use App\Models\Catalogue\Article;
 use App\Models\ExpenseLine;
+use App\Models\MissionTask;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
 use App\Services\ExpenseReportService;
@@ -18,8 +21,11 @@ class OrdreMissionController extends Controller
     private const WITH = [
         'client:id,name',
         'site:id,name',
+        'dossier:id,reference,titre',
         'responsable:id,name',
-        'bonCommande:id,numero',
+        'bonCommande:id,numero,quote_id,dossier_id',
+        'bonCommande.quote:id,number',
+        'bonCommande.dossier:id,reference,titre',
         'lignes.assignedUser:id,name',
         'lignes.equipment:id,name,code',
         'lignes.articleAction',
@@ -33,7 +39,12 @@ class OrdreMissionController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $q = OrdreMission::with(['client:id,name', 'responsable:id,name', 'bonCommande:id,numero']);
+        $q = OrdreMission::with([
+            'client:id,name',
+            'responsable:id,name',
+            'bonCommande:id,numero,quote_id',
+            'bonCommande.quote:id,number',
+        ]);
 
         if ($type = $request->query('type')) {
             $q->where('type', $type);
@@ -106,7 +117,7 @@ class OrdreMissionController extends Controller
 
     public function update(Request $request, OrdreMission $ordreMission): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $request->user()->isLab()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -120,6 +131,7 @@ class OrdreMissionController extends Controller
         ]);
 
         $ordreMission->update($validated);
+        $ordreMission->syncMissionTasksFromLignes();
 
         return response()->json($ordreMission->fresh()->load(self::WITH));
     }
@@ -135,8 +147,78 @@ class OrdreMissionController extends Controller
         return response()->json(null, 204);
     }
 
+    public function storeLigne(Request $request, OrdreMission $ordreMission): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $validated = $request->validate([
+            'libelle' => 'required_without:ref_article_id|nullable|string|max:500',
+            'quantite' => 'nullable|numeric|min:0.001',
+            'ref_article_id' => 'nullable|exists:ref_articles,id',
+            'article_action_id' => 'nullable|exists:article_actions,id',
+            'assigned_user_id' => 'nullable|exists:users,id',
+            'date_prevue' => 'nullable|date',
+            'statut' => 'sometimes|in:a_faire,en_cours,realise,annule',
+        ]);
+
+        $libelle = trim((string) ($validated['libelle'] ?? ''));
+        $refArticleId = isset($validated['ref_article_id']) ? (int) $validated['ref_article_id'] : null;
+        $articleActionId = isset($validated['article_action_id']) ? (int) $validated['article_action_id'] : null;
+
+        if ($refArticleId) {
+            $article = Article::query()->findOrFail($refArticleId);
+            if ($libelle === '') {
+                $libelle = (string) $article->libelle;
+            }
+        }
+
+        if ($articleActionId) {
+            $action = ArticleAction::query()->findOrFail($articleActionId);
+            if ($refArticleId && (int) $action->ref_article_id !== $refArticleId) {
+                return response()->json(['message' => 'L’action catalogue ne correspond pas à l’article sélectionné.'], 422);
+            }
+            if ($action->type !== $this->actionTypeForOrdreMission($ordreMission->type)) {
+                return response()->json(['message' => 'Cette action catalogue n’est pas compatible avec le type d’OdM.'], 422);
+            }
+            $libelle = $action->libelle ?: $libelle;
+            $refArticleId ??= (int) $action->ref_article_id;
+        }
+
+        if ($libelle === '') {
+            return response()->json(['message' => 'Libellé ou article catalogue requis.'], 422);
+        }
+
+        $nextOrdre = ((int) $ordreMission->lignes()->max('ordre')) + 1;
+
+        $ligne = OrdreMissionLigne::query()->create([
+            'ordre_mission_id' => $ordreMission->id,
+            'bon_commande_ligne_id' => null,
+            'ref_article_id' => $refArticleId,
+            'article_action_id' => $articleActionId,
+            'libelle' => $libelle,
+            'quantite' => $validated['quantite'] ?? 1,
+            'statut' => $validated['statut'] ?? 'a_faire',
+            'assigned_user_id' => $validated['assigned_user_id'] ?? null,
+            'date_prevue' => $validated['date_prevue'] ?? null,
+            'ordre' => $nextOrdre,
+        ]);
+
+        $ligne->ensureTaskExists();
+
+        return response()->json(
+            $ligne->fresh()->load(['assignedUser:id,name', 'equipment:id,name,code', 'article:id,code,libelle', 'articleAction']),
+            201
+        );
+    }
+
     public function updateLigne(Request $request, OrdreMission $ordreMission, OrdreMissionLigne $ligne): JsonResponse
     {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
         abort_if($ligne->ordre_mission_id !== $ordreMission->id, 404);
 
         $validated = $request->validate([
@@ -154,6 +236,31 @@ class OrdreMissionController extends Controller
         $ligne->ensureTaskExists();
 
         return response()->json($ligne->fresh()->load(['assignedUser:id,name', 'equipment:id,name,code']));
+    }
+
+    public function destroyLigne(Request $request, OrdreMission $ordreMission, OrdreMissionLigne $ligne): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        abort_if($ligne->ordre_mission_id !== $ordreMission->id, 404);
+
+        $ligne->missionTasks()->each(function (MissionTask $task) {
+            $task->delete();
+        });
+        $ligne->delete();
+
+        return response()->json(null, 204);
+    }
+
+    private function actionTypeForOrdreMission(string $omType): string
+    {
+        return match ($omType) {
+            OrdreMission::TYPE_LABO => 'labo',
+            OrdreMission::TYPE_INGENIEUR => 'ingenieur',
+            default => 'technicien',
+        };
     }
 
     public function planning(Request $request): JsonResponse

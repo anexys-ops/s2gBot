@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ArticleAction;
+use App\Models\ArticleSectionProduct;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
 use App\Models\Catalogue\Article;
@@ -35,7 +36,8 @@ class OrdreMissionFromBonCommandeService
     {
         $bc->load([
             'lignes.article.actions',
-            'lignes.article.jalonProductLinks.jalon.actions',
+            'lignes.article.sectionProducts.productArticle.actions',
+            'lignes.article.jalonProductLinks.product.actions',
             'lignes.article.productJalonLinks.jalon.actions',
             'dossier',
         ]);
@@ -73,7 +75,7 @@ class OrdreMissionFromBonCommandeService
                     $omLigne = OrdreMissionLigne::query()->create([
                         'ordre_mission_id' => $om->id,
                         'bon_commande_ligne_id' => $ligne->id,
-                        'ref_article_id' => $ligne->ref_article_id,
+                        'ref_article_id' => $action?->ref_article_id ?? $ligne->ref_article_id,
                         'article_action_id' => $action?->id,
                         'libelle' => $action?->libelle ?? $ligne->libelle,
                         'quantite' => $ligne->quantite,
@@ -153,11 +155,7 @@ class OrdreMissionFromBonCommandeService
 
         if ($this->articleTriggersOm($article, $type)) {
             return collect([
-                new ArticleAction([
-                    'type' => $type,
-                    'libelle' => $article->libelle,
-                    'ordre' => 0,
-                ]),
+                $this->syntheticAction($article, $type),
             ]);
         }
 
@@ -174,31 +172,78 @@ class OrdreMissionFromBonCommandeService
                 }
                 if ($this->articleTriggersOm($jalon, $type)) {
                     return collect([
-                        new ArticleAction([
-                            'type' => $type,
-                            'libelle' => $jalon->libelle,
-                            'ordre' => 0,
-                        ]),
+                        $this->syntheticAction($jalon, $type),
                     ]);
                 }
             }
         }
 
         if ($article->isJalon()) {
-            foreach ($article->jalonProductLinks as $link) {
-                $product = $link->product;
-                if (! $product) {
-                    continue;
-                }
-                $product->loadMissing('actions');
-                $productActions = $product->actions->where('type', $type)->values();
-                if ($productActions->isNotEmpty()) {
-                    return $productActions;
+            return $this->collectProductActionsForJalon($article, $type);
+        }
+
+        return collect();
+    }
+
+    /**
+     * Une tâche OdM par sous-produit (section OdM ou produits rattachés au jalon).
+     *
+     * @return Collection<int, ArticleAction>
+     */
+    private function collectProductActionsForJalon(Article $jalon, string $type): Collection
+    {
+        $sectionType = match ($type) {
+            OrdreMission::TYPE_TECHNICIEN => ArticleSectionProduct::SECTION_TECHNICIEN,
+            OrdreMission::TYPE_LABO => ArticleSectionProduct::SECTION_LABO,
+            OrdreMission::TYPE_INGENIEUR => ArticleSectionProduct::SECTION_INGENIEUR,
+            default => null,
+        };
+
+        $products = collect();
+
+        if ($sectionType !== null) {
+            $jalon->loadMissing(['sectionProducts.productArticle.actions']);
+            foreach ($jalon->sectionProducts->where('section_type', $sectionType)->sortBy('ordre') as $row) {
+                if ($row->productArticle) {
+                    $products->push($row->productArticle);
                 }
             }
         }
 
-        return collect();
+        if ($products->isEmpty()) {
+            $jalon->loadMissing(['jalonProductLinks.product.actions']);
+            foreach ($jalon->jalonProductLinks as $link) {
+                if ($link->product) {
+                    $products->push($link->product);
+                }
+            }
+        }
+
+        $actions = collect();
+        foreach ($products->unique(fn (Article $product) => $product->id) as $product) {
+            $productActions = $product->actions->where('type', $type)->values();
+            if ($productActions->isNotEmpty()) {
+                $actions = $actions->merge($productActions);
+
+                continue;
+            }
+
+            if ($this->articleTriggersOm($product, $type)) {
+                $actions->push($this->syntheticAction($product, $type));
+            }
+        }
+
+        return $actions;
+    }
+
+    private function syntheticAction(Article $article, string $type): ArticleAction
+    {
+        return new ArticleAction([
+            'ref_article_id' => $article->id,
+            'type' => $type,
+            'libelle' => $article->libelle,
+            'ordre' => 0,
+        ]);
     }
 
     private function articleTriggersOm(Article $article, string $type): bool

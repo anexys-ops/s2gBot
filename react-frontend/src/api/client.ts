@@ -3035,7 +3035,15 @@ export interface OrdreMission {
   site?: { id: number; name: string } | null
   dossier?: { id: number; reference: string; titre?: string | null; date_debut?: string | null; date_fin_prevue?: string | null } | null
   responsable?: { id: number; name: string } | null
-  bonCommande?: { id: number; numero: string; dossier?: { id: number; reference: string; titre?: string | null } | null } | null
+  bonCommande?: {
+    id: number
+    numero: string
+    quote_id?: number | null
+    quote?: { id: number; number: string } | null
+    dossier?: { id: number; reference: string; titre?: string | null } | null
+  } | null
+  /** Sérialisation Laravel (snake_case) */
+  bon_commande?: OrdreMission['bonCommande']
   lignes?: OrdreMissionLigne[]
 }
 
@@ -3114,8 +3122,23 @@ export const ordresMissionApi = {
     api<void>(`/ordres-mission/${id}`, { method: 'DELETE' }),
   generateFromBC: (bcId: number) =>
     api<OrdreMission[]>(`/bons-commande/${bcId}/generate-ordres-mission`, { method: 'POST' }),
+  createLigne: (
+    omId: number,
+    body: {
+      libelle?: string
+      quantite?: number
+      ref_article_id?: number | null
+      article_action_id?: number | null
+      assigned_user_id?: number | null
+      date_prevue?: string | null
+      statut?: OrdreMissionLigne['statut']
+    },
+  ) =>
+    api<OrdreMissionLigne>(`/ordres-mission/${omId}/lignes`, { method: 'POST', body: JSON.stringify(body) }),
   updateLigne: (omId: number, ligneId: number, body: Partial<OrdreMissionLigne>) =>
     api<OrdreMissionLigne>(`/ordres-mission/${omId}/lignes/${ligneId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteLigne: (omId: number, ligneId: number) =>
+    api<void>(`/ordres-mission/${omId}/lignes/${ligneId}`, { method: 'DELETE' }),
   planning: (params?: { type?: string; from?: string; to?: string }) => {
     const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
     return api<OrdreMission[]>(`/ordres-mission/planning${s ? `?${s}` : ''}`)
@@ -3285,7 +3308,7 @@ export const missionTasksApi = {
     const rows = await api<MissionTaskApiRaw[]>(`/mission-tasks/labo${s ? `?${s}` : ''}`)
     return normalizeMissionTasks(rows)
   },
-  terrainBoard: async (params?: { user_id?: number; type?: string; statut?: string }) => {
+  terrainBoard: async (params?: { user_id?: number; type?: string; statut?: string; active_only?: boolean }) => {
     const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
     const rows = await api<MissionTaskApiRaw[]>(`/mission-tasks/terrain${s ? `?${s}` : ''}`)
     return normalizeMissionTasks(rows)

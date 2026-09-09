@@ -187,6 +187,11 @@ class OrdreMissionFromBonCommandeService
         }
 
         if ($article->isProduct()) {
+            $fromJalonSection = $this->collectActionsForProductViaJalonSections($article, $type);
+            if ($fromJalonSection->isNotEmpty()) {
+                return $fromJalonSection;
+            }
+
             foreach ($article->productJalonLinks as $link) {
                 $jalon = $link->jalon;
                 if (! $jalon) {
@@ -203,6 +208,60 @@ class OrdreMissionFromBonCommandeService
                     ]);
                 }
             }
+        }
+
+        return collect();
+    }
+
+    /**
+     * Ligne BC = produit (cas fréquent depuis devis) : respecter l'affectation section du jalon parent.
+     *
+     * @return Collection<int, ArticleAction>
+     */
+    private function collectActionsForProductViaJalonSections(Article $product, string $type): Collection
+    {
+        $sectionType = match ($type) {
+            OrdreMission::TYPE_TECHNICIEN => ArticleSectionProduct::SECTION_TECHNICIEN,
+            OrdreMission::TYPE_LABO => ArticleSectionProduct::SECTION_LABO,
+            OrdreMission::TYPE_INGENIEUR => ArticleSectionProduct::SECTION_INGENIEUR,
+            default => null,
+        };
+
+        if ($sectionType === null) {
+            return collect();
+        }
+
+        $product->loadMissing(['productJalonLinks.jalon.sectionProducts', 'actions']);
+
+        foreach ($product->productJalonLinks as $link) {
+            $jalon = $link->jalon;
+            if (! $jalon) {
+                continue;
+            }
+
+            $inSection = $jalon->sectionProducts->contains(
+                fn (ArticleSectionProduct $row) => $row->product_article_id === $product->id
+                    && $row->section_type === $sectionType
+            );
+
+            if (! $inSection) {
+                continue;
+            }
+
+            $productActions = $product->actions->where('type', $type)->values();
+            if ($productActions->isNotEmpty()) {
+                return $productActions;
+            }
+
+            if ($this->articleTriggersOm($product, $type)) {
+                return collect([
+                    $this->syntheticAction($product, $type),
+                ]);
+            }
+
+            return collect([
+                $this->syntheticAction($product, $type),
+            ]);
         }
 
         return collect();

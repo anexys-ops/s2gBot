@@ -289,6 +289,87 @@ class OrdreMissionFromBonCommandeTest extends TestCase
         ]);
     }
 
+    public function test_generate_from_product_bc_line_uses_jalon_labo_section(): void
+    {
+        $client = Client::query()->create(['name' => 'ODM Client product line']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Chantier product']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-ODM-PRD',
+            'titre' => 'Dossier product line',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_EN_COURS,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $famille = FamilleArticle::query()->create([
+            'code' => 'GEO_PRD',
+            'libelle' => 'Produits',
+            'ordre' => 1,
+            'actif' => true,
+        ]);
+        $jalon = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
+            'code' => 'JAL-PRD',
+            'libelle' => 'Forfait eau',
+            'kind' => Article::KIND_JALON,
+            'actif' => true,
+            'prix_unitaire_ht' => 500,
+            'tva_rate' => 20,
+        ]);
+        $product = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
+            'code' => 'PRD-BC-LINE',
+            'libelle' => 'Prélèvement eau BC ligne produit',
+            'kind' => Article::KIND_PRODUCT,
+            'actif' => true,
+            'prix_unitaire_ht' => 100,
+            'tva_rate' => 20,
+        ]);
+        JalonProduct::query()->create([
+            'jalon_article_id' => $jalon->id,
+            'product_article_id' => $product->id,
+            'ordre' => 1,
+        ]);
+        ArticleSectionProduct::query()->create([
+            'ref_article_id' => $jalon->id,
+            'product_article_id' => $product->id,
+            'section_type' => ArticleSectionProduct::SECTION_LABO,
+            'ordre' => 1,
+        ]);
+
+        $bc = BonCommande::query()->create([
+            'numero' => 'BCC-TEST-PRD',
+            'dossier_id' => $dossier->id,
+            'client_id' => $client->id,
+            'statut' => BonCommande::STATUT_CONFIRME,
+            'date_commande' => '2026-03-01',
+            'montant_ht' => 100,
+            'montant_ttc' => 120,
+            'tva_rate' => 20,
+            'created_by' => $lab->id,
+        ]);
+        BonCommandeLigne::query()->create([
+            'bon_commande_id' => $bc->id,
+            'ref_article_id' => $product->id,
+            'libelle' => $product->libelle,
+            'quantite' => 1,
+            'prix_unitaire_ht' => 100,
+            'tva_rate' => 20,
+            'montant_ht' => 100,
+        ]);
+
+        $res = $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission");
+
+        $res->assertCreated();
+        $res->assertJsonPath('0.type', OrdreMission::TYPE_LABO);
+        $this->assertDatabaseHas('ordre_mission_lignes', [
+            'ref_article_id' => $product->id,
+        ]);
+    }
+
     public function test_generate_from_bc_creates_technicien_om_for_libelle_only_line(): void
     {
         $client = Client::query()->create(['name' => 'ODM Client libelle']);

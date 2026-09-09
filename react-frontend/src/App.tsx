@@ -94,7 +94,6 @@ import {
 } from './pages/back-office/BackOfficeMaterielRedirects'
 import PlanningTechniciensPage from './pages/terrain/PlanningTechniciensPage'
 import AgencesPage from './pages/config/AgencesPage'
-import TachesIngenieurPage from './pages/ingenierie/TachesIngenieurPage'
 import PlanningIngenieurPage from './pages/ingenierie/PlanningIngenieurPage'
 import LaboReceptionPage from './pages/labo/LaboReceptionPage'
 import PlanningLaboPage from './pages/labo/PlanningLaboPage'
@@ -274,7 +273,7 @@ function AppRoutes() {
         <Route path="labo/planning" element={<PlanningLaboPage />} />
         <Route path="labo/transco" element={<TranscoFoldPage />} />
         <Route path="ingenierie/odm" element={<Navigate to="/ordres-mission?context=ingenierie&type=ingenieur" replace />} />
-        <Route path="ingenierie/taches" element={<TachesIngenieurPage />} />
+        <Route path="ingenierie/taches" element={<TerrainTasksPage entryContext="ingenieur" />} />
         <Route path="ingenierie/planning" element={<PlanningIngenieurPage />} />
         <Route path="terrain/taches" element={<TerrainTasksPage />} />
         <Route path="notes-de-frais" element={<ExpenseReportsPage />} />

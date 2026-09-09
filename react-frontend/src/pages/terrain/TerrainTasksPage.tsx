@@ -4,7 +4,7 @@
  * Tableau de bord des tâches terrain (techniciens / ingénieurs).
  * Formulaires de mesures terrain, affectation, statuts + historique synthétique.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { missionTasksApi, type ActionMeasureConfig, type MissionTask } from '../../api/client'
@@ -246,11 +246,27 @@ function TerrainTaskRow({ task }: { task: MissionTask }) {
   )
 }
 
-export default function TerrainTasksPage() {
+type TerrainTasksEntryContext = 'terrain' | 'ingenieur'
+
+type TerrainTasksPageProps = {
+  entryContext?: TerrainTasksEntryContext
+}
+
+function defaultTypeForContext(context: TerrainTasksEntryContext, typeFromUrl: string | null): string {
+  if (typeFromUrl === 'technicien' || typeFromUrl === 'ingenieur') return typeFromUrl
+  return context === 'ingenieur' ? 'ingenieur' : 'technicien'
+}
+
+export default function TerrainTasksPage({ entryContext = 'terrain' }: TerrainTasksPageProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const view = searchParams.get('vue') === 'historique' ? 'historique' : 'actives'
+  const typeFromUrl = searchParams.get('type')
 
-  const [typeFilter, setTypeFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState(() => defaultTypeForContext(entryContext, typeFromUrl))
+
+  useEffect(() => {
+    setTypeFilter(defaultTypeForContext(entryContext, typeFromUrl))
+  }, [entryContext, typeFromUrl])
   const [statutFilter, setStatutFilter] = useState('')
   const [historyStatutFilter, setHistoryStatutFilter] = useState('')
   const [historySearch, setHistorySearch] = useState('')
@@ -277,14 +293,54 @@ export default function TerrainTasksPage() {
     }
   }
 
+  const isIngenieurView = entryContext === 'ingenieur' || typeFilter === 'ingenieur'
+  const shellMeta = isIngenieurView
+    ? {
+        breadcrumbs: [
+          { label: 'Accueil', to: '/' },
+          { label: 'Ingénierie', to: '/ingenierie/odm' },
+          { label: 'Tâches' },
+        ] as const,
+        moduleBarLabel: 'Ingénierie — Tâches',
+        title: 'Tâches ingénieur',
+        emptyHint: (
+          <>
+            Les tâches apparaissent pour les ordres de mission <strong>ingénieur</strong> au statut{' '}
+            <strong>planifié</strong> ou <strong>en cours</strong>. Générez ou ouvrez un OdM depuis{' '}
+            <Link to="/ordres-mission?context=ingenierie&type=ingenieur" className="link-inline">
+              Ingénierie → Ordres de mission
+            </Link>
+            .
+          </>
+        ),
+      }
+    : {
+        breadcrumbs: [
+          { label: 'Accueil', to: '/' },
+          { label: 'Terrain', to: '/terrain' },
+          { label: 'Tâches' },
+        ] as const,
+        moduleBarLabel: 'Terrain — Tâches',
+        title: 'Tâches terrain',
+        emptyHint: (
+          <>
+            Les tâches apparaissent ici pour les ordres de mission <strong>technicien</strong> au statut{' '}
+            <strong>planifié</strong> ou <strong>en cours</strong>. Les tâches <strong>ingénieur</strong> sont dans{' '}
+            <Link to="/ingenierie/taches" className="link-inline">Ingénierie → Tâches</Link>
+            {' '}et le <strong>laboratoire</strong> dans{' '}
+            <Link to="/labo/taches" className="link-inline">Labo → Tâches</Link>.
+          </>
+        ),
+      }
+
   return (
     <ModuleEntityShell
-      breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Terrain', to: '/terrain' }, { label: 'Tâches' }]}
-      moduleBarLabel="Terrain — Tâches"
-      title="Tâches terrain"
+      breadcrumbs={[...shellMeta.breadcrumbs]}
+      moduleBarLabel={shellMeta.moduleBarLabel}
+      title={shellMeta.title}
       subtitle={view === 'actives'
         ? `${tasks.length} tâche${tasks.length !== 1 ? 's' : ''}`
-        : 'Vue synthétique — toutes les tâches terrain et ingénieur'}
+        : `Vue synthétique — tâches ${isIngenieurView ? 'ingénieur' : 'terrain'}`}
       actions={
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <div className="terrain-tasks-view-tabs" role="tablist" aria-label="Vue tâches terrain">
@@ -363,13 +419,9 @@ export default function TerrainTasksPage() {
 
           {!isLoading && tasks.length === 0 && (
             <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
-              <p className="text-muted">Aucune tâche terrain active.</p>
+              <p className="text-muted">Aucune tâche active.</p>
               <p className="text-muted" style={{ marginTop: '0.5rem', fontSize: '0.88rem' }}>
-                Les tâches apparaissent ici pour les ordres de mission{' '}
-                <strong>technicien</strong> ou <strong>ingénieur</strong> au statut{' '}
-                <strong>planifié</strong> ou <strong>en cours</strong>, avec au moins une ligne de tâche.
-                {' '}Les OdM <strong>laboratoire</strong> sont visibles dans{' '}
-                <Link to="/labo/taches" className="link-inline">Labo → Tâches</Link>.
+                {shellMeta.emptyHint}
               </p>
             </div>
           )}

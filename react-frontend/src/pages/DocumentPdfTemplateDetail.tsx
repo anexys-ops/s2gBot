@@ -27,13 +27,21 @@ export default function DocumentPdfTemplateDetail() {
   const template: DocumentPdfTemplateRow | undefined = listData?.data.find((t) => t.id === templateId)
 
   const [name, setName] = useState('')
+  const [bladeView, setBladeView] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [isDefault, setIsDefault] = useState(false)
   const [form, setForm] = useState<PdfLayoutConfigForm>(() => layoutConfigToForm({}))
 
+  const { data: templateOptions } = useQuery({
+    queryKey: ['document-pdf-templates', 'options'],
+    queryFn: () => documentPdfTemplatesApi.options(),
+    enabled: isAdmin,
+  })
+
   useEffect(() => {
     if (!template) return
     setName(template.name)
+    setBladeView(template.blade_view)
     setIsActive(template.is_active !== false)
     setIsDefault(template.is_default)
     setForm(layoutConfigToForm(template.layout_config))
@@ -47,11 +55,11 @@ export default function DocumentPdfTemplateDetail() {
           ? (template.layout_config ?? {})
           : {
               ...(template.layout_config ?? {}),
-              totals: formToLayoutConfigPayload(form).totals,
-              lines: formToLayoutConfigPayload(form).lines,
+              ...formToLayoutConfigPayload(form),
             }
       return documentPdfTemplatesApi.update(template.id, {
         name: name.trim() || template.name,
+        blade_view: bladeView || template.blade_view,
         is_active: isActive,
         is_default: isDefault,
         layout_config,
@@ -113,6 +121,17 @@ export default function DocumentPdfTemplateDetail() {
           <label htmlFor="tpl-name">Nom du modèle</label>
           <input id="tpl-name" className="input" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
+
+        {(templateOptions?.blade_views?.[template.document_type]?.length ?? 0) > 1 && (
+          <div className="form-group">
+            <label htmlFor="tpl-blade">Mise en page</label>
+            <select id="tpl-blade" value={bladeView} onChange={(e) => setBladeView(e.target.value)}>
+              {(templateOptions?.blade_views?.[template.document_type] ?? []).map((view) => (
+                <option key={view} value={view}>{view}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <label className="pdf-layout-editor__check">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />

@@ -16,14 +16,8 @@
     </style>
 </head>
 <body>
+@include('pdf.partials.commercial-layout-config', ['layoutConfig' => $layoutConfig ?? []])
 @php
-    $linesCfg = is_array($layoutConfig['lines'] ?? null) ? $layoutConfig['lines'] : [];
-    $showLinePrices = ($linesCfg['show_prices'] ?? true) !== false;
-    $showPuPtCols = $showLinePrices && (($linesCfg['show_pu_pt_columns'] ?? true) !== false);
-    $totalsCfg = is_array($layoutConfig['totals'] ?? null) ? $layoutConfig['totals'] : [];
-    $showTotalHt = ($totalsCfg['show_total_ht'] ?? true) !== false;
-    $showTotalTva = ($totalsCfg['show_total_tva'] ?? true) !== false;
-    $showTotalTtc = ($totalsCfg['show_total_ttc'] ?? true) !== false;
     $currencyLabel = $currencyLabel ?? 'DH';
 @endphp
     <div class="header">
@@ -40,7 +34,9 @@
         <p class="meta">Échéance : {{ $invoice->due_date->format('d/m/Y') }}</p>
         @endif
         <p class="meta">Statut : {{ $invoice->status }}</p>
+        @if($showClientName)
         <p class="meta">Client : {{ $invoice->client->name }}</p>
+        @endif
         @if($invoice->billingAddress ?? null)
         <p class="meta">Facturation : {{ $invoice->billingAddress->labelFormatted() }}</p>
         @elseif($invoice->client->address)<p class="meta">{{ $invoice->client->address }}</p>@endif
@@ -53,8 +49,12 @@
     <table>
         <thead>
             <tr>
+                @if($showDesignation || $showArticleCode)
                 <th>Désignation</th>
+                @endif
+                @if($showQuantity)
                 <th>Qté</th>
+                @endif
                 @if($showPuPtCols)
                 <th>Prix unitaire HT</th>
                 <th class="text-right">Total HT</th>
@@ -63,9 +63,19 @@
         </thead>
         <tbody>
             @foreach($invoice->invoiceLines as $line)
+            @php
+                $lineParts = [];
+                if ($showArticleCode && !empty($line->line_code)) { $lineParts[] = $line->line_code; }
+                if ($showDesignation && !empty($line->description)) { $lineParts[] = $line->description; }
+                $lineLabel = $lineParts !== [] ? implode(' — ', $lineParts) : '—';
+            @endphp
             <tr>
-                <td>{{ $line->description }}</td>
+                @if($showDesignation || $showArticleCode)
+                <td>{{ $lineLabel }}</td>
+                @endif
+                @if($showQuantity)
                 <td>{{ $line->quantity }}</td>
+                @endif
                 @if($showPuPtCols)
                 <td>{{ number_format($line->unit_price, 2, ',', ' ') }} {{ $currencyLabel }}</td>
                 <td class="text-right">{{ number_format($line->total, 2, ',', ' ') }} {{ $currencyLabel }}</td>

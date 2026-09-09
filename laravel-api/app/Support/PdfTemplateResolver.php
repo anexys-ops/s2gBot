@@ -47,4 +47,24 @@ class PdfTemplateResolver
     {
         return AppBranding::mergeLayoutConfig($template?->layout_config);
     }
+
+    /** @return list<string> */
+    public static function bladeViewsForType(string $documentType): array
+    {
+        return match ($documentType) {
+            'quote' => ['pdf.quote', 'pdf.quote_detailed'],
+            'invoice' => ['pdf.invoice', 'pdf.invoice_detailed'],
+            'report' => ['reports.order', 'pdf.examples.synthese', 'pdf.examples.granulometrie', 'pdf.examples.compression'],
+            'purchase_order' => ['pdf.purchase_order'],
+            'delivery_note' => ['pdf.delivery_note'],
+            default => [],
+        };
+    }
+
+    public static function defaultBladeView(string $documentType): string
+    {
+        $views = self::bladeViewsForType($documentType);
+
+        return $views[0] ?? 'pdf.quote';
+    }
 }

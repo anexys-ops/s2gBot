@@ -14,7 +14,7 @@ class BonCommandePdfGenerator
      */
     public function generate(BonCommande $bonCommande, ?int $requestTemplateId = null): array
     {
-        $bonCommande->loadMissing(['client', 'dossier', 'quote', 'lignes']);
+        $bonCommande->loadMissing(['client', 'dossier', 'quote', 'lignes.article']);
 
         $template = PdfTemplateResolver::resolve('purchase_order', $requestTemplateId, null);
         $layoutConfig = PdfTemplateResolver::layoutConfig($template);

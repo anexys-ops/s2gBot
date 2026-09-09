@@ -190,8 +190,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('access-groups', AccessGroupController::class);
     });
 
+    Route::get('clients/portal/catalog', [ClientController::class, 'portalCatalog']);
     Route::apiResource('clients', ClientController::class);
     Route::put('clients/{client}/lab-agencies', [ClientController::class, 'syncLabAgencies']);
+    Route::put('clients/{client}/portal-modules', [ClientController::class, 'syncPortalModules']);
     Route::get('clients/{client}/agencies', [AgencyController::class, 'index']);
     Route::post('clients/{client}/agencies', [AgencyController::class, 'store']);
     Route::get('agencies/{agency}', [AgencyController::class, 'show']);
@@ -313,7 +315,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('commercial-links', [CommercialDocumentLinkController::class, 'store']);
     Route::delete('commercial-links/{commercial_document_link}', [CommercialDocumentLinkController::class, 'destroy']);
 
+    Route::get('document-pdf-templates/options', [DocumentPdfTemplateController::class, 'options']);
     Route::get('document-pdf-templates', [DocumentPdfTemplateController::class, 'index']);
+    Route::post('document-pdf-templates', [DocumentPdfTemplateController::class, 'store']);
     Route::get('document-pdf-templates/{document_pdf_template}', [DocumentPdfTemplateController::class, 'show']);
     Route::put('document-pdf-templates/{document_pdf_template}', [DocumentPdfTemplateController::class, 'update']);
 

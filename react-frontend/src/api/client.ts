@@ -242,6 +242,13 @@ export const clientsApi = {
       method: 'PUT',
       body: JSON.stringify({ lab_agency_ids: labAgencyIds }),
     }),
+  portalCatalog: () =>
+    api<{ modules: { key: string; label: string }[]; defaults: string[] }>('/clients/portal/catalog'),
+  syncPortalModules: (id: number, portalModules: string[]) =>
+    api<{ portal_modules: string[] }>(`/clients/${id}/portal-modules`, {
+      method: 'PUT',
+      body: JSON.stringify({ portal_modules: portalModules }),
+    }),
   commercialOverview: (id: number) => api<ClientCommercialOverview>(`/clients/${id}/commercial-overview`),
 }
 
@@ -393,13 +400,26 @@ export const documentPdfTemplatesApi = {
       s ? `/document-pdf-templates?${s}` : '/document-pdf-templates',
     )
   },
+  options: () =>
+    api<{ document_types: string[]; blade_views: Record<string, string[]> }>('/document-pdf-templates/options'),
   get: (id: number) => api<DocumentPdfTemplateRow>(`/document-pdf-templates/${id}`),
+  create: (body: {
+    document_type: string
+    name: string
+    slug?: string
+    blade_view?: string
+    layout_config?: PdfLayoutConfig
+    is_default?: boolean
+    is_active?: boolean
+    clone_from_id?: number
+  }) => api<DocumentPdfTemplateRow>('/document-pdf-templates', { method: 'POST', body: JSON.stringify(body) }),
   update: (
     id: number,
     body: {
       is_default?: boolean
       is_active?: boolean
       name?: string
+      blade_view?: string
       layout_config?: PdfLayoutConfig
     },
   ) => api<DocumentPdfTemplateRow>(`/document-pdf-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
@@ -2099,6 +2119,12 @@ export type EntityMetaPayload = {
   }>
   /** Tarif forfaitaire lorsqu’il n’y a pas de lignes article (optionnel) */
   tarif_global_hors_lignes_ht?: number
+  /** Désignation de la ligne forfaitaire globale (PDF) */
+  tarif_global_designation?: string
+  /** Quantité forfait document */
+  tarif_global_quantity?: number
+  /** PU HT forfait document */
+  tarif_global_prix_unitaire_ht?: number
   /** Unité du montant forfaitaire global (PDF) */
   tarif_global_unite?: string
   /** Un booléen par ligne (même ordre) : ne pas afficher le prix sur le PDF */
@@ -2522,6 +2548,9 @@ export interface User {
   access_groups?: AccessGroupRow[]
   agencies?: AgencyRow[]
   effective_permissions?: string[]
+  /** Modules portail activés (rôles client / contact chantier). */
+  effective_portal_modules?: string[]
+  is_portal_user?: boolean
 }
 
 export interface RegisterBody {
@@ -2580,6 +2609,8 @@ export interface Client {
   contacts?: ClientContactRow[]
   /** Agences labo autorisées (vide = toutes). */
   visible_lab_agencies?: Pick<Agency, 'id' | 'name' | 'code' | 'is_siege'>[]
+  /** Modules portail client activés (vide = défaut dossiers + interventions + rapports). */
+  portal_modules?: string[] | null
 }
 
 export interface Site {
@@ -3450,6 +3481,7 @@ export type LabReport = {
   sections?: LabReportSection[]
   technician?: { id: number; name: string }
   validator?: { id: number; name: string }
+  dossier?: { id: number; reference: string; titre?: string | null }
   created_at: string
 }
 

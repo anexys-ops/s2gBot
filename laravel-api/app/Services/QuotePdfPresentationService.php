@@ -65,7 +65,7 @@ class QuotePdfPresentationService
                     }
                     $jalonForfait = $documentForfait || (($jalon['mode'] ?? '') === 'forfait');
                     $rows[] = $this->formatJalonHeaderRow($jalon, $jalonForfait && ! $documentForfait);
-                    if ($jalonForfait) {
+                    if ($jalonForfait && ! $documentForfait) {
                         $rows[] = $this->formatJalonForfaitRow($jalon);
                     }
                     foreach ($jalon['product_ref_article_ids'] ?? [] as $refId) {
@@ -96,7 +96,7 @@ class QuotePdfPresentationService
             foreach ($jalons as $jalon) {
                 $jalonForfait = $documentForfait || (($jalon['mode'] ?? '') === 'forfait');
                 $rows[] = $this->formatJalonHeaderRow($jalon, $jalonForfait && ! $documentForfait);
-                if ($jalonForfait) {
+                if ($jalonForfait && ! $documentForfait) {
                     $rows[] = $this->formatJalonForfaitRow($jalon);
                 }
                 foreach ($jalon['product_ref_article_ids'] ?? [] as $refId) {
@@ -121,20 +121,11 @@ class QuotePdfPresentationService
             $seenLineIds[$line->id] = true;
         }
 
-        if ($documentForfait && ($jalons === [] || ! is_array($jalons))) {
+        if ($documentForfait) {
             $forfaitHt = $this->resolveForfaitHt($quote, $meta, $lines);
-            $forfaitUnite = trim((string) ($meta['tarif_global_unite'] ?? ''));
-            if ($forfaitUnite === '') {
-                $forfaitUnite = 'F';
+            if ($forfaitHt > 0) {
+                array_unshift($rows, $this->formatDocumentForfaitRow($meta, $hideAllPrices, $forfaitHt));
             }
-            array_unshift($rows, [
-                'type' => 'forfait_total',
-                'label' => 'Prestation forfaitaire',
-                'unite' => $forfaitUnite,
-                'qte' => 1,
-                'pu' => $hideAllPrices ? null : $forfaitHt,
-                'pt' => $hideAllPrices ? null : $forfaitHt,
-            ]);
         }
 
         if ($hideAllPrices) {
@@ -307,6 +298,47 @@ class QuotePdfPresentationService
     }
 
     /**
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    private function formatDocumentForfaitRow(array $meta, bool $hidePrices, float $forfaitHt): array
+    {
+        $qty = (float) ($meta['tarif_global_quantity'] ?? 1);
+        if ($qty <= 0) {
+            $qty = 1;
+        } else {
+            $qty = max(1, round($qty));
+        }
+
+        $unite = trim((string) ($meta['tarif_global_unite'] ?? ''));
+        if ($unite === '') {
+            $unite = 'F';
+        }
+
+        $label = trim((string) ($meta['tarif_global_designation'] ?? ''));
+        if ($label === '') {
+            $label = 'Prestation forfaitaire';
+        }
+
+        if (array_key_exists('tarif_global_prix_unitaire_ht', $meta)) {
+            $pu = round(max(0, (float) $meta['tarif_global_prix_unitaire_ht']), 2);
+            $pt = round($forfaitHt, 2);
+        } else {
+            $pt = round($forfaitHt, 2);
+            $pu = $qty > 0 ? round($pt / $qty, 2) : $pt;
+        }
+
+        return [
+            'type' => 'forfait_total',
+            'label' => $label,
+            'unite' => $unite,
+            'qte' => (int) $qty,
+            'pu' => $hidePrices ? null : $pu,
+            'pt' => $hidePrices ? null : $pt,
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $jalon
      * @return array<string, mixed>
      */
@@ -402,10 +434,16 @@ class QuotePdfPresentationService
             $lineUnite = 'U';
         }
 
+        $articleCode = trim((string) ($line->line_code ?? ''));
+        if ($articleCode === '' && $article) {
+            $articleCode = trim((string) ($article->code ?? $article->s2g_code ?? ''));
+        }
+
         return [
             'type' => 'product',
             'nested' => $nested,
-            'num' => (string) $num,
+            'num' => '',
+            'code' => $articleCode !== '' ? $articleCode : null,
             'label' => trim((string) $line->description),
             'unite' => $isForfait ? '' : $lineUnite,
             'qte' => $isForfait ? null : (int) $line->quantity,

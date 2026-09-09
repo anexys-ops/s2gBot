@@ -187,10 +187,22 @@ class AppBranding
                 'show_total_tva' => true,
                 'show_total_ttc' => true,
             ],
-            /** Colonnes et montants des lignes (devis / factures). */
+            /** Colonnes et montants des lignes (devis / factures / BC / BL). */
             'lines' => [
                 'show_prices' => true,
                 'show_pu_pt_columns' => true,
+                'show_designation' => true,
+                'show_article_code' => true,
+                'show_quantity' => true,
+                'show_unit' => true,
+                'show_line_details' => true,
+            ],
+            /** Bloc en-tête (client, dossier, références liées). */
+            'meta' => [
+                'show_client_name' => true,
+                'show_dossier_reference' => true,
+                'show_linked_quote' => true,
+                'show_affaire' => true,
             ],
         ];
     }

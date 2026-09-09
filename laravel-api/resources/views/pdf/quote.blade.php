@@ -55,12 +55,15 @@
         Devis N°&nbsp;&nbsp;<span style="color:{{ $NAVY }};">{{ $quote->number }}</span>
     </div>
 
+    @include('pdf.partials.commercial-layout-config', ['layoutConfig' => $layoutConfig ?? []])
     <table style="width:100%;margin-bottom:14px;">
+        @if($showClientName)
         <tr>
             <td style="font-weight:bold;white-space:nowrap;padding:0 8px 5px 0;vertical-align:top;width:1%;">Client :</td>
             <td style="padding-bottom:5px;">{{ $quote->client->name }}</td>
         </tr>
-        @if(!empty($ctx['affaire']))
+        @endif
+        @if($showAffaire && !empty($ctx['affaire']))
         <tr>
             <td style="font-weight:bold;white-space:nowrap;padding:0 8px 5px 0;vertical-align:top;">Affaire :</td>
             <td style="padding-bottom:5px;">{{ $ctx['affaire'] }}</td>
@@ -74,25 +77,20 @@
 
     <table style="width:100%;margin-bottom:10px;">
         @php
-            $linesCfg = is_array($layoutConfig['lines'] ?? null) ? $layoutConfig['lines'] : [];
-            $showLinePrices = ($linesCfg['show_prices'] ?? true) !== false;
-            $showPuPtCols = $showLinePrices && (($linesCfg['show_pu_pt_columns'] ?? true) !== false);
-            $colCount = $showPuPtCols ? 5 : 3;
+            $colCount = 1 + ($showUnit ? 1 : 0) + ($showQuantity ? 1 : 0) + ($showPuPtCols ? 2 : 0);
+            if ($colCount < 1) { $colCount = 1; }
         @endphp
-        <colgroup>
-            <col style="width:{{ $showPuPtCols ? '48%' : '70%' }};"/>
-            <col style="width:6%;"/>
-            <col style="width:{{ $showPuPtCols ? '8%' : '24%' }};"/>
-            @if($showPuPtCols)
-            <col style="width:19%;"/>
-            <col style="width:19%;"/>
-            @endif
-        </colgroup>
         <thead>
             <tr>
+                @if($showDesignation || $showArticleCode)
                 <th style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $NAVY }};color:#fff;font-weight:bold;text-align:left;">DESIGNATION</th>
+                @endif
+                @if($showUnit)
                 <th style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $NAVY }};color:#fff;font-weight:bold;text-align:center;">Unité</th>
+                @endif
+                @if($showQuantity)
                 <th style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $NAVY }};color:#fff;font-weight:bold;text-align:center;">Quantité</th>
+                @endif
                 @if($showPuPtCols)
                 <th style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $NAVY }};color:#fff;font-weight:bold;text-align:center;">PU HT</th>
                 <th style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $NAVY }};color:#fff;font-weight:bold;text-align:center;">PT HT</th>
@@ -112,9 +110,15 @@
                         @endif
                     </tr>
                 @elseif(($row['type'] ?? '') === 'jalon_header')
+                    @php
+                        $jalonParts = [];
+                        if ($showArticleCode && !empty($row['code'])) { $jalonParts[] = $row['code']; }
+                        if ($showDesignation && !empty($row['label'])) { $jalonParts[] = $row['label']; }
+                        $jalonText = $jalonParts !== [] ? implode(' — ', $jalonParts) : '—';
+                    @endphp
                     <tr>
                         <td colspan="{{ $colCount }}" style="padding:5px 8px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;color:{{ $NAVY }};font-size:9.5pt;">
-                            @if(!empty($row['code'])){{ $row['code'] }} — @endif{{ $row['label'] }}
+                            {{ $jalonText }}
                         </td>
                     </tr>
                 @elseif(($row['type'] ?? '') === 'product')
@@ -125,12 +129,24 @@
                         $labelPad = $nested ? 'padding:4px 6px 4px 22px;' : 'padding:4px 6px;';
                         $detailPad = $nested ? 'padding:2px 6px 2px 28px;' : 'padding:2px 6px 2px 14px;';
                     @endphp
+                    @php
+                        $lineParts = [];
+                        if ($showArticleCode && !empty($row['code'])) { $lineParts[] = $row['code']; }
+                        if ($showDesignation && !empty($row['label'])) { $lineParts[] = $row['label']; }
+                        $lineLabel = $lineParts !== [] ? implode(' — ', $lineParts) : '—';
+                    @endphp
                     <tr>
-                        <td style="{{ $labelPad }}border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};">{{ $row['num'] }}. {{ $row['label'] }}</td>
+                        @if($showDesignation || $showArticleCode)
+                        <td style="{{ $labelPad }}border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};">{{ $lineLabel }}</td>
+                        @endif
+                        @if($showUnit)
                         <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:center;">{{ $row['unite'] ?? '' }}</td>
+                        @endif
+                        @if($showQuantity)
                         <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:center;">
                             @if($row['qte'] !== null && $row['qte'] !== ''){{ $row['qte'] }}@endif
                         </td>
+                        @endif
                         @if($showPuPtCols)
                         <td style="padding:4px 6px;border:1px solid {{ $BORDER }};background:{{ $rowBg }};font-weight:{{ $labelWeight }};text-align:right;white-space:nowrap;">
                             @if($row['pu'] !== null){{ $fmt($row['pu']) }}@endif
@@ -140,11 +156,13 @@
                         </td>
                         @endif
                     </tr>
+                    @if($showLineDetails)
                     @foreach($row['details'] ?? [] as $detail)
                     <tr>
                         <td colspan="{{ $colCount }}" style="{{ $detailPad }}border:1px solid #e0e0e0;font-size:8.5pt;color:#222;">- {{ $detail }}</td>
                     </tr>
                     @endforeach
+                    @endif
                 @endif
             @endforeach
         </tbody>
@@ -156,10 +174,6 @@
         $fraisSuppTtc = (float) ($ctx['frais_supplementaires_ttc'] ?? 0);
         $documentTtc = (float) $quote->amount_ttc;
         $totalTtc = (float) ($ctx['total_ttc'] ?? $documentTtc);
-        $totalsCfg = is_array($layoutConfig['totals'] ?? null) ? $layoutConfig['totals'] : [];
-        $showTotalHt = ($totalsCfg['show_total_ht'] ?? true) !== false;
-        $showTotalTva = ($totalsCfg['show_total_tva'] ?? true) !== false;
-        $showTotalTtc = ($totalsCfg['show_total_ttc'] ?? true) !== false;
         $showTotalsBox = $showTotalHt || $showTotalTva || $showTotalTtc;
         $amountCols = ($showTotalHt ? 1 : 0) + ($showTotalTva ? 1 : 0) + ($showTotalTtc ? 1 : 0);
         $fraisPadColspan = max(1, $amountCols - ($showTotalTtc ? 1 : 0));

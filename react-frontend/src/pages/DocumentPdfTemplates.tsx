@@ -1,17 +1,21 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { documentPdfTemplatesApi, type DocumentPdfTemplateRow } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import PageBackNav from '../components/PageBackNav'
+import DocumentPdfTemplateCreateModal from '../components/pdf/DocumentPdfTemplateCreateModal'
 import { DOCUMENT_PDF_TYPE_LABELS, documentPdfTypeLabel } from '../lib/documentPdfTypes'
 
 const TYPE_ORDER = ['quote', 'invoice', 'purchase_order', 'delivery_note', 'report']
 
 export default function DocumentPdfTemplates() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const isAdmin = user?.role === 'lab_admin'
   const queryClient = useQueryClient()
+  const [showCreate, setShowCreate] = useState(false)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['document-pdf-templates'],
@@ -56,11 +60,17 @@ export default function DocumentPdfTemplates() {
         extras={[{ to: '/terrain', label: 'Terrain' }, { to: '/labo', label: 'Laboratoire' }]}
       />
       <div className="card" style={{ marginBottom: '1rem', fontSize: '0.95rem' }}>
-        <p style={{ margin: 0 }}>
-          Configurez les <strong>modèles PDF</strong> par type de document. Ouvrez un modèle pour cocher les options
-          (TVA, prix, totaux…), le définir par défaut ou l&apos;activer / désactiver. À l&apos;impression ou à
-          l&apos;envoi par email, seuls les modèles actifs sont proposés.
-        </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <p style={{ margin: 0, flex: 1 }}>
+            Configurez les <strong>modèles PDF</strong> par type de document. Créez de nouveaux modèles, masquez prix,
+            TVA, désignations ou affichez les références article. À l&apos;impression, seuls les modèles actifs sont proposés.
+          </p>
+          {isAdmin && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+              + Nouveau modèle
+            </button>
+          )}
+        </div>
         <p style={{ margin: '0.75rem 0 0', fontSize: '0.88rem' }} className="text-muted">
           Types : {Object.values(DOCUMENT_PDF_TYPE_LABELS).join(' · ')}
         </p>
@@ -84,6 +94,18 @@ export default function DocumentPdfTemplates() {
       ) : null}
 
       {toggleActiveMut.isError && <p className="error">{(toggleActiveMut.error as Error).message}</p>}
+
+      {showCreate && (
+        <DocumentPdfTemplateCreateModal
+          templates={rows}
+          onClose={() => setShowCreate(false)}
+          onCreated={(template) => {
+            setShowCreate(false)
+            void queryClient.invalidateQueries({ queryKey: ['document-pdf-templates'] })
+            navigate(`/back-office/modeles-documents-pdf/${template.id}`)
+          }}
+        />
+      )}
     </div>
   )
 }

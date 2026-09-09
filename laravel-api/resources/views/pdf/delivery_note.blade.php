@@ -14,14 +14,8 @@
     </style>
 </head>
 <body>
+@include('pdf.partials.commercial-layout-config', ['layoutConfig' => $layoutConfig ?? []])
 @php
-    $linesCfg = is_array($layoutConfig['lines'] ?? null) ? $layoutConfig['lines'] : [];
-    $showLinePrices = ($linesCfg['show_prices'] ?? true) !== false;
-    $showPuPtCols = $showLinePrices && (($linesCfg['show_pu_pt_columns'] ?? true) !== false);
-    $totalsCfg = is_array($layoutConfig['totals'] ?? null) ? $layoutConfig['totals'] : [];
-    $showTotalHt = ($totalsCfg['show_total_ht'] ?? true) !== false;
-    $showTotalTva = ($totalsCfg['show_total_tva'] ?? true) !== false;
-    $showTotalTtc = ($totalsCfg['show_total_ttc'] ?? true) !== false;
     $currencyLabel = $currencyLabel ?? 'DH';
     $fmt = fn ($n) => number_format((float) $n, 2, ',', ' ');
     $bc = $bonLivraison->bonCommande;
@@ -29,7 +23,9 @@
     @include('pdf.partials.branding-header', ['layoutConfig' => $layoutConfig ?? [], 'brandingLogoDataUri' => $brandingLogoDataUri ?? null])
     <h1>Bon de livraison n° {{ $bonLivraison->numero }}</h1>
     <p class="meta">Date livraison : {{ $bonLivraison->date_livraison?->format('d/m/Y') ?? '—' }}</p>
+    @if($showClientName)
     <p class="meta">Client : {{ $bonLivraison->client?->name ?? '—' }}</p>
+    @endif
     @if($bc)
     <p class="meta">Bon de commande : {{ $bc->numero }}</p>
     @endif
@@ -37,8 +33,12 @@
     <table>
         <thead>
             <tr>
+                @if($showDesignation || $showArticleCode)
                 <th>Désignation</th>
+                @endif
+                @if($showQuantity)
                 <th>Qté livrée</th>
+                @endif
                 @if($showPuPtCols)
                 <th>PU HT</th>
                 <th class="text-right">Total HT</th>
@@ -47,10 +47,21 @@
         </thead>
         <tbody>
             @foreach($bonLivraison->lignes as $ligne)
-            @php $bcLigne = $ligne->bonCommandeLigne; @endphp
+            @php
+                $bcLigne = $ligne->bonCommandeLigne;
+                $articleCode = trim((string) ($bcLigne?->article?->code ?? $bcLigne?->article?->s2g_code ?? ''));
+                $lineParts = [];
+                if ($showArticleCode && $articleCode !== '') { $lineParts[] = $articleCode; }
+                if ($showDesignation && !empty($ligne->libelle)) { $lineParts[] = $ligne->libelle; }
+                $lineLabel = $lineParts !== [] ? implode(' — ', $lineParts) : '—';
+            @endphp
             <tr>
-                <td>{{ $ligne->libelle ?? '—' }}</td>
+                @if($showDesignation || $showArticleCode)
+                <td>{{ $lineLabel }}</td>
+                @endif
+                @if($showQuantity)
                 <td>{{ $ligne->quantite_livree ?? '—' }}</td>
+                @endif
                 @if($showPuPtCols)
                 <td>{{ $fmt($bcLigne?->prix_unitaire_ht ?? 0) }} {{ $currencyLabel }}</td>
                 <td class="text-right">{{ $fmt(($bcLigne?->prix_unitaire_ht ?? 0) * ($ligne->quantite_livree ?? 0)) }} {{ $currencyLabel }}</td>

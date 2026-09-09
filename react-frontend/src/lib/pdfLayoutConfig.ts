@@ -31,6 +31,18 @@ export interface PdfLayoutConfigForm {
   lines: {
     show_prices: boolean
     show_pu_pt_columns: boolean
+    show_designation: boolean
+    show_article_code: boolean
+    show_quantity: boolean
+    show_unit: boolean
+    show_line_details: boolean
+  }
+  /** En-tête document (client, dossier, références). */
+  meta: {
+    show_client_name: boolean
+    show_dossier_reference: boolean
+    show_linked_quote: boolean
+    show_affaire: boolean
   }
 }
 
@@ -45,6 +57,7 @@ export function layoutConfigToForm(raw: PdfLayoutConfig | undefined | null): Pdf
   const h = (r.header as Record<string, unknown> | undefined) ?? {}
   const t = (r.totals as Record<string, unknown> | undefined) ?? {}
   const l = (r.lines as Record<string, unknown> | undefined) ?? {}
+  const m = (r.meta as Record<string, unknown> | undefined) ?? {}
   const rawFields = r.extra_fields
   const fields: PdfLayoutExtraFieldRow[] = Array.isArray(rawFields)
     ? rawFields
@@ -77,6 +90,17 @@ export function layoutConfigToForm(raw: PdfLayoutConfig | undefined | null): Pdf
     lines: {
       show_prices: l.show_prices !== false,
       show_pu_pt_columns: l.show_pu_pt_columns !== false,
+      show_designation: l.show_designation !== false,
+      show_article_code: l.show_article_code !== false,
+      show_quantity: l.show_quantity !== false,
+      show_unit: l.show_unit !== false,
+      show_line_details: l.show_line_details !== false,
+    },
+    meta: {
+      show_client_name: m.show_client_name !== false,
+      show_dossier_reference: m.show_dossier_reference !== false,
+      show_linked_quote: m.show_linked_quote !== false,
+      show_affaire: m.show_affaire !== false,
     },
   }
 }
@@ -114,6 +138,17 @@ export function formToLayoutConfigPayload(form: PdfLayoutConfigForm): PdfLayoutC
     lines: {
       show_prices: form.lines.show_prices,
       show_pu_pt_columns: form.lines.show_pu_pt_columns,
+      show_designation: form.lines.show_designation,
+      show_article_code: form.lines.show_article_code,
+      show_quantity: form.lines.show_quantity,
+      show_unit: form.lines.show_unit,
+      show_line_details: form.lines.show_line_details,
+    },
+    meta: {
+      show_client_name: form.meta.show_client_name,
+      show_dossier_reference: form.meta.show_dossier_reference,
+      show_linked_quote: form.meta.show_linked_quote,
+      show_affaire: form.meta.show_affaire,
     },
   }
 }

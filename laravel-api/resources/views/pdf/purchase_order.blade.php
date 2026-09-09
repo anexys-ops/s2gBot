@@ -14,33 +14,33 @@
     </style>
 </head>
 <body>
+@include('pdf.partials.commercial-layout-config', ['layoutConfig' => $layoutConfig ?? []])
 @php
-    $linesCfg = is_array($layoutConfig['lines'] ?? null) ? $layoutConfig['lines'] : [];
-    $showLinePrices = ($linesCfg['show_prices'] ?? true) !== false;
-    $showPuPtCols = $showLinePrices && (($linesCfg['show_pu_pt_columns'] ?? true) !== false);
-    $totalsCfg = is_array($layoutConfig['totals'] ?? null) ? $layoutConfig['totals'] : [];
-    $showTotalHt = ($totalsCfg['show_total_ht'] ?? true) !== false;
-    $showTotalTva = ($totalsCfg['show_total_tva'] ?? true) !== false;
-    $showTotalTtc = ($totalsCfg['show_total_ttc'] ?? true) !== false;
     $currencyLabel = $currencyLabel ?? 'DH';
     $fmt = fn ($n) => number_format((float) $n, 2, ',', ' ');
 @endphp
     @include('pdf.partials.branding-header', ['layoutConfig' => $layoutConfig ?? [], 'brandingLogoDataUri' => $brandingLogoDataUri ?? null])
     <h1>Bon de commande n° {{ $bonCommande->numero }}</h1>
     <p class="meta">Date : {{ $bonCommande->date_commande?->format('d/m/Y') ?? '—' }}</p>
+    @if($showClientName)
     <p class="meta">Client : {{ $bonCommande->client?->name ?? '—' }}</p>
-    @if($bonCommande->dossier)
+    @endif
+    @if($showDossierReference && $bonCommande->dossier)
     <p class="meta">Dossier : {{ $bonCommande->dossier->reference ?? '' }} — {{ $bonCommande->dossier->titre ?? '' }}</p>
     @endif
-    @if($bonCommande->quote)
+    @if($showLinkedQuote && $bonCommande->quote)
     <p class="meta">Devis : {{ $bonCommande->quote->number }}</p>
     @endif
 
     <table>
         <thead>
             <tr>
+                @if($showDesignation || $showArticleCode)
                 <th>Désignation</th>
+                @endif
+                @if($showQuantity)
                 <th>Qté</th>
+                @endif
                 @if($showPuPtCols)
                 <th>PU HT</th>
                 <th class="text-right">Total HT</th>
@@ -49,9 +49,20 @@
         </thead>
         <tbody>
             @foreach($bonCommande->lignes as $ligne)
+            @php
+                $articleCode = trim((string) ($ligne->article?->code ?? $ligne->article?->s2g_code ?? ''));
+                $lineParts = [];
+                if ($showArticleCode && $articleCode !== '') { $lineParts[] = $articleCode; }
+                if ($showDesignation && !empty($ligne->libelle)) { $lineParts[] = $ligne->libelle; }
+                $lineLabel = $lineParts !== [] ? implode(' — ', $lineParts) : '—';
+            @endphp
             <tr>
-                <td>{{ $ligne->libelle ?? '—' }}</td>
+                @if($showDesignation || $showArticleCode)
+                <td>{{ $lineLabel }}</td>
+                @endif
+                @if($showQuantity)
                 <td>{{ $ligne->quantite }}</td>
+                @endif
                 @if($showPuPtCols)
                 <td>{{ $fmt($ligne->prix_unitaire_ht ?? 0) }} {{ $currencyLabel }}</td>
                 <td class="text-right">{{ $fmt($ligne->montant_ht ?? 0) }} {{ $currencyLabel }}</td>

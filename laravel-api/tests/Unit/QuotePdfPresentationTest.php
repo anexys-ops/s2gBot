@@ -443,4 +443,63 @@ class QuotePdfPresentationTest extends TestCase
         $this->assertStringStartsWith('%PDF', $binary);
         $this->assertSame('devis-DV-TEST-1.pdf', $filename);
     }
+
+    public function test_quote_pdf_generator_renders_forfait_ht_layout_template(): void
+    {
+        $client = Client::query()->create(['name' => 'Client forfait HT PDF']);
+        $template = \App\Models\DocumentPdfTemplate::query()->create([
+            'document_type' => 'quote',
+            'slug' => 'test-forfait-ht-'.uniqid(),
+            'name' => 'Test forfait HT',
+            'blade_view' => 'pdf.quote',
+            'is_default' => false,
+            'is_active' => true,
+            'layout_config' => [
+                'totals' => [
+                    'show_total_ht' => true,
+                    'show_total_tva' => false,
+                    'show_total_ttc' => false,
+                ],
+                'lines' => [
+                    'show_prices' => false,
+                    'show_pu_pt_columns' => false,
+                    'show_designation' => true,
+                    'show_article_code' => false,
+                    'show_quantity' => true,
+                    'show_unit' => true,
+                    'show_line_details' => true,
+                ],
+            ],
+        ]);
+
+        $quote = Quote::query()->create([
+            'client_id' => $client->id,
+            'number' => 'DV-FHT-'.uniqid(),
+            'quote_date' => '2026-09-09',
+            'amount_ht' => 7500,
+            'amount_ttc' => 9000,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_DRAFT,
+            'meta' => [
+                'mode_devis' => 'forfait',
+                'tarif_global_hors_lignes_ht' => 7500,
+                'tarif_global_designation' => 'Prestation forfaitaire',
+                'tarif_global_quantity' => 1,
+                'tarif_global_unite' => 'F',
+            ],
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $quote->id,
+            'description' => 'Ligne jalon',
+            'quantity' => 1,
+            'unit_price' => 0,
+            'total' => 0,
+        ]);
+
+        $generator = app(\App\Services\QuotePdfGenerator::class);
+        [$binary, $filename] = $generator->generate($quote->fresh(), $template->id);
+
+        $this->assertStringStartsWith('%PDF', $binary);
+        $this->assertStringStartsWith('devis-DV-FHT-', $filename);
+    }
 }

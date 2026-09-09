@@ -55,7 +55,7 @@
         Devis N°&nbsp;&nbsp;<span style="color:{{ $NAVY }};">{{ $quote->number }}</span>
     </div>
 
-    @include('pdf.partials.commercial-layout-config', ['layoutConfig' => $layoutConfig ?? []])
+    @php extract(\App\Support\AppBranding::commercialLayoutViewVars($layoutConfig ?? [])); @endphp
     <table style="width:100%;margin-bottom:14px;">
         @if($showClientName)
         <tr>
@@ -77,7 +77,7 @@
 
     <table style="width:100%;margin-bottom:10px;">
         @php
-            $colCount = 1 + ($showUnit ? 1 : 0) + ($showQuantity ? 1 : 0) + ($showPuPtCols ? 2 : 0);
+            $colCount = ($showDesignation || $showArticleCode ? 1 : 0) + ($showUnit ? 1 : 0) + ($showQuantity ? 1 : 0) + ($showPuPtCols ? 2 : 0);
             if ($colCount < 1) { $colCount = 1; }
         @endphp
         <thead>
@@ -101,9 +101,15 @@
             @foreach($rows as $row)
                 @if(($row['type'] ?? '') === 'forfait_total')
                     <tr>
+                        @if($showDesignation || $showArticleCode)
                         <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;">{{ $row['label'] }}</td>
+                        @endif
+                        @if($showUnit)
                         <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:center;">{{ $row['unite'] ?? 'F' }}</td>
+                        @endif
+                        @if($showQuantity)
                         <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:center;">{{ $row['qte'] ?? 1 }}</td>
+                        @endif
                         @if($showPuPtCols)
                         <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:right;white-space:nowrap;">@if($row['pu'] !== null){{ $fmt($row['pu']) }}@endif</td>
                         <td style="padding:5px 6px;border:1px solid {{ $BORDER }};background:{{ $LGRAY }};font-weight:bold;text-align:right;white-space:nowrap;">@if($row['pt'] !== null){{ $fmt($row['pt']) }}@endif</td>

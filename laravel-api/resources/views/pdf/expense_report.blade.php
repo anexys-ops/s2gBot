@@ -22,7 +22,7 @@
     </style>
 </head>
 <body>
-@include('pdf.partials.commercial-layout-config', ['layoutConfig' => $layoutConfig ?? []])
+@php extract(\App\Support\AppBranding::commercialLayoutViewVars($layoutConfig ?? [])); @endphp
 @php
     $fmt = fn ($n) => number_format((float) $n, 2, ',', ' ');
     $total = (float) ($report->total ?? $report->lines->sum('amount'));

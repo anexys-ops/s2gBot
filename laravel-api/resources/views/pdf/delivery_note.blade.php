@@ -14,7 +14,7 @@
     </style>
 </head>
 <body>
-@include('pdf.partials.commercial-layout-config', ['layoutConfig' => $layoutConfig ?? []])
+@php extract(\App\Support\AppBranding::commercialLayoutViewVars($layoutConfig ?? [])); @endphp
 @php
     $currencyLabel = $currencyLabel ?? 'DH';
     $fmt = fn ($n) => number_format((float) $n, 2, ',', ' ');

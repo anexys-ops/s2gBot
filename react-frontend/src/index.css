@@ -7374,6 +7374,46 @@ a.catalogue-tree__link-article:hover {
   min-width: 8.5rem;
 }
 
+.odm-type-sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.odm-type-sections__card {
+  flex: 1 1 150px;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: var(--odm-type-bg, #f8fafc);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.odm-type-sections__card:hover {
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+.odm-type-sections__card.is-active {
+  border-color: var(--odm-type-color, #64748b);
+}
+.odm-type-sections__count {
+  font-weight: 700;
+  color: var(--odm-type-color, #334155);
+  font-size: 1.4rem;
+  line-height: 1.1;
+}
+.odm-type-sections__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text, #0f172a);
+}
+.odm-type-sections__sub {
+  font-size: 0.75rem;
+  color: var(--color-muted, #64748b);
+  margin-top: 0.15rem;
+}
+
 .om-list__statut-select {
   font-size: 0.82rem;
   min-width: 7.5rem;

@@ -138,7 +138,7 @@ export default function AppNavigation() {
         items: filterItems([
           { to: '/terrain/chantiers', label: 'Chantiers et carte GPS' },
           { to: '/terrain/mesures', label: 'Mesures terrain' },
-          { to: '/ordres-mission', label: 'OdM Terrain' },
+          { to: '/ordres-mission?context=terrain&type=technicien', label: 'Ordres de mission' },
           { to: '/terrain/taches', label: 'Tâches terrain' },
           { to: '/terrain/planning', label: 'Planning terrain' },
           { to: '/notes-de-frais', label: 'Notes de frais' },
@@ -149,7 +149,7 @@ export default function AppNavigation() {
         label: 'Laboratoire',
         items: filterItems([
           { to: '/labo/reception', label: 'Réception (FOLD)' },
-          { to: '/labo/odm', label: 'OdM Laboratoire' },
+          { to: '/ordres-mission?context=labo&type=labo', label: 'Ordres de mission' },
           { to: '/labo/taches', label: 'Tâches en cours' },
           { to: '/labo/planning', label: 'Planning labo' },
           { to: '/labo/rapports', label: "Rapports d'essais" },
@@ -161,7 +161,7 @@ export default function AppNavigation() {
         id: 'ingenierie' as MenuGroupId,
         label: 'Ingénierie',
         items: filterItems([
-          { to: '/ingenierie/odm', label: 'OdM Ingénieur' },
+          { to: '/ordres-mission?context=ingenierie&type=ingenieur', label: 'Ordres de mission' },
           { to: '/ingenierie/taches', label: 'Tâches ingénieur' },
           { to: '/ingenierie/planning', label: 'Planning ingénieur' },
         ]),

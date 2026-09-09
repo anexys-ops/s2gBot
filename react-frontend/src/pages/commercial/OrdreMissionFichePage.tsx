@@ -242,6 +242,12 @@ export default function OrdreMissionFichePage() {
   }
 
   const typeMeta = TYPE_META[om.type] ?? { label: om.type, color: '#6b7280' }
+  const listBackTo =
+    om.type === 'labo'
+      ? '/ordres-mission?context=labo&type=labo'
+      : om.type === 'ingenieur'
+        ? '/ordres-mission?context=ingenierie&type=ingenieur'
+        : '/ordres-mission?context=terrain&type=technicien'
   const bc = ordreMissionBonCommande(om)
   const quote = ordreMissionQuote(om)
   const dossier = ordreMissionDossier(om)
@@ -256,10 +262,10 @@ export default function OrdreMissionFichePage() {
       shellClassName="module-shell--crm"
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'Ordres de mission', to: '/ordres-mission' },
+        { label: 'Ordres de mission', to: listBackTo },
         { label: om.numero },
       ]}
-      moduleBarLabel="Commercial — Ordre de mission"
+      moduleBarLabel="Ordre de mission"
       title={om.numero}
       subtitle={
         <div className="om-fiche__title-row">
@@ -272,7 +278,7 @@ export default function OrdreMissionFichePage() {
       }
       actions={
         <div className="crud-actions">
-          <Link to="/ordres-mission" className="btn btn-secondary btn-sm">
+          <Link to={listBackTo} className="btn btn-secondary btn-sm">
             ← Liste
           </Link>
           <label className="om-fiche__statut-select">

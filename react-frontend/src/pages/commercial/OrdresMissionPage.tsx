@@ -4,7 +4,7 @@
  * Tableau de bord des ordres de mission (labo / technicien / ingénieur).
  * Génération depuis un bon de commande.
  */
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { bonsCommandeApi, ordresMissionApi, type OrdreMission } from '../../api/client'
@@ -15,10 +15,25 @@ import StatusChangeModal from '../../components/StatusChangeModal'
 import { useAuth } from '../../contexts/AuthContext'
 import { ordreMissionBonCommande, ordreMissionQuote } from '../../lib/ordreMissionDisplay'
 
-const TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
-  labo:       { label: 'Laboratoire', color: '#10b981', bg: '#d1fae5' },
-  technicien: { label: 'Techniciens', color: '#f59e0b', bg: '#fef3c7' },
-  ingenieur:  { label: 'Ingénieurs',  color: '#3b82f6', bg: '#dbeafe' },
+const TYPE_ORDER = ['technicien', 'labo', 'ingenieur'] as const
+type OmType = (typeof TYPE_ORDER)[number]
+
+const TYPE_META: Record<OmType, { label: string; color: string; bg: string; short: string }> = {
+  technicien: { label: 'Techniciens (terrain)', color: '#f59e0b', bg: '#fef3c7', short: 'Terrain' },
+  labo:       { label: 'Laboratoire', color: '#10b981', bg: '#d1fae5', short: 'Labo' },
+  ingenieur:  { label: 'Ingénieurs', color: '#3b82f6', bg: '#dbeafe', short: 'Ingénierie' },
+}
+
+const CONTEXT_META: Record<string, { moduleBar: string; subtitle: string }> = {
+  terrain: { moduleBar: 'Terrain — Ordres de mission', subtitle: 'Techniciens, laboratoire et ingénierie pour un même devis / BC.' },
+  labo: { moduleBar: 'Laboratoire — Ordres de mission', subtitle: 'Techniciens, laboratoire et ingénierie pour un même devis / BC.' },
+  ingenierie: { moduleBar: 'Ingénierie — Ordres de mission', subtitle: 'Techniciens, laboratoire et ingénierie pour un même devis / BC.' },
+  default: { moduleBar: 'Ordres de mission', subtitle: 'Un OdM par type (terrain, labo, ingénieur) pour chaque bon de commande.' },
+}
+
+function parseOmType(value: string | null): OmType | '' {
+  if (value === 'technicien' || value === 'labo' || value === 'ingenieur') return value
+  return ''
 }
 
 const STATUT_META: Record<string, string> = {
@@ -34,7 +49,10 @@ const STATUTS = ['brouillon', 'planifie', 'en_cours', 'termine', 'annule'] as co
 const statusOptions = STATUTS.map((value) => ({ value, label: STATUT_META[value] ?? value }))
 
 function TypeBadge({ type }: { type: string }) {
-  const meta = TYPE_META[type] ?? { label: type, color: '#6b7280', bg: '#f3f4f6' }
+  const meta =
+    type in TYPE_META
+      ? TYPE_META[type as OmType]
+      : { label: type, color: '#6b7280', bg: '#f3f4f6', short: type }
   return (
     <span style={{ padding: '0.15rem 0.5rem', borderRadius: 12, fontSize: '0.78rem', fontWeight: 600, color: meta.color, background: meta.bg }}>
       {meta.label}
@@ -46,11 +64,29 @@ export default function OrdresMissionPage() {
   const qc = useQueryClient()
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [statusModalOm, setStatusModalOm] = useState<{ id: number; numero: string; statut: string } | null>(null)
   const bcFilterFromUrl = searchParams.get('bon_commande_id')
-  const [typeFilter, setTypeFilter] = useState('')
+  const contextFromUrl = searchParams.get('context') ?? 'default'
+  const typeFromUrl = parseOmType(searchParams.get('type'))
+  const [typeFilter, setTypeFilter] = useState<OmType | ''>(() => typeFromUrl)
   const [statutFilter, setStatutFilter] = useState('')
+
+  useEffect(() => {
+    setTypeFilter(typeFromUrl)
+  }, [typeFromUrl])
+
+  const contextMeta = CONTEXT_META[contextFromUrl] ?? CONTEXT_META.default
+
+  function setTypeFilterAndUrl(next: OmType | '') {
+    setTypeFilter(next)
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev)
+      if (next) params.set('type', next)
+      else params.delete('type')
+      return params
+    }, { replace: true })
+  }
   const [generateBcId, setGenerateBcId] = useState<number | ''>(() =>
     bcFilterFromUrl && Number.isFinite(Number(bcFilterFromUrl)) ? Number(bcFilterFromUrl) : '',
   )
@@ -117,21 +153,32 @@ export default function OrdresMissionPage() {
     },
   })
 
-  const stats = Object.keys(TYPE_META).map((type) => ({
+  const stats = TYPE_ORDER.map((type) => ({
     type,
     total: ordres.filter((o) => o.type === type).length,
     en_cours: ordres.filter((o) => o.type === type && o.statut === 'en_cours').length,
   }))
 
+  const displayedOrdres = useMemo(() => {
+    const list = typeFilter ? ordres.filter((o) => o.type === typeFilter) : ordres
+    return [...list].sort((a, b) => {
+      const bcA = ordreMissionBonCommande(a)?.numero ?? ''
+      const bcB = ordreMissionBonCommande(b)?.numero ?? ''
+      if (bcA !== bcB) return bcB.localeCompare(bcA, 'fr')
+      const typeIdx = (t: string) => TYPE_ORDER.indexOf(t as OmType)
+      return typeIdx(a.type) - typeIdx(b.type)
+    })
+  }, [ordres, typeFilter])
+
   return (
     <ModuleEntityShell
       breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Ordres de mission' }]}
-      moduleBarLabel="Commercial — Ordres de mission"
+      moduleBarLabel={contextMeta.moduleBar}
       title="Ordres de mission"
       subtitle={
         bcFilterFromUrl
-          ? `${ordres.length} ordre(s) pour le BC #${bcFilterFromUrl}`
-          : `${ordres.length} ordre(s) affiché(s)`
+          ? `${displayedOrdres.length} ordre(s) pour le BC #${bcFilterFromUrl} — ${contextMeta.subtitle}`
+          : `${displayedOrdres.length} ordre(s) affiché(s) — ${contextMeta.subtitle}`
       }
       actions={
         <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowGeneratePanel((v) => !v)}>
@@ -139,20 +186,25 @@ export default function OrdresMissionPage() {
         </button>
       }
     >
-      {/* Stats */}
-      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+      {/* 3 sections OdM (terrain / labo / ingénieur) — un OdM par type pour le même devis */}
+      <div className="odm-type-sections" role="tablist" aria-label="Types d'ordres de mission">
         {stats.map(({ type, total, en_cours }) => {
           const meta = TYPE_META[type]
+          const active = typeFilter === type
           return (
-            <div
+            <button
               key={type}
-              style={{ flex: '1 1 150px', padding: '0.75rem 1rem', borderRadius: 8, background: meta.bg, cursor: 'pointer', border: typeFilter === type ? `2px solid ${meta.color}` : '2px solid transparent' }}
-              onClick={() => setTypeFilter(typeFilter === type ? '' : type)}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className={`odm-type-sections__card${active ? ' is-active' : ''}`}
+              style={{ ['--odm-type-color' as string]: meta.color, ['--odm-type-bg' as string]: meta.bg }}
+              onClick={() => setTypeFilterAndUrl(active ? '' : type)}
             >
-              <div style={{ fontWeight: 700, color: meta.color, fontSize: '1.4rem' }}>{total}</div>
-              <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{meta.label}</div>
-              {en_cours > 0 && <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{en_cours} en cours</div>}
-            </div>
+              <div className="odm-type-sections__count">{total}</div>
+              <div className="odm-type-sections__label">{meta.label}</div>
+              {en_cours > 0 && <div className="odm-type-sections__sub">{en_cours} en cours</div>}
+            </button>
           )
         })}
       </div>
@@ -162,8 +214,9 @@ export default function OrdresMissionPage() {
         <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
           <h4 style={{ margin: '0 0 0.5rem' }}>Générer depuis un bon de commande</h4>
           <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-            Les OMs labo / technicien / ingénieur seront créés selon les actions catalogue, les déclencheurs OdM
-            ou la planification terrain (technicien + dates) des lignes BC.
+            Un OdM est créé par type (terrain, labo, ingénieur) pour le même devis / BC. Les tâches sont générées
+            à partir des sous-produits du catalogue (sections OdM) et de leurs actions ; vous pourrez ensuite
+            affecter, planifier les dates et faire évoluer les statuts.
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <label style={{ flex: '1 1 280px' }}>
@@ -186,9 +239,9 @@ export default function OrdresMissionPage() {
 
       {/* Filtres */}
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={{ flex: '1 1 160px', maxWidth: 200 }}>
-          <option value="">— Tous types —</option>
-          {Object.entries(TYPE_META).map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
+        <select value={typeFilter} onChange={(e) => setTypeFilterAndUrl(parseOmType(e.target.value || null))} style={{ flex: '1 1 160px', maxWidth: 220 }}>
+          <option value="">— Les 3 types —</option>
+          {TYPE_ORDER.map((v) => <option key={v} value={v}>{TYPE_META[v].label}</option>)}
         </select>
         <select value={statutFilter} onChange={(e) => setStatutFilter(e.target.value)} style={{ flex: '1 1 160px', maxWidth: 200 }}>
           <option value="">— Tous statuts —</option>
@@ -218,7 +271,7 @@ export default function OrdresMissionPage() {
                 </tr>
               </thead>
               <tbody>
-                {ordres.map((om) => {
+                {displayedOrdres.map((om) => {
                   const bc = ordreMissionBonCommande(om)
                   const quote = ordreMissionQuote(om)
                   const st = ordreMissionStatutBadgeProps(om.statut)
@@ -285,7 +338,7 @@ export default function OrdresMissionPage() {
               </tbody>
             </table>
           </div>
-          {ordres.length === 0 && <p style={{ padding: '1rem' }} className="text-muted">Aucun ordre de mission.</p>}
+          {displayedOrdres.length === 0 && <p style={{ padding: '1rem' }} className="text-muted">Aucun ordre de mission.</p>}
         </div>
       )}
 

@@ -148,6 +148,33 @@ class OrdreMissionFromBonCommandeService
             return collect();
         }
 
+        // Ligne jalon : sous-produits par section en priorité ; sinon actions legacy sur le jalon.
+        if ($article->isJalon()) {
+            $article->loadMissing(['sectionProducts']);
+            $fromProducts = $this->collectProductActionsForJalon($article, $type);
+            if ($fromProducts->isNotEmpty()) {
+                return $fromProducts;
+            }
+
+            // Catalogue structuré par sections : pas de repli sur les actions du jalon parent.
+            if ($article->sectionProducts->isNotEmpty()) {
+                return collect();
+            }
+
+            $direct = $article->actions->where('type', $type)->values();
+            if ($direct->isNotEmpty()) {
+                return $direct;
+            }
+
+            if ($this->articleTriggersOm($article, $type)) {
+                return collect([
+                    $this->syntheticAction($article, $type),
+                ]);
+            }
+
+            return collect();
+        }
+
         $direct = $article->actions->where('type', $type)->values();
         if ($direct->isNotEmpty()) {
             return $direct;
@@ -178,10 +205,6 @@ class OrdreMissionFromBonCommandeService
             }
         }
 
-        if ($article->isJalon()) {
-            return $this->collectProductActionsForJalon($article, $type);
-        }
-
         return collect();
     }
 
@@ -199,10 +222,11 @@ class OrdreMissionFromBonCommandeService
             default => null,
         };
 
+        $jalon->loadMissing(['sectionProducts.productArticle.actions', 'jalonProductLinks.product.actions']);
+
         $products = collect();
 
         if ($sectionType !== null) {
-            $jalon->loadMissing(['sectionProducts.productArticle.actions']);
             foreach ($jalon->sectionProducts->where('section_type', $sectionType)->sortBy('ordre') as $row) {
                 if ($row->productArticle) {
                     $products->push($row->productArticle);
@@ -210,9 +234,9 @@ class OrdreMissionFromBonCommandeService
             }
         }
 
-        if ($products->isEmpty()) {
-            $jalon->loadMissing(['jalonProductLinks.product.actions']);
-            foreach ($jalon->jalonProductLinks as $link) {
+        // Sans sections catalogue : tous les sous-produits du jalon (legacy).
+        if ($products->isEmpty() && $jalon->sectionProducts->isEmpty()) {
+            foreach ($jalon->jalonProductLinks->sortBy('ordre') as $link) {
                 if ($link->product) {
                     $products->push($link->product);
                 }
@@ -258,11 +282,20 @@ class OrdreMissionFromBonCommandeService
 
     private function ligneEligibleTechnicienFallback(BonCommandeLigne $ligne): bool
     {
+        if ($ligne->article?->isJalon()) {
+            $ligne->article->loadMissing(['sectionProducts']);
+            if ($ligne->article->sectionProducts->isNotEmpty()) {
+                return false;
+            }
+            // Jalon legacy sans sections : repli planification terrain BC.
+            return (bool) ($ligne->technicien_id && $ligne->date_debut_prevue);
+        }
+
         if ($ligne->technicien_id && $ligne->date_debut_prevue) {
             return true;
         }
 
-        return trim((string) $ligne->libelle) !== '';
+        return trim((string) $ligne->libelle) !== '' && ! $ligne->ref_article_id;
     }
 
     /**

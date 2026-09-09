@@ -94,10 +94,8 @@ import {
 } from './pages/back-office/BackOfficeMaterielRedirects'
 import PlanningTechniciensPage from './pages/terrain/PlanningTechniciensPage'
 import AgencesPage from './pages/config/AgencesPage'
-import OdmIngenieurPage from './pages/ingenierie/OdmIngenieurPage'
 import TachesIngenieurPage from './pages/ingenierie/TachesIngenieurPage'
 import PlanningIngenieurPage from './pages/ingenierie/PlanningIngenieurPage'
-import LaboOdmPage from './pages/labo/LaboOdmPage'
 import LaboReceptionPage from './pages/labo/LaboReceptionPage'
 import PlanningLaboPage from './pages/labo/PlanningLaboPage'
 import TranscoFoldPage from './pages/labo/TranscoFoldPage'
@@ -272,10 +270,10 @@ function AppRoutes() {
         <Route path="labo/rapports" element={<LabReportsListPage />} />
         <Route path="labo/rapports/:reportId" element={<LabReportViewPage />} />
         <Route path="labo/reception" element={<LaboReceptionPage />} />
-        <Route path="labo/odm" element={<LaboOdmPage />} />
+        <Route path="labo/odm" element={<Navigate to="/ordres-mission?context=labo&type=labo" replace />} />
         <Route path="labo/planning" element={<PlanningLaboPage />} />
         <Route path="labo/transco" element={<TranscoFoldPage />} />
-        <Route path="ingenierie/odm" element={<OdmIngenieurPage />} />
+        <Route path="ingenierie/odm" element={<Navigate to="/ordres-mission?context=ingenierie&type=ingenieur" replace />} />
         <Route path="ingenierie/taches" element={<TachesIngenieurPage />} />
         <Route path="ingenierie/planning" element={<PlanningIngenieurPage />} />
         <Route path="terrain/taches" element={<TerrainTasksPage />} />

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { isPortalUser } from '../lib/portalAccess'
 import AppVersionFooter from '../components/AppVersionFooter'
 import { DEFAULT_APP_LOGO_ALT, DEFAULT_APP_LOGO_SRC } from '../lib/appBranding'
 
@@ -19,8 +20,8 @@ export default function Login() {
     setError('')
     setSubmitting(true)
     try {
-      await login(email, password)
-      navigate('/')
+      const u = await login(email, password)
+      navigate(isPortalUser(u) ? '/portal' : '/')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erreur de connexion'
       setError(

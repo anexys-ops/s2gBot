@@ -2040,6 +2040,7 @@ export interface ActivityLogRow {
   subject_id?: number | null
   properties?: Record<string, unknown> | null
   ip_address?: string | null
+  user_agent?: string | null
   created_at: string
   user?: { id: number; name: string }
 }
@@ -2053,6 +2054,79 @@ export const activityLogsApi = {
     const s = q.toString()
     return api<ActivityLogRow[]>(`/activity-logs${s ? `?${s}` : ''}`)
   },
+}
+
+export type MonitoringActivityRow = ActivityLogRow & {
+  user?: { id: number; name: string; email?: string }
+}
+
+export interface MonitoringErrorRow {
+  id: number
+  status_code: number
+  method: string
+  url: string
+  message?: string | null
+  exception_class?: string | null
+  ip_address?: string | null
+  user_agent?: string | null
+  created_at: string
+  user?: { id: number; name: string; email?: string } | null
+}
+
+export interface MonitoringSecurityRow {
+  id: number
+  event_type: string
+  email_attempted?: string | null
+  ip_address?: string | null
+  user_agent?: string | null
+  properties?: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface MonitoringSessionRow {
+  id: number
+  token_id: number
+  user_id: number
+  ip_address?: string | null
+  user_agent?: string | null
+  current_page?: string | null
+  last_seen_at: string
+  created_at: string
+  user?: { id: number; name: string; email?: string; role?: string } | null
+}
+
+export const monitoringApi = {
+  activity: (params?: { limit?: number; category?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.limit) q.set('limit', String(params.limit))
+    if (params?.category) q.set('category', params.category)
+    const s = q.toString()
+    return api<MonitoringActivityRow[]>(`/admin/monitoring/activity${s ? `?${s}` : ''}`)
+  },
+  errors: (params?: { limit?: number; status_group?: '4xx' | '5xx' | '404' }) => {
+    const q = new URLSearchParams()
+    if (params?.limit) q.set('limit', String(params.limit))
+    if (params?.status_group) q.set('status_group', params.status_group)
+    const s = q.toString()
+    return api<MonitoringErrorRow[]>(`/admin/monitoring/errors${s ? `?${s}` : ''}`)
+  },
+  security: (params?: { limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.limit) q.set('limit', String(params.limit))
+    const s = q.toString()
+    return api<MonitoringSecurityRow[]>(`/admin/monitoring/security${s ? `?${s}` : ''}`)
+  },
+  sessions: (params?: { stale_minutes?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.stale_minutes) q.set('stale_minutes', String(params.stale_minutes))
+    const s = q.toString()
+    return api<MonitoringSessionRow[]>(`/admin/monitoring/sessions${s ? `?${s}` : ''}`)
+  },
+  presence: (page: string) =>
+    api<{ last_seen_at: string }>('/user/presence', {
+      method: 'POST',
+      body: JSON.stringify({ page }),
+    }),
 }
 
 export interface StatsEssaisParType {

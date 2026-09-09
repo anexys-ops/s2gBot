@@ -28,8 +28,15 @@ const STATUT_OPTIONS = (Object.keys(STATUT_LABELS) as DossierStatut[]).map((v) =
   label: STATUT_LABELS[v],
 }))
 
-export default function DossiersListPage() {
+type DossiersListPageProps = {
+  mode?: 'staff' | 'portal'
+}
+
+export default function DossiersListPage({ mode = 'staff' }: DossiersListPageProps) {
   const { user } = useAuth()
+  const isPortal = mode === 'portal'
+  const listBase = isPortal ? '/portal/dossiers' : '/dossiers'
+  const homePath = isPortal ? '/portal' : '/'
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
@@ -145,13 +152,13 @@ export default function DossiersListPage() {
     return (
       <ModuleEntityShell
         shellClassName="module-shell--crm"
-        breadcrumbs={[
-          { label: 'Accueil', to: '/' },
-          { label: 'Commercial', to: '/crm' },
-          { label: 'Dossiers chantier' },
-        ]}
-        moduleBarLabel="Commercial — Dossiers chantier"
-        title="Dossiers chantier (PROLAB)"
+        breadcrumbs={
+          isPortal
+            ? [{ label: 'Portail', to: homePath }, { label: 'Mes dossiers' }]
+            : [{ label: 'Accueil', to: '/' }, { label: 'Commercial', to: '/crm' }, { label: 'Dossiers chantier' }]
+        }
+        moduleBarLabel={isPortal ? 'Portail client — Dossiers' : 'Commercial — Dossiers chantier'}
+        title={isPortal ? 'Mes dossiers' : 'Dossiers chantier (PROLAB)'}
       >
         <p>Chargement…</p>
       </ModuleEntityShell>
@@ -162,13 +169,13 @@ export default function DossiersListPage() {
     return (
       <ModuleEntityShell
         shellClassName="module-shell--crm"
-        breadcrumbs={[
-          { label: 'Accueil', to: '/' },
-          { label: 'Commercial', to: '/crm' },
-          { label: 'Dossiers chantier' },
-        ]}
-        moduleBarLabel="Commercial — Dossiers chantier"
-        title="Dossiers chantier (PROLAB)"
+        breadcrumbs={
+          isPortal
+            ? [{ label: 'Portail', to: homePath }, { label: 'Mes dossiers' }]
+            : [{ label: 'Accueil', to: '/' }, { label: 'Commercial', to: '/crm' }, { label: 'Dossiers chantier' }]
+        }
+        moduleBarLabel={isPortal ? 'Portail client — Dossiers' : 'Commercial — Dossiers chantier'}
+        title={isPortal ? 'Mes dossiers' : 'Dossiers chantier (PROLAB)'}
       >
         <p className="error">Erreur : {(error as Error).message}</p>
       </ModuleEntityShell>
@@ -178,13 +185,13 @@ export default function DossiersListPage() {
   return (
     <ModuleEntityShell
       shellClassName="module-shell--crm"
-      breadcrumbs={[
-        { label: 'Accueil', to: '/' },
-        { label: 'Commercial', to: '/crm' },
-        { label: 'Dossiers chantier' },
-      ]}
-      moduleBarLabel="Commercial — Dossiers chantier"
-      title="Dossiers chantier (PROLAB)"
+      breadcrumbs={
+        isPortal
+          ? [{ label: 'Portail', to: homePath }, { label: 'Mes dossiers' }]
+          : [{ label: 'Accueil', to: '/' }, { label: 'Commercial', to: '/crm' }, { label: 'Dossiers chantier' }]
+      }
+      moduleBarLabel={isPortal ? 'Portail client — Dossiers' : 'Commercial — Dossiers chantier'}
+      title={isPortal ? 'Mes dossiers' : 'Dossiers chantier (PROLAB)'}
       subtitle={
         total > 0
           ? `${total} dossier(s) — page ${currentPage} / ${lastPage}`
@@ -389,12 +396,12 @@ export default function DossiersListPage() {
                     className="table-row-link"
                     onClick={(e) => {
                       if (shouldIgnoreTableRowClick(e.target)) return
-                      navigate(`/dossiers/${d.id}`)
+                      navigate(`${listBase}/${d.id}`)
                     }}
                   >
                     {visible.reference !== false && (
                       <td className="data-table__reference">
-                        <Link to={`/dossiers/${d.id}`} onClick={(e) => e.stopPropagation()}>
+                        <Link to={`${listBase}/${d.id}`} onClick={(e) => e.stopPropagation()}>
                           <code>{d.reference}</code>
                         </Link>
                       </td>

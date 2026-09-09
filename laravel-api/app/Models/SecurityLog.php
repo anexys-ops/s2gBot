@@ -3,20 +3,17 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class ActivityLog extends Model
+class SecurityLog extends Model
 {
     public $timestamps = false;
 
     protected $fillable = [
-        'user_id',
-        'action',
-        'subject_type',
-        'subject_id',
-        'properties',
+        'event_type',
+        'email_attempted',
         'ip_address',
         'user_agent',
+        'properties',
         'created_at',
     ];
 
@@ -26,10 +23,5 @@ class ActivityLog extends Model
             'properties' => 'array',
             'created_at' => 'datetime',
         ];
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
     }
 }

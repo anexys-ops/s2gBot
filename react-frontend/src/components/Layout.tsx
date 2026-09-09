@@ -4,6 +4,7 @@ import { getOfflineQueueLength } from '../lib/offlineQueue'
 import AppNavigation from './AppNavigation'
 import AppContextBar from './AppContextBar'
 import AppVersionFooter from './AppVersionFooter'
+import SessionPresenceTracker from './SessionPresenceTracker'
 
 export default function Layout() {
   const [online, setOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true))
@@ -32,6 +33,7 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
+      <SessionPresenceTracker />
       <AppNavigation />
       <AppContextBar />
       {!online && (

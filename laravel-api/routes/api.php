@@ -61,6 +61,7 @@ use App\Http\Controllers\Api\LabReceptionController;
 use App\Http\Controllers\Api\SampleReceptionController;
 use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\StatsController;
+use App\Http\Controllers\Api\SystemMonitoringController;
 use App\Http\Controllers\Api\TestResultController;
 use App\Http\Controllers\Api\TestTypeController;
 use App\Http\Controllers\Api\UserManagementController;
@@ -184,8 +185,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('user/api-tokens/{tokenId}', [AccountController::class, 'revokeApiToken'])->whereNumber('tokenId');
     Route::get('permissions/catalog', [AccountController::class, 'permissionCatalog']);
 
+    Route::post('user/presence', [SystemMonitoringController::class, 'updatePresence']);
+
     Route::prefix('admin')->group(function () {
         Route::get('activity-logs', [ActivityLogController::class, 'indexAll']);
+        Route::get('monitoring/activity', [SystemMonitoringController::class, 'activityLogs']);
+        Route::get('monitoring/errors', [SystemMonitoringController::class, 'errorLogs']);
+        Route::get('monitoring/security', [SystemMonitoringController::class, 'securityLogs']);
+        Route::get('monitoring/sessions', [SystemMonitoringController::class, 'activeSessions']);
         Route::apiResource('users', UserManagementController::class);
         Route::apiResource('access-groups', AccessGroupController::class);
     });

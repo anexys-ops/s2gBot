@@ -76,6 +76,7 @@ import SettingsSecurityPage from './pages/settings/SettingsSecurityPage'
 import SettingsUsersPage from './pages/settings/SettingsUsersPage'
 import SettingsGroupsPage from './pages/settings/SettingsGroupsPage'
 import SettingsBrandingPage from './pages/settings/SettingsBrandingPage'
+import SettingsLogsPage from './pages/settings/SettingsLogsPage'
 import BonsCommandeListPage from './pages/commercial/BonsCommandeListPage'
 import BonCommandeFichePage from './pages/commercial/BonCommandeFichePage'
 import BonsLivraisonListPage from './pages/commercial/BonsLivraisonListPage'
@@ -102,11 +103,39 @@ import PlanningLaboPage from './pages/labo/PlanningLaboPage'
 import TranscoFoldPage from './pages/labo/TranscoFoldPage'
 import LabReportsListPage from './pages/labo/LabReportsListPage'
 import LabReportViewPage from './pages/labo/LabReportViewPage'
+import NotFoundPage from './pages/NotFoundPage'
+import PortalLayout from './components/PortalLayout'
+import PortalHomePage from './pages/portal/PortalHomePage'
+import PortalInterventionsPage from './pages/portal/PortalInterventionsPage'
+import PortalRapportsPage from './pages/portal/PortalRapportsPage'
+import PortalRapportViewPage from './pages/portal/PortalRapportViewPage'
+import { hasPortalModule, isPortalUser, type PortalModuleKey } from './lib/portalAccess'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   if (loading) return <div className="container">Chargement...</div>
   if (!user) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
+
+function StaffRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <div className="container">Chargement...</div>
+  if (isPortalUser(user)) return <Navigate to="/portal" replace />
+  return <>{children}</>
+}
+
+function PortalRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <div className="container">Chargement...</div>
+  if (!isPortalUser(user)) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
+function PortalModuleRoute({ module, children }: { module: PortalModuleKey; children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <div className="container">Chargement...</div>
+  if (!hasPortalModule(user, module)) return <Navigate to="/portal" replace />
   return <>{children}</>
 }
 
@@ -123,10 +152,69 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route
+        path="/portal"
+        element={
+          <PrivateRoute>
+            <PortalRoute>
+              <PortalLayout />
+            </PortalRoute>
+          </PrivateRoute>
+        }
+      >
+        <Route index element={<PortalHomePage />} />
+        <Route
+          path="dossiers"
+          element={
+            <PortalModuleRoute module="dossiers">
+              <DossiersListPage mode="portal" />
+            </PortalModuleRoute>
+          }
+        />
+        <Route
+          path="dossiers/:id"
+          element={
+            <PortalModuleRoute module="dossiers">
+              <DossierFichePage />
+            </PortalModuleRoute>
+          }
+        >
+          <Route index element={<Navigate to="infos" replace />} />
+          <Route path="infos" element={<DossierInfosTab />} />
+          <Route path="documents" element={<DossierDocumentsTab />} />
+        </Route>
+        <Route
+          path="interventions"
+          element={
+            <PortalModuleRoute module="interventions">
+              <PortalInterventionsPage />
+            </PortalModuleRoute>
+          }
+        />
+        <Route
+          path="rapports"
+          element={
+            <PortalModuleRoute module="rapports">
+              <PortalRapportsPage />
+            </PortalModuleRoute>
+          }
+        />
+        <Route
+          path="rapports/:reportId"
+          element={
+            <PortalModuleRoute module="rapports">
+              <PortalRapportViewPage />
+            </PortalModuleRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/portal" replace />} />
+      </Route>
+      <Route
         path="/"
         element={
           <PrivateRoute>
-            <Layout />
+            <StaffRoute>
+              <Layout />
+            </StaffRoute>
           </PrivateRoute>
         }
       >
@@ -254,14 +342,15 @@ function AppRoutes() {
         <Route path="settings" element={<SettingsLayout />}>
           <Route index element={<Navigate to="compte" replace />} />
           <Route path="compte" element={<SettingsAccountPage />} />
+          <Route path="journaux" element={<SettingsLogsPage />} />
           <Route path="securite" element={<SettingsSecurityPage />} />
           <Route path="utilisateurs" element={<SettingsUsersPage />} />
           <Route path="groupes" element={<SettingsGroupsPage />} />
           <Route path="charte" element={<SettingsBrandingPage />} />
         </Route>
         <Route path="config/agences" element={<AgencesPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

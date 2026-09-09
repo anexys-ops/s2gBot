@@ -47,6 +47,7 @@ class Client extends Model
         'cnss_employer',
         'capital_social',
         'meta',
+        'portal_modules',
         // Référents S2G
         'commercial_id',
         'responsable_technique_id',
@@ -60,7 +61,8 @@ class Client extends Model
     protected function casts(): array
     {
         return [
-            'meta'           => 'array',
+            'meta'            => 'array',
+            'portal_modules'  => 'array',
             'capital_social' => 'decimal:2',
             'lat'            => 'float',
             'lng'            => 'float',

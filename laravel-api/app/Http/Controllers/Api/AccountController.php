@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\ActivityLogger;
+use App\Services\SecurityLogger;
 use App\Support\PermissionCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +15,11 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class AccountController extends Controller
 {
+    public function __construct(
+        private ActivityLogger $activityLogger,
+        private SecurityLogger $securityLogger,
+    ) {}
+
     public function updateProfile(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -21,10 +28,17 @@ class AccountController extends Controller
             'phone' => 'nullable|string|max:40',
         ]);
 
-        $request->user()->fill($validated);
-        $request->user()->save();
+        $user = $request->user();
+        $before = $user->only(array_keys($validated));
+        $user->fill($validated);
+        $user->save();
 
-        return response()->json($this->serializeUser($request->user()->fresh()->load(['client', 'site', 'accessGroups'])));
+        $this->activityLogger->log($user, 'account.profile.updated', $user, [
+            'before' => $before,
+            'after' => $user->only(array_keys($validated)),
+        ]);
+
+        return response()->json($this->serializeUser($user->fresh()->load(['client', 'site', 'accessGroups'])));
     }
 
     public function updatePassword(Request $request): JsonResponse
@@ -35,12 +49,18 @@ class AccountController extends Controller
         ]);
 
         if (! Hash::check($validated['current_password'], $request->user()->password)) {
+            $this->securityLogger->log('password_change_failed', $request->user()->email, [
+                'reason' => 'wrong_current_password',
+            ]);
+
             return response()->json(['message' => 'Mot de passe actuel incorrect.'], 422);
         }
 
         $request->user()->update([
             'password' => Hash::make($validated['password']),
         ]);
+
+        $this->activityLogger->log($request->user(), 'account.password.updated', $request->user());
 
         return response()->json(['message' => 'Mot de passe mis à jour.']);
     }
@@ -71,6 +91,9 @@ class AccountController extends Controller
         }
 
         $token = $request->user()->createToken($validated['name']);
+        $this->activityLogger->log($request->user(), 'account.api_token.created', null, [
+            'token_name' => $validated['name'],
+        ]);
 
         return response()->json([
             'token' => $token->plainTextToken,
@@ -92,6 +115,9 @@ class AccountController extends Controller
             return response()->json(['message' => 'Impossible de révoquer le jeton de session web (spa). Déconnectez-vous à la place.'], 422);
         }
 
+        $this->activityLogger->log($request->user(), 'account.api_token.revoked', null, [
+            'token_name' => $token->name,
+        ]);
         $token->delete();
 
         return response()->json(null, 204);

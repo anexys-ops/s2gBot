@@ -1,4 +1,4 @@
-import { Outlet, useParams } from 'react-router-dom'
+import { Outlet, useLocation, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { dossiersApi, type DossierRow } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
@@ -15,7 +15,11 @@ const TABS = [
 
 export default function DossierFichePage() {
   const { id } = useParams<{ id: string }>()
+  const location = useLocation()
+  const isPortal = location.pathname.startsWith('/portal/dossiers')
   const dossierId = Number(id)
+  const listPath = isPortal ? '/portal/dossiers' : '/dossiers'
+  const homePath = isPortal ? '/portal' : '/'
   const { data: dossier, isLoading, error } = useQuery({
     queryKey: ['dossier', dossierId],
     queryFn: () => dossiersApi.get(dossierId),
@@ -30,11 +34,11 @@ export default function DossierFichePage() {
     return (
       <ModuleEntityShell
         breadcrumbs={[
-          { label: 'Accueil', to: '/' },
-          { label: 'Dossiers', to: '/dossiers' },
+          { label: isPortal ? 'Portail' : 'Accueil', to: homePath },
+          { label: 'Dossiers', to: listPath },
           { label: '…' },
         ]}
-        moduleBarLabel="Dossier chantier"
+        moduleBarLabel={isPortal ? 'Portail — Dossier' : 'Dossier chantier'}
         title="Chargement…"
       >
         <p className="text-muted">Chargement de la fiche…</p>
@@ -46,11 +50,11 @@ export default function DossierFichePage() {
     return (
       <ModuleEntityShell
         breadcrumbs={[
-          { label: 'Accueil', to: '/' },
-          { label: 'Dossiers', to: '/dossiers' },
+          { label: isPortal ? 'Portail' : 'Accueil', to: homePath },
+          { label: 'Dossiers', to: listPath },
           { label: 'Erreur' },
         ]}
-        moduleBarLabel="Dossier chantier"
+        moduleBarLabel={isPortal ? 'Portail — Dossier' : 'Dossier chantier'}
         title="Dossier introuvable"
       >
         <p className="error">{(error as Error)?.message ?? 'Accès refusé ou dossier supprimé.'}</p>
@@ -58,18 +62,19 @@ export default function DossierFichePage() {
     )
   }
 
-  const base = `/dossiers/${dossierId}`
+  const base = `${listPath}/${dossierId}`
+  const visibleTabs = isPortal ? TABS.filter((t) => t.to === 'infos' || t.to === 'documents') : TABS
   const st = dossierStatutBadgeProps(dossier.statut)
 
   return (
     <ModuleEntityShell
       shellClassName="module-shell--crm"
       breadcrumbs={[
-        { label: 'Accueil', to: '/' },
-        { label: 'Dossiers', to: '/dossiers' },
+        { label: isPortal ? 'Portail' : 'Accueil', to: homePath },
+        { label: 'Dossiers', to: listPath },
         { label: dossier.reference },
       ]}
-      moduleBarLabel="Dossier chantier"
+      moduleBarLabel={isPortal ? 'Portail — Dossier' : 'Dossier chantier'}
       title={dossier.titre}
       subtitle={
         <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
@@ -82,7 +87,7 @@ export default function DossierFichePage() {
           </span>
         </span>
       }
-      tabs={TABS.map((t) => ({ to: `${base}/${t.to}`, label: t.label, end: true }))}
+      tabs={visibleTabs.map((t) => ({ to: `${base}/${t.to}`, label: t.label, end: true }))}
     >
       <Outlet context={{ dossier, dossierId } satisfies DossierFicheOutletContext} />
     </ModuleEntityShell>

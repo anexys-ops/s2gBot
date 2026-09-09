@@ -7,6 +7,7 @@ import EntityMetaCard from '../../components/module/EntityMetaCard'
 import Modal from '../../components/Modal'
 import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
 import { legalFormLabel } from '../../constants/moroccoClient'
+import ClientPortalModulesPanel from '../../components/clients/ClientPortalModulesPanel'
 import type { ClientOutletContext } from './ClientLayout'
 
 function parseCapital(v: Client['capital_social']): number | undefined {
@@ -194,6 +195,8 @@ export default function ClientFicheTab() {
           <div><dt>SIRET / réf. étrangère</dt><dd>{client.siret?.trim() ? client.siret : '—'}</dd></div>
         </dl>
       </div>
+
+      <ClientPortalModulesPanel clientId={clientId} client={client} canEdit={isAdmin} />
 
       <EntityMetaCard
         meta={client.meta}

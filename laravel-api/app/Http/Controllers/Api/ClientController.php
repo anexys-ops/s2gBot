@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Support\AgencyAccess;
 use App\Support\ClientListEnrichment;
+use App\Support\ClientPortalAccess;
+use App\Support\ClientPortalCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -154,6 +156,40 @@ class ClientController extends Controller
         $client->visibleLabAgencies()->sync($allowed);
 
         return response()->json($client->fresh()->load('visibleLabAgencies:id,name,code,is_siege'));
+    }
+
+    /**
+     * Catalogue des modules portail client (libellés pour l’admin).
+     */
+    public function portalCatalog(): JsonResponse
+    {
+        return response()->json([
+            'modules' => collect(ClientPortalCatalog::labels())
+                ->map(fn (string $label, string $key) => ['key' => $key, 'label' => $label])
+                ->values(),
+            'defaults' => ClientPortalCatalog::defaults(),
+        ]);
+    }
+
+    /**
+     * Modules portail activés pour un client (checkboxes admin).
+     */
+    public function syncPortalModules(Request $request, Client $client): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $validated = $request->validate([
+            'portal_modules' => 'required|array',
+            'portal_modules.*' => 'string|in:'.implode(',', ClientPortalCatalog::keys()),
+        ]);
+
+        $client = ClientPortalAccess::syncClientModules($client, $validated['portal_modules']);
+
+        return response()->json([
+            'portal_modules' => ClientPortalCatalog::normalize($client->portal_modules),
+        ]);
     }
 
     // ----------------------------------------------------------------

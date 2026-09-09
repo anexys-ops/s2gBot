@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { brandingApi } from '../api/client'
 import { DEFAULT_APP_LOGO_ALT, DEFAULT_APP_LOGO_SRC, resolveAppLogoSrc } from '../lib/appBranding'
 import GlobalSearch from './GlobalSearch'
+import { isPortalUser } from '../lib/portalAccess'
 
 type SubItem = { to: string; label: string; labOnly?: boolean }
 
@@ -229,6 +230,8 @@ export default function AppNavigation() {
   const toggleDropdown = (id: string) => {
     setOpenDropdown((prev) => (prev === id ? null : id))
   }
+
+  if (isPortalUser(user)) return null
 
   return (
     <header className="app-header" ref={navRef}>

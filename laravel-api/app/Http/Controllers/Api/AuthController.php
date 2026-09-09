@@ -7,6 +7,10 @@ use App\Models\Agency;
 use App\Models\Client;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ActivityLogger;
+use App\Services\SecurityLogger;
+use App\Services\SessionPresenceService;
+use App\Support\ClientPortalAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +19,12 @@ use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private SecurityLogger $securityLogger,
+        private ActivityLogger $activityLogger,
+        private SessionPresenceService $presence,
+    ) {}
+
     public function login(Request $request): JsonResponse
     {
         $request->validate([
@@ -24,6 +34,10 @@ class AuthController extends Controller
         ]);
 
         if (! Auth::attempt($request->only('email', 'password'))) {
+            $this->securityLogger->log('login_failed', $request->input('email'), [
+                'reason' => 'invalid_credentials',
+            ]);
+
             return response()->json(['message' => 'Identifiants invalides'], 401);
         }
 
@@ -31,11 +45,16 @@ class AuthController extends Controller
         $device = $request->input('device_name');
         $tokenName = is_string($device) && trim($device) !== '' ? trim($device) : 'spa';
         // Keep existing SPA tokens so another tab/device login does not disconnect active sessions.
-        $token = $user->createToken($tokenName)->plainTextToken;
+        $accessToken = $user->createToken($tokenName);
+        $token = $accessToken->plainTextToken;
+
+        $this->activityLogger->log($user, 'auth.login', null, [
+            'device' => $tokenName,
+        ]);
+        $this->presence->touch($user, $accessToken->accessToken, $request, '/login');
 
         $user->load(['client', 'site', 'agency', 'accessGroups', 'agencies']);
-        $payload = $user->toArray();
-        $payload['effective_permissions'] = $user->effectivePermissionKeys();
+        $payload = $this->serializeUser($user);
 
         return response()->json([
             'user' => $payload,
@@ -74,11 +93,9 @@ class AuthController extends Controller
         $token = $user->createToken('spa')->plainTextToken;
 
         $user->load(['client', 'site', 'agency', 'accessGroups', 'agencies']);
-        $payload = $user->toArray();
-        $payload['effective_permissions'] = $user->effectivePermissionKeys();
 
         return response()->json([
-            'user' => $payload,
+            'user' => $this->serializeUser($user),
             'token' => $token,
             'token_type' => 'Bearer',
         ], 201);
@@ -131,7 +148,12 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        $token = $request->user()->currentAccessToken();
+        if ($token !== null) {
+            $this->presence->removeToken($token->id);
+            $this->activityLogger->log($request->user(), 'auth.logout');
+            $token->delete();
+        }
 
         return response()->json(['message' => 'Déconnexion réussie']);
     }
@@ -139,9 +161,18 @@ class AuthController extends Controller
     public function user(Request $request): JsonResponse
     {
         $u = $request->user()->load(['client', 'site', 'accessGroups', 'agencies']);
-        $data = $u->toArray();
-        $data['effective_permissions'] = $u->effectivePermissionKeys();
 
-        return response()->json($data);
+        return response()->json($this->serializeUser($u));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeUser(User $user): array
+    {
+        $data = $user->toArray();
+        $data['effective_permissions'] = $user->effectivePermissionKeys();
+
+        return array_merge($data, ClientPortalAccess::authPayload($user));
     }
 }

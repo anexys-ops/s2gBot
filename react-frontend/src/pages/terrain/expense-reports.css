@@ -208,6 +208,17 @@
   align-items: end;
 }
 
+.ndf-desc-cell {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  max-width: 360px;
+  white-space: pre-wrap;
+}
+
+.ndf-line-row--validated td {
+  background: #f0fdf4;
+}
+
 .ndf-line-form label {
   display: flex;
   flex-direction: column;

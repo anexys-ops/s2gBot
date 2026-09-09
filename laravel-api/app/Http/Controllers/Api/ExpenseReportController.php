@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\ExpenseLine;
 use App\Models\ExpenseReport;
 use App\Models\OrdreMission;
+use App\Models\MailLog;
 use App\Services\ExpenseReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -19,9 +21,33 @@ class ExpenseReportController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $q = ExpenseReport::with(['ordreMission.dossier', 'createdBy', 'validatedBy', 'lines'])
+        $q = ExpenseReport::with(['ordreMission.dossier', 'ordreMission.client', 'ordreMission.site', 'createdBy', 'validatedBy', 'lines'])
+            ->withCount([
+                'lines',
+                'lines as lines_validated_count' => fn ($qb) => $qb->where('is_validated', true),
+            ])
             ->when($request->statut, fn ($qb, $v) => $qb->where('statut', $v))
             ->when($request->ordre_mission_id, fn ($qb, $v) => $qb->where('ordre_mission_id', $v))
+            ->when($request->search, function ($qb, $search) {
+                $term = trim((string) $search);
+                if ($term === '') {
+                    return;
+                }
+                $like = '%'.$term.'%';
+                $qb->where(function ($sub) use ($like) {
+                    $sub->where('unique_number', 'like', $like)
+                        ->orWhereHas('ordreMission', function ($om) use ($like) {
+                            $om->where('numero', 'like', $like)
+                                ->orWhere('unique_number', 'like', $like)
+                                ->orWhereHas('client', fn ($cq) => $cq->where('name', 'like', $like))
+                                ->orWhereHas('dossier', function ($dq) use ($like) {
+                                    $dq->where('reference', 'like', $like)
+                                        ->orWhere('titre', 'like', $like);
+                                })
+                                ->orWhereHas('site', fn ($sq) => $sq->where('name', 'like', $like));
+                        });
+                });
+            })
             ->orderByDesc('id');
 
         return response()->json($q->paginate(20));
@@ -65,7 +91,7 @@ class ExpenseReportController extends Controller
 
     public function show(ExpenseReport $expenseReport): JsonResponse
     {
-        $expenseReport->load(['ordreMission.dossier', 'createdBy', 'validatedBy', 'lines.user']);
+        $expenseReport->load(['ordreMission.dossier', 'ordreMission.client', 'ordreMission.site', 'createdBy', 'validatedBy', 'lines.user']);
         $expenseReport->append('total');
 
         return response()->json($expenseReport);
@@ -76,8 +102,10 @@ class ExpenseReportController extends Controller
     public function update(Request $request, ExpenseReport $expenseReport): JsonResponse
     {
         $data = $request->validate([
-            'statut' => 'sometimes|in:brouillon,soumis,valide,rembourse,rejete',
-            'notes'  => 'nullable|string',
+            'statut'         => 'sometimes|in:brouillon,soumis,valide,rembourse,rejete',
+            'notes'          => 'nullable|string',
+            'private_notes'  => 'nullable|string',
+            'advance_amount' => 'nullable|numeric|min:0',
         ]);
 
         if (isset($data['statut']) && $data['statut'] === ExpenseReport::STATUT_VALIDE) {
@@ -150,7 +178,6 @@ class ExpenseReportController extends Controller
     public function updateLine(Request $request, ExpenseReport $expenseReport, ExpenseLine $line, ExpenseReportService $expenseReports): JsonResponse
     {
         $this->ensureLineBelongs($expenseReport, $line);
-        $this->ensureBrouillon($expenseReport);
 
         $data = $request->validate([
             'user_id'        => 'sometimes|exists:users,id',
@@ -159,12 +186,15 @@ class ExpenseReportController extends Controller
             'payment_method' => 'nullable|in:' . implode(',', ExpenseLine::PAYMENT_METHODS),
             'date'           => 'sometimes|date',
             'description'    => 'nullable|string|max:512',
+            'is_validated'   => 'sometimes|boolean',
             'lieu_depart'    => 'nullable|string|max:255',
             'lieu_arrivee'   => 'nullable|string|max:255',
             'distance_km'    => 'nullable|numeric|min:0',
             'taux_km'        => 'nullable|numeric|min:0',
             'type_transport' => 'nullable|in:voiture,moto,velo,transports_commun,autre',
         ]);
+
+        $this->ensureLineEditable($expenseReport, $data);
 
         if ($line->isDeplacement() || isset($data['distance_km'])) {
             $distance = (float) ($data['distance_km'] ?? $line->distance_km ?? 0);
@@ -248,6 +278,56 @@ class ExpenseReportController extends Controller
         return response()->json($line->fresh()->load('user:id,name'));
     }
 
+    public function sendEmail(Request $request, ExpenseReport $expenseReport, ExpenseReportService $expenseReports): JsonResponse
+    {
+        $validated = $request->validate([
+            'to'      => 'required|email',
+            'subject' => 'required|string|max:255',
+            'body'    => 'nullable|string',
+        ]);
+
+        $mailer = (string) config('mail.default', 'log');
+        if (in_array($mailer, ['log', 'array'], true)) {
+            return response()->json([
+                'message' => 'Envoi email impossible : le serveur SMTP n\'est pas configuré.',
+            ], 503);
+        }
+
+        $expenseReport->load(['ordreMission.client', 'ordreMission.dossier', 'ordreMission.site', 'lines.user', 'createdBy']);
+        $expenseReport->append('total');
+
+        $body = $validated['body'] ?? $expenseReports->buildEmailBody($expenseReport);
+
+        try {
+            Mail::raw($body, function ($message) use ($validated) {
+                $message->to($validated['to'])->subject($validated['subject']);
+            });
+
+            MailLog::create([
+                'to'            => $validated['to'],
+                'subject'       => $validated['subject'],
+                'template_name' => 'expense_report',
+                'status'        => 'sent',
+                'user_id'       => $request->user()->id,
+                'sent_at'       => now(),
+            ]);
+        } catch (\Throwable $e) {
+            MailLog::create([
+                'to'            => $validated['to'],
+                'subject'       => $validated['subject'],
+                'template_name' => 'expense_report',
+                'status'        => 'failed',
+                'error_message' => $e->getMessage(),
+                'user_id'       => $request->user()->id,
+                'sent_at'       => now(),
+            ]);
+
+            return response()->json(['message' => 'Échec envoi : '.$e->getMessage()], 500);
+        }
+
+        return response()->json(['message' => 'E-mail envoyé']);
+    }
+
     private function ensureBrouillon(ExpenseReport $expenseReport): void
     {
         abort_if(
@@ -255,6 +335,18 @@ class ExpenseReportController extends Controller
             422,
             'Cette note de frais n\'est plus modifiable.',
         );
+    }
+
+    /** @param array<string, mixed> $data */
+    private function ensureLineEditable(ExpenseReport $expenseReport, array $data): void
+    {
+        $keys = array_keys($data);
+        $onlyValidation = $keys === ['is_validated'];
+        if ($onlyValidation) {
+            return;
+        }
+
+        $this->ensureBrouillon($expenseReport);
     }
 
     private function ensureLineBelongs(ExpenseReport $expenseReport, ExpenseLine $line): void

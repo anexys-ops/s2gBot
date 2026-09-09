@@ -21,6 +21,7 @@ class ExpenseLine extends Model
         'description',
         'receipt_path',
         'receipt_filename',
+        'is_validated',
         'lieu_depart',
         'lieu_arrivee',
         'distance_km',
@@ -29,10 +30,11 @@ class ExpenseLine extends Model
     ];
 
     protected $casts = [
-        'amount'      => 'float',
-        'date'        => 'date',
-        'distance_km' => 'float',
-        'taux_km'     => 'float',
+        'amount'         => 'float',
+        'date'           => 'date',
+        'distance_km'    => 'float',
+        'taux_km'        => 'float',
+        'is_validated'   => 'boolean',
     ];
 
     public function isDeplacement(): bool

@@ -3406,6 +3406,7 @@ export interface ExpenseLine {
   distance_km?: number | null
   taux_km?: number | null
   type_transport?: ExpenseTransportType | null
+  is_validated?: boolean
   created_at: string
   updated_at: string
 }
@@ -3415,6 +3416,18 @@ export function isExpenseDeplacementLine(line: Pick<ExpenseLine, 'category' | 'd
 }
 
 export type ExpenseReportStatut = 'brouillon' | 'soumis' | 'valide' | 'rembourse' | 'rejete'
+
+export const EXPENSE_STATUT_LABELS: Record<ExpenseReportStatut, string> = {
+  brouillon: 'Brouillon',
+  soumis: 'Soumis',
+  valide: 'Validé',
+  rembourse: 'Remboursé',
+  rejete: 'Rejeté',
+}
+
+export const EXPENSE_STATUT_OPTIONS: { value: ExpenseReportStatut; label: string }[] = (
+  Object.entries(EXPENSE_STATUT_LABELS) as [ExpenseReportStatut, string][]
+).map(([value, label]) => ({ value, label }))
 
 export interface ExpenseReport {
   id: number
@@ -3432,6 +3445,10 @@ export interface ExpenseReport {
   }
   statut: ExpenseReportStatut
   notes?: string
+  private_notes?: string
+  advance_amount?: number | null
+  lines_count?: number
+  lines_validated_count?: number
   created_by?: number
   created_by_user?: { id: number; name: string }
   validated_by?: number
@@ -3446,11 +3463,14 @@ export interface ExpenseReport {
 export const expenseReportsApi = {
   eligibleOMs: () => api<OrdreMission[]>('/expense-reports/eligible-oms'),
 
-  list: (params?: { statut?: string; ordre_mission_id?: number }) => {
-    const s = params
-      ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
-      : ''
-    return api<{ data: ExpenseReport[]; total: number }>(`/expense-reports${s ? `?${s}` : ''}`)
+  list: (params?: { statut?: string; ordre_mission_id?: number; search?: string; page?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.statut) q.set('statut', params.statut)
+    if (params?.ordre_mission_id != null) q.set('ordre_mission_id', String(params.ordre_mission_id))
+    if (params?.search) q.set('search', params.search)
+    if (params?.page != null) q.set('page', String(params.page))
+    const s = q.toString()
+    return api<LaravelPaginator<ExpenseReport>>(`/expense-reports${s ? `?${s}` : ''}`)
   },
 
   get: (id: number) => api<ExpenseReport>(`/expense-reports/${id}`),
@@ -3458,8 +3478,11 @@ export const expenseReportsApi = {
   create: (body: { ordre_mission_id: number; notes?: string }) =>
     api<ExpenseReport>('/expense-reports', { method: 'POST', body: JSON.stringify(body) }),
 
-  update: (id: number, body: Partial<Pick<ExpenseReport, 'statut' | 'notes'>>) =>
+  update: (id: number, body: Partial<Pick<ExpenseReport, 'statut' | 'notes' | 'private_notes' | 'advance_amount'>>) =>
     api<ExpenseReport>(`/expense-reports/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  sendEmail: (id: number, body: { to: string; subject: string; body?: string }) =>
+    api<{ message: string }>(`/expense-reports/${id}/send-email`, { method: 'POST', body: JSON.stringify(body) }),
 
   delete: (id: number) => api<void>(`/expense-reports/${id}`, { method: 'DELETE' }),
 

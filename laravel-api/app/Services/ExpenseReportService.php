@@ -85,6 +85,52 @@ class ExpenseReportService
         };
     }
 
+    public function buildEmailBody(ExpenseReport $report): string
+    {
+        $report->loadMissing(['ordreMission.client', 'ordreMission.dossier', 'ordreMission.site', 'lines.user']);
+        $om = $report->ordreMission;
+        $lines = $report->lines ?? collect();
+        $total = (float) ($report->total ?? $lines->sum('amount'));
+        $advance = (float) ($report->advance_amount ?? 0);
+        $net = max(0, $total - $advance);
+
+        $rows = $lines->map(function (ExpenseLine $line) {
+            $validated = $line->is_validated ? '✓' : '○';
+            $desc = trim((string) ($line->description ?? ''));
+
+            return sprintf(
+                "%s | %s | %s | %s | %s %s",
+                $line->date?->format('d/m/Y') ?? '—',
+                $line->category,
+                number_format((float) $line->amount, 2, ',', ' '),
+                $line->payment_method ?? '—',
+                $validated,
+                $desc !== '' ? "— {$desc}" : '',
+            );
+        })->implode("\n");
+
+        $context = array_filter([
+            $om?->unique_number ?? $om?->numero,
+            $om?->dossier?->reference ?? $om?->dossier?->titre,
+            $om?->client?->name,
+            $om?->site?->name,
+        ]);
+
+        return implode("\n", array_filter([
+            "Note de frais {$report->unique_number}",
+            'Statut : '.$report->statut,
+            'Contexte : '.implode(' · ', $context),
+            '',
+            'Date | Catégorie | Montant | Paiement | Validé',
+            $rows !== '' ? $rows : '(aucune ligne)',
+            '',
+            'Total TTC : '.number_format($total, 2, ',', ' '),
+            $advance > 0 ? 'Acompte versé : '.number_format($advance, 2, ',', ' ') : null,
+            $advance > 0 ? 'Net à rembourser : '.number_format($net, 2, ',', ' ') : null,
+            $report->notes ? "\nNotes :\n".$report->notes : null,
+        ]));
+    }
+
     public function assertDeplacementLineBelongsToOrdreMission(
         ExpenseLine $line,
         OrdreMission $ordreMission,

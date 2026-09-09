@@ -22,13 +22,16 @@ class ExpenseReport extends Model
         'ordre_mission_id',
         'statut',
         'notes',
+        'private_notes',
+        'advance_amount',
         'created_by',
         'validated_by',
         'validated_at',
     ];
 
     protected $casts = [
-        'validated_at' => 'datetime',
+        'validated_at'   => 'datetime',
+        'advance_amount' => 'float',
     ];
 
     protected static function booted(): void

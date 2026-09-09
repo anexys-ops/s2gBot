@@ -393,6 +393,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('expense-reports', [ExpenseReportController::class, 'store']);
     Route::get('expense-reports/{expenseReport}', [ExpenseReportController::class, 'show']);
     Route::put('expense-reports/{expenseReport}', [ExpenseReportController::class, 'update']);
+    Route::post('expense-reports/{expenseReport}/send-email', [ExpenseReportController::class, 'sendEmail']);
     Route::delete('expense-reports/{expenseReport}', [ExpenseReportController::class, 'destroy']);
     Route::post('expense-reports/{expenseReport}/lines', [ExpenseReportController::class, 'storeLine']);
     Route::put('expense-reports/{expenseReport}/lines/{line}', [ExpenseReportController::class, 'updateLine']);

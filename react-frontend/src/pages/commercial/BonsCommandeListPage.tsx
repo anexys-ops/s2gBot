@@ -3,7 +3,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { bonsCommandeApi, devisV1Api, quotesApi, type BonCommande, type Quote } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import ClickableStatusBadge from '../../components/ds/ClickableStatusBadge'
 import StatusBadge, { bonCommandeStatutBadgeProps, quoteStatutBadgeProps } from '../../components/ds/StatusBadge'
+import StatusChangeModal from '../../components/StatusChangeModal'
 import ListTableToolbar from '../../components/ListTableToolbar'
 import { ListTableFootRow, ListTablePanelHeader } from '../../components/ListTablePanel'
 import { sumNumeric } from '../../lib/listTableTotals'
@@ -220,6 +222,7 @@ export default function BonsCommandeListPage() {
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statutFilter, setStatutFilter] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<BonCommande | null>(null)
+  const [statusModalBc, setStatusModalBc] = useState<{ id: number; numero: string; statut: string } | null>(null)
 
   const { visible, toggle } = usePersistedColumnVisibility('bons-commande', {
     number: true,
@@ -249,6 +252,15 @@ export default function BonsCommandeListPage() {
       void qc.invalidateQueries({ queryKey: ['bons-commande'] })
       void qc.invalidateQueries({ queryKey: ['quotes', 'eligible-bc'] })
       setDeleteTarget(null)
+    },
+  })
+
+  const statusMut = useMutation({
+    mutationFn: ({ id, statut }: { id: number; statut: string }) => bonsCommandeApi.update(id, { statut }),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+      void qc.invalidateQueries({ queryKey: ['bon-commande', vars.id] })
+      setStatusModalBc(null)
     },
   })
 
@@ -430,9 +442,22 @@ export default function BonsCommandeListPage() {
                       {visible.ttc !== false && <td>{formatMoney(Number(bc.montant_ttc))}</td>}
                       {visible.status !== false && (
                         <td className="data-table__status">
-                          <StatusBadge variant={st.variant} size="sm">
-                            {st.label}
-                          </StatusBadge>
+                          {isLab ? (
+                            <ClickableStatusBadge
+                              variant={st.variant}
+                              size="sm"
+                              ariaLabel={`Changer le statut du bon ${bc.numero}`}
+                              onClick={() =>
+                                setStatusModalBc({ id: bc.id, numero: bc.numero, statut: bc.statut })
+                              }
+                            >
+                              {st.label}
+                            </ClickableStatusBadge>
+                          ) : (
+                            <StatusBadge variant={st.variant} size="sm">
+                              {st.label}
+                            </StatusBadge>
+                          )}
                         </td>
                       )}
                       {visible.actions !== false && isLab ? (
@@ -472,6 +497,18 @@ export default function BonsCommandeListPage() {
           </p>
         )}
       </div>
+
+      {statusModalBc !== null ? (
+        <StatusChangeModal
+          title={`Statut — ${statusModalBc.numero}`}
+          initialValue={statusModalBc.statut}
+          options={statusOptions}
+          isPending={statusMut.isPending}
+          error={statusMut.isError ? (statusMut.error as Error).message : null}
+          onClose={() => setStatusModalBc(null)}
+          onSave={(statut) => statusMut.mutate({ id: statusModalBc.id, statut })}
+        />
+      ) : null}
 
       {deleteTarget ? (
         <ConfirmDialog

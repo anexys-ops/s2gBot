@@ -70,3 +70,43 @@ export function clearedForfaitJalonPricing<T extends ForfaitJalonFields>(jalon: 
   delete next.montant_ht
   return next
 }
+
+/** Champs meta du forfait document (boîte jaune étape Lignes). */
+export type ForfaitDocumentFields = {
+  tarif_global_designation?: string
+  tarif_global_quantity?: number
+  tarif_global_prix_unitaire_ht?: number
+  tarif_global_hors_lignes_ht?: number
+  tarif_global_unite?: string
+}
+
+export const DEFAULT_FORFAIT_DESIGNATION = 'Prestation forfaitaire'
+
+export function forfaitDocumentQuantity(meta: ForfaitDocumentFields | undefined | null): number {
+  const q = Number(meta?.tarif_global_quantity)
+  if (Number.isFinite(q) && q > 0) return Math.round(q)
+  return 1
+}
+
+export function forfaitDocumentUnitPrice(meta: ForfaitDocumentFields | undefined | null): number {
+  const pu = Number(meta?.tarif_global_prix_unitaire_ht)
+  if (Number.isFinite(pu) && pu >= 0) return Math.round(pu * 100) / 100
+  const ht = Number(meta?.tarif_global_hors_lignes_ht)
+  const qty = forfaitDocumentQuantity(meta)
+  if (Number.isFinite(ht) && ht >= 0 && qty > 0) return Math.round((ht / qty) * 100) / 100
+  return 0
+}
+
+export function forfaitDocumentTotalHt(meta: ForfaitDocumentFields | undefined | null): number {
+  const qty = forfaitDocumentQuantity(meta)
+  const pu = forfaitDocumentUnitPrice(meta)
+  if (meta?.tarif_global_prix_unitaire_ht != null || pu > 0) {
+    return Math.round(qty * pu * 100) / 100
+  }
+  const ht = Number(meta?.tarif_global_hors_lignes_ht)
+  return Number.isFinite(ht) && ht >= 0 ? Math.round(ht * 100) / 100 : 0
+}
+
+export function withSyncedForfaitDocumentMontant<T extends ForfaitDocumentFields>(meta: T): T {
+  return { ...meta, tarif_global_hors_lignes_ht: forfaitDocumentTotalHt(meta) }
+}

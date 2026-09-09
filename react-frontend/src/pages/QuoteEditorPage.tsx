@@ -46,6 +46,7 @@ import {
 } from '../lib/s2gDevisCatalogue'
 import {
   clearedForfaitJalonPricing,
+  DEFAULT_FORFAIT_DESIGNATION,
   sumForfaitJalonsHt,
 } from '../lib/quoteForfaitJalon'
 
@@ -243,6 +244,14 @@ export default function QuoteEditorPage() {
       const jalonsTotal = sumForfaitJalonsHt(meta.devis_jalons)
       if (!(Number.isFinite(existingGlobal) && existingGlobal > 0) && jalonsTotal > 0) {
         meta.tarif_global_hors_lignes_ht = jalonsTotal
+      }
+      meta.tarif_global_designation =
+        (meta.tarif_global_designation ?? '').trim() || DEFAULT_FORFAIT_DESIGNATION
+      meta.tarif_global_quantity = Math.max(1, Math.round(Number(meta.tarif_global_quantity) || 1))
+      const ht = Math.max(0, Number(meta.tarif_global_hors_lignes_ht) || 0)
+      if (meta.tarif_global_prix_unitaire_ht == null && ht > 0) {
+        meta.tarif_global_prix_unitaire_ht =
+          Math.round((ht / meta.tarif_global_quantity) * 100) / 100
       }
       meta.tarif_global_unite = (meta.tarif_global_unite ?? '').trim() || 'F'
       meta.devis_jalons = (meta.devis_jalons ?? []).map((j) => clearedForfaitJalonPricing(j))

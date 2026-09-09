@@ -1,13 +1,6 @@
-import { useState } from 'react'
 import type { QuoteFormState } from '../QuoteFormFields'
 import type { DocumentTotalsResult } from '../../../lib/quoteTotals'
 import { formatMoney } from '../../../lib/appLocale'
-import {
-  clearedForfaitJalonPricing,
-  effectiveForfaitDocumentHt,
-  htFromTtc,
-  ttcFromHt,
-} from '../../../lib/quoteForfaitJalon'
 
 type Props = {
   form: QuoteFormState
@@ -34,41 +27,8 @@ export default function WizardStep5Pricing({
     setForm((f) => ({ ...f, meta: { ...f.meta, [key]: value } }))
 
   const discountMode = (form.meta?.discount_mode as string) ?? 'percent'
-  const isForfait = form.meta?.mode_devis === 'forfait'
-  const [forfaitInputMode, setForfaitInputMode] = useState<'ht' | 'ttc'>('ht')
 
   const fraisSupp = form.meta?.frais_supplementaires ?? []
-
-  const tvaRate = form.tva_rate ?? 20
-  const forfaitHtEffective = effectiveForfaitDocumentHt(
-    form.meta?.devis_jalons,
-    form.meta?.tarif_global_hors_lignes_ht,
-  )
-  const forfaitTtcEffective = ttcFromHt(forfaitHtEffective, tvaRate)
-
-  const applyGlobalForfaitAmount = (ht: number | undefined) => {
-    setForm((f) => ({
-      ...f,
-      lines: f.lines.map((l) => ({ ...l, unit_price: 0, discount_percent: 0 })),
-      meta: {
-        ...f.meta,
-        tarif_global_hors_lignes_ht: ht,
-        tarif_global_unite: 'F',
-        devis_jalons: (f.meta.devis_jalons ?? []).map((j) => clearedForfaitJalonPricing(j)),
-      },
-    }))
-  }
-
-  const onForfaitAmountChange = (raw: string) => {
-    if (raw === '') {
-      applyGlobalForfaitAmount(undefined)
-      return
-    }
-    const num = Math.max(0, Number(raw))
-    if (!Number.isFinite(num)) return
-    const ht = forfaitInputMode === 'ttc' ? htFromTtc(num, tvaRate) : num
-    applyGlobalForfaitAmount(Math.round(ht * 100) / 100)
-  }
 
   const addFraisSupp = () => {
     const newFrais = {
@@ -99,63 +59,6 @@ export default function WizardStep5Pricing({
     <div className="qw-body">
       <p className="qw-section-title">Tarif &amp; Validation</p>
       <p className="qw-section-sub">Remise, frais, TVA, conditions et récapitulatif.</p>
-
-      {isForfait ? (
-        <div className="qw-forfait-box" style={{ marginBottom: '1.5rem' }}>
-          <p className="qw-forfait-box__title">Devis forfaitaire — Montant global</p>
-          <p className="qw-forfait-box__hint">
-            Saisissez un montant forfaitaire global sans affecter de prix aux jalons. La modification
-            réinitialise les prix des lignes et des jalons.
-          </p>
-          <div className="qw-forfait-box__fields">
-            <div className="qw-forfait-box__field">
-              <span>Saisie</span>
-              <div className="qw-mode-btns" style={{ margin: 0 }}>
-                <button
-                  type="button"
-                  className={`qw-mode-btn${forfaitInputMode === 'ht' ? ' qw-mode-btn--active' : ''}`}
-                  onClick={() => setForfaitInputMode('ht')}
-                >
-                  HT
-                </button>
-                <button
-                  type="button"
-                  className={`qw-mode-btn${forfaitInputMode === 'ttc' ? ' qw-mode-btn--active' : ''}`}
-                  onClick={() => setForfaitInputMode('ttc')}
-                >
-                  TTC
-                </button>
-              </div>
-            </div>
-            <label className="qw-forfait-box__field">
-              <span>Montant {forfaitInputMode === 'ht' ? 'HT' : 'TTC'}</span>
-              <input
-                className="qw-forfait-input"
-                type="number"
-                min={0}
-                step={0.01}
-                value={
-                  forfaitInputMode === 'ht'
-                    ? forfaitHtEffective > 0
-                      ? forfaitHtEffective
-                      : ''
-                    : forfaitTtcEffective > 0
-                      ? forfaitTtcEffective
-                      : ''
-                }
-                onChange={(e) => onForfaitAmountChange(e.target.value)}
-                placeholder="0,00"
-              />
-            </label>
-            <div className="qw-forfait-box__field qw-forfait-box__field--readonly">
-              <span>{forfaitInputMode === 'ht' ? 'Total TTC' : 'Total HT'}</span>
-              <strong>
-                {formatMoney(forfaitInputMode === 'ht' ? forfaitTtcEffective : forfaitHtEffective)}
-              </strong>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {/* Remise globale */}
       <div style={{ marginBottom: '1.5rem' }}>

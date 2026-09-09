@@ -166,6 +166,74 @@ export function rebuildDevisParcours(
   return out
 }
 
+/** Réordonne les produits imbriqués sous un jalon (glisser-déposer). */
+export function reorderJalonProductKeys(
+  meta: EntityMetaPayload,
+  jalonId: string,
+  fromIndex: number,
+  toIndex: number,
+  lines: { row_key?: string; ref_article_id?: number | null }[],
+): EntityMetaPayload {
+  const jalons = meta.devis_jalons ?? []
+  const jIdx = jalons.findIndex((j) => j.id === jalonId)
+  if (jIdx < 0) return meta
+
+  const keys = [...(jalons[jIdx].product_line_keys ?? [])]
+  if (
+    fromIndex < 0 ||
+    fromIndex >= keys.length ||
+    toIndex < 0 ||
+    toIndex >= keys.length ||
+    fromIndex === toIndex
+  ) {
+    return meta
+  }
+
+  const [movedKey] = keys.splice(fromIndex, 1)
+  keys.splice(toIndex, 0, movedKey)
+
+  const refByKey = new Map<string, number>()
+  lines.forEach((l, i) => {
+    const key = lineKeyForRow(l, i)
+    if (l.ref_article_id != null) refByKey.set(key, l.ref_article_id)
+  })
+  const newRefs = keys
+    .map((k) => refByKey.get(k))
+    .filter((id): id is number => id != null)
+
+  const nextJalons = jalons.map((j, i) =>
+    i === jIdx
+      ? {
+          ...j,
+          product_line_keys: keys,
+          product_ref_article_ids:
+            newRefs.length > 0 ? newRefs : (j.product_ref_article_ids ?? []),
+        }
+      : j,
+  )
+
+  const parcours = [...(meta.devis_parcours ?? getEffectiveDevisParcours(lines, meta))]
+  const jalonParcoursIdx = parcours.findIndex((p) => p.kind === 'jalon' && p.id === jalonId)
+  if (jalonParcoursIdx < 0) {
+    return { ...meta, devis_jalons: nextJalons }
+  }
+
+  const childKeySet = new Set(keys)
+  let end = jalonParcoursIdx + 1
+  while (end < parcours.length && parcours[end].kind === 'ligne' && childKeySet.has(parcours[end].id)) {
+    end++
+  }
+
+  const reorderedChildren: DevisParcoursItem[] = keys.map((id) => ({ kind: 'ligne', id }))
+  const nextParcours = [
+    ...parcours.slice(0, jalonParcoursIdx + 1),
+    ...reorderedChildren,
+    ...parcours.slice(end),
+  ]
+
+  return { ...meta, devis_jalons: nextJalons, devis_parcours: nextParcours }
+}
+
 export function filterDevisParcoursRemoveLigne(
   p: DevisParcoursItem[] | undefined,
   lineId: string,

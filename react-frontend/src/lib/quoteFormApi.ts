@@ -79,10 +79,27 @@ export function buildQuoteApiBody(form: QuoteFormState): QuoteCreateBody {
     })
   }
   if (meta.mode_devis === 'forfait') {
-    meta.tarif_global_hors_lignes_ht = Math.max(0, finiteNum(meta.tarif_global_hors_lignes_ht, 0))
+    meta.tarif_global_quantity = Math.max(1, Math.round(finiteNum(meta.tarif_global_quantity, 1)))
+    meta.tarif_global_prix_unitaire_ht = Math.max(
+      0,
+      finiteNum(meta.tarif_global_prix_unitaire_ht, 0),
+    )
+    meta.tarif_global_hors_lignes_ht = Math.max(
+      0,
+      finiteNum(
+        meta.tarif_global_hors_lignes_ht,
+        meta.tarif_global_quantity * meta.tarif_global_prix_unitaire_ht,
+      ),
+    )
     meta.tarif_global_unite = (meta.tarif_global_unite ?? '').trim() || 'F'
+    const designation = (meta.tarif_global_designation ?? '').trim()
+    if (designation) meta.tarif_global_designation = designation
+    else delete meta.tarif_global_designation
   } else if (meta.tarif_global_hors_lignes_ht == null) {
     delete meta.tarif_global_hors_lignes_ht
+    delete meta.tarif_global_designation
+    delete meta.tarif_global_quantity
+    delete meta.tarif_global_prix_unitaire_ht
     delete meta.tarif_global_unite
   }
   if (meta.frais_supplementaires && meta.frais_supplementaires.length === 0) delete meta.frais_supplementaires

@@ -5,14 +5,23 @@ import UniteSelect from '../UniteSelect'
 import { lineHt, isJalonForfait, lineLockedByForfaitJalon, quoteFormPricingLines } from '../../../lib/quoteTotals'
 import {
   clearedForfaitJalonPricing,
+  DEFAULT_FORFAIT_DESIGNATION,
+  forfaitDocumentQuantity,
+  forfaitDocumentTotalHt,
+  forfaitDocumentUnitPrice,
   forfaitJalonQuantity,
   forfaitJalonTotalHt,
   forfaitJalonUnitPrice,
+  withSyncedForfaitDocumentMontant,
   withSyncedForfaitJalonMontant,
 } from '../../../lib/quoteForfaitJalon'
 import { formatMoney } from '../../../lib/appLocale'
-import { getEffectiveDevisParcours, lineKeyForRow } from '../../../lib/devisParcours'
-import type { DevisParcoursItem } from '../../../lib/devisParcours'
+import {
+  getEffectiveDevisParcours,
+  lineKeyForRow,
+  reorderJalonProductKeys,
+  type DevisParcoursItem,
+} from '../../../lib/devisParcours'
 import { DEFAULT_FORFAIT_UNITE, DEFAULT_QUOTE_UNITE } from '../../../lib/quoteUnites'
 
 type Props = {
@@ -102,6 +111,12 @@ function LineRow({
   updateLine,
   onDelete,
   nested,
+  draggable,
+  dragOver,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: {
   line: QuoteLineDraft
   lineIndex: number
@@ -112,15 +127,53 @@ function LineRow({
   updateLine: Props['updateLine']
   onDelete: () => void
   nested?: boolean
+  draggable?: boolean
+  dragOver?: boolean
+  onDragStart?: () => void
+  onDragOver?: (e: React.DragEvent) => void
+  onDrop?: () => void
+  onDragEnd?: () => void
 }) {
   const qty = moneyLocked ? 1 : line.quantity
   const ht = lineHt(qty, line.unit_price, line.discount_percent ?? 0)
   return (
-    <tr className={nested ? 'qw-s2g-line-row qw-s2g-line-row--nested' : 'qw-s2g-line-row'}>
+    <tr
+      className={[
+        nested ? 'qw-s2g-line-row qw-s2g-line-row--nested' : 'qw-s2g-line-row',
+        dragOver ? 'qw-s2g-line-row--drag-over' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      onDragOver={draggable ? onDragOver : undefined}
+      onDrop={draggable ? onDrop : undefined}
+    >
       <td>
-        <span className={`status-pill ${lineOriginTone(line)}`} style={{ fontSize: '0.72rem' }}>
-          {lineOrigin(line)}
-        </span>
+        <div className="qw-s2g-line-row__origin">
+          {draggable ? (
+            <button
+              type="button"
+              className="qw-drag-handle"
+              draggable
+              title="Glisser pour réordonner"
+              aria-label="Glisser pour réordonner"
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = 'move'
+                onDragStart?.()
+              }}
+              onDragEnd={onDragEnd}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+                <path
+                  fill="currentColor"
+                  d="M9 5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm6-11a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"
+                />
+              </svg>
+            </button>
+          ) : null}
+          <span className={`status-pill ${lineOriginTone(line)}`} style={{ fontSize: '0.72rem' }}>
+            {lineOrigin(line)}
+          </span>
+        </div>
       </td>
       <td>
         <input
@@ -256,10 +309,14 @@ export default function WizardStep4Lines({
   const isForfait = form.meta?.mode_devis === 'forfait'
   const [deleteIndex, setDeleteIndex] = useState<number | null>(null)
   const [deleteJalonId, setDeleteJalonId] = useState<string | null>(null)
+  const [dragState, setDragState] = useState<{ jalonId: string; fromIndex: number } | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   const jalons = form.meta?.devis_jalons ?? []
 
-  const forfaitHt = Math.max(0, Number(form.meta?.tarif_global_hors_lignes_ht ?? 0))
+  const forfaitQty = forfaitDocumentQuantity(form.meta)
+  const forfaitPu = forfaitDocumentUnitPrice(form.meta)
+  const forfaitHt = forfaitDocumentTotalHt(form.meta)
   const forfaitTva = Math.min(100, Math.max(0, Number(form.tva_rate ?? 20)))
   const forfaitTvaAmount = Math.round(forfaitHt * (forfaitTva / 100) * 100) / 100
   const forfaitTtc = Math.round((forfaitHt + forfaitTvaAmount) * 100) / 100
@@ -334,32 +391,49 @@ export default function WizardStep4Lines({
           (sum, line) => sum + lineHt(line.quantity, line.unit_price, line.discount_percent ?? 0),
           0,
         )
-        meta.tarif_global_hors_lignes_ht =
+        const ht =
           Number.isFinite(existing) && existing > 0 ? existing : Math.round(linesHt * 100) / 100
-        meta.tarif_global_unite = 'F'
+        const qty = forfaitDocumentQuantity(f.meta)
+        meta.tarif_global_designation =
+          (f.meta?.tarif_global_designation ?? '').trim() || DEFAULT_FORFAIT_DESIGNATION
+        meta.tarif_global_quantity = qty
+        meta.tarif_global_prix_unitaire_ht =
+          qty > 0 ? Math.round((ht / qty) * 100) / 100 : ht
+        meta.tarif_global_hors_lignes_ht = ht
+        meta.tarif_global_unite = (f.meta?.tarif_global_unite ?? '').trim() || DEFAULT_FORFAIT_UNITE
         meta.devis_jalons = (meta.devis_jalons ?? []).map((j) => clearedForfaitJalonPricing(j))
         delete meta.ligne_masque_prix_pdf
       } else {
         delete meta.mode_devis
         delete meta.tarif_global_hors_lignes_ht
+        delete meta.tarif_global_designation
+        delete meta.tarif_global_quantity
+        delete meta.tarif_global_prix_unitaire_ht
         delete meta.tarif_global_unite
       }
       return { ...f, lines: nextLines, meta }
     })
   }
 
-  const setForfaitHt = (raw: string) => {
-    setForm((f) => ({
-      ...f,
-      lines: f.lines.map((l) => ({ ...l, unit_price: 0, discount_percent: 0 })),
-      meta: {
+  const applyForfaitDocumentMeta = (
+    patch: Partial<NonNullable<QuoteFormState['meta']>>,
+  ) => {
+    setForm((f) => {
+      const merged = withSyncedForfaitDocumentMontant({
         ...f.meta,
         mode_devis: 'forfait',
-        tarif_global_hors_lignes_ht: raw === '' ? 0 : Math.max(0, Number(raw)),
-        tarif_global_unite: 'F',
-        devis_jalons: (f.meta.devis_jalons ?? []).map((j) => clearedForfaitJalonPricing(j)),
-      },
-    }))
+        ...patch,
+      })
+      return {
+        ...f,
+        lines: f.lines.map((l) => ({ ...l, unit_price: 0, discount_percent: 0 })),
+        meta: {
+          ...merged,
+          tarif_global_unite: (merged.tarif_global_unite ?? '').trim() || DEFAULT_FORFAIT_UNITE,
+          devis_jalons: (f.meta.devis_jalons ?? []).map((j) => clearedForfaitJalonPricing(j)),
+        },
+      }
+    })
   }
 
   const setForfaitTva = (raw: string) => {
@@ -437,6 +511,14 @@ export default function WizardStep4Lines({
       .map((i) => ({ line: form.lines[i], index: i }))
   }
 
+  const reorderJalonProducts = (jalonId: string, fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return
+    setForm((f) => ({
+      ...f,
+      meta: reorderJalonProductKeys(f.meta, jalonId, fromIndex, toIndex, f.lines),
+    }))
+  }
+
   const deleteTarget = deleteIndex != null ? form.lines[deleteIndex] : null
   const deleteJalonTarget = deleteJalonId
     ? jalons.find((j) => j.id === deleteJalonId)
@@ -475,21 +557,67 @@ export default function WizardStep4Lines({
         <div className="qw-forfait-box">
           <p className="qw-forfait-box__title">Montant forfaitaire</p>
           <p className="qw-forfait-box__hint">
-            Un seul montant HT pour tout le devis, sans affecter de prix aux jalons. Les prix des articles
-            sont désactivés ; le TTC et le PDF utilisent ce forfait.
+            Saisissez la désignation, l’unité, la quantité et le PU HT. Le total HT, la TVA et le TTC se
+            calculent automatiquement. Les prix des articles sous les jalons restent masqués.
           </p>
           <div className="qw-forfait-box__fields">
+            <label className="qw-forfait-box__field qw-forfait-box__field--wide">
+              <span>Désignation</span>
+              <input
+                className="qw-forfait-input qw-forfait-input--wide"
+                type="text"
+                value={form.meta?.tarif_global_designation ?? DEFAULT_FORFAIT_DESIGNATION}
+                onChange={(e) =>
+                  applyForfaitDocumentMeta({ tarif_global_designation: e.target.value })
+                }
+                placeholder="Prestation forfaitaire…"
+              />
+            </label>
             <label className="qw-forfait-box__field">
-              <span>Montant HT</span>
+              <span>Unité</span>
+              <UniteSelect
+                className="qw-forfait-input"
+                value={form.meta?.tarif_global_unite || DEFAULT_FORFAIT_UNITE}
+                onChange={(code) => applyForfaitDocumentMeta({ tarif_global_unite: code })}
+              />
+            </label>
+            <label className="qw-forfait-box__field">
+              <span>Qté</span>
+              <input
+                className="qw-forfait-input"
+                type="number"
+                min={1}
+                step={1}
+                value={forfaitQty}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  applyForfaitDocumentMeta({
+                    tarif_global_quantity:
+                      raw === '' ? 1 : Math.max(1, Math.round(Number(raw))),
+                  })
+                }}
+              />
+            </label>
+            <label className="qw-forfait-box__field">
+              <span>PU HT</span>
               <input
                 className="qw-forfait-input"
                 type="number"
                 min={0}
                 step={0.01}
-                value={form.meta?.tarif_global_hors_lignes_ht ?? 0}
-                onChange={(e) => setForfaitHt(e.target.value)}
+                value={forfaitPu}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  applyForfaitDocumentMeta({
+                    tarif_global_prix_unitaire_ht: raw === '' ? 0 : Math.max(0, Number(raw)),
+                  })
+                }}
               />
             </label>
+            <div className="qw-forfait-box__field qw-forfait-box__field--readonly">
+              <span>Total HT</span>
+              <strong>{formatMoney(forfaitHt)}</strong>
+            </div>
             <label className="qw-forfait-box__field">
               <span>TVA %</span>
               <input
@@ -749,8 +877,9 @@ export default function WizardStep4Lines({
                         </div>
                       </td>
                     </tr>
-                    {children.map(({ line, index }) => {
+                    {children.map(({ line, index }, childIdx) => {
                       const lock = lineMoneyLock(line, index)
+                      const canDrag = children.length > 1
                       return (
                         <LineRow
                           key={line.row_key ?? `child-${index}`}
@@ -758,11 +887,35 @@ export default function WizardStep4Lines({
                           lineIndex={index}
                           moneyLocked={lock.locked}
                           lockTitle={lock.title}
-                      uniteLocked={isForfait || lock.locked}
+                          uniteLocked={isForfait || lock.locked}
                           form={form}
                           updateLine={updateLine}
                           onDelete={() => setDeleteIndex(index)}
                           nested
+                          draggable={canDrag}
+                          dragOver={
+                            dragState?.jalonId === block.jalonId && dragOverIndex === childIdx
+                          }
+                          onDragStart={() =>
+                            setDragState({ jalonId: block.jalonId, fromIndex: childIdx })
+                          }
+                          onDragOver={(e) => {
+                            e.preventDefault()
+                            if (dragState?.jalonId === block.jalonId) {
+                              setDragOverIndex(childIdx)
+                            }
+                          }}
+                          onDrop={() => {
+                            if (dragState?.jalonId === block.jalonId) {
+                              reorderJalonProducts(block.jalonId, dragState.fromIndex, childIdx)
+                            }
+                            setDragState(null)
+                            setDragOverIndex(null)
+                          }}
+                          onDragEnd={() => {
+                            setDragState(null)
+                            setDragOverIndex(null)
+                          }}
                         />
                       )
                     })}

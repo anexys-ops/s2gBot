@@ -123,8 +123,177 @@
 
 /* Totals summary step 5 */
 .qw-totals-card { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
-.qw-totals-row { display: flex; justify-content: space-between; padding: .3rem 0; font-size: .9rem; }
-.qw-totals-row--total { font-weight: 700; font-size: 1.1rem; border-top: 2px solid #e5e7eb; padding-top: .6rem; margin-top: .3rem; }
+.qw-totals-row { display: flex; justify-content: space-between; gap: 1rem; padding: .35rem 0; font-size: .9rem; align-items: baseline; }
+.qw-totals-row strong { font-variant-numeric: tabular-nums; }
+.qw-totals-row--discount strong { color: #dc2626; }
+.qw-totals-row--muted { font-size: .82rem; color: #6b7280; }
+.qw-totals-row--total {
+  font-weight: 700;
+  font-size: 1.05rem;
+  border-top: 2px solid #e5e7eb;
+  padding-top: .75rem;
+  margin-top: .5rem;
+}
+.qw-totals-row--total strong {
+  color: #16a34a;
+  font-size: 1.35rem;
+}
+.qw-totals-card--aside {
+  position: sticky;
+  top: 1rem;
+  margin-bottom: 0;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+/* Étape 5 — Tarif & Validation */
+.qw-pricing-step {
+  max-width: 1120px;
+}
+.qw-pricing-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 1.25rem;
+  align-items: start;
+}
+.qw-pricing-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+.qw-pricing-aside {
+  min-width: 0;
+}
+.qw-pricing-card {
+  margin-bottom: 1rem;
+}
+.qw-pricing-card__header {
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.65rem;
+}
+.qw-pricing-card__header h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+.qw-pricing-card__hint {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: #6b7280;
+  font-weight: 400;
+}
+.qw-pricing-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.qw-pricing-card--forfait {
+  border-color: #fcd34d;
+  background: linear-gradient(180deg, #fffbeb 0%, #fff 55%);
+}
+.qw-pricing-forfait-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+}
+.qw-pricing-forfait-summary__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #fde68a;
+  font-size: 0.82rem;
+  color: #92400e;
+}
+.qw-pricing-forfait-summary__item strong {
+  font-size: 1.05rem;
+  color: #1f2937;
+  font-variant-numeric: tabular-nums;
+}
+.qw-pricing-discount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+}
+.qw-pricing-discount__mode {
+  margin: 0;
+}
+.qw-pricing-discount__value {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+}
+.qw-pricing-field {
+  margin: 0;
+}
+.qw-pricing-field label {
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+.qw-pricing-field--grow {
+  flex: 2 1 12rem;
+  min-width: 10rem;
+}
+.qw-pricing-field--tva {
+  flex: 0 0 5.5rem;
+  min-width: 5.5rem;
+}
+.qw-pricing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem 1rem;
+}
+.qw-pricing-grid__full {
+  grid-column: 1 / -1;
+}
+.qw-pricing-empty {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px dashed #d1d5db;
+  color: #6b7280;
+  font-size: 0.88rem;
+}
+.qw-pricing-frais-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.qw-pricing-frais-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px solid #eef0f3;
+}
+.qw-pricing-frais-row__remove {
+  flex-shrink: 0;
+  margin-bottom: 0.15rem;
+}
+.qw-pricing-add-frais {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+}
+
+@media (max-width: 960px) {
+  .qw-pricing-layout {
+    grid-template-columns: 1fr;
+  }
+  .qw-totals-card--aside {
+    position: static;
+    order: -1;
+  }
+  .qw-pricing-forfait-summary {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* Step 6 send */
 .qw-send-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 1.5rem; margin-bottom: 1rem; }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Support\AgencyAccess;
 use App\Support\ClientListEnrichment;
+use App\Services\DocumentActivityLogger;
 use App\Support\ClientPortalAccess;
 use App\Support\ClientPortalCatalog;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +14,13 @@ use Illuminate\Http\Request;
 
 class ClientController extends Controller
 {
+    private const CLIENT_AUDIT_FIELDS = [
+        'name', 'email', 'phone', 'whatsapp', 'siret', 'ice', 'rc', 'city', 'address',
+        'commercial_id', 'portal_modules',
+    ];
+
+    public function __construct(private DocumentActivityLogger $documentActivity) {}
+
     private const REFERENT_RELATIONS = [
         'commercial:id,name,email',
         'responsableTechnique:id,name,email',
@@ -85,6 +93,7 @@ class ClientController extends Controller
 
         $validated = $request->validate($this->rules());
         $client    = Client::create($validated);
+        $this->documentActivity->clientCreated($request->user(), $client);
 
         return response()->json($client->load(['sites', ...self::REFERENT_RELATIONS]), 201);
     }
@@ -116,9 +125,12 @@ class ClientController extends Controller
         }
 
         $validated = $request->validate($this->rules(sometimes: true));
+        $before = $client->only(self::CLIENT_AUDIT_FIELDS);
         $client->update($validated);
+        $fresh = $client->fresh();
+        $this->documentActivity->clientUpdated($request->user(), $fresh, $before);
 
-        return response()->json($client->load(['sites', ...self::REFERENT_RELATIONS]));
+        return response()->json($fresh->load(['sites', ...self::REFERENT_RELATIONS]));
     }
 
     public function destroy(Request $request, Client $client): JsonResponse
@@ -127,6 +139,7 @@ class ClientController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
+        $this->documentActivity->clientDeleted($request->user(), $client);
         $client->delete();
 
         return response()->json(null, 204);

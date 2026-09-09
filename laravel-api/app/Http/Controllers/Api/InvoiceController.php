@@ -15,6 +15,7 @@ use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
 use Illuminate\Database\Eloquent\Builder;
 use App\Services\CommercialDocumentTotalsService;
+use App\Services\DocumentActivityLogger;
 use App\Services\InvoiceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,9 +26,15 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InvoiceController extends Controller
 {
+    private const INVOICE_AUDIT_FIELDS = [
+        'number', 'client_id', 'contact_id', 'invoice_date', 'due_date', 'status',
+        'notes', 'amount_ht', 'amount_ttc', 'tva_rate', 'discount_percent', 'discount_amount',
+    ];
+
     public function __construct(
         private InvoiceService $invoiceService,
-        private DocumentSequenceService $documentSequences
+        private DocumentSequenceService $documentSequences,
+        private DocumentActivityLogger $documentActivity,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -351,7 +358,10 @@ class InvoiceController extends Controller
             ]);
         }
 
-        return response()->json($invoice->fresh()->load([
+        $fresh = $invoice->fresh();
+        $this->documentActivity->invoiceCreated($request->user(), $fresh);
+
+        return response()->json($fresh->load([
             'client', 'clientContact', 'orders', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
         ]), 201);
     }
@@ -375,6 +385,8 @@ class InvoiceController extends Controller
         }
 
         $statusRule = Rule::in(Invoice::statuses());
+        $before = $invoice->only(self::INVOICE_AUDIT_FIELDS);
+        $tasks = [];
 
         if ($invoice->status !== Invoice::STATUS_DRAFT) {
             $validated = $request->validate([
@@ -390,8 +402,11 @@ class InvoiceController extends Controller
             $invoice->update($validated);
             $invoice->refresh();
             ClientContactDocument::assertBelongsToClient($invoice->contact_id, (int) $invoice->client_id);
+            $fresh = $invoice->fresh();
+            $tasks[] = 'statut/relance';
+            $this->documentActivity->invoiceUpdated($request->user(), $fresh, $before, $tasks);
 
-            return response()->json($invoice->fresh()->load([
+            return response()->json($fresh->load([
                 'client', 'clientContact', 'orders', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
             ]));
         }
@@ -433,6 +448,7 @@ class InvoiceController extends Controller
         if (isset($validated['lines'])) {
             $defaultTva = $validated['tva_rate'] ?? $invoice->tva_rate;
             $invoice->invoiceLines()->delete();
+            $tasks[] = 'lignes facture';
             foreach ($validated['lines'] as $line) {
                 $tva = isset($line['tva_rate']) ? (float) $line['tva_rate'] : (float) $defaultTva;
                 $disc = isset($line['discount_percent']) ? (float) $line['discount_percent'] : 0;
@@ -458,7 +474,10 @@ class InvoiceController extends Controller
             $this->invoiceService->recalculateTotals($invoice);
         }
 
-        return response()->json($invoice->fresh()->load([
+        $fresh = $invoice->fresh();
+        $this->documentActivity->invoiceUpdated($request->user(), $fresh, $before, $tasks);
+
+        return response()->json($fresh->load([
             'client', 'clientContact', 'orders', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
         ]));
     }
@@ -469,6 +488,7 @@ class InvoiceController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
+        $this->documentActivity->invoiceDeleted($request->user(), $invoice);
         $invoice->delete();
 
         return response()->json(null, 204);

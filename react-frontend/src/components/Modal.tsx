@@ -4,9 +4,14 @@ type ModalProps = {
   title: string
   children: ReactNode
   onClose: () => void
+  /** default 520px · wide 720px · xl 920px */
+  size?: 'default' | 'wide' | 'xl'
 }
 
-export default function Modal({ title, children, onClose }: ModalProps) {
+export default function Modal({ title, children, onClose, size = 'default' }: ModalProps) {
+  const boxClass =
+    size === 'xl' ? 'modal-box modal-box--xl' : size === 'wide' ? 'modal-box modal-box--wide' : 'modal-box'
+
   return (
     <div
       className="modal-overlay"
@@ -17,7 +22,7 @@ export default function Modal({ title, children, onClose }: ModalProps) {
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
     >
       <div
-        className="modal-box"
+        className={boxClass}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-head">

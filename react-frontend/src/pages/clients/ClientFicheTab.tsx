@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { clientsApi, adminUsersApi, type Client, type EntityMetaPayload } from '../../api/client'
-import ClientMoroccoFormFields from '../../components/clients/ClientMoroccoFormFields'
+import ClientFormModal from '../../components/clients/ClientFormModal'
 import EntityMetaCard from '../../components/module/EntityMetaCard'
-import Modal from '../../components/Modal'
 import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
 import { legalFormLabel } from '../../constants/moroccoClient'
 import ClientPortalModulesPanel from '../../components/clients/ClientPortalModulesPanel'
@@ -207,71 +206,16 @@ export default function ClientFicheTab() {
       />
 
       {modalOpen && isAdmin && (
-        <Modal title="Modifier le client" onClose={() => setModalOpen(false)}>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>Nom *</label>
-              <input value={form.name ?? ''} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
-            </div>
-            <div className="form-group">
-              <label>Adresse</label>
-              <input value={form.address ?? ''} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label>Email</label>
-              <input type="email" value={form.email ?? ''} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-            </div>
-            <ClientMoroccoFormFields form={form} setForm={setForm} />
-
-            {/* GPS */}
-            <fieldset style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: '0.75rem', marginTop: '0.75rem' }}>
-              <legend style={{ fontSize: '0.85rem', fontWeight: 600, padding: '0 0.25rem' }}>Coordonnées GPS (optionnel)</legend>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Latitude</label>
-                  <input type="number" step="any" value={form.lat ?? ''} onChange={(e) => setForm((f) => ({ ...f, lat: e.target.value ? Number(e.target.value) : null }))} placeholder="ex: 33.5731" />
-                </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Longitude</label>
-                  <input type="number" step="any" value={form.lng ?? ''} onChange={(e) => setForm((f) => ({ ...f, lng: e.target.value ? Number(e.target.value) : null }))} placeholder="ex: -7.5898" />
-                </div>
-              </div>
-            </fieldset>
-
-            {/* Référents S2G */}
-            <fieldset style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: '0.75rem', marginTop: '0.75rem' }}>
-              <legend style={{ fontSize: '0.85rem', fontWeight: 600, padding: '0 0.25rem' }}>Référents S2G</legend>
-              {[
-                { key: 'commercial_id', label: 'Commercial' },
-                { key: 'responsable_technique_id', label: 'Responsable technique' },
-                { key: 'responsable_facturation_id', label: 'Facturation' },
-                { key: 'responsable_recouvrement_id', label: 'Recouvrement' },
-              ].map(({ key, label }) => (
-                <div key={key} className="form-group">
-                  <label>{label}</label>
-                  <select
-                    value={String(form[key as keyof typeof form] ?? '')}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value ? Number(e.target.value) : null }))}
-                  >
-                    <option value="">— Aucun —</option>
-                    {staffUsers.map((u) => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-            </fieldset>
-
-            <div className="crud-actions" style={{ marginTop: '1rem' }}>
-              <button type="submit" className="btn btn-primary" disabled={updateMut.isPending}>
-                Enregistrer
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>
-                Annuler
-              </button>
-            </div>
-          </form>
-        </Modal>
+        <ClientFormModal
+          mode="edit"
+          form={form}
+          setForm={setForm}
+          onSubmit={handleSubmit}
+          onClose={() => setModalOpen(false)}
+          isPending={updateMut.isPending}
+          errorMessage={updateMut.isError ? (updateMut.error as Error).message : null}
+          staffUsers={staffUsers}
+        />
       )}
       {toast && (
         <Toast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} />

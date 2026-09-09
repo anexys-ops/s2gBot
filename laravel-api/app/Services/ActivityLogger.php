@@ -8,13 +8,19 @@ use Illuminate\Database\Eloquent\Model;
 
 class ActivityLogger
 {
-    public function log(?User $user, string $action, ?Model $subject = null, ?array $properties = null): ActivityLog
-    {
+    public function log(
+        ?User $user,
+        string $action,
+        ?Model $subject = null,
+        ?array $properties = null,
+        ?string $description = null,
+    ): ActivityLog {
         $req = request();
 
         return ActivityLog::query()->create([
             'user_id' => $user?->id,
             'action' => $action,
+            'description' => $description,
             'subject_type' => $subject ? $subject::class : null,
             'subject_id' => $subject?->getKey(),
             'properties' => $properties,

@@ -3,12 +3,11 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { clientsApi, type Client } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
-import Modal from '../components/Modal'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { ListTablePanelHeader } from '../components/ListTablePanel'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
-import ClientMoroccoFormFields from '../components/clients/ClientMoroccoFormFields'
+import ClientFormModal from '../components/clients/ClientFormModal'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import Toast, { toastErrorMessage, type ToastVariant } from '../components/Toast'
 import TableRowActions from '../components/TableRowActions'
@@ -425,31 +424,19 @@ export default function Clients() {
       </div>
 
       {modal && (
-        <Modal title={modal === 'create' ? 'Nouveau client' : 'Modifier le client'} onClose={() => setModal(null)}>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>Nom *</label>
-              <input value={form.name ?? ''} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
-            </div>
-            <div className="form-group">
-              <label>Adresse (rue, quartier…)</label>
-              <input value={form.address ?? ''} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label>Email</label>
-              <input type="email" value={form.email ?? ''} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-            </div>
-            <ClientMoroccoFormFields form={form} setForm={setForm} />
-            <div className="crud-actions" style={{ marginTop: '1rem' }}>
-              <button type="submit" className="btn btn-primary" disabled={createMut.isPending || updateMut.isPending}>
-                Enregistrer
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>
-                Annuler
-              </button>
-            </div>
-          </form>
-        </Modal>
+        <ClientFormModal
+          mode={modal}
+          form={form}
+          setForm={setForm}
+          onSubmit={handleSubmit}
+          onClose={() => setModal(null)}
+          isPending={createMut.isPending || updateMut.isPending}
+          errorMessage={
+            createMut.isError || updateMut.isError
+              ? ((createMut.error ?? updateMut.error) as Error).message
+              : null
+          }
+        />
       )}
       {toast && (
         <Toast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} />

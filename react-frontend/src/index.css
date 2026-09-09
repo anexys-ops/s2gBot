@@ -2790,6 +2790,46 @@ a.ds-icon-btn {
   font-size: 0.85rem;
 }
 
+.settings-logs__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  align-items: flex-end;
+}
+
+.settings-logs__search-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.settings-logs__search-label input,
+.settings-logs__search-label select {
+  font-weight: 400;
+  color: inherit;
+}
+
+.monitoring-table__desc {
+  min-width: 200px;
+  max-width: 320px;
+  line-height: 1.4;
+}
+
+.monitoring-table__changes {
+  min-width: 180px;
+  max-width: 280px;
+  font-size: 0.82rem;
+  color: var(--color-muted);
+  line-height: 1.35;
+}
+
 .monitoring-table {
   width: 100%;
   border-collapse: collapse;
@@ -3493,6 +3533,26 @@ a.ds-icon-btn {
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+}
+.modal-box--wide {
+  max-width: min(94vw, 720px);
+}
+.modal-box--xl,
+.modal-box:has(.client-form-modal) {
+  max-width: min(96vw, 920px);
+  max-height: min(92vh, 900px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-box--xl .modal-body,
+.modal-box:has(.client-form-modal) .modal-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 0;
 }
 .modal-box:has(.catalogue-article-new-form),
 .modal-box:has(.equipment-create-form),
@@ -6079,6 +6139,178 @@ a.ds-icon-btn {
   margin-top: 1.25rem;
   padding-top: 1rem;
   border-top: 1px solid var(--color-border);
+}
+
+/* Client — formulaire modal large */
+.client-form-modal {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.client-form-modal__hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.15rem 1.35rem;
+  background: linear-gradient(135deg, #1c3a6e 0%, #2d5aa8 55%, #3b82c4 100%);
+  color: #fff;
+}
+.client-form-modal__avatar {
+  flex-shrink: 0;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 1.35rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.client-form-modal__hero-kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.82;
+}
+.client-form-modal__hero-name {
+  margin: 0 0 0.35rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.client-form-modal__hero-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  opacity: 0.88;
+  max-width: 42rem;
+}
+.client-form-modal__sections {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.1rem 1.25rem 0.5rem;
+  background: #f8fafc;
+}
+.client-form-modal__panel {
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 1rem 1.05rem 1.05rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.client-form-modal__panel--identity {
+  border-left: 4px solid #2563eb;
+  background: linear-gradient(180deg, #f8fbff 0%, #fff 100%);
+}
+.client-form-modal__panel--location {
+  border-left: 4px solid #0d9488;
+  background: linear-gradient(180deg, #f0fdfa 0%, #fff 100%);
+}
+.client-form-modal__panel--legal {
+  border-left: 4px solid #b45309;
+  background: linear-gradient(180deg, #fffbeb 0%, #fff 100%);
+}
+.client-form-modal__panel--gps {
+  border-left: 4px solid #7c3aed;
+  background: linear-gradient(180deg, #f5f3ff 0%, #fff 100%);
+}
+.client-form-modal__panel--staff {
+  border-left: 4px solid #1c3a6e;
+  background: linear-gradient(180deg, #eef2ff 0%, #fff 100%);
+}
+.client-form-modal__panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+.client-form-modal__panel-icon {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+  background: rgba(15, 23, 42, 0.05);
+}
+.client-form-modal__panel-title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.client-form-modal__panel-desc {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+.client-form-modal__grid {
+  margin-bottom: 0;
+}
+.client-form-modal__grid .form-group,
+.client-form-modal__field {
+  margin-bottom: 0;
+}
+.client-form-modal__field--wide {
+  grid-column: 1 / -1;
+}
+.client-form-modal__field label,
+.client-form-modal__staff-field label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+  letter-spacing: 0.01em;
+}
+.client-form-modal__field input,
+.client-form-modal__field select,
+.client-form-modal__staff-field select {
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.client-form-modal__field input:focus,
+.client-form-modal__field select:focus,
+.client-form-modal__staff-field select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  outline: none;
+}
+.client-form-modal__grid--staff {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+}
+.client-form-modal__staff-icon {
+  margin-right: 0.35rem;
+}
+.client-form-modal__staff-field select {
+  width: 100%;
+}
+.client-form-modal__error {
+  margin: 0 1.25rem;
+}
+.client-form-modal__actions {
+  margin: 0;
+  padding: 1rem 1.25rem 1.15rem;
+  border-top: 1px solid #e2e8f0;
+  background: #fff;
+  position: sticky;
+  bottom: 0;
+}
+@media (max-width: 640px) {
+  .client-form-modal__hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .client-form-modal__sections {
+    padding: 0.85rem 0.85rem 0.35rem;
+  }
 }
 
 .quote-devis-header {

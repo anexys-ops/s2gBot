@@ -2057,6 +2057,7 @@ export const activityLogsApi = {
 }
 
 export type MonitoringActivityRow = ActivityLogRow & {
+  description?: string | null
   user?: { id: number; name: string; email?: string }
 }
 
@@ -2096,10 +2097,12 @@ export interface MonitoringSessionRow {
 }
 
 export const monitoringApi = {
-  activity: (params?: { limit?: number; category?: string }) => {
+  activity: (params?: { limit?: number; category?: string; search?: string; entity?: string }) => {
     const q = new URLSearchParams()
     if (params?.limit) q.set('limit', String(params.limit))
     if (params?.category) q.set('category', params.category)
+    if (params?.search) q.set('search', params.search)
+    if (params?.entity) q.set('entity', params.entity)
     const s = q.toString()
     return api<MonitoringActivityRow[]>(`/admin/monitoring/activity${s ? `?${s}` : ''}`)
   },

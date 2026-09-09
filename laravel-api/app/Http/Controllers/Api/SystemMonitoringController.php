@@ -22,6 +22,8 @@ class SystemMonitoringController extends Controller
 
         $limit = min(200, max(1, (int) $request->query('limit', 100)));
         $category = trim((string) $request->query('category', ''));
+        $search = trim((string) $request->query('search', ''));
+        $entity = trim((string) $request->query('entity', ''));
 
         $query = ActivityLog::query()->with('user:id,name,email')->orderByDesc('created_at');
 
@@ -32,6 +34,27 @@ class SystemMonitoringController extends Controller
                 'deleted' => '%.deleted',
                 'print' => '%.generated',
                 default => '%'.$category.'%',
+            });
+        }
+
+        if ($entity !== '') {
+            $query->where('action', 'like', match ($entity) {
+                'quote', 'devis' => 'quote.%',
+                'invoice', 'facture' => 'invoice.%',
+                'client' => 'client.%',
+                default => $entity.'%',
+            });
+        }
+
+        if ($search !== '') {
+            $like = '%'.$search.'%';
+            $query->where(function ($q) use ($like, $search) {
+                $q->where('description', 'like', $like)
+                    ->orWhere('action', 'like', $like)
+                    ->orWhere('properties', 'like', $like);
+                if (ctype_digit($search)) {
+                    $q->orWhere('subject_id', (int) $search);
+                }
             });
         }
 

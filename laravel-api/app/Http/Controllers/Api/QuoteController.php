@@ -17,6 +17,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Models\DocumentSequence;
 use App\Services\CommercialDocumentTotalsService;
+use App\Services\DocumentActivityLogger;
 use App\Services\QuotePricingService;
 use App\Services\DocumentSequenceService;
 use App\Services\DocumentStatusService;
@@ -29,8 +30,15 @@ use Illuminate\Validation\Rule;
 
 class QuoteController extends Controller
 {
+    private const QUOTE_AUDIT_FIELDS = [
+        'number', 'client_id', 'site_id', 'dossier_id', 'contact_id', 'quote_date',
+        'valid_until', 'status', 'notes', 'tva_rate', 'discount_percent', 'discount_amount',
+        'amount_ht', 'amount_ttc',
+    ];
+
     public function __construct(
-        private readonly DocumentSequenceService $documentSequences
+        private readonly DocumentSequenceService $documentSequences,
+        private readonly DocumentActivityLogger $documentActivity,
     ) {}
 
     private const QUOTE_LINE_BASE = [
@@ -206,7 +214,10 @@ class QuoteController extends Controller
             $this->syncDevisTaches($quote, $validated['taches'] ?? []);
         }
 
-        return response()->json($this->loadQuoteForResponse($quote->fresh()), 201);
+        $fresh = $quote->fresh();
+        $this->documentActivity->quoteCreated($request->user(), $fresh);
+
+        return response()->json($this->loadQuoteForResponse($fresh), 201);
     }
 
     public function show(Request $request, Quote $quote): JsonResponse
@@ -226,6 +237,8 @@ class QuoteController extends Controller
         }
 
         $oldStatus = $quote->status;
+        $before = $quote->only(self::QUOTE_AUDIT_FIELDS);
+        $tasks = [];
         $statusRule = Rule::in(Quote::statuses());
 
         if ($quote->status !== Quote::STATUS_DRAFT) {
@@ -243,8 +256,11 @@ class QuoteController extends Controller
             );
             $quote->save();
             $this->recordQuoteStatusChange($quote, $oldStatus, $request);
+            $fresh = $quote->fresh();
+            $tasks[] = 'statut/notes';
+            $this->documentActivity->quoteUpdated($request->user(), $fresh, $before, $tasks);
 
-            return response()->json($this->loadQuoteForResponse($quote->fresh()));
+            return response()->json($this->loadQuoteForResponse($fresh));
         }
 
         $validated = $request->validate(array_merge([
@@ -317,17 +333,21 @@ class QuoteController extends Controller
             $defaultTva = $validated['tva_rate'] ?? $quote->tva_rate;
             $quote->quoteLines()->delete();
             $this->syncQuoteLines($quote, $validated['lines'], (float) $defaultTva);
+            $tasks[] = 'lignes devis';
         }
 
         if (array_key_exists('taches', $validated)) {
             $this->syncDevisTaches($quote, $validated['taches'] ?? []);
+            $tasks[] = 'tâches devis';
         }
 
         $quote->save();
         $this->recalculateQuoteTotals($quote);
         $this->recordQuoteStatusChange($quote->fresh(), $oldStatus, $request);
+        $fresh = $quote->fresh();
+        $this->documentActivity->quoteUpdated($request->user(), $fresh, $before, $tasks);
 
-        return response()->json($this->loadQuoteForResponse($quote->fresh()));
+        return response()->json($this->loadQuoteForResponse($fresh));
     }
 
     public function destroy(Request $request, Quote $quote): JsonResponse
@@ -336,6 +356,7 @@ class QuoteController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
+        $this->documentActivity->quoteDeleted($request->user(), $quote);
         $quote->delete();
 
         return response()->json(null, 204);
@@ -413,6 +434,8 @@ class QuoteController extends Controller
             if ($quote->status !== Quote::STATUS_SENT) {
                 $quote->update(['status' => Quote::STATUS_SENT]);
             }
+
+            $this->documentActivity->quoteEmailed($user, $quote->fresh(), $recipientEmail);
 
             return response()->json([
                 'message' => 'Devis envoyé avec succès à ' . $recipientEmail,

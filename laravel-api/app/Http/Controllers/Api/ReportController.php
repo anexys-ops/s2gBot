@@ -11,6 +11,7 @@ use App\Services\ReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\URL;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -47,7 +48,11 @@ class ReportController extends Controller
         }
 
         $validated = $request->validate([
-            'pdf_template_id' => 'nullable|integer|exists:report_pdf_templates,id',
+            'pdf_template_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('document_pdf_templates', 'id')->where('document_type', 'report'),
+            ],
             'form_data' => 'nullable|array',
         ]);
 

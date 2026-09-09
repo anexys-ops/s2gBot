@@ -156,6 +156,17 @@ export default function DocumentPdfTemplateOptionsEditor({ form, setForm, disabl
             />
             Afficher les colonnes PU HT / PT HT
           </label>
+          {(documentType === 'quote' || documentType === 'invoice') && (
+            <label className="pdf-layout-editor__check">
+              <input
+                type="checkbox"
+                checked={form.lines.show_tva_column}
+                onChange={(e) => setLine(setForm, 'show_tva_column', e.target.checked)}
+                disabled={disabled || !form.lines.show_prices || !form.totals.show_total_tva}
+              />
+              Afficher la colonne TVA par ligne (modèles détaillés)
+            </label>
+          )}
         </section>
       ) : null}
 

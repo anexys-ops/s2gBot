@@ -191,6 +191,7 @@ class AppBranding
             'lines' => [
                 'show_prices' => true,
                 'show_pu_pt_columns' => true,
+                'show_tva_column' => true,
                 'show_designation' => true,
                 'show_article_code' => true,
                 'show_quantity' => true,

@@ -31,6 +31,7 @@ export interface PdfLayoutConfigForm {
   lines: {
     show_prices: boolean
     show_pu_pt_columns: boolean
+    show_tva_column: boolean
     show_designation: boolean
     show_article_code: boolean
     show_quantity: boolean
@@ -90,6 +91,7 @@ export function layoutConfigToForm(raw: PdfLayoutConfig | undefined | null): Pdf
     lines: {
       show_prices: l.show_prices !== false,
       show_pu_pt_columns: l.show_pu_pt_columns !== false,
+      show_tva_column: l.show_tva_column !== false,
       show_designation: l.show_designation !== false,
       show_article_code: l.show_article_code !== false,
       show_quantity: l.show_quantity !== false,
@@ -138,6 +140,7 @@ export function formToLayoutConfigPayload(form: PdfLayoutConfigForm): PdfLayoutC
     lines: {
       show_prices: form.lines.show_prices,
       show_pu_pt_columns: form.lines.show_pu_pt_columns,
+      show_tva_column: form.lines.show_tva_column,
       show_designation: form.lines.show_designation,
       show_article_code: form.lines.show_article_code,
       show_quantity: form.lines.show_quantity,

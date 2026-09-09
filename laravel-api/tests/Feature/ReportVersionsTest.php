@@ -21,7 +21,9 @@ class ReportVersionsTest extends TestCase
     {
         $client = Client::create(['name' => 'RepCo']);
         $agencyId = Agency::query()->where('client_id', $client->id)->where('is_headquarters', true)->value('id');
-        $tplId = (int) DB::table('report_pdf_templates')->value('id');
+        $tplId = (int) DB::table('document_pdf_templates')
+            ->where('document_type', 'report')
+            ->value('id');
 
         $order = Order::create([
             'reference' => 'ORD-RV-'.uniqid(),

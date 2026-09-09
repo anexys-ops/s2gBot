@@ -383,7 +383,9 @@ export default function ArticleActionsPanel({
   canEdit?: boolean
 }) {
   const articleId = article.id
-  const isS2g = article.kind === 'jalon' || article.kind === 'product'
+  const isJalon = article.kind === 'jalon'
+  const isProduct = article.kind === 'product'
+  const isS2g = isJalon || isProduct
   const qc = useQueryClient()
   const [deleteActionTarget, setDeleteActionTarget] = useState<ArticleAction | null>(null)
   const [deleteEquipmentTarget, setDeleteEquipmentTarget] = useState<ArticleEquipmentRequirement | null>(null)
@@ -429,9 +431,11 @@ export default function ArticleActionsPanel({
       <section className="card dossier-tab-panel">
         <h2 className="ds-form-section__title">Actions &amp; matériel</h2>
         <p className="dossier-tab-panel__intro">
-          {isS2g
-            ? 'Répartissez les produits S2G par profil (terrain, ingénieur, laboratoire) et définissez le matériel requis.'
-            : 'Définissez les actions par profil (terrain, ingénieur, laboratoire), les champs de mesure associés et le matériel requis pour réaliser la prestation.'}
+          {isJalon
+            ? 'Sur un jalon, assignez chaque sous-produit à un seul profil (terrain, ingénieur ou laboratoire). Les actions se définissent ensuite sur la fiche de chaque produit.'
+            : isProduct
+              ? 'Cochez le profil actif du produit, puis ajoutez les actions (libellé, durée, mesures) pour ce profil. Un produit ne peut être que dans une section à la fois.'
+              : 'Définissez les actions par profil (terrain, ingénieur, laboratoire), les champs de mesure associés et le matériel requis pour réaliser la prestation.'}
         </p>
       </section>
 
@@ -448,7 +452,7 @@ export default function ArticleActionsPanel({
             <div className="article-actions-section__header">
               <span className={`article-actions-type-dot ${meta.dotClass}`} aria-hidden />
               <h3 className="ds-form-section__title">{meta.label}</h3>
-              {!isS2g ? (
+              {!isJalon ? (
                 <span className="badge">
                   {typeActions.length} action{typeActions.length !== 1 ? 's' : ''}
                 </span>
@@ -457,9 +461,11 @@ export default function ArticleActionsPanel({
 
             {isS2g ? (
               <ArticleS2gSectionProducts article={article} sectionType={type} canEdit={canEdit} />
-            ) : (
+            ) : null}
+
+            {!isJalon ? (
               <>
-                <NewActionForm articleId={articleId} type={type} nextOrdre={nextOrdre} />
+                {canEdit ? <NewActionForm articleId={articleId} type={type} nextOrdre={nextOrdre} /> : null}
 
                 <div className="card dossier-tab-panel dossier-tab-panel--table article-actions-section__table">
                   <div className="dossier-tab-panel__header">
@@ -503,7 +509,7 @@ export default function ArticleActionsPanel({
                   />
                 ))}
               </>
-            )}
+            ) : null}
           </section>
         )
       })}

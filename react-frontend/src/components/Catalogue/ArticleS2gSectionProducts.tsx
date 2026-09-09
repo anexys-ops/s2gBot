@@ -116,10 +116,19 @@ export default function ArticleS2gSectionProducts({ article, sectionType, canEdi
   }
 
   if (candidates.length === 0) {
+    const otherSections =
+      sectionType === 'labo'
+        ? 'Terrain / Technicien ou Ingénieur'
+        : sectionType === 'technicien'
+          ? 'Ingénieur ou Laboratoire'
+          : 'Terrain / Technicien ou Laboratoire'
+
     return (
       <div className="card dossier-tab-panel article-section-products">
         <p className="dossier-tab-empty text-muted">
-          Tous les produits sont déjà assignés à une autre section.
+          {isProduct
+            ? `Ce produit est déjà assigné à une autre section (${otherSections}). Ouvrez l’onglet correspondant et décochez-le, puis revenez ici.`
+            : `Tous les sous-produits de ce jalon sont déjà assignés à une autre section (${otherSections}). Décochez-les dans l’onglet concerné, puis cochez-les ici.`}
         </p>
       </div>
     )

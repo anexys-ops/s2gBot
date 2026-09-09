@@ -4,9 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\BonCommande;
-use App\Models\FraisDeplacement;
+use App\Models\ExpenseLine;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
+use App\Services\ExpenseReportService;
 use App\Services\OrdreMissionFromBonCommandeService;
 use App\Support\AgencyAccess;
 use Illuminate\Http\JsonResponse;
@@ -177,14 +178,25 @@ class OrdreMissionController extends Controller
         return response()->json($q->orderBy('date_prevue')->get());
     }
 
-    public function fraisIndex(OrdreMission $ordreMission): JsonResponse
+    public function fraisIndex(OrdreMission $ordreMission, ExpenseReportService $expenseReports): JsonResponse
     {
-        return response()->json(
-            $ordreMission->fraisDeplacement()->with('user:id,name')->get()
-        );
+        $report = $ordreMission->expenseReports()->orderBy('id')->first();
+        if ($report === null) {
+            return response()->json([]);
+        }
+
+        $lines = $expenseReports
+            ->deplacementLinesQuery($report)
+            ->with('user:id,name')
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (ExpenseLine $line) => $expenseReports->deplacementLineToFraisPayload($line, $report));
+
+        return response()->json($lines);
     }
 
-    public function fraisStore(Request $request, OrdreMission $ordreMission): JsonResponse
+    public function fraisStore(Request $request, OrdreMission $ordreMission, ExpenseReportService $expenseReports): JsonResponse
     {
         $validated = $request->validate([
             'user_id'         => 'required|exists:users,id',
@@ -197,14 +209,41 @@ class OrdreMissionController extends Controller
             'notes'           => 'nullable|string',
         ]);
 
-        $frais = $ordreMission->fraisDeplacement()->create($validated);
+        $distance = (float) $validated['distance_km'];
+        $taux = (float) ($validated['taux_km'] ?? 0.401);
 
-        return response()->json($frais->load('user:id,name'), 201);
+        $report = $expenseReports->firstOrCreateForOrdreMission($ordreMission, (int) $validated['user_id']);
+
+        $line = $report->lines()->create([
+            'user_id'        => $validated['user_id'],
+            'category'       => 'Voyage',
+            'amount'         => $expenseReports->computeDeplacementAmount($distance, $taux),
+            'date'           => $validated['date'],
+            'description'    => $expenseReports->buildDeplacementDescription(
+                $validated['lieu_depart'] ?? null,
+                $validated['lieu_arrivee'] ?? null,
+                $validated['notes'] ?? null,
+            ),
+            'lieu_depart'    => $validated['lieu_depart'] ?? null,
+            'lieu_arrivee'   => $validated['lieu_arrivee'] ?? null,
+            'distance_km'    => $distance,
+            'taux_km'        => $taux,
+            'type_transport' => $validated['type_transport'] ?? 'voiture',
+        ]);
+
+        return response()->json(
+            $expenseReports->deplacementLineToFraisPayload($line->fresh(), $report->fresh()),
+            201,
+        );
     }
 
-    public function fraisUpdate(Request $request, OrdreMission $ordreMission, FraisDeplacement $frais): JsonResponse
-    {
-        abort_if($frais->ordre_mission_id !== $ordreMission->id, 404);
+    public function fraisUpdate(
+        Request $request,
+        OrdreMission $ordreMission,
+        ExpenseLine $frais,
+        ExpenseReportService $expenseReports,
+    ): JsonResponse {
+        $report = $expenseReports->assertDeplacementLineBelongsToOrdreMission($frais, $ordreMission);
 
         $validated = $request->validate([
             'date'           => 'sometimes|date',
@@ -214,18 +253,43 @@ class OrdreMissionController extends Controller
             'taux_km'        => 'nullable|numeric|min:0',
             'type_transport' => 'nullable|in:voiture,moto,velo,transports_commun,autre',
             'notes'          => 'nullable|string',
-            'statut'         => 'sometimes|in:draft,valide,rembourse',
         ]);
 
-        $frais->update($validated);
+        $distance = array_key_exists('distance_km', $validated)
+            ? (float) $validated['distance_km']
+            : (float) ($frais->distance_km ?? 0);
+        $taux = array_key_exists('taux_km', $validated)
+            ? (float) ($validated['taux_km'] ?? 0.401)
+            : (float) ($frais->taux_km ?? 0.401);
 
-        return response()->json($frais->fresh()->load('user:id,name'));
+        $lieuDepart = array_key_exists('lieu_depart', $validated) ? $validated['lieu_depart'] : $frais->lieu_depart;
+        $lieuArrivee = array_key_exists('lieu_arrivee', $validated) ? $validated['lieu_arrivee'] : $frais->lieu_arrivee;
+        $notes = array_key_exists('notes', $validated) ? $validated['notes'] : $frais->description;
+
+        $frais->update([
+            ...$validated,
+            'amount'      => $expenseReports->computeDeplacementAmount($distance, $taux),
+            'distance_km' => $distance,
+            'taux_km'     => $taux,
+            'description' => $expenseReports->buildDeplacementDescription($lieuDepart, $lieuArrivee, $notes),
+        ]);
+
+        return response()->json(
+            $expenseReports->deplacementLineToFraisPayload($frais->fresh()->load('user:id,name'), $report->fresh()),
+        );
     }
 
-    public function fraisDestroy(OrdreMission $ordreMission, FraisDeplacement $frais): JsonResponse
-    {
-        abort_if($frais->ordre_mission_id !== $ordreMission->id, 404);
+    public function fraisDestroy(
+        OrdreMission $ordreMission,
+        ExpenseLine $frais,
+        ExpenseReportService $expenseReports,
+    ): JsonResponse {
+        $report = $expenseReports->assertDeplacementLineBelongsToOrdreMission($frais, $ordreMission);
         $frais->delete();
+
+        if (! $report->lines()->exists()) {
+            $report->delete();
+        }
 
         return response()->json(null, 204);
     }

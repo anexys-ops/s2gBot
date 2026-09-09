@@ -2962,9 +2962,13 @@ export interface OrdreMission {
   lignes?: OrdreMissionLigne[]
 }
 
+/** Ligne de déplacement km — stockée dans expense_lines (note de frais / NDF). */
 export interface FraisDeplacement {
   id: number
   ordre_mission_id: number
+  expense_report_id: number
+  expense_report_number: string
+  ndf_statut: ExpenseReportStatut
   user_id: number
   date: string
   lieu_depart?: string | null
@@ -2974,6 +2978,7 @@ export interface FraisDeplacement {
   montant: number
   type_transport: string
   notes?: string | null
+  /** Alias legacy — préférer ndf_statut */
   statut: 'draft' | 'valide' | 'rembourse'
   user?: { id: number; name: string } | null
 }
@@ -3370,6 +3375,20 @@ export const planningApi = {
 export const EXPENSE_CATEGORIES = ['Essence', 'Hotel', 'Voyage', 'Repas', 'Peage', 'Parking', 'Divers'] as const
 export type ExpenseCategory = typeof EXPENSE_CATEGORIES[number]
 
+export const EXPENSE_PAYMENT_METHODS = ['especes', 'cb', 'virement', 'cheque', 'autre'] as const
+export type ExpensePaymentMethod = typeof EXPENSE_PAYMENT_METHODS[number]
+
+export const EXPENSE_PAYMENT_METHOD_LABELS: Record<ExpensePaymentMethod, string> = {
+  especes: 'Espèces',
+  cb: 'Carte bancaire',
+  virement: 'Virement',
+  cheque: 'Chèque',
+  autre: 'Autre',
+}
+
+export const EXPENSE_TRANSPORT_TYPES = ['voiture', 'moto', 'velo', 'transports_commun', 'autre'] as const
+export type ExpenseTransportType = typeof EXPENSE_TRANSPORT_TYPES[number]
+
 export interface ExpenseLine {
   id: number
   expense_report_id: number
@@ -3377,12 +3396,25 @@ export interface ExpenseLine {
   user?: { id: number; name: string }
   category: ExpenseCategory
   amount: number
+  payment_method?: ExpensePaymentMethod | null
   date: string
   description?: string
-  receipt_path?: string
+  receipt_path?: string | null
+  receipt_filename?: string | null
+  lieu_depart?: string | null
+  lieu_arrivee?: string | null
+  distance_km?: number | null
+  taux_km?: number | null
+  type_transport?: ExpenseTransportType | null
   created_at: string
   updated_at: string
 }
+
+export function isExpenseDeplacementLine(line: Pick<ExpenseLine, 'category' | 'distance_km'>): boolean {
+  return line.category === 'Voyage' && line.distance_km != null
+}
+
+export type ExpenseReportStatut = 'brouillon' | 'soumis' | 'valide' | 'rembourse' | 'rejete'
 
 export interface ExpenseReport {
   id: number
@@ -3398,7 +3430,7 @@ export interface ExpenseReport {
     client?: { id: number; name: string }
     site?: { id: number; nom?: string; name?: string }
   }
-  statut: 'brouillon' | 'soumis' | 'valide' | 'rembourse' | 'rejete'
+  statut: ExpenseReportStatut
   notes?: string
   created_by?: number
   created_by_user?: { id: number; name: string }
@@ -3439,6 +3471,46 @@ export const expenseReportsApi = {
 
   deleteLine: (reportId: number, lineId: number) =>
     api<void>(`/expense-reports/${reportId}/lines/${lineId}`, { method: 'DELETE' }),
+
+  async uploadLineReceipt(reportId: number, lineId: number, file: File): Promise<ExpenseLine> {
+    const token = getToken()
+    const fd = new FormData()
+    fd.append('file', file)
+    const path = `/expense-reports/${reportId}/lines/${lineId}/receipt`
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}`, Accept: 'application/json' } : { Accept: 'application/json' },
+      body: fd,
+    })
+    if (res.status === 401) {
+      handleApiUnauthorized(path, Boolean(token))
+    }
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error((data as { message?: string }).message || `Erreur ${res.status}`)
+    return data as ExpenseLine
+  },
+
+  async downloadLineReceipt(reportId: number, lineId: number, filename: string): Promise<void> {
+    const token = getToken()
+    const path = `/expense-reports/${reportId}/lines/${lineId}/receipt`
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (res.status === 401) {
+      handleApiUnauthorized(path, Boolean(token))
+    }
+    if (!res.ok) throw new Error('Justificatif introuvable')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+
+  deleteLineReceipt: (reportId: number, lineId: number) =>
+    api<ExpenseLine>(`/expense-reports/${reportId}/lines/${lineId}/receipt`, { method: 'DELETE' }),
 }
 
 // ─── Lab Reports ────────────────────────────────────────────────────────────

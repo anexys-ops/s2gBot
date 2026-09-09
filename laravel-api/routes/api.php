@@ -397,6 +397,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('expense-reports/{expenseReport}/lines', [ExpenseReportController::class, 'storeLine']);
     Route::put('expense-reports/{expenseReport}/lines/{line}', [ExpenseReportController::class, 'updateLine']);
     Route::delete('expense-reports/{expenseReport}/lines/{line}', [ExpenseReportController::class, 'destroyLine']);
+    Route::post('expense-reports/{expenseReport}/lines/{line}/receipt', [ExpenseReportController::class, 'uploadLineReceipt']);
+    Route::get('expense-reports/{expenseReport}/lines/{line}/receipt', [ExpenseReportController::class, 'downloadLineReceipt']);
+    Route::delete('expense-reports/{expenseReport}/lines/{line}/receipt', [ExpenseReportController::class, 'deleteLineReceipt']);
 
     // App mobile laboratoire / terrain — dossiers (mesures + photos)
     Route::prefix('mobile/dossiers')->group(function () {

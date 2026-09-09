@@ -1,19 +1,26 @@
 /**
  * ExpenseReportsPage — Notes de frais (NDF)
- * Liste les NDF + création depuis un OM terrain/ingénieur + gestion des lignes.
+ * CRUD lignes, justificatifs, modes de paiement.
  */
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  adminUsersApi,
   expenseReportsApi,
   EXPENSE_CATEGORIES,
-  type ExpenseReport,
+  EXPENSE_PAYMENT_METHOD_LABELS,
+  EXPENSE_PAYMENT_METHODS,
+  EXPENSE_TRANSPORT_TYPES,
+  isExpenseDeplacementLine,
   type ExpenseLine,
+  type ExpensePaymentMethod,
+  type ExpenseReport,
   type ExpenseCategory,
+  type ExpenseTransportType,
 } from '../../api/client'
+import { useAuth } from '../../contexts/AuthContext'
 import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 
-// ── Couleur badge statut ─────────────────────────────────────────────────────
 const STATUT_COLORS: Record<string, string> = {
   brouillon: '#6b7280',
   soumis:    '#3b82f6',
@@ -22,7 +29,28 @@ const STATUT_COLORS: Record<string, string> = {
   rejete:    '#ef4444',
 }
 
-// ── Composant ligne individuelle ─────────────────────────────────────────────
+function computeKmAmount(distanceKm: number, tauxKm: number): number {
+  return Math.round(Math.max(0, distanceKm) * Math.max(0, tauxKm) * 2 * 100) / 100
+}
+
+function paymentLabel(method?: ExpensePaymentMethod | null): string {
+  if (!method) return '—'
+  return EXPENSE_PAYMENT_METHOD_LABELS[method] ?? method
+}
+
+function lineDetailText(line: ExpenseLine): string {
+  const parts: string[] = []
+  if (line.description) parts.push(line.description)
+  if (isExpenseDeplacementLine(line)) {
+    const trajet = [line.lieu_depart, line.lieu_arrivee].filter(Boolean).join(' → ')
+    if (trajet) parts.push(trajet)
+    if (line.distance_km != null) {
+      parts.push(`${line.distance_km} km × ${line.taux_km ?? 0.401} (A/R)`)
+    }
+  }
+  return parts.join(' · ') || '—'
+}
+
 function LineRow({
   line,
   reportId,
@@ -40,6 +68,17 @@ function LineRow({
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['expense-report', reportId] }),
   })
 
+  const downloadMut = useMutation({
+    mutationFn: () =>
+      expenseReportsApi.downloadLineReceipt(
+        reportId,
+        line.id,
+        line.receipt_filename ?? `justificatif-ligne-${line.id}`,
+      ),
+  })
+
+  const fromOm = isExpenseDeplacementLine(line)
+
   if (editing) {
     return (
       <LineForm
@@ -55,9 +94,30 @@ function LineRow({
       <td style={{ fontSize: '0.82rem' }}>{line.date}</td>
       <td>
         <span className="badge">{line.category}</span>
+        {fromOm ? (
+          <span className="badge" style={{ marginLeft: '0.35rem', background: '#dbeafe', color: '#1d4ed8' }}>
+            OM
+          </span>
+        ) : null}
       </td>
       <td style={{ fontWeight: 600 }}>{formatMoney(Number(line.amount))}</td>
-      <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>{line.description || '—'}</td>
+      <td style={{ fontSize: '0.82rem' }}>{paymentLabel(line.payment_method)}</td>
+      <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>{lineDetailText(line)}</td>
+      <td style={{ fontSize: '0.82rem' }}>
+        {line.receipt_path ? (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={downloadMut.isPending}
+            onClick={() => downloadMut.mutate()}
+            title={line.receipt_filename ?? 'Télécharger le justificatif'}
+          >
+            📎 {line.receipt_filename ? line.receipt_filename.slice(0, 18) : 'Justificatif'}
+          </button>
+        ) : (
+          <span className="text-muted">—</span>
+        )}
+      </td>
       <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>{line.user?.name || `#${line.user_id}`}</td>
       {canEdit && (
         <td style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
@@ -66,7 +126,7 @@ function LineRow({
             type="button"
             className="btn btn-secondary btn-sm btn-danger-outline"
             disabled={deleteMut.isPending}
-            onClick={() => { if (window.confirm('Supprimer ?')) deleteMut.mutate() }}
+            onClick={() => { if (window.confirm('Supprimer cette ligne ?')) deleteMut.mutate() }}
           >✕</button>
         </td>
       )}
@@ -74,7 +134,6 @@ function LineRow({
   )
 }
 
-// ── Formulaire ligne ─────────────────────────────────────────────────────────
 function LineForm({
   initial,
   reportId,
@@ -84,24 +143,76 @@ function LineForm({
   reportId: number
   onDone: () => void
 }) {
-  const user = { id: 1 }
+  const { user: authUser } = useAuth()
   const qc = useQueryClient()
+  const isEdit = !!initial?.id
+  const isVoyage = (initial?.category ?? 'Repas') === 'Voyage' || initial?.distance_km != null
 
+  const { data: usersPage } = useQuery({
+    queryKey: ['admin-users', 'ndf-line'],
+    queryFn: () => adminUsersApi.list({ page: 1 }),
+    staleTime: 120_000,
+  })
+  const users = usersPage?.data ?? []
+
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const [form, setForm] = useState({
-    user_id:     initial?.user_id ?? user?.id ?? 0,
-    category:    (initial?.category ?? 'Repas') as ExpenseCategory,
-    amount:      initial?.amount ?? 0,
-    date:        initial?.date ?? new Date().toISOString().slice(0, 10),
-    description: initial?.description ?? '',
+    user_id:         initial?.user_id ?? authUser?.id ?? 0,
+    category:        (initial?.category ?? 'Repas') as ExpenseCategory,
+    amount:          initial?.amount ?? 0,
+    payment_method:  (initial?.payment_method ?? '') as ExpensePaymentMethod | '',
+    date:            initial?.date ?? new Date().toISOString().slice(0, 10),
+    description:     initial?.description ?? '',
+    lieu_depart:     initial?.lieu_depart ?? '',
+    lieu_arrivee:    initial?.lieu_arrivee ?? '',
+    distance_km:     initial?.distance_km ?? '',
+    taux_km:         initial?.taux_km ?? 0.401,
+    type_transport:  (initial?.type_transport ?? 'voiture') as ExpenseTransportType,
+    useKmCalc:       isVoyage && initial?.distance_km != null,
   })
 
-  const isEdit = !!initial?.id
+  const showKmFields = form.category === 'Voyage' && (form.useKmCalc || isExpenseDeplacementLine(initial ?? {}))
+
+  const computedAmount = showKmFields && form.distance_km !== ''
+    ? computeKmAmount(Number(form.distance_km), Number(form.taux_km))
+    : form.amount
 
   const mut = useMutation({
-    mutationFn: () =>
-      isEdit
-        ? expenseReportsApi.updateLine(reportId, initial!.id!, form)
-        : expenseReportsApi.addLine(reportId, form),
+    mutationFn: async () => {
+      const payload = {
+        user_id: form.user_id,
+        category: form.category,
+        amount: showKmFields ? computedAmount : form.amount,
+        payment_method: form.payment_method || null,
+        date: form.date,
+        description: form.description || null,
+        ...(showKmFields
+          ? {
+              lieu_depart: form.lieu_depart || null,
+              lieu_arrivee: form.lieu_arrivee || null,
+              distance_km: Number(form.distance_km) || 0,
+              taux_km: Number(form.taux_km) || 0.401,
+              type_transport: form.type_transport,
+            }
+          : {
+              lieu_depart: null,
+              lieu_arrivee: null,
+              distance_km: null,
+              taux_km: null,
+              type_transport: null,
+            }),
+      }
+
+      const line = isEdit
+        ? await expenseReportsApi.updateLine(reportId, initial!.id!, payload)
+        : await expenseReportsApi.addLine(reportId, payload)
+
+      if (receiptFile) {
+        await expenseReportsApi.uploadLineReceipt(reportId, line.id, receiptFile)
+      }
+
+      return line
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['expense-report', reportId] })
       onDone()
@@ -110,10 +221,10 @@ function LineForm({
 
   return (
     <tr>
-      <td colSpan={6}>
+      <td colSpan={8}>
         <div
           style={{
-            padding: '0.5rem',
+            padding: '0.75rem',
             background: 'var(--color-surface)',
             borderRadius: 6,
             border: '1px solid var(--color-border)',
@@ -133,7 +244,14 @@ function LineForm({
               Catégorie *
               <select
                 value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value as ExpenseCategory })}
+                onChange={(e) => {
+                  const category = e.target.value as ExpenseCategory
+                  setForm({
+                    ...form,
+                    category,
+                    useKmCalc: category === 'Voyage' ? form.useKmCalc : false,
+                  })
+                }}
               >
                 {EXPENSE_CATEGORIES.map((c) => (
                   <option key={c} value={c}>{c}</option>
@@ -141,17 +259,48 @@ function LineForm({
               </select>
             </label>
             <label>
-              Montant TTC ({MONEY_UNIT_LABEL}) *
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
-                required
-              />
+              Personnel *
+              <select
+                value={form.user_id}
+                onChange={(e) => setForm({ ...form, user_id: Number(e.target.value) })}
+              >
+                <option value={0}>— sélectionner —</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
             </label>
             <label>
+              Mode de paiement
+              <select
+                value={form.payment_method}
+                onChange={(e) => setForm({ ...form, payment_method: e.target.value as ExpensePaymentMethod | '' })}
+              >
+                <option value="">— non renseigné —</option>
+                {EXPENSE_PAYMENT_METHODS.map((m) => (
+                  <option key={m} value={m}>{EXPENSE_PAYMENT_METHOD_LABELS[m]}</option>
+                ))}
+              </select>
+            </label>
+            {!showKmFields ? (
+              <label>
+                Montant TTC ({MONEY_UNIT_LABEL}) *
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.amount}
+                  onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
+                  required
+                />
+              </label>
+            ) : (
+              <label>
+                Montant calculé ({MONEY_UNIT_LABEL})
+                <input type="text" value={formatMoney(computedAmount)} readOnly disabled />
+              </label>
+            )}
+            <label style={{ gridColumn: 'span 2' }}>
               Description
               <input
                 value={form.description}
@@ -159,12 +308,87 @@ function LineForm({
                 placeholder="Détail de la dépense"
               />
             </label>
+            <label>
+              Justificatif
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
+              />
+              {initial?.receipt_filename && !receiptFile ? (
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  Actuel : {initial.receipt_filename}
+                </span>
+              ) : null}
+            </label>
           </div>
+
+          {form.category === 'Voyage' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', fontSize: '0.85rem' }}>
+              <input
+                type="checkbox"
+                checked={form.useKmCalc}
+                onChange={(e) => setForm({ ...form, useKmCalc: e.target.checked })}
+              />
+              Déplacement kilométrique (calcul auto A/R)
+            </label>
+          )}
+
+          {showKmFields && (
+            <div className="quote-form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginTop: '0.5rem' }}>
+              <label>
+                Départ
+                <input
+                  value={form.lieu_depart}
+                  onChange={(e) => setForm({ ...form, lieu_depart: e.target.value })}
+                />
+              </label>
+              <label>
+                Arrivée
+                <input
+                  value={form.lieu_arrivee}
+                  onChange={(e) => setForm({ ...form, lieu_arrivee: e.target.value })}
+                />
+              </label>
+              <label>
+                Distance (km) *
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={form.distance_km}
+                  onChange={(e) => setForm({ ...form, distance_km: e.target.value === '' ? '' : Number(e.target.value) })}
+                />
+              </label>
+              <label>
+                Taux km
+                <input
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={form.taux_km}
+                  onChange={(e) => setForm({ ...form, taux_km: Number(e.target.value) })}
+                />
+              </label>
+              <label>
+                Transport
+                <select
+                  value={form.type_transport}
+                  onChange={(e) => setForm({ ...form, type_transport: e.target.value as ExpenseTransportType })}
+                >
+                  {EXPENSE_TRANSPORT_TYPES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+
           <div className="crud-actions" style={{ marginTop: '0.5rem' }}>
             <button
               type="button"
               className="btn btn-primary btn-sm"
-              disabled={mut.isPending}
+              disabled={mut.isPending || !form.user_id}
               onClick={() => mut.mutate()}
             >
               {mut.isPending ? '…' : isEdit ? 'Enregistrer' : 'Ajouter'}
@@ -172,6 +396,11 @@ function LineForm({
             <button type="button" className="btn btn-secondary btn-sm" onClick={onDone}>
               Annuler
             </button>
+            {mut.isError && (
+              <span style={{ color: 'var(--color-danger)', fontSize: '0.82rem' }}>
+                {(mut.error as Error).message}
+              </span>
+            )}
           </div>
         </div>
       </td>
@@ -179,9 +408,44 @@ function LineForm({
   )
 }
 
-// ── Détail NDF ───────────────────────────────────────────────────────────────
+function PaymentSummary({ lines }: { lines: ExpenseLine[] }) {
+  const byMethod = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const line of lines) {
+      const key = line.payment_method ? EXPENSE_PAYMENT_METHOD_LABELS[line.payment_method] : 'Non renseigné'
+      map.set(key, (map.get(key) ?? 0) + Number(line.amount))
+    }
+    return [...map.entries()].sort((a, b) => b[1] - a[1])
+  }, [lines])
+
+  if (byMethod.length === 0) return null
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: '0.75rem',
+        flexWrap: 'wrap',
+        marginBottom: '1rem',
+        fontSize: '0.82rem',
+      }}
+    >
+      {byMethod.map(([label, total]) => (
+        <span
+          key={label}
+          className="badge"
+          style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'inherit' }}
+        >
+          {label} : <strong>{formatMoney(total)}</strong>
+        </span>
+      ))}
+    </div>
+  )
+}
+
 function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => void }) {
   const [addingLine, setAddingLine] = useState(false)
+  const [notesDraft, setNotesDraft] = useState<string | null>(null)
   const qc = useQueryClient()
 
   const { data: report, isLoading } = useQuery({
@@ -189,12 +453,23 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
     queryFn: () => expenseReportsApi.get(reportId),
   })
 
+  const notesValue = notesDraft ?? report?.notes ?? ''
+
   const updateMut = useMutation({
-    mutationFn: (statut: ExpenseReport['statut']) =>
-      expenseReportsApi.update(reportId, { statut }),
+    mutationFn: (body: Partial<Pick<ExpenseReport, 'statut' | 'notes'>>) =>
+      expenseReportsApi.update(reportId, body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['expense-report', reportId] })
       void qc.invalidateQueries({ queryKey: ['expense-reports'] })
+      setNotesDraft(null)
+    },
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: () => expenseReportsApi.delete(reportId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['expense-reports'] })
+      onBack()
     },
   })
 
@@ -203,10 +478,11 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
   const canEdit = report.statut === 'brouillon'
   const lines = report.lines ?? []
   const total = lines.reduce((s, l) => s + Number(l.amount), 0)
+  const colCount = canEdit ? 8 : 7
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <button type="button" className="btn btn-secondary btn-sm" onClick={onBack}>← Retour</button>
         <h2 style={{ margin: 0, fontSize: '1.1rem' }}>{report.unique_number}</h2>
         <span
@@ -226,14 +502,40 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
         {report.ordre_mission?.site && ` — ${report.ordre_mission.site.nom ?? report.ordre_mission.site.name}`}
       </div>
 
-      {/* Actions statut */}
+      <div style={{ marginBottom: '1rem' }}>
+        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: 4 }}>
+          Notes internes
+        </label>
+        <textarea
+          value={notesValue}
+          onChange={(e) => setNotesDraft(e.target.value)}
+          readOnly={!canEdit}
+          rows={2}
+          style={{ width: '100%', maxWidth: 640, fontSize: '0.85rem' }}
+          placeholder="Commentaires sur cette note de frais…"
+        />
+        {canEdit && notesDraft !== null && notesDraft !== (report.notes ?? '') && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            style={{ marginTop: '0.35rem' }}
+            disabled={updateMut.isPending}
+            onClick={() => updateMut.mutate({ notes: notesDraft })}
+          >
+            Enregistrer les notes
+          </button>
+        )}
+      </div>
+
+      <PaymentSummary lines={lines} />
+
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         {report.statut === 'brouillon' && (
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            disabled={updateMut.isPending}
-            onClick={() => updateMut.mutate('soumis')}
+            disabled={updateMut.isPending || lines.length === 0}
+            onClick={() => updateMut.mutate({ statut: 'soumis' })}
           >
             Soumettre
           </button>
@@ -244,7 +546,7 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
               type="button"
               className="btn btn-primary btn-sm"
               disabled={updateMut.isPending}
-              onClick={() => updateMut.mutate('valide')}
+              onClick={() => updateMut.mutate({ statut: 'valide' })}
             >
               ✓ Valider
             </button>
@@ -252,7 +554,7 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
               type="button"
               className="btn btn-secondary btn-sm btn-danger-outline"
               disabled={updateMut.isPending}
-              onClick={() => updateMut.mutate('rejete')}
+              onClick={() => updateMut.mutate({ statut: 'rejete' })}
             >
               ✗ Rejeter
             </button>
@@ -263,14 +565,26 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
             type="button"
             className="btn btn-primary btn-sm"
             disabled={updateMut.isPending}
-            onClick={() => updateMut.mutate('rembourse')}
+            onClick={() => updateMut.mutate({ statut: 'rembourse' })}
           >
             Marquer remboursé
           </button>
         )}
+        {canEdit && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm btn-danger-outline"
+            style={{ marginLeft: 'auto' }}
+            disabled={deleteMut.isPending}
+            onClick={() => {
+              if (window.confirm('Supprimer cette note de frais ?')) deleteMut.mutate()
+            }}
+          >
+            Supprimer la NDF
+          </button>
+        )}
       </div>
 
-      {/* Lignes */}
       <div className="table-wrap">
         <table className="data-table data-table--compact">
           <thead>
@@ -278,7 +592,9 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
               <th>Date</th>
               <th>Catégorie</th>
               <th>Montant</th>
+              <th>Paiement</th>
               <th>Description</th>
+              <th>Justificatif</th>
               <th>Personnel</th>
               {canEdit && <th></th>}
             </tr>
@@ -292,7 +608,7 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
             )}
             {lines.length === 0 && !addingLine && (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '1rem' }}>
+                <td colSpan={colCount} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '1rem' }}>
                   Aucune ligne — ajoutez des dépenses ci-dessous
                 </td>
               </tr>
@@ -315,7 +631,6 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
   )
 }
 
-// ── Page principale ──────────────────────────────────────────────────────────
 export default function ExpenseReportsPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [creating, setCreating] = useState(false)
@@ -380,7 +695,6 @@ export default function ExpenseReportsPage() {
         </button>
       </div>
 
-      {/* Formulaire création */}
       {creating && (
         <div
           style={{
@@ -405,7 +719,7 @@ export default function ExpenseReportsPage() {
               <option value="">— sélectionner —</option>
               {eligibleOMs.map((om) => (
                 <option key={om.id} value={om.id}>
-                  {om.unique_number ?? om.numero} — {om.type} — {(om as any).client?.name ?? ''}
+                  {om.unique_number ?? om.numero} — {om.type} — {(om as { client?: { name: string } }).client?.name ?? ''}
                 </option>
               ))}
             </select>

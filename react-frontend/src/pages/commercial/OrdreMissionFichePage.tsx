@@ -171,6 +171,7 @@ export default function OrdreMissionFichePage() {
     }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['ordre-mission-frais', omId] })
+      void qc.invalidateQueries({ queryKey: ['expense-reports'] })
       setShowFraisForm(false)
       setFraisForm({ user_id: '', date: '', lieu_depart: '', lieu_arrivee: '', distance_km: '', taux_km: '0.4010', type_transport: 'voiture', notes: '' })
     },
@@ -178,7 +179,10 @@ export default function OrdreMissionFichePage() {
 
   const deleteFraisMut = useMutation({
     mutationFn: (fraisId: number) => ordresMissionApi.fraisDelete(omId, fraisId),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['ordre-mission-frais', omId] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['ordre-mission-frais', omId] })
+      void qc.invalidateQueries({ queryKey: ['expense-reports'] })
+    },
   })
 
   if (isLoading || !omDraft) {
@@ -216,6 +220,8 @@ export default function OrdreMissionFichePage() {
 
   const typeMeta = TYPE_META[om.type] ?? { label: om.type, color: '#6b7280' }
   const totalFrais = frais.reduce((s, f) => s + f.montant, 0)
+  const expenseReportId = frais[0]?.expense_report_id
+  const expenseReportNumber = frais[0]?.expense_report_number
   const statutBadge = ordreMissionStatutBadgeProps(omDraft.statut)
 
   return (
@@ -412,13 +418,22 @@ export default function OrdreMissionFichePage() {
         {(om.lignes ?? []).length === 0 && <p style={{ padding: '1rem' }} className="text-muted">Aucune ligne.</p>}
       </div>
 
-      {/* Frais de déplacement (technicien uniquement) */}
+      {/* Notes de frais — déplacement (technicien uniquement) */}
       {om.type === 'technicien' && (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
-              <span style={{ fontWeight: 600 }}>Frais de déplacement</span>
+              <span style={{ fontWeight: 600 }}>Notes de frais — déplacement</span>
               {frais.length > 0 && <span className="text-muted" style={{ marginLeft: '0.5rem', fontSize: '0.85rem' }}>Total : {formatMoney(totalFrais)}</span>}
+              {expenseReportId ? (
+                <p className="text-muted" style={{ margin: '0.35rem 0 0', fontSize: '0.82rem' }}>
+                  Liée à la NDF{' '}
+                  <Link to={`/notes-de-frais/${expenseReportId}`} className="link-inline">
+                    {expenseReportNumber ?? `#${expenseReportId}`}
+                  </Link>
+                  {' '}— validation dans Terrain → Notes de frais
+                </p>
+              ) : null}
             </div>
             <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowFraisForm((v) => !v)}>+ Ajouter</button>
           </div>
@@ -490,7 +505,7 @@ export default function OrdreMissionFichePage() {
                     <td>{[f.lieu_depart, f.lieu_arrivee].filter(Boolean).join(' → ') || '—'}</td>
                     <td>{f.distance_km} km</td>
                     <td><strong>{formatMoney(f.montant)}</strong></td>
-                    <td><span className="badge">{f.statut}</span></td>
+                    <td><span className="badge">{f.ndf_statut ?? f.statut}</span></td>
                     <td>
                       <button type="button" className="btn btn-secondary btn-sm btn-danger-outline"
                         onClick={() => { if (window.confirm('Supprimer ?')) deleteFraisMut.mutate(f.id) }}>
@@ -502,7 +517,11 @@ export default function OrdreMissionFichePage() {
               </tbody>
             </table>
           </div>
-          {frais.length === 0 && !showFraisForm && <p style={{ padding: '1rem' }} className="text-muted">Aucun frais de déplacement.</p>}
+          {frais.length === 0 && !showFraisForm && (
+            <p style={{ padding: '1rem' }} className="text-muted">
+              Aucune ligne de déplacement. Chaque saisie crée ou complète la note de frais (NDF) de l’OM.
+            </p>
+          )}
         </div>
       )}
     </ModuleEntityShell>

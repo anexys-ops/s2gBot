@@ -93,9 +93,9 @@ class OrdreMission extends Model
         return $this->hasMany(OrdreMissionLigne::class, 'ordre_mission_id')->orderBy('ordre');
     }
 
-    public function fraisDeplacement(): HasMany
+    public function expenseReports(): HasMany
     {
-        return $this->hasMany(FraisDeplacement::class, 'ordre_mission_id');
+        return $this->hasMany(ExpenseReport::class, 'ordre_mission_id');
     }
 
     /** Génère le prochain numéro séquentiel */

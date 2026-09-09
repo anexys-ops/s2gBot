@@ -171,7 +171,13 @@ function LineForm({
     useKmCalc:       isVoyage && initial?.distance_km != null,
   })
 
-  const showKmFields = form.category === 'Voyage' && (form.useKmCalc || isExpenseDeplacementLine(initial ?? {}))
+  const showKmFields = form.category === 'Voyage' && (
+    form.useKmCalc ||
+    isExpenseDeplacementLine({
+      category: initial?.category ?? 'Voyage',
+      distance_km: initial?.distance_km,
+    })
+  )
 
   const computedAmount = showKmFields && form.distance_km !== ''
     ? computeKmAmount(Number(form.distance_km), Number(form.taux_km))
@@ -183,23 +189,23 @@ function LineForm({
         user_id: form.user_id,
         category: form.category,
         amount: showKmFields ? computedAmount : form.amount,
-        payment_method: form.payment_method || null,
+        payment_method: form.payment_method || undefined,
         date: form.date,
-        description: form.description || null,
+        description: form.description || undefined,
         ...(showKmFields
           ? {
-              lieu_depart: form.lieu_depart || null,
-              lieu_arrivee: form.lieu_arrivee || null,
+              lieu_depart: form.lieu_depart || undefined,
+              lieu_arrivee: form.lieu_arrivee || undefined,
               distance_km: Number(form.distance_km) || 0,
               taux_km: Number(form.taux_km) || 0.401,
               type_transport: form.type_transport,
             }
           : {
-              lieu_depart: null,
-              lieu_arrivee: null,
-              distance_km: null,
-              taux_km: null,
-              type_transport: null,
+              lieu_depart: undefined,
+              lieu_arrivee: undefined,
+              distance_km: undefined,
+              taux_km: undefined,
+              type_transport: undefined,
             }),
       }
 

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Modal from '../Modal'
+import S2gCatalogueBrowsePanel from './S2gCatalogueBrowsePanel'
 import {
   articleSectionProductsApi,
   catalogueApi,
   commercialOfferingsApi,
+  type RefArticleKind,
   type RefArticleRow,
   type RefQualificationTagRow,
 } from '../../api/client'
@@ -40,6 +42,7 @@ type Props = {
   onPick: (result: S2gCataloguePickResult) => void | Promise<void>
 }
 
+type PickerTab = 'qualification' | 'catalogue'
 type Step = 'qualification' | 'jalon' | 'products'
 
 type ProductCandidate = S2gCatalogueProductPick & {
@@ -99,15 +102,23 @@ function SortSelect({
 }
 
 export default function S2gCataloguePickerModal({ onClose, onPick }: Props) {
+  const [tab, setTab] = useState<PickerTab>('catalogue')
   const [step, setStep] = useState<Step>('qualification')
   const [qualification, setQualification] = useState<RefQualificationTagRow | null>(null)
   const [jalon, setJalon] = useState<RefArticleRow | null>(null)
   const [selectedProductIds, setSelectedProductIds] = useState<Set<number>>(() => new Set())
   const [search, setSearch] = useState('')
+  const [catalogSearch, setCatalogSearch] = useState('')
+  const [catalogKind, setCatalogKind] = useState<RefArticleKind | ''>('')
+  const [catalogQualif, setCatalogQualif] = useState('')
   const [sort, setSort] = useState<S2gPickerSort>('name-asc')
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastAddedLabel, setLastAddedLabel] = useState<string | null>(null)
+  const [jalonChoiceForProduct, setJalonChoiceForProduct] = useState<{
+    product: RefArticleRow
+    jalons: RefArticleRow[]
+  } | null>(null)
 
   const { data: qualificationTags = [], isLoading: loadingTags } = useQuery({
     queryKey: ['catalogue-qualification-tags'],
@@ -272,6 +283,84 @@ export default function S2gCataloguePickerModal({ onClose, onPick }: Props) {
     setError(null)
   }
 
+  function backFromProducts() {
+    setStep(tab === 'catalogue' ? 'qualification' : 'jalon')
+    setJalon(null)
+    setSelectedProductIds(new Set())
+    setSearch('')
+    setError(null)
+  }
+
+  async function handleCatalogueProductPick(product: RefArticleRow) {
+    setError(null)
+    setAdding(true)
+    try {
+      const detail = await catalogueApi.article(product.id)
+      const jalons = (detail.product_jalons ?? [])
+        .map((row) => row.jalon)
+        .filter((j): j is NonNullable<typeof j> => j != null) as RefArticleRow[]
+
+      if (jalons.length === 0) {
+        setError('Ce produit n’est rattaché à aucun jalon S2G.')
+        return
+      }
+
+      if (jalons.length === 1) {
+        await onPick({
+          jalon: jalons[0],
+          products: [toProductCandidate(product, 'jalon', 'jalon')],
+        })
+        setLastAddedLabel(`${jalons[0].libelle} · ${product.libelle}`)
+        resetAfterPick()
+        return
+      }
+
+      setJalonChoiceForProduct({ product, jalons })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de charger le produit.')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function confirmJalonChoiceForProduct(jalonRow: RefArticleRow) {
+    if (!jalonChoiceForProduct) return
+    setAdding(true)
+    setError(null)
+    try {
+      await onPick({
+        jalon: jalonRow,
+        products: [toProductCandidate(jalonChoiceForProduct.product, 'jalon', 'jalon')],
+      })
+      setLastAddedLabel(`${jalonRow.libelle} · ${jalonChoiceForProduct.product.libelle}`)
+      setJalonChoiceForProduct(null)
+      resetAfterPick()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible d’ajouter le produit.')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  function resetAfterPick() {
+    setQualification(null)
+    setJalon(null)
+    setSelectedProductIds(new Set())
+    setStep('qualification')
+    setSearch('')
+    setCatalogSearch('')
+  }
+
+  function switchTab(next: PickerTab) {
+    setTab(next)
+    setStep('qualification')
+    setJalon(null)
+    setSelectedProductIds(new Set())
+    setSearch('')
+    setError(null)
+    setJalonChoiceForProduct(null)
+  }
+
   function toggleProduct(id: number) {
     setSelectedProductIds((prev) => {
       const next = new Set(prev)
@@ -308,11 +397,7 @@ export default function S2gCataloguePickerModal({ onClose, onPick }: Props) {
       setLastAddedLabel(
         `${activeJalon.libelle} · ${selected.length} article${selected.length !== 1 ? 's' : ''}`,
       )
-      setQualification(null)
-      setJalon(null)
-      setSelectedProductIds(new Set())
-      setStep('qualification')
-      setSearch('')
+      resetAfterPick()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossible d’ajouter la sélection.')
     } finally {
@@ -365,17 +450,45 @@ export default function S2gCataloguePickerModal({ onClose, onPick }: Props) {
     )
   }
 
+  const showQualificationWizard = tab === 'qualification' && step !== 'products'
+  const showCatalogueBrowse = tab === 'catalogue' && step !== 'products'
+
   return (
     <Modal title="Catalogue S2G" onClose={onClose}>
       <div className="s2g-picker-modal">
-      <p className="text-muted s2g-picker__intro">
-        Parcours guidé : <strong>Qualification → Jalon → Articles</strong>. Vous pouvez enchaîner plusieurs ajouts.
-      </p>
-      <ol className="s2g-picker__steps" aria-label="Étapes du parcours">
-        <li className={idx === 0 ? 'is-active' : idx > 0 ? 'is-done' : undefined}>1. Qualification</li>
-        <li className={idx === 1 ? 'is-active' : idx > 1 ? 'is-done' : undefined}>2. Jalon</li>
-        <li className={idx === 2 ? 'is-active' : undefined}>3. Articles</li>
-      </ol>
+      <div className="s2g-picker__tabs" role="tablist" aria-label="Mode de recherche catalogue">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'catalogue'}
+          className={`s2g-picker__tab${tab === 'catalogue' ? ' is-active' : ''}`}
+          onClick={() => switchTab('catalogue')}
+        >
+          Catalogue / recherche
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'qualification'}
+          className={`s2g-picker__tab${tab === 'qualification' ? ' is-active' : ''}`}
+          onClick={() => switchTab('qualification')}
+        >
+          Par qualification
+        </button>
+      </div>
+
+      {tab === 'qualification' && step !== 'products' ? (
+        <>
+          <p className="text-muted s2g-picker__intro">
+            Parcours guidé : <strong>Qualification → Jalon → Articles</strong>.
+          </p>
+          <ol className="s2g-picker__steps" aria-label="Étapes du parcours">
+            <li className={idx === 0 ? 'is-active' : idx > 0 ? 'is-done' : undefined}>1. Qualification</li>
+            <li className={idx === 1 ? 'is-active' : idx > 1 ? 'is-done' : undefined}>2. Jalon</li>
+            <li className={idx === 2 ? 'is-active' : undefined}>3. Articles</li>
+          </ol>
+        </>
+      ) : null}
 
       {lastAddedLabel ? (
         <p className="s2g-picker__success" role="status">
@@ -383,54 +496,143 @@ export default function S2gCataloguePickerModal({ onClose, onPick }: Props) {
         </p>
       ) : null}
 
-      <div className="s2g-picker__crumbs">
-        {qualification ? (
-          <button type="button" className="s2g-picker__crumb" onClick={goQualification}>
-            {qualification.display_label}
-          </button>
-        ) : (
-          <span className="s2g-picker__crumb s2g-picker__crumb--muted">Qualification</span>
-        )}
-        <span className="s2g-picker__crumb-sep" aria-hidden>
-          →
-        </span>
-        {jalon ? (
-          <button
-            type="button"
-            className="s2g-picker__crumb"
-            onClick={() => {
-              setStep('jalon')
-              setJalon(null)
-              setSelectedProductIds(new Set())
-              setSearch('')
-            }}
-          >
-            {jalon.libelle}
-          </button>
-        ) : (
-          <span className="s2g-picker__crumb s2g-picker__crumb--muted">Jalon</span>
-        )}
-        <span className="s2g-picker__crumb-sep" aria-hidden>
-          →
-        </span>
-        <span className={`s2g-picker__crumb${step === 'products' ? '' : ' s2g-picker__crumb--muted'}`}>
-          Articles
-        </span>
-      </div>
+      {tab === 'qualification' ? (
+        <div className="s2g-picker__crumbs">
+          {qualification ? (
+            <button type="button" className="s2g-picker__crumb" onClick={goQualification}>
+              {qualification.display_label}
+            </button>
+          ) : (
+            <span className="s2g-picker__crumb s2g-picker__crumb--muted">Qualification</span>
+          )}
+          <span className="s2g-picker__crumb-sep" aria-hidden>
+            →
+          </span>
+          {jalon ? (
+            <button
+              type="button"
+              className="s2g-picker__crumb"
+              onClick={() => {
+                setStep('jalon')
+                setJalon(null)
+                setSelectedProductIds(new Set())
+                setSearch('')
+              }}
+            >
+              {jalon.libelle}
+            </button>
+          ) : (
+            <span className="s2g-picker__crumb s2g-picker__crumb--muted">Jalon</span>
+          )}
+          <span className="s2g-picker__crumb-sep" aria-hidden>
+            →
+          </span>
+          <span className={`s2g-picker__crumb${step === 'products' ? '' : ' s2g-picker__crumb--muted'}`}>
+            Articles
+          </span>
+        </div>
+      ) : null}
 
-      <div className="s2g-picker__filters">
-        <input
-          type="search"
-          placeholder={searchPlaceholder}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="s2g-picker__search"
-          autoFocus
+      {productsReady ? (
+        <div className="s2g-picker__toolbar">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={backFromProducts}>
+            {tab === 'catalogue' ? '← Catalogue' : '← Jalons'}
+          </button>
+          <div className="s2g-picker__toolbar-right">
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={selectAllVisible}
+              disabled={filteredProducts.length === 0}
+            >
+              Tout sélectionner
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={clearSelection}
+              disabled={selectedProductIds.size === 0}
+            >
+              Tout désélectionner
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {showQualificationWizard ? (
+        <div className="s2g-picker__filters">
+          <input
+            type="search"
+            placeholder={searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="s2g-picker__search"
+            autoFocus
+          />
+          <SortSelect value={sort} onChange={setSort} showCount={step === 'qualification' || step === 'jalon'} />
+        </div>
+      ) : null}
+
+      <div className="s2g-picker__scroll">
+      {showCatalogueBrowse ? (
+        <S2gCatalogueBrowsePanel
+          search={catalogSearch}
+          kind={catalogKind}
+          qualificationCode={catalogQualif}
+          sort={sort}
+          qualificationTags={qualificationTags}
+          onSearchChange={setCatalogSearch}
+          onKindChange={setCatalogKind}
+          onQualificationChange={setCatalogQualif}
+          onSortChange={setSort}
+          onPickJalon={(j) => {
+            setTab('catalogue')
+            goProducts(j)
+          }}
+          onPickProduct={(p) => void handleCatalogueProductPick(p)}
         />
-        <SortSelect value={sort} onChange={setSort} showCount={step === 'qualification' || step === 'jalon'} />
-      </div>
+      ) : null}
 
-      {step === 'qualification' && (
+      {jalonChoiceForProduct ? (
+        <div className="s2g-picker__jalon-choice card dossier-tab-panel">
+          <h4 className="article-actions-add__title">
+            Choisir le jalon pour « {jalonChoiceForProduct.product.libelle} »
+          </h4>
+          <p className="text-muted s2g-picker__intro">
+            Ce produit est rattaché à plusieurs jalons. Sélectionnez celui à ajouter au devis.
+          </p>
+          <div className="catalog-picker-list">
+            {jalonChoiceForProduct.jalons.map((j) => (
+              <button
+                key={j.id}
+                type="button"
+                className="catalog-picker-row catalog-picker-row--rich"
+                disabled={adding}
+                onClick={() => void confirmJalonChoiceForProduct(j)}
+              >
+                <span className="catalog-picker-row__head">
+                  <span className="catalog-picker-row__name">{j.libelle}</span>
+                </span>
+                <span className="catalog-picker-row__meta">
+                  <code className="catalog-picker-row__code">{j.code}</code>
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="s2g-picker__footer s2g-picker__footer--end">
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={adding}
+              onClick={() => setJalonChoiceForProduct(null)}
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {showQualificationWizard && step === 'qualification' && (
         <>
           {loadingTags ? (
             <p>Chargement des qualifications…</p>
@@ -494,9 +696,9 @@ export default function S2gCataloguePickerModal({ onClose, onPick }: Props) {
         </>
       )}
 
-      {step === 'jalon' && qualification && (
+      {showQualificationWizard && step === 'jalon' && qualification && (
         <>
-          <div className="s2g-picker__toolbar">
+          <div className="s2g-picker__toolbar s2g-picker__toolbar--in-scroll">
             <button type="button" className="btn btn-secondary btn-sm" onClick={goQualification}>
               ← Qualifications
             </button>
@@ -546,39 +748,6 @@ export default function S2gCataloguePickerModal({ onClose, onPick }: Props) {
 
       {productsReady ? (
         <>
-          <div className="s2g-picker__toolbar">
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => {
-                setStep('jalon')
-                setJalon(null)
-                setSelectedProductIds(new Set())
-                setSearch('')
-              }}
-            >
-              ← Jalons
-            </button>
-            <div className="s2g-picker__toolbar-right">
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={selectAllVisible}
-                disabled={filteredProducts.length === 0}
-              >
-                Tout sélectionner
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={clearSelection}
-                disabled={selectedProductIds.size === 0}
-              >
-                Tout désélectionner
-              </button>
-            </div>
-          </div>
-
           {loadingProducts ? (
             <p>Chargement des articles…</p>
           ) : productsError ? (
@@ -627,33 +796,39 @@ export default function S2gCataloguePickerModal({ onClose, onPick }: Props) {
             </div>
           )}
 
-          {error ? <p className="error">{error}</p> : null}
-
-          <div className="s2g-picker__footer">
-            <span className="text-muted s2g-picker__count">
-              {selectedProductIds.size} sélectionné{selectedProductIds.size !== 1 ? 's' : ''}
-              {filteredProducts.length > 0
-                ? ` · ${filteredProducts.length} visible${filteredProducts.length !== 1 ? 's' : ''}`
-                : ''}
-            </span>
-            <div className="s2g-picker__footer-actions">
-              <button type="button" className="btn btn-secondary" onClick={onClose} disabled={adding}>
-                Terminer
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => void confirmAdd()}
-                disabled={adding || selectedProductIds.size === 0}
-              >
-                {adding ? 'Ajout…' : 'Ajouter au devis'}
-              </button>
-            </div>
-          </div>
         </>
       ) : null}
+      </div>
 
-      {step !== 'products' ? (
+      {productsReady && error ? <p className="error">{error}</p> : null}
+
+      {productsReady ? (
+        <div className="s2g-picker__footer">
+          <span className="text-muted s2g-picker__count">
+            {selectedProductIds.size} sélectionné{selectedProductIds.size !== 1 ? 's' : ''}
+            {filteredProducts.length > 0
+              ? ` · ${filteredProducts.length} visible${filteredProducts.length !== 1 ? 's' : ''}`
+              : ''}
+          </span>
+          <div className="s2g-picker__footer-actions">
+            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={adding}>
+              Terminer
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => void confirmAdd()}
+              disabled={adding || selectedProductIds.size === 0}
+            >
+              {adding ? 'Ajout…' : 'Ajouter au devis'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {error && !productsReady && !jalonChoiceForProduct ? <p className="error">{error}</p> : null}
+
+      {step !== 'products' && !jalonChoiceForProduct ? (
         <div className="s2g-picker__footer s2g-picker__footer--end">
           <button type="button" className="btn btn-secondary" onClick={onClose}>
             Fermer

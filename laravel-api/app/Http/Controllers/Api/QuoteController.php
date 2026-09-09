@@ -21,6 +21,7 @@ use App\Services\DocumentActivityLogger;
 use App\Services\QuotePricingService;
 use App\Services\DocumentSequenceService;
 use App\Services\DocumentStatusService;
+use App\Support\ActivityChangeTracker;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
 use Illuminate\Http\JsonResponse;
@@ -328,12 +329,18 @@ class QuoteController extends Controller
             (int) $quote->client_id,
         );
 
+        $lineChanges = [];
         if (isset($validated['lines'])) {
+            $linesBefore = $this->snapshotQuoteLines($quote);
             $this->assertLinesNoDualRef($validated['lines']);
             $defaultTva = $validated['tva_rate'] ?? $quote->tva_rate;
             $quote->quoteLines()->delete();
             $this->syncQuoteLines($quote, $validated['lines'], (float) $defaultTva);
             $tasks[] = 'lignes devis';
+            $lineChanges = ActivityChangeTracker::diffDocumentLines(
+                $linesBefore,
+                $this->snapshotQuoteLines($quote->fresh()),
+            );
         }
 
         if (array_key_exists('taches', $validated)) {
@@ -345,7 +352,7 @@ class QuoteController extends Controller
         $this->recalculateQuoteTotals($quote);
         $this->recordQuoteStatusChange($quote->fresh(), $oldStatus, $request);
         $fresh = $quote->fresh();
-        $this->documentActivity->quoteUpdated($request->user(), $fresh, $before, $tasks);
+        $this->documentActivity->quoteUpdated($request->user(), $fresh, $before, $tasks, $lineChanges);
 
         return response()->json($this->loadQuoteForResponse($fresh));
     }
@@ -454,6 +461,27 @@ class QuoteController extends Controller
 
             return response()->json(['message' => 'Erreur d\'envoi : ' . $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function snapshotQuoteLines(Quote $quote): array
+    {
+        return $quote->quoteLines()
+            ->orderBy('id')
+            ->get(['description', 'quantity', 'unit_price', 'unite', 'total', 'tva_rate', 'discount_percent'])
+            ->map(fn (QuoteLine $line) => [
+                'description' => $line->description,
+                'quantity' => $line->quantity,
+                'unit_price' => $line->unit_price,
+                'unite' => $line->unite,
+                'total' => $line->total,
+                'tva_rate' => $line->tva_rate,
+                'discount_percent' => $line->discount_percent,
+            ])
+            ->values()
+            ->all();
     }
 
     private function loadQuoteForResponse(Quote $quote): Quote

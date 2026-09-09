@@ -37,13 +37,14 @@ class DocumentActivityLogger
     /**
      * @param  array<string, mixed>  $before
      * @param  list<string>  $tasks
+     * @param  list<array<string, mixed>>  $lineChanges
      */
-    public function quoteUpdated(User $user, Quote $quote, array $before, array $tasks = []): void
+    public function quoteUpdated(User $user, Quote $quote, array $before, array $tasks = [], array $lineChanges = []): void
     {
         $quote->loadMissing('client');
         $after = $quote->only(array_keys($before));
         $changes = ActivityChangeTracker::diff($before, $after);
-        $fieldSummary = ActivityChangeTracker::summarizeFieldChanges($changes);
+        $detailSummary = ActivityChangeTracker::buildDetailSummary($changes, $lineChanges);
 
         $this->activityLogger->log(
             $user,
@@ -55,6 +56,8 @@ class DocumentActivityLogger
                 'client_name' => $quote->client?->name,
                 'tasks' => $tasks,
                 'changes' => $changes,
+                'line_changes' => $lineChanges,
+                'detail_summary' => $detailSummary,
             ],
             ActivityChangeTracker::buildDescription(
                 'Devis',
@@ -63,7 +66,7 @@ class DocumentActivityLogger
                 'Modification',
                 $quote->client?->name,
                 $tasks,
-                $fieldSummary !== '' ? "Champs: {$fieldSummary}" : null,
+                $detailSummary !== '' ? $detailSummary : null,
             ),
         );
     }
@@ -139,13 +142,14 @@ class DocumentActivityLogger
     /**
      * @param  array<string, mixed>  $before
      * @param  list<string>  $tasks
+     * @param  list<array<string, mixed>>  $lineChanges
      */
-    public function invoiceUpdated(User $user, Invoice $invoice, array $before, array $tasks = []): void
+    public function invoiceUpdated(User $user, Invoice $invoice, array $before, array $tasks = [], array $lineChanges = []): void
     {
         $invoice->loadMissing('client');
         $after = $invoice->only(array_keys($before));
         $changes = ActivityChangeTracker::diff($before, $after);
-        $fieldSummary = ActivityChangeTracker::summarizeFieldChanges($changes);
+        $detailSummary = ActivityChangeTracker::buildDetailSummary($changes, $lineChanges);
 
         $this->activityLogger->log(
             $user,
@@ -157,6 +161,8 @@ class DocumentActivityLogger
                 'client_name' => $invoice->client?->name,
                 'tasks' => $tasks,
                 'changes' => $changes,
+                'line_changes' => $lineChanges,
+                'detail_summary' => $detailSummary,
             ],
             ActivityChangeTracker::buildDescription(
                 'Facture',
@@ -165,7 +171,7 @@ class DocumentActivityLogger
                 'Modification',
                 $invoice->client?->name,
                 $tasks,
-                $fieldSummary !== '' ? "Champs: {$fieldSummary}" : null,
+                $detailSummary !== '' ? $detailSummary : null,
             ),
         );
     }
@@ -211,7 +217,7 @@ class DocumentActivityLogger
     {
         $after = $client->only(array_keys($before));
         $changes = ActivityChangeTracker::diff($before, $after);
-        $fieldSummary = ActivityChangeTracker::summarizeFieldChanges($changes);
+        $detailSummary = ActivityChangeTracker::buildDetailSummary($changes);
 
         $this->activityLogger->log(
             $user,
@@ -220,6 +226,7 @@ class DocumentActivityLogger
             [
                 'name' => $client->name,
                 'changes' => $changes,
+                'detail_summary' => $detailSummary,
             ],
             ActivityChangeTracker::buildDescription(
                 'Client',
@@ -228,7 +235,7 @@ class DocumentActivityLogger
                 'Modification',
                 null,
                 [],
-                $fieldSummary !== '' ? "Champs: {$fieldSummary}" : null,
+                $detailSummary !== '' ? $detailSummary : null,
             ),
         );
     }

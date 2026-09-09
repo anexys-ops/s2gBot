@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Navigate } from 'react-router-dom'
 import { monitoringApi, type MonitoringActivityRow } from '../../api/client'
+import { formatActivityDetail } from '../../lib/activityLogFormat'
 import { useAuth } from '../../contexts/AuthContext'
 import { canViewMonitoringLogs } from '../../lib/settingsAccess'
 
@@ -44,28 +45,6 @@ function entityId(log: MonitoringActivityRow): string {
   if (typeof props.invoice_id === 'number') return String(props.invoice_id)
   if (typeof props.client_id === 'number') return String(props.client_id)
   return '—'
-}
-
-function formatChanges(log: MonitoringActivityRow): string {
-  const props = log.properties
-  if (!props) return '—'
-
-  const tasks = Array.isArray(props.tasks) ? (props.tasks as string[]).join(', ') : null
-  const changes = props.changes as Record<string, { from?: unknown; to?: unknown }> | undefined
-
-  const parts: string[] = []
-  if (tasks) parts.push(`Tâches: ${tasks}`)
-
-  if (changes && typeof changes === 'object') {
-    const entries = Object.entries(changes).slice(0, 4)
-    for (const [field, diff] of entries) {
-      parts.push(`${field}: ${String(diff.from ?? '—')} → ${String(diff.to ?? '—')}`)
-    }
-    const extra = Object.keys(changes).length - entries.length
-    if (extra > 0) parts.push(`+${extra} champ(s)`)
-  }
-
-  return parts.length > 0 ? parts.join(' · ') : '—'
 }
 
 function statusTone(code: number): string {
@@ -213,7 +192,7 @@ export default function SettingsLogsPage() {
                         <span className={`log-badge log-badge--${cat}`}>{categoryLabel(cat)}</span>
                       </td>
                       <td className="monitoring-table__desc">{log.description ?? '—'}</td>
-                      <td className="monitoring-table__changes">{formatChanges(log)}</td>
+                      <td className="monitoring-table__changes">{formatActivityDetail(log)}</td>
                       <td title={log.user_agent ?? undefined}>
                         {log.ip_address ?? '—'}
                         <span className="settings-logs__email">

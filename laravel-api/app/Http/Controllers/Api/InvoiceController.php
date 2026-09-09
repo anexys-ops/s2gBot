@@ -11,6 +11,7 @@ use App\Models\InvoiceLine;
 use App\Models\MailLog;
 use App\Models\MailTemplate;
 use App\Services\DocumentSequenceService;
+use App\Support\ActivityChangeTracker;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
 use Illuminate\Database\Eloquent\Builder;
@@ -445,7 +446,9 @@ class InvoiceController extends Controller
         $invoice->fill(collect($validated)->except('lines')->toArray());
         ClientContactDocument::assertBelongsToClient($invoice->contact_id, (int) $invoice->client_id);
 
+        $lineChanges = [];
         if (isset($validated['lines'])) {
+            $linesBefore = $this->snapshotInvoiceLines($invoice);
             $defaultTva = $validated['tva_rate'] ?? $invoice->tva_rate;
             $invoice->invoiceLines()->delete();
             $tasks[] = 'lignes facture';
@@ -467,6 +470,10 @@ class InvoiceController extends Controller
                     'total' => $ht,
                 ]);
             }
+            $lineChanges = ActivityChangeTracker::diffDocumentLines(
+                $linesBefore,
+                $this->snapshotInvoiceLines($invoice->fresh()),
+            );
         }
 
         $invoice->save();
@@ -475,7 +482,7 @@ class InvoiceController extends Controller
         }
 
         $fresh = $invoice->fresh();
-        $this->documentActivity->invoiceUpdated($request->user(), $fresh, $before, $tasks);
+        $this->documentActivity->invoiceUpdated($request->user(), $fresh, $before, $tasks, $lineChanges);
 
         return response()->json($fresh->load([
             'client', 'clientContact', 'orders', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate',
@@ -723,6 +730,26 @@ class InvoiceController extends Controller
         } else {
             $query->whereIn('status', $filtered);
         }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function snapshotInvoiceLines(Invoice $invoice): array
+    {
+        return $invoice->invoiceLines()
+            ->orderBy('id')
+            ->get(['description', 'quantity', 'unit_price', 'total', 'tva_rate', 'discount_percent'])
+            ->map(fn (InvoiceLine $line) => [
+                'description' => $line->description,
+                'quantity' => $line->quantity,
+                'unit_price' => $line->unit_price,
+                'total' => $line->total,
+                'tva_rate' => $line->tva_rate,
+                'discount_percent' => $line->discount_percent,
+            ])
+            ->values()
+            ->all();
     }
 
     /**

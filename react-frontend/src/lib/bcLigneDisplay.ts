@@ -27,7 +27,7 @@ export function resolveDevisDisplayMeta(
 }
 
 export type BcLigneDisplayRow<T extends GroupableLigne = BonCommandeLigne> =
-  | { type: 'jalon_header'; key: string; label: string; code?: string | null }
+  | { type: 'jalon_header'; key: string; jalonId: string; label: string; code?: string | null; ligneIds: number[] }
   | { type: 'product'; key: string; ligne: T; nested: boolean }
 
 export function isDocumentForfaitMeta(meta?: EntityMetaPayload | null): boolean {
@@ -143,16 +143,20 @@ export function buildBcLigneDisplayRows<T extends GroupableLigne>(
   const emitJalon = (jalonId: string) => {
     const jalon = jalonById.get(jalonId)
     if (!jalon) return
+    const childLignes: T[] = []
+    for (const refId of jalon.product_ref_article_ids ?? []) {
+      const ligne = findByRefId(refId)
+      if (ligne) childLignes.push(ligne)
+    }
     rows.push({
       type: 'jalon_header',
       key: `j-${jalonId}`,
+      jalonId,
       label: jalon.libelle,
       code: jalon.s2g_code ?? null,
+      ligneIds: childLignes.map((l) => l.id),
     })
-    for (const refId of jalon.product_ref_article_ids ?? []) {
-      const ligne = findByRefId(refId)
-      if (ligne) emitProduct(ligne, true)
-    }
+    for (const ligne of childLignes) emitProduct(ligne, true)
   }
 
   if (parcours.length > 0) {

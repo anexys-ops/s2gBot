@@ -298,6 +298,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('quotes/{id}/send-email', [QuoteController::class, 'sendEmail'])->whereNumber('id');
     Route::apiResource('commercial-offerings', CommercialOfferingController::class);
     Route::get('pdf/templates', [PdfController::class, 'templates']);
+    Route::get('pdf/preview-link', [PdfController::class, 'previewLink']);
     Route::post('pdf/generate', [PdfController::class, 'generate']);
     Route::get('pdf/examples/{slug}', [ExamplePdfController::class, 'download']);
     Route::get('mail/templates', [MailController::class, 'templates']);
@@ -352,6 +353,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('currencies', [FxRateController::class, 'catalog']);
     Route::get('fx-rates', [FxRateController::class, 'show']);
     Route::get('fx-rates/settings', [FxRateController::class, 'settings']);
+    Route::get('fx-rates/status', [FxRateController::class, 'status']);
+    Route::post('fx-rates/refresh', [FxRateController::class, 'refresh']);
 
     // ── Actions par article & matériel requis ────────────────────────────────
     Route::get('articles/{article}/actions', [ArticleActionController::class, 'index']);
@@ -522,4 +525,8 @@ Route::middleware('signed')->group(function () {
         ->name('invoice.pdf.signed');
     Route::get('reports/{report}/pdf', [ReportController::class, 'signedPdf'])
         ->name('report.pdf.signed');
+    Route::get('pdf/preview/{type}/{id}/{template_id}', [PdfController::class, 'signedGenerate'])
+        ->where('template_id', '[0-9]+')
+        ->whereNumber('id')
+        ->name('commercial.pdf.signed');
 });

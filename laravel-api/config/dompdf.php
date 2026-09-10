@@ -15,7 +15,7 @@ return [
             'https://' => ['rules' => []],
         ],
         'log_output_file' => null,
-        'enable_font_subsetting' => false,
+        'enable_font_subsetting' => true,
         'pdf_backend' => 'CPDF',
         'default_font' => 'serif',
         'dpi' => 96,

@@ -13,6 +13,14 @@ class AppBranding
 {
     public const MODULE_KEY = 'app_branding';
 
+    private static ?string $cachedLogoDataUri = null;
+
+    private static ?string $cachedLetterheadDataUri = null;
+
+    private static bool $logoDataUriResolved = false;
+
+    private static bool $letterheadDataUriResolved = false;
+
     /** @var list<string> */
     private const DEFAULT_LOGO_PUBLIC_FILES = [
         'branding/s2g-app-logo.png',
@@ -64,19 +72,24 @@ class AppBranding
      */
     public static function logoDataUriForPdf(): ?string
     {
+        if (self::$logoDataUriResolved) {
+            return self::$cachedLogoDataUri;
+        }
+
+        self::$logoDataUriResolved = true;
         $uri = self::fileToDataUri(self::logoPublicPath());
         if ($uri !== null) {
-            return $uri;
+            return self::$cachedLogoDataUri = $uri;
         }
 
         foreach (self::DEFAULT_LOGO_PUBLIC_FILES as $rel) {
             $uri = self::absolutePathToDataUri(public_path($rel));
             if ($uri !== null) {
-                return $uri;
+                return self::$cachedLogoDataUri = $uri;
             }
         }
 
-        return null;
+        return self::$cachedLogoDataUri = null;
     }
 
     /** Chemin relatif sous public/ pour le logo S2G embarqué, ou null. */
@@ -109,12 +122,17 @@ class AppBranding
     /** En-tête pleine largeur pour PDF devis S2G (priorité sur le logo compact). */
     public static function devisLetterheadDataUriForPdf(): ?string
     {
+        if (self::$letterheadDataUriResolved) {
+            return self::$cachedLetterheadDataUri;
+        }
+
+        self::$letterheadDataUriResolved = true;
         $settings = self::settings();
         $rel = $settings['devis_letterhead_public_path'] ?? null;
         if (is_string($rel) && $rel !== '') {
             $uri = self::fileToDataUri($rel);
             if ($uri !== null) {
-                return $uri;
+                return self::$cachedLetterheadDataUri = $uri;
             }
         }
 
@@ -124,18 +142,18 @@ class AppBranding
         ] as $abs) {
             $uri = self::absolutePathToDataUri($abs);
             if ($uri !== null) {
-                return $uri;
+                return self::$cachedLetterheadDataUri = $uri;
             }
         }
 
         foreach (['branding/s2g-devis-letterhead.png', 'branding/s2g-devis-letterhead.jpg', 'branding/devis-letterhead.jpg'] as $fallback) {
             $uri = self::fileToDataUri($fallback);
             if ($uri !== null) {
-                return $uri;
+                return self::$cachedLetterheadDataUri = $uri;
             }
         }
 
-        return self::logoDataUriForPdf();
+        return self::$cachedLetterheadDataUri = self::logoDataUriForPdf();
     }
 
     private static function absolutePathToDataUri(string $abs): ?string

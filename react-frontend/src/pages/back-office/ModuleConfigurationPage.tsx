@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { canManageAppConfig } from '../../lib/settingsAccess'
 import Modal from '../../components/Modal'
 import ConfigCatalogueProductsPanel from '../../components/config/ConfigCatalogueProductsPanel'
+import ConfigFxRatesPanel from '../../components/config/ConfigFxRatesPanel'
 import DocumentStatusDefinitionsPanel from '../../components/config/DocumentStatusDefinitionsPanel'
 
 const ENTITY_TABS: { type: ExtrafieldEntityType; label: string }[] = [
@@ -231,13 +232,6 @@ function ModuleListsSection() {
   const [ordersPriority, setOrdersPriority] = useState<string>('')
   const [linkEquipmentToProducts, setLinkEquipmentToProducts] = useState(true)
   const [showEquipmentOnQuotePdf, setShowEquipmentOnQuotePdf] = useState(true)
-  const [fxEnabled, setFxEnabled] = useState(true)
-  const [fxProvider, setFxProvider] = useState('frankfurter')
-  const [fxCacheTtl, setFxCacheTtl] = useState('360')
-  const [fxFallbackEur, setFxFallbackEur] = useState('10.85')
-  const [fxFallbackUsd, setFxFallbackUsd] = useState('10.02')
-  const [fxFallbackGbp, setFxFallbackGbp] = useState('12.50')
-
   useEffect(() => {
     if (!data?.settings) return
     const s = data.settings
@@ -255,15 +249,6 @@ function ModuleListsSection() {
     if (activeKey === 'commercial_catalog') {
       setLinkEquipmentToProducts(s.link_equipment_to_products !== false)
       setShowEquipmentOnQuotePdf(s.show_equipment_on_quote_pdf !== false)
-    }
-    if (activeKey === 'fx_rates') {
-      setFxEnabled(s.enabled !== false)
-      setFxProvider(String(s.provider ?? 'frankfurter'))
-      setFxCacheTtl(String(s.cache_ttl_minutes ?? 360))
-      const fallback = (s.fallback_rates as Record<string, number> | undefined) ?? {}
-      setFxFallbackEur(String(fallback.EUR ?? 10.85))
-      setFxFallbackUsd(String(fallback.USD ?? 10.02))
-      setFxFallbackGbp(String(fallback.GBP ?? 12.5))
     }
   }, [data, activeKey])
 
@@ -304,27 +289,6 @@ function ModuleListsSection() {
           show_equipment_on_quote_pdf: showEquipmentOnQuotePdf,
         })
       }
-      if (activeKey === 'fx_rates') {
-        const parseRate = (value: string) => {
-          const n = parseFloat(value.trim())
-          return Number.isFinite(n) && n > 0 ? n : null
-        }
-        const eur = parseRate(fxFallbackEur)
-        const usd = parseRate(fxFallbackUsd)
-        const gbp = parseRate(fxFallbackGbp)
-        const fallback_rates: Record<string, number> = {}
-        if (eur) fallback_rates.EUR = eur
-        if (usd) fallback_rates.USD = usd
-        if (gbp) fallback_rates.GBP = gbp
-        const cache = parseInt(fxCacheTtl, 10)
-        return moduleSettingsApi.update('fx_rates', {
-          enabled: fxEnabled,
-          provider: fxProvider,
-          base_currency: 'MAD',
-          cache_ttl_minutes: Number.isFinite(cache) && cache >= 5 ? cache : 360,
-          fallback_rates,
-        })
-      }
       return Promise.reject(new Error('Module de configuration non géré.'))
     },
     onSuccess: () => {
@@ -350,7 +314,9 @@ function ModuleListsSection() {
           </button>
         ))}
       </div>
-      {isLoading ? (
+      {activeKey === 'fx_rates' ? (
+        isLoading ? <p>Chargement…</p> : <ConfigFxRatesPanel />
+      ) : isLoading ? (
         <p>Chargement…</p>
       ) : (
         <div className="card">
@@ -416,53 +382,6 @@ function ModuleListsSection() {
                 placeholder="normal, urgent, basse"
               />
             </div>
-          )}
-          {activeKey === 'fx_rates' && (
-            <>
-              <p className="text-muted" style={{ maxWidth: '64ch' }}>
-                API gratuite <strong>Frankfurter</strong> pour actualiser les taux vers le dirham (MAD). Les taux de
-                repli sont utilisés si l&apos;API est indisponible. Les factures en brouillon recalculent le taux à
-                chaque mise à jour des totaux.
-              </p>
-              <div className="form-group" style={{ marginTop: '0.75rem' }}>
-                <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <input type="checkbox" checked={fxEnabled} onChange={(e) => setFxEnabled(e.target.checked)} />
-                  Activer la récupération automatique des taux
-                </label>
-              </div>
-              <div className="form-group">
-                <label>Fournisseur</label>
-                <select value={fxProvider} onChange={(e) => setFxProvider(e.target.value)}>
-                  <option value="frankfurter">Frankfurter (gratuit, sans clé API)</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Durée de cache (minutes)</label>
-                <input
-                  type="number"
-                  min={5}
-                  value={fxCacheTtl}
-                  onChange={(e) => setFxCacheTtl(e.target.value)}
-                />
-              </div>
-              <fieldset className="form-group">
-                <legend>Taux de repli (1 unité étrangère → MAD)</legend>
-                <div className="quote-form-grid">
-                  <label>
-                    EUR → MAD
-                    <input type="text" value={fxFallbackEur} onChange={(e) => setFxFallbackEur(e.target.value)} />
-                  </label>
-                  <label>
-                    USD → MAD
-                    <input type="text" value={fxFallbackUsd} onChange={(e) => setFxFallbackUsd(e.target.value)} />
-                  </label>
-                  <label>
-                    GBP → MAD
-                    <input type="text" value={fxFallbackGbp} onChange={(e) => setFxFallbackGbp(e.target.value)} />
-                  </label>
-                </div>
-              </fieldset>
-            </>
           )}
           {activeKey === 'commercial_catalog' && (
             <>

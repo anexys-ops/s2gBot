@@ -1810,6 +1810,11 @@ th {
 .pdf-preview-modal__intro {
   margin: 0 0 1rem;
 }
+.pdf-preview-modal__loading {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+
 .pdf-preview-modal__viewer {
   flex: 1 1 auto;
   min-height: 0;
@@ -9783,23 +9788,35 @@ a.catalogue-tree__link-article:hover {
 .bc-fiche__qty-error {
   margin: 0.75rem 1.25rem 1rem;
 }
-.bc-fiche__qty-mass {
-  margin: 0 1.25rem 1rem;
+.bc-lignes-table__jalon-label {
+  font-weight: inherit;
 }
-.bc-fiche__qty-mass-fields {
-  flex-wrap: wrap;
+.bc-lignes-table__jalon-mass {
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+  vertical-align: middle;
 }
-.bc-fiche__qty-footer {
-  margin: 0 1.25rem 1rem;
-  padding-top: 0.25rem;
-  border-top: 1px solid var(--color-border, #e2e8f0);
-}
-.bc-fiche__qty-footer .bc-fiche__qty-mass {
-  margin: 0 0 0.75rem;
-}
-.bc-fiche__qty-footer-save {
+.bc-jalon-qty-mass {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.55rem;
+}
+.bc-jalon-qty-mass__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.bc-jalon-qty-mass__input {
+  width: 4.5rem;
+}
+.bc-jalon-qty-mass__apply {
+  white-space: nowrap;
 }
 .bc-lignes-table__col-money {
   width: 8rem;

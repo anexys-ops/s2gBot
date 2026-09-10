@@ -14,7 +14,6 @@ import ClientContactPicker from '../../components/clients/ClientContactPicker'
 import {
   buildBcLigneDisplayRows,
   clampQtyToDevis,
-  filterForfaitBcLignes,
   qtyExceedsDevis,
   resolveDevisDisplayMeta,
   resolveQuantiteDevis,
@@ -56,68 +55,38 @@ function applyMassQtyToLignes(
   })
 }
 
-type BcQtyMassActionsProps = {
-  massQty: string
-  onMassQtyChange: (value: string) => void
-  allCount: number
-  forfaitCount: number
-  onApplyAll: () => void
-  onApplyForfait: () => void
-  className?: string
+type BcJalonQtyMassProps = {
+  jalonLabel: string
+  value: string
+  lineCount: number
+  onChange: (value: string) => void
+  onApply: () => void
 }
 
-function BcQtyMassActions({
-  massQty,
-  onMassQtyChange,
-  allCount,
-  forfaitCount,
-  onApplyAll,
-  onApplyForfait,
-  className,
-}: BcQtyMassActionsProps) {
-  const disabled = !massQty.trim()
-
+function BcJalonQtyMass({ jalonLabel, value, lineCount, onChange, onApply }: BcJalonQtyMassProps) {
   return (
-    <div className={`planning-mass-actions bc-fiche__qty-mass${className ? ` ${className}` : ''}`}>
-      <div className="planning-mass-actions__head">
-        <strong className="planning-mass-actions__title">Quantités en masse</strong>
-        <p className="planning-mass-actions__hint text-muted">
-          Saisissez une quantité puis appliquez à toutes les lignes ou aux lignes forfait (plafonnée à la qté
-          devis par ligne) — enregistrez ensuite.
-        </p>
-      </div>
-      <div className="planning-mass-actions__fields bc-fiche__qty-mass-fields">
-        <label className="planning-mass-actions__field">
-          <span>Quantité</span>
-          <input
-            type="number"
-            min={0}
-            step="any"
-            inputMode="decimal"
-            value={massQty}
-            onChange={(e) => onMassQtyChange(e.target.value)}
-            aria-label="Quantité à appliquer en masse"
-          />
-        </label>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm planning-mass-actions__apply"
-          disabled={disabled}
-          onClick={onApplyAll}
-        >
-          Appliquer à toutes les lignes ({allCount})
-        </button>
-        {forfaitCount > 0 ? (
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm planning-mass-actions__apply"
-            disabled={disabled}
-            onClick={onApplyForfait}
-          >
-            Appliquer aux lignes forfait ({forfaitCount})
-          </button>
-        ) : null}
-      </div>
+    <div className="bc-jalon-qty-mass">
+      <label className="bc-jalon-qty-mass__field">
+        <span className="bc-jalon-qty-mass__label">Qté</span>
+        <input
+          type="number"
+          className="bc-lignes-table__qty-input bc-jalon-qty-mass__input"
+          min={0}
+          step="any"
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label={`Quantité en masse pour le jalon ${jalonLabel}`}
+        />
+      </label>
+      <button
+        type="button"
+        className="btn btn-secondary btn-sm bc-jalon-qty-mass__apply"
+        disabled={!value.trim() || lineCount === 0}
+        onClick={onApply}
+      >
+        Appliquer ({lineCount})
+      </button>
     </div>
   )
 }
@@ -135,7 +104,7 @@ export default function BonCommandeFichePage() {
   const [qtyEdits, setQtyEdits] = useState<Record<number, string>>({})
   const [confirmAction, setConfirmAction] = useState<'confirmer' | 'bl' | null>(null)
   const [planningToast, setPlanningToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
-  const [massQty, setMassQty] = useState('')
+  const [jalonMassQty, setJalonMassQty] = useState<Record<string, string>>({})
 
   const { data: bc, isLoading, error } = useQuery({
     queryKey: ['bon-commande', bcId],
@@ -246,21 +215,24 @@ export default function BonCommandeFichePage() {
 
   const ligneCount = bc?.lignes?.length ?? 0
 
-  function applyMassQty(lignes: BonCommandeLigne[]) {
+  const devisDisplayMeta = useMemo(() => resolveDevisDisplayMeta(bc), [bc])
+  const ligneById = useMemo(
+    () => new Map((bc?.lignes ?? []).map((l) => [l.id, l])),
+    [bc?.lignes],
+  )
+
+  function applyJalonMassQty(jalonId: string, ligneIds: number[]) {
+    const lignes = ligneIds
+      .map((id) => ligneById.get(id))
+      .filter((l): l is BonCommandeLigne => l != null)
     applyMassQtyToLignes(
       lignes,
-      massQty,
+      jalonMassQty[jalonId] ?? '',
       setQtyEdits,
       () => setPlanningToast({ message: 'Quantité en masse invalide.', variant: 'error' }),
       () => mutQuantites.reset(),
     )
   }
-
-  const devisDisplayMeta = useMemo(() => resolveDevisDisplayMeta(bc), [bc])
-  const forfaitLignes = useMemo(
-    () => filterForfaitBcLignes(bc?.lignes ?? [], devisDisplayMeta),
-    [bc?.lignes, devisDisplayMeta],
-  )
   const ligneDisplayRows = useMemo(
     () => buildBcLigneDisplayRows(bc?.lignes ?? [], devisDisplayMeta),
     [bc?.lignes, devisDisplayMeta],
@@ -356,25 +328,12 @@ export default function BonCommandeFichePage() {
   const canGenerateOm = lab && isAdmin && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
   const hasBonLivraison = (bc.bons_livraison?.length ?? 0) > 0
   const canEditQuantites = lab && ligneCount > 0 && bc.statut !== 'annule'
-  const allLignes = bc.lignes ?? []
 
   function saveQuantites() {
     setPlanningToast(null)
     mutQuantites.reset()
     mutQuantites.mutate(qtyEdits)
   }
-
-  const qtyMassActions =
-    canEditQuantites ? (
-      <BcQtyMassActions
-        massQty={massQty}
-        onMassQtyChange={setMassQty}
-        allCount={ligneCount}
-        forfaitCount={forfaitLignes.length}
-        onApplyAll={() => applyMassQty(allLignes)}
-        onApplyForfait={() => applyMassQty(forfaitLignes)}
-      />
-    ) : null
 
   const saveQuantitesButton =
     canEditQuantites ? (
@@ -549,15 +508,13 @@ export default function BonCommandeFichePage() {
                     <p className="dossier-tab-panel__intro">
                       Prestations et articles repris du devis source ({MONEY_UNIT_LABEL}).
                       {lab && bc.statut !== 'annule'
-                        ? ' Vous pouvez ajuster les quantités commandées dans la limite du devis, puis enregistrer.'
+                        ? ' Ajustez les quantités par ligne ou en masse depuis chaque jalon (plafond = qté devis), puis enregistrez.'
                         : null}
                     </p>
                   </div>
                   {saveQuantitesButton}
                 </div>
               </div>
-
-              {qtyMassActions}
 
               {ligneCount === 0 ? (
                 <p className="dossier-tab-empty">Aucune ligne sur ce bon de commande.</p>
@@ -593,7 +550,7 @@ export default function BonCommandeFichePage() {
                         if (row.type === 'jalon_header') {
                           return (
                             <tr key={row.key} className="bc-lignes-table__jalon">
-                              <td colSpan={5}>
+                              <td className="bc-lignes-table__jalon-label">
                                 {row.code ? (
                                   <>
                                     <span className="bc-lignes-table__jalon-code">{row.code}</span>
@@ -602,6 +559,21 @@ export default function BonCommandeFichePage() {
                                 ) : null}
                                 {row.label}
                               </td>
+                              <td />
+                              <td className="bc-lignes-table__jalon-mass">
+                                {canEditQuantites && row.ligneIds.length > 0 ? (
+                                  <BcJalonQtyMass
+                                    jalonLabel={row.label}
+                                    value={jalonMassQty[row.jalonId] ?? ''}
+                                    lineCount={row.ligneIds.length}
+                                    onChange={(value) =>
+                                      setJalonMassQty((prev) => ({ ...prev, [row.jalonId]: value }))
+                                    }
+                                    onApply={() => applyJalonMassQty(row.jalonId, row.ligneIds)}
+                                  />
+                                ) : null}
+                              </td>
+                              <td colSpan={2} />
                             </tr>
                           )
                         }
@@ -684,12 +656,6 @@ export default function BonCommandeFichePage() {
                   </table>
                 </div>
               )}
-              {canEditQuantites ? (
-                <div className="bc-fiche__qty-footer">
-                  {qtyMassActions}
-                  <div className="bc-fiche__qty-footer-save">{saveQuantitesButton}</div>
-                </div>
-              ) : null}
               {qtyOverDevis ? (
                 <p className="error bc-fiche__qty-error" role="alert">
                   Une ou plusieurs quantités dépassent le plafond du devis.

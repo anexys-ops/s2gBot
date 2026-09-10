@@ -11,6 +11,7 @@ class BonCommandePdfGenerator
 {
     public function __construct(
         private BonCommandePdfPresentationService $presentation,
+        private CommercialPdfCache $pdfCache,
     ) {}
 
     /**
@@ -19,38 +20,48 @@ class BonCommandePdfGenerator
     public function generate(BonCommande $bonCommande, ?int $requestTemplateId = null): array
     {
         $template = PdfTemplateResolver::resolve('purchase_order', $requestTemplateId, null);
-        $layoutConfig = PdfTemplateResolver::layoutConfig($template);
-        $view = $template?->blade_view ?? 'pdf.purchase_order';
-        $isDossierRecap = $view === 'pdf.purchase_order_dossier_recap';
+        $cacheKey = $this->pdfCache->keyForDocument(
+            'purchase_order',
+            (int) $bonCommande->id,
+            $template?->id,
+            $bonCommande->updated_at?->getTimestamp() ?? 0,
+            $template?->updated_at?->getTimestamp() ?? 0,
+        );
 
-        $bonCommande->loadMissing(['client', 'dossier', 'quote', 'lignes.article']);
-        if ($isDossierRecap) {
-            $bonCommande->loadMissing([
-                'clientContact',
-                'createur',
-                'dossier.site',
-                'dossier.contacts',
-                'dossier.mission',
-                'lignes.article.famille',
-            ]);
-        }
+        return $this->pdfCache->remember($cacheKey, function () use ($bonCommande, $template) {
+            $layoutConfig = PdfTemplateResolver::layoutConfig($template);
+            $view = $template?->blade_view ?? 'pdf.purchase_order';
+            $isDossierRecap = $view === 'pdf.purchase_order_dossier_recap';
 
-        $html = view($view, [
-            'bonCommande' => $bonCommande,
-            'template' => $template,
-            'layoutConfig' => $layoutConfig,
-            'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
-            'currencyLabel' => \App\Support\MoneyFormat::currencyLabel($bonCommande->quote?->currency_code),
-            'pdfContext' => $isDossierRecap ? $this->presentation->buildContext($bonCommande) : [],
-        ])->render();
+            $bonCommande->loadMissing(['client', 'dossier', 'quote', 'lignes.article']);
+            if ($isDossierRecap) {
+                $bonCommande->loadMissing([
+                    'clientContact',
+                    'createur',
+                    'dossier.site',
+                    'dossier.contacts',
+                    'dossier.mission',
+                    'lignes.article.famille',
+                ]);
+            }
 
-        $pdf = Pdf::loadHTML($html);
-        $pdf->getDomPDF()->setPaper('A4', 'portrait');
+            $html = view($view, [
+                'bonCommande' => $bonCommande,
+                'template' => $template,
+                'layoutConfig' => $layoutConfig,
+                'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
+                'currencyLabel' => \App\Support\MoneyFormat::currencyLabel($bonCommande->quote?->currency_code),
+                'pdfContext' => $isDossierRecap ? $this->presentation->buildContext($bonCommande) : [],
+            ])->render();
 
-        $filename = $isDossierRecap
-            ? 'bc-recap-'.$bonCommande->numero.'.pdf'
-            : 'bc-'.$bonCommande->numero.'.pdf';
+            $pdf = Pdf::loadHTML($html);
+            $pdf->getDomPDF()->setPaper('A4', 'portrait');
 
-        return [$pdf->output(), $filename];
+            $filename = $isDossierRecap
+                ? 'bc-recap-'.$bonCommande->numero.'.pdf'
+                : 'bc-'.$bonCommande->numero.'.pdf';
+
+            return [$pdf->output(), $filename];
+        });
     }
 }

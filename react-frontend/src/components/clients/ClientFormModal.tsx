@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react'
 import type { Client } from '../../api/client'
-import { SUPPORTED_CURRENCIES } from '../../lib/currencies'
+import { useCurrencyCatalog } from '../../hooks/useCurrencyCatalog'
 import Modal from '../Modal'
 import ClientMoroccoFormFields from './ClientMoroccoFormFields'
 
@@ -34,6 +34,7 @@ export default function ClientFormModal({
   errorMessage,
   staffUsers,
 }: Props) {
+  const { currencies } = useCurrencyCatalog()
   const showInternal = staffUsers !== undefined
   const previewName = form.name?.trim() || (mode === 'create' ? 'Nouveau client' : 'Client')
 
@@ -94,7 +95,7 @@ export default function ClientFormModal({
                   value={form.currency_code ?? 'MAD'}
                   onChange={(e) => setForm((f) => ({ ...f, currency_code: e.target.value }))}
                 >
-                  {SUPPORTED_CURRENCIES.map((currency) => (
+                  {currencies.map((currency) => (
                     <option key={currency.code} value={currency.code}>
                       {currency.name} ({currency.label})
                     </option>

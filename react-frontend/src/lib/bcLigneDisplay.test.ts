@@ -102,6 +102,7 @@ describe('buildBcLigneDisplayRows', () => {
     )
     expect(rows.map((r) => r.type)).toEqual(['jalon_header', 'product', 'product', 'product'])
     expect(rows[0].type === 'jalon_header' && rows[0].label).toBe('Lot essais')
+    expect(rows[0].type === 'jalon_header' && rows[0].ligneIds).toEqual([1, 2])
     expect(rows[1].type === 'product' && rows[1].nested).toBe(true)
     expect(rows[3].type === 'product' && rows[3].nested).toBe(false)
   })

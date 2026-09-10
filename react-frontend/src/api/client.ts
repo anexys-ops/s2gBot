@@ -585,6 +585,21 @@ export type FxRatesSettings = {
   base_currency?: string
   cache_ttl_minutes?: number
   fallback_rates?: Record<string, number>
+  extra_currencies?: { code: string; label: string; name: string }[]
+}
+
+export type FxRateStatusRow = {
+  code: string
+  label: string
+  name: string
+  rate: number | null
+  fetched_at: string | null
+  source: 'api' | 'fallback' | null
+}
+
+export type FxRatesStatus = FxRatesSettings & {
+  last_refresh_at: string | null
+  rates: FxRateStatusRow[]
 }
 
 export const fxRatesApi = {
@@ -607,6 +622,8 @@ export const fxRatesApi = {
     }>(`/fx-rates?${q.toString()}`)
   },
   settings: () => api<FxRatesSettings>('/fx-rates/settings'),
+  status: () => api<FxRatesStatus>('/fx-rates/status'),
+  refresh: () => api<FxRatesStatus>('/fx-rates/refresh', { method: 'POST' }),
 }
 
 export interface RefPackageRow {
@@ -2666,6 +2683,11 @@ export const pdfApi = {
     a.download = `exemple-${slug}.pdf`
     a.click()
     URL.revokeObjectURL(url)
+  },
+  getPreviewLink: (type: string, id: number, templateId?: number) => {
+    const q = new URLSearchParams({ type, id: String(id) })
+    if (templateId != null) q.set('template_id', String(templateId))
+    return api<{ url: string }>(`/pdf/preview-link?${q.toString()}`)
   },
   fetchGenerate: async (type: string, id: number, templateId?: number) => {
     const token = getToken()

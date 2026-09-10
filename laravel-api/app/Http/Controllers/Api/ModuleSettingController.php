@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ModuleSetting;
+use App\Services\FxRateService;
 use App\Support\PermissionCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,13 @@ class ModuleSettingController extends Controller
 
         $row = ModuleSetting::query()->where('module_key', $moduleKey)->first();
         if (! $row) {
+            if ($moduleKey === 'fx_rates') {
+                return response()->json([
+                    'module_key' => 'fx_rates',
+                    'settings' => app(FxRateService::class)->settings(),
+                ]);
+            }
+
             return response()->json(['message' => 'Module inconnu'], 404);
         }
 
@@ -39,7 +47,7 @@ class ModuleSettingController extends Controller
         ]);
 
         $row = ModuleSetting::query()->firstOrNew(['module_key' => $moduleKey]);
-        if (! $row->exists) {
+        if (! $row->exists && $moduleKey !== 'fx_rates') {
             return response()->json(['message' => 'Module inconnu'], 404);
         }
 

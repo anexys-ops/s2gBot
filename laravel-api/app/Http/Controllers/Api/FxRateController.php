@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\FxRateService;
 use App\Support\CurrencyCode;
+use App\Support\PermissionCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -50,5 +51,24 @@ class FxRateController extends Controller
     public function settings(): JsonResponse
     {
         return response()->json($this->fxRates->settings());
+    }
+
+    public function status(): JsonResponse
+    {
+        return response()->json($this->fxRates->status());
+    }
+
+    public function refresh(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->isLabAdmin() && ! $user->hasCapability(PermissionCatalog::CONFIG_MANAGE)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        try {
+            return response()->json($this->fxRates->refresh());
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 }

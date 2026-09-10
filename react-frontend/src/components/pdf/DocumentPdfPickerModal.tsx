@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Modal from '../Modal'
 import { documentPdfTemplatesApi, invoicesApi, pdfApi } from '../../api/client'
@@ -37,6 +37,8 @@ export default function DocumentPdfPickerModal({
   const [error, setError] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null)
+  const [iframeLoading, setIframeLoading] = useState(false)
+  const previewRequestRef = useRef(0)
 
   const { data, isLoading } = useQuery({
     queryKey: ['document-pdf-templates', documentType, 'active'],
@@ -57,48 +59,67 @@ export default function DocumentPdfPickerModal({
 
   const selectedId = templateId ?? defaultId
 
-  function clearPreview() {
+  const clearPreview = useCallback(() => {
     setPreviewUrl((current) => {
-      if (current) URL.revokeObjectURL(current)
+      if (current?.startsWith('blob:')) URL.revokeObjectURL(current)
       return null
     })
     setPreviewBlob(null)
-  }
+    setIframeLoading(false)
+  }, [])
 
   useEffect(() => {
     clearPreview()
     setError(null)
-  }, [selectedId, documentType, documentId, signedInvoicePreview])
+  }, [selectedId, documentType, documentId, signedInvoicePreview, clearPreview])
 
-  useEffect(() => () => clearPreview(), [])
+  useEffect(() => () => clearPreview(), [clearPreview])
 
-  useEffect(() => {
-    if (signedInvoicePreview && !onEmail) {
-      void loadPreview()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- chargement initial facture signée uniquement
-  }, [signedInvoicePreview, documentId, onEmail])
-
-  async function loadPreview() {
+  const loadPreview = useCallback(async () => {
     if (!signedInvoicePreview && selectedId == null) {
       setError('Aucun modèle PDF actif disponible.')
       return
     }
+
+    const requestId = previewRequestRef.current + 1
+    previewRequestRef.current = requestId
     setLoading(true)
     setError(null)
+    clearPreview()
+
     try {
-      const blob = signedInvoicePreview
-        ? await invoicesApi.fetchInvoicePdf(documentId)
-        : await pdfApi.fetchGenerate(documentType, documentId, Number(selectedId))
-      clearPreview()
-      setPreviewBlob(blob)
-      setPreviewUrl(URL.createObjectURL(blob))
+      if (signedInvoicePreview) {
+        const blob = await invoicesApi.fetchInvoicePdf(documentId)
+        if (previewRequestRef.current !== requestId) return
+        setPreviewBlob(blob)
+        setPreviewUrl(URL.createObjectURL(blob))
+        setIframeLoading(true)
+        return
+      }
+
+      const { url } = await pdfApi.getPreviewLink(documentType, documentId, selectedId ?? undefined)
+      if (previewRequestRef.current !== requestId) return
+      setPreviewUrl(url)
+      setIframeLoading(true)
     } catch (e) {
+      if (previewRequestRef.current !== requestId) return
       setError(e instanceof Error ? e.message : String(e))
     } finally {
-      setLoading(false)
+      if (previewRequestRef.current === requestId) {
+        setLoading(false)
+      }
     }
-  }
+  }, [clearPreview, documentId, documentType, selectedId, signedInvoicePreview])
+
+  useEffect(() => {
+    if (onEmail) return
+    if (signedInvoicePreview) {
+      void loadPreview()
+      return
+    }
+    if (isLoading || templates.length === 0 || selectedId == null) return
+    void loadPreview()
+  }, [isLoading, loadPreview, onEmail, selectedId, signedInvoicePreview, templates.length])
 
   async function handleConfirm() {
     if (onEmail) {
@@ -121,15 +142,26 @@ export default function DocumentPdfPickerModal({
     await loadPreview()
   }
 
-  function handleDownload() {
-    if (!previewBlob) return
-    pdfApi.downloadBlob(previewBlob, defaultDownloadName(documentType, documentLabel))
+  async function handleDownload() {
+    if (previewBlob) {
+      pdfApi.downloadBlob(previewBlob, defaultDownloadName(documentType, documentLabel))
+      return
+    }
+    if (!previewUrl) return
+    try {
+      const blob = await pdfApi.fetchGenerate(documentType, documentId, selectedId ?? undefined)
+      pdfApi.downloadBlob(blob, defaultDownloadName(documentType, documentLabel))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
   }
 
   const typeLabel = documentPdfTypeLabel(documentType)
   const title =
     titleOverride ??
     (onEmail ? `Envoyer ${typeLabel} par email` : `Aperçu ${typeLabel}`)
+
+  const showViewer = Boolean(previewUrl) || loading || iframeLoading
 
   return (
     <Modal title={title} onClose={() => !loading && onClose()} size="xl">
@@ -166,13 +198,19 @@ export default function DocumentPdfPickerModal({
 
         {error ? <p className="error">{error}</p> : null}
 
-        {previewUrl ? (
+        {showViewer ? (
           <div className="pdf-preview-modal__viewer">
-            <iframe
-              title={`Aperçu PDF — ${documentLabel}`}
-              src={previewUrl}
-              className="pdf-preview-modal__frame"
-            />
+            {(loading || iframeLoading) && !error ? (
+              <p className="pdf-preview-modal__loading text-muted">Génération du PDF en cours…</p>
+            ) : null}
+            {previewUrl ? (
+              <iframe
+                title={`Aperçu PDF — ${documentLabel}`}
+                src={previewUrl}
+                className="pdf-preview-modal__frame"
+                onLoad={() => setIframeLoading(false)}
+              />
+            ) : null}
           </div>
         ) : null}
 
@@ -199,8 +237,8 @@ export default function DocumentPdfPickerModal({
               <button
                 type="button"
                 className="btn btn-secondary"
-                disabled={!previewBlob}
-                onClick={handleDownload}
+                disabled={!previewUrl && !previewBlob}
+                onClick={() => void handleDownload()}
               >
                 Télécharger
               </button>

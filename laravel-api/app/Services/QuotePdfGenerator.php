@@ -13,6 +13,7 @@ class QuotePdfGenerator
 {
     public function __construct(
         private readonly QuotePdfPresentationService $presentation,
+        private readonly CommercialPdfCache $pdfCache,
     ) {}
 
     /**
@@ -32,27 +33,37 @@ class QuotePdfGenerator
         ]);
 
         $template = PdfTemplateResolver::resolve('quote', $requestTemplateId, $quote->pdf_template_id);
-        $view = $template?->blade_view ?? 'pdf.quote';
-        $layoutConfig = PdfTemplateResolver::layoutConfig($template);
-        $pdfContext = $this->presentation->buildContext($quote);
-        $itemRows = $this->presentation->buildItemRows($quote, $layoutConfig);
-        $amountInWords = FrenchAmountInWords::format($pdfContext['total_ttc']);
+        $cacheKey = $this->pdfCache->keyForDocument(
+            'quote',
+            (int) $quote->id,
+            $template?->id,
+            $quote->updated_at?->getTimestamp() ?? 0,
+            $template?->updated_at?->getTimestamp() ?? 0,
+        );
 
-        $html = view($view, [
-            'quote' => $quote,
-            'template' => $template,
-            'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
-            'letterheadDataUri' => AppBranding::devisLetterheadDataUriForPdf(),
-            'layoutConfig' => $layoutConfig,
-            'pdfContext' => $pdfContext,
-            'itemRows' => $itemRows,
-            'amountInWords' => $amountInWords,
-            'currencyLabel' => \App\Support\MoneyFormat::currencyLabel($quote->currency_code),
-        ])->render();
+        return $this->pdfCache->remember($cacheKey, function () use ($quote, $template) {
+            $view = $template?->blade_view ?? 'pdf.quote';
+            $layoutConfig = PdfTemplateResolver::layoutConfig($template);
+            $pdfContext = $this->presentation->buildContext($quote);
+            $itemRows = $this->presentation->buildItemRows($quote, $layoutConfig);
+            $amountInWords = FrenchAmountInWords::format($pdfContext['total_ttc']);
 
-        $pdf = Pdf::loadHTML($html);
-        $pdf->getDomPDF()->setPaper('A4', 'portrait');
+            $html = view($view, [
+                'quote' => $quote,
+                'template' => $template,
+                'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
+                'letterheadDataUri' => AppBranding::devisLetterheadDataUriForPdf(),
+                'layoutConfig' => $layoutConfig,
+                'pdfContext' => $pdfContext,
+                'itemRows' => $itemRows,
+                'amountInWords' => $amountInWords,
+                'currencyLabel' => \App\Support\MoneyFormat::currencyLabel($quote->currency_code),
+            ])->render();
 
-        return [$pdf->output(), 'devis-'.$quote->number.'.pdf'];
+            $pdf = Pdf::loadHTML($html);
+            $pdf->getDomPDF()->setPaper('A4', 'portrait');
+
+            return [$pdf->output(), 'devis-'.$quote->number.'.pdf'];
+        });
     }
 }

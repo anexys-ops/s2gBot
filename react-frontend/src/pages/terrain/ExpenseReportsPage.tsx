@@ -3,7 +3,7 @@
  */
 import { useMemo, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   expenseReportsApi,
   EXPENSE_PAYMENT_METHOD_LABELS,
@@ -258,19 +258,18 @@ function LineRow({
       <td>{line.user?.name || `#${line.user_id}`}</td>
       {(canEdit || canDelete) && (
         <td className="ndf-no-print">
-          <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
-            {canEdit ? (
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => onEdit(line)} title="Modifier">✏️</button>
-            ) : null}
-            {canDelete ? (
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm btn-danger-outline"
-                disabled={deleteMut.isPending}
-                onClick={() => { if (window.confirm('Supprimer cette ligne ?')) deleteMut.mutate() }}
-              >✕</button>
-            ) : null}
-          </div>
+          <TableRowActions
+            onEdit={canEdit ? () => onEdit(line) : undefined}
+            onDelete={
+              canDelete
+                ? () => {
+                    if (window.confirm('Supprimer cette ligne ?')) deleteMut.mutate()
+                  }
+                : undefined
+            }
+            editLabel="Modifier la ligne"
+            deleteLabel="Supprimer la ligne"
+          />
         </td>
       )}
     </tr>
@@ -326,7 +325,17 @@ function TotalHero({ total, advance }: { total: number; advance: number }) {
   )
 }
 
-function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => void }) {
+function ReportDetail({
+  reportId,
+  onBack,
+  onCreateNew,
+  createNewPending = false,
+}: {
+  reportId: number
+  onBack: () => void
+  onCreateNew: () => void
+  createNewPending?: boolean
+}) {
   const [lineModal, setLineModal] = useState<'new' | ExpenseLine | null>(null)
   const [notesDraft, setNotesDraft] = useState<string | null>(null)
   const [privateNotesDraft, setPrivateNotesDraft] = useState<string | null>(null)
@@ -410,8 +419,27 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
       actions={
         <div className="ndf-toolbar-actions ndf-no-print">
           <button type="button" className="btn btn-secondary btn-sm" onClick={onBack}>← Liste</button>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={createNewPending}
+            onClick={onCreateNew}
+          >
+            {createNewPending ? 'Création…' : '+ Ajouter une note de frais'}
+          </button>
           <QuotePdfButton onClick={() => setPdfOpen(true)} />
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEmailOpen(true)}>✉ Envoyer par mail</button>
+          {canDelete ? (
+            <TableRowActions
+              onDelete={() => {
+                const msg = report.statut === 'brouillon'
+                  ? 'Supprimer cette note de frais ?'
+                  : `Supprimer la note de frais ${report.unique_number} (statut : ${EXPENSE_STATUT_LABELS[report.statut]}) ?`
+                if (window.confirm(msg)) deleteMut.mutate()
+              }}
+              deleteLabel={`Supprimer ${report.unique_number}`}
+            />
+          ) : null}
         </div>
       }
     >
@@ -497,22 +525,15 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
           {report.statut === 'valide' && (
             <button type="button" className="btn btn-primary btn-sm" disabled={updateMut.isPending} onClick={() => updateMut.mutate({ statut: 'rembourse' })}>Marquer remboursé</button>
           )}
-          {canDelete && (
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm btn-danger-outline"
-              style={{ marginLeft: 'auto' }}
-              disabled={deleteMut.isPending}
-              onClick={() => {
-                const msg = report.statut === 'brouillon'
-                  ? 'Supprimer cette note de frais ?'
-                  : `Supprimer la note de frais ${report.unique_number} (statut : ${EXPENSE_STATUT_LABELS[report.statut]}) ?`
-                if (window.confirm(msg)) deleteMut.mutate()
-              }}
-            >
-              Supprimer
+        </div>
+
+        <div className="ndf-lines-toolbar ndf-no-print">
+          <h2 className="ds-form-section__title">Lignes de dépenses</h2>
+          {canEdit ? (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setLineModal('new')}>
+              + Ajouter une ligne
             </button>
-          )}
+          ) : null}
         </div>
 
         <div className="table-wrap">
@@ -527,7 +548,7 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
                 <th>Description</th>
                 <th>Justificatif</th>
                 <th>Personnel</th>
-                {(canEdit || canDeleteLines) && <th className="ndf-no-print"></th>}
+                {(canEdit || canDeleteLines) && <th className="ndf-no-print">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -553,11 +574,6 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
           </table>
         </div>
 
-        {canEdit && (
-          <button type="button" className="btn btn-secondary btn-sm ndf-no-print" style={{ marginTop: '0.75rem' }} onClick={() => setLineModal('new')}>
-            + Ajouter une ligne
-          </button>
-        )}
       </div>
 
       {lineModal ? (
@@ -641,6 +657,14 @@ export default function ExpenseReportsPage() {
     },
   })
 
+  const createStandaloneMut = useMutation({
+    mutationFn: () => expenseReportsApi.create({}),
+    onSuccess: (report) => {
+      void qc.invalidateQueries({ queryKey: ['expense-reports'] })
+      navigate(`/notes-de-frais/${report.id}`)
+    },
+  })
+
   const statusMut = useMutation({
     mutationFn: ({ id: rid, statut }: { id: number; statut: ExpenseReportStatut }) =>
       expenseReportsApi.update(rid, { statut }),
@@ -653,7 +677,14 @@ export default function ExpenseReportsPage() {
   })
 
   if (reportId && !Number.isNaN(reportId)) {
-    return <ReportDetail reportId={reportId} onBack={() => navigate('/notes-de-frais')} />
+    return (
+      <ReportDetail
+        reportId={reportId}
+        onBack={() => navigate('/notes-de-frais')}
+        onCreateNew={() => createStandaloneMut.mutate()}
+        createNewPending={createStandaloneMut.isPending}
+      />
+    )
   }
 
   const list = data?.data ?? []
@@ -668,7 +699,9 @@ export default function ExpenseReportsPage() {
       actions={
         <div className="ndf-toolbar-actions ndf-no-print">
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.print()}>🖨 Imprimer</button>
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>+ Nouvelle NDF</button>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>
+            + Ajouter une note de frais
+          </button>
         </div>
       }
     >
@@ -827,20 +860,21 @@ export default function ExpenseReportsPage() {
                       )}
                       {visible.actions !== false && (
                         <td onClick={(e) => e.stopPropagation()}>
-                          <div className="data-table__actions-inner">
-                            <Link to={`/notes-de-frais/${r.id}`} className="btn btn-secondary btn-sm">Ouvrir</Link>
-                            {canDeleteExpenseReport(r.statut) ? (
-                              <TableRowActions
-                                deleteLabel={`Supprimer ${r.unique_number}`}
-                                onDelete={() => {
-                                  const msg = r.statut === 'brouillon'
-                                    ? `Supprimer la note de frais ${r.unique_number} ?`
-                                    : `Supprimer ${r.unique_number} (statut : ${EXPENSE_STATUT_LABELS[r.statut]}) ?`
-                                  if (window.confirm(msg)) deleteMut.mutate(r.id)
-                                }}
-                              />
-                            ) : null}
-                          </div>
+                          <TableRowActions
+                            onEdit={() => navigate(`/notes-de-frais/${r.id}`)}
+                            onDelete={
+                              canDeleteExpenseReport(r.statut)
+                                ? () => {
+                                    const msg = r.statut === 'brouillon'
+                                      ? `Supprimer la note de frais ${r.unique_number} ?`
+                                      : `Supprimer ${r.unique_number} (statut : ${EXPENSE_STATUT_LABELS[r.statut]}) ?`
+                                    if (window.confirm(msg)) deleteMut.mutate(r.id)
+                                  }
+                                : undefined
+                            }
+                            editLabel={`Modifier ${r.unique_number}`}
+                            deleteLabel={`Supprimer ${r.unique_number}`}
+                          />
                         </td>
                       )}
                     </tr>

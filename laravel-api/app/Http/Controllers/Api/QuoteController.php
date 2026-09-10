@@ -17,6 +17,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Models\DocumentSequence;
 use App\Services\CommercialDocumentTotalsService;
+use App\Services\CommercialPdfPreGenerationService;
 use App\Services\DocumentActivityLogger;
 use App\Services\DocumentCurrencyService;
 use App\Services\QuotePricingService;
@@ -43,6 +44,7 @@ class QuoteController extends Controller
         private readonly DocumentSequenceService $documentSequences,
         private readonly DocumentActivityLogger $documentActivity,
         private readonly DocumentCurrencyService $documentCurrency,
+        private readonly CommercialPdfPreGenerationService $pdfPreGeneration,
     ) {}
 
     private const QUOTE_LINE_BASE = [
@@ -225,6 +227,7 @@ class QuoteController extends Controller
 
         $fresh = $quote->fresh();
         $this->documentActivity->quoteCreated($request->user(), $fresh);
+        $this->pdfPreGeneration->warmQuote($fresh);
 
         return response()->json($this->loadQuoteForResponse($fresh), 201);
     }
@@ -268,6 +271,7 @@ class QuoteController extends Controller
             $fresh = $quote->fresh();
             $tasks[] = 'statut/notes';
             $this->documentActivity->quoteUpdated($request->user(), $fresh, $before, $tasks);
+            $this->pdfPreGeneration->warmQuote($fresh);
 
             return response()->json($this->loadQuoteForResponse($fresh));
         }
@@ -361,6 +365,7 @@ class QuoteController extends Controller
         $this->recordQuoteStatusChange($quote->fresh(), $oldStatus, $request);
         $fresh = $quote->fresh();
         $this->documentActivity->quoteUpdated($request->user(), $fresh, $before, $tasks, $lineChanges);
+        $this->pdfPreGeneration->warmQuote($fresh);
 
         return response()->json($this->loadQuoteForResponse($fresh));
     }

@@ -129,12 +129,6 @@ export default function AppNavigation() {
   const groups: MenuGroup[] = useMemo(() => {
     const canCommercial = canAccessStaffModule(user, 'commercial')
     const canDossiers = canAccessStaffModule(user, 'dossiers')
-    const canTerrain = canAccessStaffModule(user, 'terrain')
-    const canLabo = canAccessStaffModule(user, 'laboratoire')
-    const canIngenierie = canAccessStaffModule(user, 'ingenierie')
-    const canCatalogue = canAccessStaffModule(user, 'catalogue')
-    const canRapports = canAccessStaffModule(user, 'rapports')
-    const canConfig = canAccessStaffModule(user, 'configuration')
     const canOdm = canAccessOrdresMission(user)
 
     const filterItems = (items: SubItem[]) =>

@@ -97,9 +97,12 @@ export default function DocumentPdfPickerModal({
         return
       }
 
-      const { url } = await pdfApi.getPreviewLink(documentType, documentId, selectedId ?? undefined)
+      // Blob + object URL : évite que le service worker PWA intercepte /api/... dans l’iframe
+      // (sinon React affiche une 404 « Page introuvable » à la place du PDF).
+      const blob = await pdfApi.fetchGenerate(documentType, documentId, selectedId ?? undefined)
       if (previewRequestRef.current !== requestId) return
-      setPreviewUrl(url)
+      setPreviewBlob(blob)
+      setPreviewUrl(URL.createObjectURL(blob))
       setIframeLoading(true)
     } catch (e) {
       if (previewRequestRef.current !== requestId) return
@@ -147,7 +150,6 @@ export default function DocumentPdfPickerModal({
       pdfApi.downloadBlob(previewBlob, defaultDownloadName(documentType, documentLabel))
       return
     }
-    if (!previewUrl) return
     try {
       const blob = await pdfApi.fetchGenerate(documentType, documentId, selectedId ?? undefined)
       pdfApi.downloadBlob(blob, defaultDownloadName(documentType, documentLabel))

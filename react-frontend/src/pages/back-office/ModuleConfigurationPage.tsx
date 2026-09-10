@@ -302,6 +302,10 @@ function ModuleListsSection() {
         Valeurs proposées dans les listes déroulantes (TVA, statuts de bons de commande éligibles à la facturation,
         etc.). Séparez les nombres par des virgules.
       </p>
+      <p className="module-configuration-page__hint" style={{ maxWidth: '70ch', lineHeight: 1.5 }}>
+        <strong>Devises &amp; taux de change</strong> (API Frankfurter, FCFA/XOF, actualisation forcée) : onglet dédié
+        ci-dessous.
+      </p>
       <div className="module-configuration-page__entity-tabs" style={{ marginBottom: '1rem' }}>
         {MODULE_KEYS.map((m) => (
           <button

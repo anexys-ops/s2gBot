@@ -17,7 +17,12 @@ function parseFallbackRates(raw: Record<string, number> | undefined): Record<str
 export default function ConfigFxRatesPanel() {
   const queryClient = useQueryClient()
 
-  const { data: settingsRow, isLoading: settingsLoading } = useQuery({
+  const {
+    data: settingsRow,
+    isLoading: settingsLoading,
+    isError: settingsError,
+    error: settingsLoadError,
+  } = useQuery({
     queryKey: ['module-settings', 'fx_rates'],
     queryFn: () => moduleSettingsApi.get('fx_rates'),
   })
@@ -124,6 +129,13 @@ export default function ConfigFxRatesPanel() {
   }
 
   if (settingsLoading) return <p>Chargement…</p>
+  if (settingsError) {
+    return (
+      <p className="error">
+        Impossible de charger la configuration des devises : {(settingsLoadError as Error).message}
+      </p>
+    )
+  }
 
   return (
     <div className="config-fx-rates">

@@ -25,6 +25,7 @@ class BonCommandeController extends Controller
     {
         $q = BonCommande::query()
             ->with(['dossier', 'client', 'clientContact', 'lignes', 'quote'])
+            ->withCount(['bonsLivraison', 'invoices'])
             ->orderByDesc('date_commande')
             ->orderByDesc('id');
         if ($request->filled('dossier_id')) {
@@ -192,6 +193,14 @@ class BonCommandeController extends Controller
 
                 return response()->json([
                     'message' => "La quantité ne peut pas être inférieure à la quantité déjà livrée ({$minLabel}).",
+                ], 422);
+            }
+            $maxDevis = $ligne->quantite_devis !== null ? (float) $ligne->quantite_devis : null;
+            if ($maxDevis !== null && $qty > $maxDevis + 1e-9) {
+                $maxLabel = $this->formatQtyLabel($maxDevis);
+
+                return response()->json([
+                    'message' => "La quantité ne peut pas dépasser celle du devis ({$maxLabel}).",
                 ], 422);
             }
             $ligne->quantite = $qty;

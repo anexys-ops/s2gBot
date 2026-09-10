@@ -26,6 +26,8 @@ export interface PdfLayoutConfigForm {
     show_total_ht: boolean
     show_total_tva: boolean
     show_total_ttc: boolean
+    show_discount: boolean
+    show_frais_supplementaires: boolean
   }
   /** Colonnes et montants des lignes (devis / factures / BC / BL). */
   lines: {
@@ -87,6 +89,8 @@ export function layoutConfigToForm(raw: PdfLayoutConfig | undefined | null): Pdf
       show_total_ht: t.show_total_ht !== false,
       show_total_tva: t.show_total_tva !== false,
       show_total_ttc: t.show_total_ttc !== false,
+      show_discount: t.show_discount !== false,
+      show_frais_supplementaires: t.show_frais_supplementaires !== false,
     },
     lines: {
       show_prices: l.show_prices !== false,
@@ -136,6 +140,8 @@ export function formToLayoutConfigPayload(form: PdfLayoutConfigForm): PdfLayoutC
       show_total_ht: form.totals.show_total_ht,
       show_total_tva: form.totals.show_total_tva,
       show_total_ttc: form.totals.show_total_ttc,
+      show_discount: form.totals.show_discount,
+      show_frais_supplementaires: form.totals.show_frais_supplementaires,
     },
     lines: {
       show_prices: form.lines.show_prices,

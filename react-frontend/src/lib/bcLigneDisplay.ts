@@ -30,6 +30,62 @@ export type BcLigneDisplayRow<T extends GroupableLigne = BonCommandeLigne> =
   | { type: 'jalon_header'; key: string; label: string; code?: string | null }
   | { type: 'product'; key: string; ligne: T; nested: boolean }
 
+export function isDocumentForfaitMeta(meta?: EntityMetaPayload | null): boolean {
+  return meta?.mode_devis === 'forfait'
+}
+
+export function collectForfaitRefArticleIds(meta?: EntityMetaPayload | null): Set<number> {
+  const ids = new Set<number>()
+  for (const jalon of meta?.devis_jalons ?? []) {
+    if (jalon.mode !== 'forfait') continue
+    for (const refId of jalon.product_ref_article_ids ?? []) {
+      const id = Number(refId)
+      if (id > 0) ids.add(id)
+    }
+  }
+  return ids
+}
+
+/** Ligne BC rattachée à un forfait document ou jalon forfait (meta devis source). */
+export function isForfaitBcLigne(
+  ligne: Pick<BonCommandeLigne, 'ref_article_id'>,
+  meta?: EntityMetaPayload | null,
+): boolean {
+  if (isDocumentForfaitMeta(meta)) return true
+  const refId = ligne.ref_article_id != null ? Number(ligne.ref_article_id) : 0
+  if (refId <= 0) return false
+  return collectForfaitRefArticleIds(meta).has(refId)
+}
+
+export function filterForfaitBcLignes<T extends Pick<BonCommandeLigne, 'id' | 'ref_article_id'>>(
+  lignes: T[],
+  meta?: EntityMetaPayload | null,
+): T[] {
+  return lignes.filter((l) => isForfaitBcLigne(l, meta))
+}
+
+export function resolveQuantiteDevis(ligne: Pick<BonCommandeLigne, 'quantite_devis' | 'quantite'>): number | null {
+  if (ligne.quantite_devis == null || ligne.quantite_devis === '') return null
+  const n = Number(ligne.quantite_devis)
+  return Number.isFinite(n) ? n : null
+}
+
+export function qtyExceedsDevis(rawQty: string, maxDevis: number | null): boolean {
+  if (maxDevis == null) return false
+  const n = Number(String(rawQty).replace(',', '.'))
+  if (!Number.isFinite(n)) return true
+  return n > maxDevis + 1e-9
+}
+
+export function clampQtyToDevis(rawQty: string, maxDevis: number | null): string {
+  const trimmed = rawQty.trim()
+  if (!trimmed || maxDevis == null) return rawQty
+  const n = Number(trimmed.replace(',', '.'))
+  if (!Number.isFinite(n) || n <= maxDevis + 1e-9) return rawQty
+  if (Math.abs(maxDevis - Math.round(maxDevis)) < 1e-9) return String(Math.round(maxDevis))
+  return String(maxDevis)
+}
+
 function sortLignes<T extends GroupableLigne>(lignes: T[]): T[] {
   return [...lignes].sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0) || a.id - b.id)
 }

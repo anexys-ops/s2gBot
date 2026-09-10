@@ -19,6 +19,7 @@ class BonCommandeLigne extends Model
         'libelle',
         'ordre',
         'quantite',
+        'quantite_devis',
         'prix_unitaire_ht',
         'tva_rate',
         'montant_ht',

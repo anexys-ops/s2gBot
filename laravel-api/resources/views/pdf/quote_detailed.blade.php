@@ -18,13 +18,17 @@
 </head>
 <body>
 @php
+    extract(\App\Support\AppBranding::commercialLayoutViewVars($layoutConfig ?? []));
     $linesCfg = is_array($layoutConfig['lines'] ?? null) ? $layoutConfig['lines'] : [];
     $showLinePrices = ($linesCfg['show_prices'] ?? true) !== false;
     $showPuPtCols = $showLinePrices && (($linesCfg['show_pu_pt_columns'] ?? true) !== false);
-    $totalsCfg = is_array($layoutConfig['totals'] ?? null) ? $layoutConfig['totals'] : [];
-    $showTotalTva = ($totalsCfg['show_total_tva'] ?? true) !== false;
     $showTvaCol = $showLinePrices && $showTotalTva && (($linesCfg['show_tva_column'] ?? true) !== false);
     $currencyLabel = $currencyLabel ?? 'DH';
+    $ctx = $pdfContext ?? [];
+    $fraisSuppItems = is_array($ctx['frais_supplementaires'] ?? null) ? $ctx['frais_supplementaires'] : [];
+    $fraisSuppTtc = (float) ($ctx['frais_supplementaires_ttc'] ?? 0);
+    $hasDiscount = ($ctx['has_discount'] ?? false) && $showDiscount;
+    $showFraisRows = $showFraisSupplementaires && $fraisSuppTtc > 0 && $fraisSuppItems !== [];
 @endphp
     <div class="header">
         @include('pdf.partials.branding-header', ['layoutConfig' => $layoutConfig ?? [], 'brandingLogoDataUri' => $brandingLogoDataUri ?? null])
@@ -92,14 +96,12 @@
     </table>
 
     <div class="totals">
-        @php
-            $totalsCfg = is_array(($layoutConfig['totals'] ?? null)) ? $layoutConfig['totals'] : [];
-            $showTotalHt = ($totalsCfg['show_total_ht'] ?? true) !== false;
-            $showTotalTva = ($totalsCfg['show_total_tva'] ?? true) !== false;
-            $showTotalTtc = ($totalsCfg['show_total_ttc'] ?? true) !== false;
-        @endphp
-        @if((float)$quote->discount_percent > 0 || (float)$quote->discount_amount > 0)
-        <p>Remise document : {{ number_format($quote->discount_percent, 2, ',', ' ') }} % @if((float)$quote->discount_amount > 0) + {{ number_format($quote->discount_amount, 2, ',', ' ') }} {{ $currencyLabel }} HT @endif</p>
+        @if($hasDiscount)
+        <p>{{ $ctx['discount_label'] ?? 'Remise' }} : -{{ number_format((float) ($ctx['discount_ht'] ?? 0), 2, ',', ' ') }} {{ $currencyLabel }} HT
+            @if((float) ($ctx['discount_tva'] ?? 0) > 0)
+            (-{{ number_format((float) ($ctx['discount_tva'] ?? 0), 2, ',', ' ') }} {{ $currencyLabel }} TVA)
+            @endif
+        </p>
         @endif
         @if((float)$quote->shipping_amount_ht > 0)
         <p>Frais de port / livraison HT : {{ number_format($quote->shipping_amount_ht, 2, ',', ' ') }} {{ $currencyLabel }} (TVA {{ number_format($quote->shipping_tva_rate, 2, ',', ' ') }} %)</p>
@@ -110,8 +112,16 @@
         @if($showTotalTva)
         <p><strong>Total TVA :</strong> {{ number_format(max(0, (float)$quote->amount_ttc - (float)$quote->amount_ht), 2, ',', ' ') }} {{ $currencyLabel }}</p>
         @endif
+        @if($showFraisRows)
+        @foreach($fraisSuppItems as $fraisItem)
+        <p>+ {{ $fraisItem['description'] ?? 'Frais supplémentaire' }} :
+            {{ number_format((float) ($fraisItem['montant_ht'] ?? 0), 2, ',', ' ') }} {{ $currencyLabel }} HT
+            (TTC {{ number_format((float) ($fraisItem['montant_ttc'] ?? 0), 2, ',', ' ') }} {{ $currencyLabel }})
+        </p>
+        @endforeach
+        @endif
         @if($showTotalTtc)
-        <p><strong>Total TTC :</strong> {{ number_format($quote->amount_ttc, 2, ',', ' ') }} {{ $currencyLabel }}</p>
+        <p><strong>Total TTC :</strong> {{ number_format($showFraisRows ? (float) ($ctx['total_ttc'] ?? $quote->amount_ttc) : ($fraisSuppTtc > 0 && ! $showFraisSupplementaires ? $quote->amount_ttc : (float) ($ctx['total_ttc'] ?? $quote->amount_ttc)), 2, ',', ' ') }} {{ $currencyLabel }}</p>
         @endif
     </div>
 

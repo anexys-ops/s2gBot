@@ -1,4 +1,5 @@
 import type { Quote, QuoteCreateBody } from '../api/client'
+import { todayLocalDateInput } from './appLocale'
 
 /** Corps API pour dupliquer un devis en nouveau brouillon (sans id / numéro). */
 export function buildQuoteDuplicateBody(quote: Quote): QuoteCreateBody {
@@ -23,7 +24,7 @@ export function buildQuoteDuplicateBody(quote: Quote): QuoteCreateBody {
     contact_id: quote.contact_id ?? undefined,
     site_id: quote.site_id,
     dossier_id: quote.dossier_id ?? undefined,
-    quote_date: new Date().toISOString().slice(0, 10),
+    quote_date: todayLocalDateInput(),
     order_date: quote.order_date?.slice(0, 10),
     site_delivery_date: quote.site_delivery_date?.slice(0, 10),
     valid_until: quote.valid_until?.slice(0, 10),

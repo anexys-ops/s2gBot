@@ -81,7 +81,7 @@ class QuoteController extends Controller
             'billingAddress',
             'deliveryAddress',
             'pdfTemplate',
-            'bonCommande' => function ($q) {
+            'bonsCommande' => function ($q) {
                 $q->select('id', 'numero', 'quote_id', 'dossier_id')
                     ->withCount(['bonsLivraison', 'invoices']);
             },
@@ -92,11 +92,14 @@ class QuoteController extends Controller
         }
 
         if ($search = trim((string) $request->query('search', ''))) {
-            $query->where(function ($q) use ($search) {
-                $q->where('number', 'like', '%'.$search.'%')
-                    ->orWhere('notes', 'like', '%'.$search.'%')
-                    ->orWhereHas('client', function ($cq) use ($search) {
-                        $cq->where('name', 'like', '%'.$search.'%');
+            $like = '%'.$search.'%';
+            $query->where(function ($q) use ($like) {
+                $q->where('number', 'like', $like)
+                    ->orWhere('notes', 'like', $like)
+                    ->orWhereHas('client', fn ($cq) => $cq->where('name', 'like', $like))
+                    ->orWhereHas('dossier', function ($dq) use ($like) {
+                        $dq->where('reference', 'like', $like)
+                            ->orWhere('titre', 'like', $like);
                     });
             });
         }
@@ -108,8 +111,7 @@ class QuoteController extends Controller
         if ($request->boolean('eligible_bc')) {
             $query
                 ->whereNotNull('dossier_id')
-                ->whereIn('status', [Quote::STATUS_SIGNED, Quote::STATUS_ACCEPTED])
-                ->whereDoesntHave('bonCommande');
+                ->whereIn('status', [Quote::STATUS_SIGNED, Quote::STATUS_ACCEPTED]);
         }
 
         $perPage = min(max((int) $request->query('per_page', 15), 1), 100);

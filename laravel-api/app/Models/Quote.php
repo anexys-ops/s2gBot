@@ -142,9 +142,15 @@ class Quote extends Model
         return $this->hasMany(DevisTache::class, 'quote_id')->orderBy('ordre');
     }
 
+    public function bonsCommande(): HasMany
+    {
+        return $this->hasMany(BonCommande::class, 'quote_id')->orderByDesc('id');
+    }
+
+    /** Dernier BC créé — rétrocompatibilité API / écrans legacy. */
     public function bonCommande(): HasOne
     {
-        return $this->hasOne(BonCommande::class, 'quote_id');
+        return $this->hasOne(BonCommande::class, 'quote_id')->latestOfMany();
     }
 
     public function attachments(): MorphMany

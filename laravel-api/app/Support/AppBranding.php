@@ -186,6 +186,8 @@ class AppBranding
                 'show_total_ht' => true,
                 'show_total_tva' => true,
                 'show_total_ttc' => true,
+                'show_discount' => true,
+                'show_frais_supplementaires' => true,
             ],
             /** Colonnes et montants des lignes (devis / factures / BC / BL). */
             'lines' => [
@@ -238,6 +240,8 @@ class AppBranding
             'showTotalHt' => ($totalsCfg['show_total_ht'] ?? true) !== false,
             'showTotalTva' => ($totalsCfg['show_total_tva'] ?? true) !== false,
             'showTotalTtc' => ($totalsCfg['show_total_ttc'] ?? true) !== false,
+            'showDiscount' => ($totalsCfg['show_discount'] ?? true) !== false,
+            'showFraisSupplementaires' => ($totalsCfg['show_frais_supplementaires'] ?? true) !== false,
             'showClientName' => ($metaCfg['show_client_name'] ?? true) !== false,
             'showDossierReference' => ($metaCfg['show_dossier_reference'] ?? true) !== false,
             'showLinkedQuote' => ($metaCfg['show_linked_quote'] ?? true) !== false,

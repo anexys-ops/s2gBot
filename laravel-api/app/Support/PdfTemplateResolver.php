@@ -56,7 +56,7 @@ class PdfTemplateResolver
             'quote' => ['pdf.quote', 'pdf.quote_detailed'],
             'invoice' => ['pdf.invoice', 'pdf.invoice_detailed'],
             'report' => ['reports.order', 'pdf.examples.synthese', 'pdf.examples.granulometrie', 'pdf.examples.compression'],
-            'purchase_order' => ['pdf.purchase_order'],
+            'purchase_order' => ['pdf.purchase_order', 'pdf.purchase_order_dossier_recap'],
             'delivery_note' => ['pdf.delivery_note'],
             'expense_report' => ['pdf.expense_report'],
             default => [],

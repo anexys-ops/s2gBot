@@ -1,19 +1,33 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { bonsCommandeApi, devisV1Api, quotesApi, type BonCommande, type Quote } from '../../api/client'
+import {
+  bonsCommandeApi,
+  devisV1Api,
+  quotesApi,
+  type BonCommande,
+  type EntityMetaPayload,
+} from '../../api/client'
+import {
+  BonCommandeRowActionCells,
+  BonCommandeRowActionHeaders,
+} from '../../components/crm/BonCommandeListTableActions'
+import { QuotePdfButton } from '../../components/crm/QuoteListTableActions'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import ClickableStatusBadge from '../../components/ds/ClickableStatusBadge'
 import StatusBadge, { bonCommandeStatutBadgeProps, quoteStatutBadgeProps } from '../../components/ds/StatusBadge'
 import StatusChangeModal from '../../components/StatusChangeModal'
+import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
 import ListTableToolbar from '../../components/ListTableToolbar'
 import { ListTableFootRow, ListTablePanelHeader } from '../../components/ListTablePanel'
+import Modal from '../../components/Modal'
+import EntityMetaCard from '../../components/module/EntityMetaCard'
 import { sumNumeric } from '../../lib/listTableTotals'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
-import TableRowActions from '../../components/TableRowActions'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
+import { commercialDocumentCapabilities } from '../../lib/commercialDocumentActionConfig'
 import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
 
@@ -27,17 +41,32 @@ const STATUT_LABELS: Record<string, string> = {
 
 const statusOptions = Object.entries(STATUT_LABELS).map(([value, label]) => ({ value, label }))
 
+function chainCount(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+function bcHasBonLivraison(bc: BonCommande): boolean {
+  if (chainCount(bc.bons_livraison_count) > 0) return true
+  return Array.isArray(bc.bons_livraison) && bc.bons_livraison.length > 0
+}
+
 function BonCommandeCreateFromDevisPanel() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [quoteId, setQuoteId] = useState('')
+  const [quoteSearchInput, setQuoteSearchInput] = useState('')
+  const debouncedQuoteSearch = useDebouncedValue(quoteSearchInput, 250)
 
   const { data: eligiblePage, isLoading, isError, error } = useQuery({
-    queryKey: ['quotes', 'eligible-bc'],
-    queryFn: () => quotesApi.listEligibleForBc(),
+    queryKey: ['quotes', 'eligible-bc', debouncedQuoteSearch],
+    queryFn: () =>
+      quotesApi.listEligibleForBc({
+        search: debouncedQuoteSearch.trim() || undefined,
+      }),
   })
 
   const eligibleQuotes = eligiblePage?.data ?? []
+  const hasQuoteSearch = debouncedQuoteSearch.trim() !== ''
 
   const selectedQuote = useMemo(
     () => eligibleQuotes.find((q) => String(q.id) === quoteId),
@@ -68,7 +97,7 @@ function BonCommandeCreateFromDevisPanel() {
         </h2>
         <p className="bc-from-devis-panel__intro text-muted">
           Générez un bon de commande (BCC) à partir d&apos;un devis <strong>signé</strong> ou{' '}
-          <strong>accepté</strong>, rattaché à un dossier et sans BC existant.
+          <strong>accepté</strong>, rattaché à un dossier. Vous pouvez créer plusieurs BC pour le même devis.
         </p>
       </header>
 
@@ -76,13 +105,13 @@ function BonCommandeCreateFromDevisPanel() {
         <p className="text-muted bc-from-devis-panel__status">Chargement des devis éligibles…</p>
       ) : isError ? (
         <p className="error bc-from-devis-panel__status">{(error as Error).message}</p>
-      ) : eligibleQuotes.length === 0 ? (
+      ) : eligibleQuotes.length === 0 && !hasQuoteSearch ? (
         <div className="bc-from-devis-panel__empty dossier-tab-empty">
           <p>Aucun devis éligible pour le moment.</p>
           <ul className="bc-from-devis-panel__criteria">
             <li>Statut : signé ou accepté</li>
             <li>Rattaché à un dossier chantier</li>
-            <li>Sans bon de commande déjà créé</li>
+            <li>Plusieurs BC possibles sur le même devis accepté</li>
           </ul>
           <p className="bc-from-devis-panel__empty-actions">
             <Link to="/devis" className="btn btn-secondary btn-sm">
@@ -97,22 +126,66 @@ function BonCommandeCreateFromDevisPanel() {
         <div className="bc-from-devis-panel__body">
           <div className="bc-from-devis-panel__form">
             <label className="form-group bc-from-devis-panel__field">
-              <span className="bc-from-devis-panel__label">Devis source</span>
-              <select
-                value={quoteId}
+              <span className="bc-from-devis-panel__label">Rechercher un devis</span>
+              <input
+                type="search"
+                value={quoteSearchInput}
                 onChange={(e) => {
-                  setQuoteId(e.target.value)
+                  setQuoteSearchInput(e.target.value)
+                  setQuoteId('')
                   createMut.reset()
                 }}
-              >
-                <option value="">Sélectionner un devis…</option>
-                {eligibleQuotes.map((quote) => (
-                  <option key={quote.id} value={quote.id}>
-                    {formatQuoteOptionLabel(quote)}
-                  </option>
-                ))}
-              </select>
+                placeholder="N° devis, client, référence ou titre dossier…"
+                autoComplete="off"
+              />
             </label>
+
+            <div className="invoice-orders-picker__list" role="listbox" aria-label="Devis éligibles">
+              {eligibleQuotes.length === 0 ? (
+                <p className="invoice-orders-picker__empty">
+                  {hasQuoteSearch
+                    ? 'Aucun devis éligible ne correspond à la recherche.'
+                    : 'Aucun devis éligible pour le moment.'}
+                </p>
+              ) : (
+                eligibleQuotes.map((quote) => {
+                  const selected = String(quote.id) === quoteId
+                  const st = quoteStatutBadgeProps(quote.status)
+                  const bcCount = (quote.bons_commande ?? quote.bonsCommande)?.length ?? 0
+                  return (
+                    <button
+                      key={quote.id}
+                      type="button"
+                      className={`invoice-orders-picker__option${selected ? ' invoice-orders-picker__option--selected' : ''}`}
+                      role="option"
+                      aria-selected={selected}
+                      onClick={() => {
+                        setQuoteId(selected ? '' : String(quote.id))
+                        createMut.reset()
+                      }}
+                    >
+                      <span className="invoice-orders-picker__checkbox" aria-hidden="true">
+                        {selected ? '✓' : ''}
+                      </span>
+                      <span>
+                        <strong>{quote.number}</strong> — {quote.client?.name ?? `Client #${quote.client_id}`}
+                        {quote.dossier ? (
+                          <span className="invoice-orders-picker__status">
+                            {' '}
+                            ({quote.dossier.reference ?? `#${quote.dossier_id}`})
+                          </span>
+                        ) : null}
+                        <span className="invoice-orders-picker__status">
+                          {' '}
+                          — {st.label} — {formatMoney(Number(quote.amount_ttc))} TTC
+                          {bcCount > 0 ? ` — ${bcCount} BC existant${bcCount > 1 ? 's' : ''}` : ''}
+                        </span>
+                      </span>
+                    </button>
+                  )
+                })
+              )}
+            </div>
 
             <div className="bc-from-devis-panel__actions">
               <button
@@ -205,24 +278,25 @@ function BonCommandeCreateFromDevisPanel() {
   )
 }
 
-function formatQuoteOptionLabel(quote: Quote): string {
-  const client = quote.client?.name ?? `Client #${quote.client_id}`
-  const dossierRef = quote.dossier?.reference ?? (quote.dossier_id ? `#${quote.dossier_id}` : '—')
-  const amount = formatMoney(Number(quote.amount_ttc))
-  return `${quote.number} — ${client} — ${dossierRef} — ${amount} TTC`
-}
-
 export default function BonsCommandeListPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
+  const isAdmin = user?.role === 'lab_admin'
 
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statutFilter, setStatutFilter] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<BonCommande | null>(null)
   const [statusModalBc, setStatusModalBc] = useState<{ id: number; numero: string; statut: string } | null>(null)
+  const [pdfTarget, setPdfTarget] = useState<BonCommande | null>(null)
+  const [metaModalQuote, setMetaModalQuote] = useState<{
+    id: number
+    number: string
+    meta: unknown
+    bcNumero: string
+  } | null>(null)
 
   const { visible, toggle } = usePersistedColumnVisibility('bons-commande', {
     number: true,
@@ -233,6 +307,9 @@ export default function BonsCommandeListPage() {
     ht: true,
     ttc: true,
     status: true,
+    bl: true,
+    invoices: true,
+    pdf: true,
     actions: true,
   })
 
@@ -261,6 +338,15 @@ export default function BonsCommandeListPage() {
       void qc.invalidateQueries({ queryKey: ['bons-commande'] })
       void qc.invalidateQueries({ queryKey: ['bon-commande', vars.id] })
       setStatusModalBc(null)
+    },
+  })
+
+  const quoteMetaMut = useMutation({
+    mutationFn: ({ id, meta }: { id: number; meta: EntityMetaPayload }) => quotesApi.update(id, { meta }),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+      void qc.invalidateQueries({ queryKey: ['quote', vars.id] })
+      setMetaModalQuote(null)
     },
   })
 
@@ -322,7 +408,14 @@ export default function BonsCommandeListPage() {
           { id: 'ht', label: 'Montant HT' },
           { id: 'ttc', label: 'Montant TTC' },
           { id: 'status', label: 'Statut' },
-          { id: 'actions', label: 'Actions' },
+          ...(isLab
+            ? [
+                { id: 'bl', label: 'BL' },
+                { id: 'invoices', label: 'Factures' },
+              ]
+            : []),
+          ...(isLab ? [{ id: 'pdf', label: 'PDF' }] : []),
+          ...(isLab ? [{ id: 'actions', label: 'Actions' }] : []),
         ]}
         visibleColumns={visible}
         onToggleColumn={toggle}
@@ -378,12 +471,25 @@ export default function BonsCommandeListPage() {
                   {visible.ht !== false && <th>HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.ttc !== false && <th>TTC ({MONEY_UNIT_LABEL})</th>}
                   {visible.status !== false && <th>Statut</th>}
-                  {visible.actions !== false && isLab && <th className="data-table__actions">Actions</th>}
+                  {isLab && visible.bl !== false && <th className="data-table__num">BL</th>}
+                  {isLab && visible.invoices !== false && <th className="data-table__num">Factures</th>}
+                  {isLab && visible.pdf !== false && <th className="data-table__pdf">PDF</th>}
+                  {isLab && visible.actions !== false && <BonCommandeRowActionHeaders />}
                 </tr>
               </thead>
               <tbody>
                 {bons.map((bc) => {
                   const st = bonCommandeStatutBadgeProps(bc.statut)
+                  const hasBl = bcHasBonLivraison(bc)
+                  const capabilities = commercialDocumentCapabilities({
+                    documentType: 'bon_commande',
+                    status: bc.statut,
+                    isLab,
+                    isAdmin,
+                    hasBonLivraison: hasBl,
+                  })
+                  const blCount = chainCount(bc.bons_livraison_count)
+                  const invoiceCount = chainCount(bc.invoices_count)
                   return (
                     <tr
                       key={bc.id}
@@ -460,13 +566,39 @@ export default function BonsCommandeListPage() {
                           )}
                         </td>
                       )}
-                      {visible.actions !== false && isLab ? (
-                        <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
-                          <TableRowActions
-                            onDelete={() => setDeleteTarget(bc)}
-                            deleteLabel={`Supprimer le bon ${bc.numero}`}
+                      {isLab && visible.bl !== false && (
+                        <td className="data-table__num">{blCount > 0 ? blCount : <span className="text-muted">—</span>}</td>
+                      )}
+                      {isLab && visible.invoices !== false && (
+                        <td className="data-table__num">
+                          {invoiceCount > 0 ? invoiceCount : <span className="text-muted">—</span>}
+                        </td>
+                      )}
+                      {isLab && visible.pdf !== false && (
+                        <td className="data-table__pdf">
+                          <QuotePdfButton
+                            label="Télécharger le PDF"
+                            onClick={() => setPdfTarget(bc)}
                           />
                         </td>
+                      )}
+                      {isLab && visible.actions !== false ? (
+                        <BonCommandeRowActionCells
+                          bcNumero={bc.numero}
+                          canDelete={capabilities.canDelete}
+                          onMeta={
+                            bc.quote_id && bc.quote?.number
+                              ? () =>
+                                  setMetaModalQuote({
+                                    id: bc.quote_id!,
+                                    number: bc.quote!.number,
+                                    meta: bc.quote?.meta,
+                                    bcNumero: bc.numero,
+                                  })
+                              : undefined
+                          }
+                          onDelete={() => setDeleteTarget(bc)}
+                        />
                       ) : null}
                     </tr>
                   )
@@ -482,7 +614,14 @@ export default function BonsCommandeListPage() {
                   { id: 'ht', kind: 'money' },
                   { id: 'ttc', kind: 'money' },
                   { id: 'status', kind: 'text' },
-                  { id: 'actions', kind: 'text' },
+                  ...(isLab
+                    ? [
+                        { id: 'bl', kind: 'text' as const },
+                        { id: 'invoices', kind: 'text' as const },
+                      ]
+                    : []),
+                  ...(isLab ? [{ id: 'pdf', kind: 'text' as const }] : []),
+                  ...(isLab ? [{ id: 'actions', kind: 'text' as const, span: 2 }] : []),
                 ]}
                 visible={visible}
                 totals={totals}
@@ -507,6 +646,30 @@ export default function BonsCommandeListPage() {
           error={statusMut.isError ? (statusMut.error as Error).message : null}
           onClose={() => setStatusModalBc(null)}
           onSave={(statut) => statusMut.mutate({ id: statusModalBc.id, statut })}
+        />
+      ) : null}
+
+      {metaModalQuote ? (
+        <Modal
+          title={`Métadonnées devis — ${metaModalQuote.number} (BC ${metaModalQuote.bcNumero})`}
+          onClose={() => setMetaModalQuote(null)}
+        >
+          <EntityMetaCard
+            meta={metaModalQuote.meta}
+            editable
+            onSave={(meta) => quoteMetaMut.mutateAsync({ id: metaModalQuote.id, meta })}
+            isSaving={quoteMetaMut.isPending}
+            saveError={quoteMetaMut.isError ? (quoteMetaMut.error as Error).message : null}
+          />
+        </Modal>
+      ) : null}
+
+      {pdfTarget ? (
+        <DocumentPdfPickerModal
+          documentType="purchase_order"
+          documentId={pdfTarget.id}
+          documentLabel={pdfTarget.numero}
+          onClose={() => setPdfTarget(null)}
         />
       ) : null}
 

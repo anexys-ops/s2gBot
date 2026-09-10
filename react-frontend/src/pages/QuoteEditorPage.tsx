@@ -28,7 +28,7 @@ import {
 } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
-import { formatMoney } from '../lib/appLocale'
+import { formatMoney, todayLocalDateInput } from '../lib/appLocale'
 import { computeQuoteFormDocumentTotals, quoteFormPricingLines, lineLockedByForfaitJalon, sumFraisSupplementairesTtc } from '../lib/quoteTotals'
 import {
   getEffectiveDevisParcours,
@@ -75,7 +75,7 @@ function emptyForm(): QuoteFormState {
     contact_id: undefined,
     site_id: undefined,
     dossier_id: undefined,
-    quote_date: new Date().toISOString().slice(0, 10),
+    quote_date: todayLocalDateInput(),
     order_date: '',
     site_delivery_date: '',
     valid_until: '',

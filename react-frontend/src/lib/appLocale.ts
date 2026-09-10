@@ -27,14 +27,34 @@ export function formatQuantity(value: string | number): string {
 /** Libellé unité pour en-têtes (ex. colonne « TTC (DH) »). */
 export const MONEY_UNIT_LABEL = 'DH'
 
+/** Date du jour locale au format `YYYY-MM-DD` (champs `<input type="date">`, défauts formulaires). */
+export function todayLocalDateInput(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function parseAppCalendarDate(value: string | number | Date): Date | null {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value
+  }
+  const s = String(value)
+  const plain = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (plain) {
+    const y = Number(plain[1])
+    const m = Number(plain[2])
+    const day = Number(plain[3])
+    const local = new Date(y, m - 1, day)
+    return Number.isNaN(local.getTime()) ? null : local
+  }
+  const d = new Date(s)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
 /** Valeur `YYYY-MM-DD` pour un `<input type="date">` depuis une date API (évite le décalage UTC). */
 export function dateInputFromApi(value: string | number | Date | null | undefined): string {
   if (value == null || value === '') return ''
-  const s = String(value)
-  const plain = s.match(/^(\d{4}-\d{2}-\d{2})$/)
-  if (plain) return plain[1]
-  const d = typeof value === 'object' && value instanceof Date ? value : new Date(s)
-  if (Number.isNaN(d.getTime())) return ''
+  const d = parseAppCalendarDate(value)
+  if (!d) return ''
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -42,7 +62,8 @@ export function formatAppDate(
   value: string | number | Date,
   options?: Intl.DateTimeFormatOptions,
 ): string {
-  const d = typeof value === 'string' || typeof value === 'number' ? new Date(value) : value
+  const d = parseAppCalendarDate(value)
+  if (!d) return '—'
   return d.toLocaleDateString(APP_LOCALE, options)
 }
 

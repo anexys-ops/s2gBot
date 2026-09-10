@@ -15,7 +15,7 @@ import DocumentPdfPickerModal from '../components/pdf/DocumentPdfPickerModal'
 import type { PdfGenerateType } from '../lib/documentPdfTypes'
 import { useAuth } from '../contexts/AuthContext'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
-import { formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
+import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
 
 const QUOTE_STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
@@ -282,7 +282,7 @@ export default function CrmDocuments() {
                   <tr key={q.id}>
                     {showClientCol && <td>{q.client?.name ?? '—'}</td>}
                     {visible.number !== false && <td className="data-table__code">{q.number}</td>}
-                    {visible.date !== false && <td>{new Date(q.quote_date).toLocaleDateString('fr-FR')}</td>}
+                    {visible.date !== false && <td>{formatAppDate(q.quote_date)}</td>}
                     {visible.status !== false && <td>{QUOTE_STATUS_LABELS[q.status] ?? q.status}</td>}
                     {visible.ht !== false && <td className="data-table__num">{formatMoney(Number(q.amount_ht))}</td>}
                     {visible.ttc !== false && <td className="data-table__num">{formatMoney(Number(q.amount_ttc))}</td>}

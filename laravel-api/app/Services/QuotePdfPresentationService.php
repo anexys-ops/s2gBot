@@ -178,6 +178,49 @@ class QuotePdfPresentationService
         $totalTva = round(max(0, (float) $quote->amount_ttc - (float) $quote->amount_ht), 2);
         $totalTtc = round((float) $quote->amount_ttc + $fraisSupp['total_ttc'], 2);
 
+        $linesData = [];
+        $linesTvaBefore = 0.0;
+        foreach ($quote->quoteLines as $line) {
+            $ht = (float) $line->total;
+            $rate = max(0, min(100, (float) $line->tva_rate));
+            $linesData[] = ['ht' => $ht, 'tva_rate' => $rate];
+            $linesTvaBefore += round($ht * ($rate / 100), 2);
+        }
+
+        $computed = CommercialDocumentTotalsService::computeTotals(
+            $linesData,
+            (float) $quote->discount_percent,
+            (float) $quote->discount_amount,
+            (float) $quote->shipping_amount_ht,
+            (float) $quote->shipping_tva_rate,
+            (float) $quote->travel_fee_ht,
+            (float) $quote->travel_fee_tva_rate,
+        );
+
+        $linesHtSubtotal = $computed['lines_ht_subtotal'];
+        $linesAfterDiscount = $computed['lines_ht_after_discount'];
+        $discountHt = round(max(0, $linesHtSubtotal - $linesAfterDiscount), 2);
+        $scaledTva = $linesHtSubtotal > 0
+            ? round($linesTvaBefore * ($linesAfterDiscount / $linesHtSubtotal), 2)
+            : 0.0;
+        $discountTva = round(max(0, $linesTvaBefore - $scaledTva), 2);
+        $discountTtc = round($discountHt + $discountTva, 2);
+
+        $discountPercent = (float) $quote->discount_percent;
+        $discountAmount = (float) $quote->discount_amount;
+        $hasDiscount = $discountHt > 0.001 || $discountPercent > 0.001 || $discountAmount > 0.001;
+
+        $discountLabelParts = [];
+        if ($discountPercent > 0) {
+            $discountLabelParts[] = '-'.number_format($discountPercent, 2, ',', "\xc2\xa0").' %';
+        }
+        if ($discountAmount > 0) {
+            $discountLabelParts[] = '-'.number_format($discountAmount, 2, ',', "\xc2\xa0").' DH HT';
+        }
+        $discountLabel = $discountLabelParts !== []
+            ? 'Remise ('.implode(' + ', $discountLabelParts).')'
+            : 'Remise';
+
         return [
             'affaire' => $affaire,
             'validite_label' => $validite,
@@ -185,6 +228,16 @@ class QuotePdfPresentationService
             'total_ht' => $totalHt,
             'total_tva' => $totalTva,
             'total_ttc' => $totalTtc,
+            'subtotal_ht' => $linesHtSubtotal,
+            'subtotal_tva' => $linesTvaBefore,
+            'subtotal_ttc' => round($linesHtSubtotal + $linesTvaBefore, 2),
+            'discount_percent' => $discountPercent,
+            'discount_amount' => $discountAmount,
+            'discount_ht' => $discountHt,
+            'discount_tva' => $discountTva,
+            'discount_ttc' => $discountTtc,
+            'discount_label' => $discountLabel,
+            'has_discount' => $hasDiscount,
             'frais_supplementaires_ttc' => $fraisSupp['total_ttc'],
             'frais_supplementaires' => $fraisSupp['items'],
             'is_forfait' => ($meta['mode_devis'] ?? '') === 'forfait',

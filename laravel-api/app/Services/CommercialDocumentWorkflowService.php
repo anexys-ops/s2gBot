@@ -24,10 +24,6 @@ class CommercialDocumentWorkflowService
             throw new \InvalidArgumentException('Devis sans dossier : impossible de créer un bon de commande.');
         }
 
-        if (BonCommande::query()->where('quote_id', $quote->id)->exists()) {
-            throw new \InvalidArgumentException('Un bon de commande existe déjà pour ce devis.');
-        }
-
         if (! in_array($quote->status, [Quote::STATUS_SIGNED, Quote::STATUS_ACCEPTED], true)) {
             throw new \InvalidArgumentException('Le devis doit être accepté (signé ou accepté) pour générer un BC.');
         }
@@ -63,6 +59,7 @@ class CommercialDocumentWorkflowService
                     'libelle' => $line->description,
                     'ordre' => $ordre++,
                     'quantite' => (float) $line->quantity,
+                    'quantite_devis' => (float) $line->quantity,
                     'prix_unitaire_ht' => (float) $line->unit_price,
                     'tva_rate' => (float) $line->tva_rate,
                     'montant_ht' => $ht,
@@ -74,6 +71,11 @@ class CommercialDocumentWorkflowService
                 $meta = [];
             }
             $meta['bon_commande_id'] = $bc->id;
+            $existingIds = $meta['bon_commande_ids'] ?? [];
+            if (! is_array($existingIds)) {
+                $existingIds = [];
+            }
+            $meta['bon_commande_ids'] = array_values(array_unique([...$existingIds, $bc->id]));
             $meta['transforme_bc_at'] = now()->toIso8601String();
             $quote->update(['meta' => $meta]);
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attachment;
+use App\Models\BonCommande;
 use App\Models\Calibration;
 use App\Models\Client;
 use App\Models\Dossier;
@@ -24,7 +25,7 @@ class AttachmentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order', 'site', 'equipment', 'calibration', 'dossier'])],
+            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order', 'site', 'equipment', 'calibration', 'dossier', 'bon_commande'])],
             'attachable_id' => 'required|integer',
         ]);
 
@@ -41,7 +42,7 @@ class AttachmentController extends Controller
     {
         $validated = $request->validate([
             'file' => 'required|file|max:15360',
-            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order', 'site', 'equipment', 'calibration', 'dossier'])],
+            'attachable_type' => ['required', Rule::in(['client', 'quote', 'invoice', 'order', 'site', 'equipment', 'calibration', 'dossier', 'bon_commande'])],
             'attachable_id' => 'required|integer',
         ]);
 
@@ -112,12 +113,16 @@ class AttachmentController extends Controller
             'equipment' => Equipment::class,
             'calibration' => Calibration::class,
             'dossier' => Dossier::class,
+            'bon_commande' => BonCommande::class,
             default => Client::class,
         };
     }
 
     private function userCanAccessAttachmentContext($user, object $model): bool
     {
+        if ($model instanceof BonCommande) {
+            return AgencyAccess::userMayAccessBonCommande($user, $model);
+        }
         if ($model instanceof Dossier) {
             return AgencyAccess::userMayAccessDossier($user, $model);
         }

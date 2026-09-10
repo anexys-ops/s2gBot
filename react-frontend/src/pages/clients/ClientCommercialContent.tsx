@@ -11,7 +11,7 @@ import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
 import type { PdfGenerateType } from '../../lib/documentPdfTypes'
 import { useAuth } from '../../contexts/AuthContext'
 import { INVOICE_STATUS_LABELS, QUOTE_STATUS_LABELS } from '../../lib/commercialStatusLabels'
-import { formatMoney } from '../../lib/appLocale'
+import { formatAppDate, formatMoney } from '../../lib/appLocale'
 
 const ADDR_TYPES: Record<string, string> = {
   billing: 'Facturation',
@@ -301,7 +301,7 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
             {quotes.map((q) => (
               <tr key={q.id}>
                 <td className="data-table__code">{q.number}</td>
-                <td>{new Date(q.quote_date).toLocaleDateString('fr-FR')}</td>
+                <td>{formatAppDate(q.quote_date)}</td>
                 <td>{q.status}</td>
                 <td>{formatMoney(Number(q.amount_ttc))}</td>
                 <td>

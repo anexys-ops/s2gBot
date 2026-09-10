@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { bonsCommandeApi, ordresMissionApi, planningTerrainApi, type BonCommandeLigne } from '../../api/client'
+import { bonsCommandeApi, ordresMissionApi } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import CommercialDocumentActions from '../../components/crm/CommercialDocumentActions'
 import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
@@ -9,36 +9,18 @@ import StatusBadge, { bonCommandeStatutBadgeProps, bonLivraisonStatutBadgeProps 
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
+import EntityAttachmentsPanel from '../../components/attachments/EntityAttachmentsPanel'
 import ClientContactPicker from '../../components/clients/ClientContactPicker'
-import { buildBcLigneDisplayRows, resolveDevisDisplayMeta } from '../../lib/bcLigneDisplay'
-import { dateInputFromApi, formatAppDate, formatMoney, formatQuantity, MONEY_UNIT_LABEL } from '../../lib/appLocale'
-import PlanningMassActionsBar from '../../components/planning/PlanningMassActionsBar'
-import { formatTechnicienOption } from '../../lib/userRolePresentation'
-
+import {
+  buildBcLigneDisplayRows,
+  clampQtyToDevis,
+  filterForfaitBcLignes,
+  qtyExceedsDevis,
+  resolveDevisDisplayMeta,
+  resolveQuantiteDevis,
+} from '../../lib/bcLigneDisplay'
+import { formatAppDate, formatMoney, formatQuantity, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
-
-type LignePeriodeEdit = { debut: string; fin: string }
-type LigneExtraEdit = { technicien_id: number | null; date_livraison: string; notes_ligne: string }
-
-function normalizeLignePlanningDates(
-  periode: LignePeriodeEdit,
-  extra: LigneExtraEdit,
-): { periode: LignePeriodeEdit; extra: LigneExtraEdit } {
-  const debut = periode.debut.trim()
-  if (!debut) {
-    return { periode, extra }
-  }
-  return {
-    periode: {
-      debut,
-      fin: periode.fin.trim() || debut,
-    },
-    extra: {
-      ...extra,
-      date_livraison: extra.date_livraison.trim() || debut,
-    },
-  }
-}
 
 function qtyInputFromApi(q: string | number | null | undefined): string {
   if (q == null || q === '') return '0'
@@ -58,26 +40,15 @@ export default function BonCommandeFichePage() {
 
   const [notes, setNotes] = useState('')
   const [contactId, setContactId] = useState<number | null>(null)
-  const [ligneEdits, setLigneEdits] = useState<Record<number, LignePeriodeEdit>>({})
-  const [ligneExtraEdits, setLigneExtraEdits] = useState<Record<number, LigneExtraEdit>>({})
   const [qtyEdits, setQtyEdits] = useState<Record<number, string>>({})
   const [confirmAction, setConfirmAction] = useState<'confirmer' | 'bl' | null>(null)
   const [planningToast, setPlanningToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
-  const [massTechnicienId, setMassTechnicienId] = useState<number | ''>('')
-  const [massDebut, setMassDebut] = useState('')
-  const [massFin, setMassFin] = useState('')
+  const [massForfaitQty, setMassForfaitQty] = useState('')
 
   const { data: bc, isLoading, error } = useQuery({
     queryKey: ['bon-commande', bcId],
     queryFn: () => bonsCommandeApi.get(bcId),
     enabled: Number.isFinite(bcId) && bcId > 0,
-  })
-
-  const { data: techniciens = [] } = useQuery({
-    queryKey: ['planning-terrain', 'techniciens'],
-    queryFn: () => planningTerrainApi.techniciens(),
-    enabled: lab,
-    staleTime: 120_000,
   })
 
   useEffect(() => {
@@ -89,46 +60,20 @@ export default function BonCommandeFichePage() {
   const serverLignesKey = useMemo(
     () =>
       (bc?.lignes ?? [])
-        .map((l) =>
-          [
-            l.id,
-            qtyInputFromApi(l.quantite),
-            dateInputFromApi(l.date_debut_prevue),
-            dateInputFromApi(l.date_fin_prevue),
-            l.technicien_id ?? '',
-            dateInputFromApi(l.date_livraison),
-            l.notes_ligne ?? '',
-          ].join(':'),
-        )
+        .map((l) => [l.id, qtyInputFromApi(l.quantite)].join(':'))
         .join('|'),
     [bc?.lignes],
   )
 
   useEffect(() => {
     if (!bc?.lignes?.length) {
-      setLigneEdits({})
-      setLigneExtraEdits({})
       setQtyEdits({})
       return
     }
-    const next: Record<number, LignePeriodeEdit> = {}
-    const nextExtra: Record<number, LigneExtraEdit> = {}
     const nextQty: Record<number, string> = {}
     for (const l of bc.lignes) {
-      const dl = l as BonCommandeLigne
-      next[l.id] = {
-        debut: dateInputFromApi(dl.date_debut_prevue),
-        fin: dateInputFromApi(dl.date_fin_prevue),
-      }
-      nextExtra[l.id] = {
-        technicien_id: dl.technicien_id ?? null,
-        date_livraison: dateInputFromApi(dl.date_livraison),
-        notes_ligne: dl.notes_ligne ?? '',
-      }
-      nextQty[l.id] = qtyInputFromApi(dl.quantite)
+      nextQty[l.id] = qtyInputFromApi(l.quantite)
     }
-    setLigneEdits(next)
-    setLigneExtraEdits(nextExtra)
     setQtyEdits(nextQty)
   }, [bc?.id, serverLignesKey])
 
@@ -157,6 +102,12 @@ export default function BonCommandeFichePage() {
         if (!Number.isFinite(qty) || qty < 0) {
           throw new Error(`Quantité invalide pour « ${l.libelle} ».`)
         }
+        const maxDevis = resolveQuantiteDevis(l)
+        if (maxDevis != null && qty > maxDevis + 1e-9) {
+          throw new Error(
+            `La quantité pour « ${l.libelle} » ne peut pas dépasser celle du devis (${formatQuantity(maxDevis)}).`,
+          )
+        }
         if (Math.abs(qty - Number(l.quantite)) < 1e-9) continue
         await bonsCommandeApi.updateLigne(bcId, l.id, { quantite: qty })
       }
@@ -169,60 +120,6 @@ export default function BonCommandeFichePage() {
     onError: (err) => {
       setPlanningToast({
         message: toastErrorMessage(err, 'Échec de l’enregistrement des quantités.'),
-        variant: 'error',
-      })
-    },
-  })
-
-  const mutLignes = useMutation({
-    mutationFn: async (payload: {
-      edits: Record<number, LignePeriodeEdit>
-      extras: Record<number, LigneExtraEdit>
-    }) => {
-      if (!bc?.lignes?.length) return
-      for (const l of bc.lignes) {
-        const rawPeriode = payload.edits[l.id] ?? { debut: '', fin: '' }
-        const rawExtra = payload.extras[l.id] ?? {
-          technicien_id: null,
-          date_livraison: '',
-          notes_ligne: '',
-        }
-        const { periode, extra } = normalizeLignePlanningDates(rawPeriode, rawExtra)
-        await bonsCommandeApi.updateLigne(bcId, l.id, {
-          date_debut_prevue: periode.debut || null,
-          date_fin_prevue: periode.fin || null,
-          technicien_id: extra.technicien_id,
-          date_livraison: extra.date_livraison || null,
-          notes_ligne: extra.notes_ligne || null,
-        })
-      }
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
-      void qc.invalidateQueries({ queryKey: ['planning-terrain'] })
-      void qc.invalidateQueries({ queryKey: ['planning-overview'] })
-      if (user?.role === 'lab_admin' && bc && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')) {
-        mutGenerateOm.mutate(undefined, {
-          onSuccess: (created) => {
-            setPlanningToast({
-              message: `Planification enregistrée — ${created.length} ordre(s) de mission généré(s).`,
-              variant: 'success',
-            })
-          },
-          onError: (err) => {
-            setPlanningToast({
-              message: `Planification enregistrée, mais OdM non générés : ${toastErrorMessage(err, 'erreur inconnue')}`,
-              variant: 'error',
-            })
-          },
-        })
-      } else {
-        setPlanningToast({ message: 'Planification enregistrée.', variant: 'success' })
-      }
-    },
-    onError: (err) => {
-      setPlanningToast({
-        message: toastErrorMessage(err, 'Échec de l’enregistrement de la planification.'),
         variant: 'error',
       })
     },
@@ -257,47 +154,35 @@ export default function BonCommandeFichePage() {
 
   const ligneCount = bc?.lignes?.length ?? 0
 
-  function applyMassPlanning() {
-    if (!bc?.lignes?.length) return
-    const hasTech = massTechnicienId !== ''
-    const hasDebut = Boolean(massDebut)
-    const hasFin = Boolean(massFin)
-    if (!hasTech && !hasDebut && !hasFin) return
-    mutLignes.reset()
-    setLigneEdits((prev) => {
+  function applyMassForfaitQty() {
+    if (!forfaitLignes.length) return
+    const raw = massForfaitQty.trim()
+    if (!raw) return
+    const qty = Number(raw.replace(',', '.'))
+    if (!Number.isFinite(qty) || qty < 0) {
+      setPlanningToast({ message: 'Quantité forfait invalide.', variant: 'error' })
+      return
+    }
+    mutQuantites.reset()
+    setQtyEdits((prev) => {
       const next = { ...prev }
-      for (const l of bc.lignes!) {
-        const debut = hasDebut ? massDebut : (prev[l.id]?.debut ?? '')
-        next[l.id] = {
-          debut,
-          fin: hasFin ? massFin : (hasDebut ? massDebut : (prev[l.id]?.fin ?? '')),
-        }
+      for (const l of forfaitLignes) {
+        const maxDevis = resolveQuantiteDevis(l)
+        const capped = maxDevis != null && qty > maxDevis ? maxDevis : qty
+        next[l.id] = qtyInputFromApi(capped)
       }
       return next
     })
-    if (hasTech || hasDebut) {
-      setLigneExtraEdits((prev) => {
-        const next = { ...prev }
-        for (const l of bc.lignes!) {
-          next[l.id] = {
-            technicien_id: hasTech ? massTechnicienId : (prev[l.id]?.technicien_id ?? null),
-            date_livraison: hasDebut ? massDebut : (prev[l.id]?.date_livraison ?? ''),
-            notes_ligne: prev[l.id]?.notes_ligne ?? '',
-          }
-        }
-        return next
-      })
-    }
   }
 
-  function handleMassDebutChange(value: string) {
-    setMassDebut(value)
-    setMassFin(value)
-  }
-
+  const devisDisplayMeta = useMemo(() => resolveDevisDisplayMeta(bc), [bc])
+  const forfaitLignes = useMemo(
+    () => filterForfaitBcLignes(bc?.lignes ?? [], devisDisplayMeta),
+    [bc?.lignes, devisDisplayMeta],
+  )
   const ligneDisplayRows = useMemo(
-    () => buildBcLigneDisplayRows(bc?.lignes ?? [], resolveDevisDisplayMeta(bc)),
-    [bc],
+    () => buildBcLigneDisplayRows(bc?.lignes ?? [], devisDisplayMeta),
+    [bc?.lignes, devisDisplayMeta],
   )
   const qtyDirty = useMemo(() => {
     if (!bc?.lignes?.length) return false
@@ -307,6 +192,14 @@ export default function BonCommandeFichePage() {
       const n = Number(String(raw).replace(',', '.'))
       if (!Number.isFinite(n)) return true
       return Math.abs(n - Number(l.quantite)) >= 1e-9
+    })
+  }, [bc?.lignes, qtyEdits])
+  const qtyOverDevis = useMemo(() => {
+    if (!bc?.lignes?.length) return false
+    return bc.lignes.some((l) => {
+      const raw = qtyEdits[l.id]
+      if (raw === undefined) return false
+      return qtyExceedsDevis(raw, resolveQuantiteDevis(l))
     })
   }, [bc?.lignes, qtyEdits])
   const previewTotals = useMemo(() => {
@@ -543,7 +436,7 @@ export default function BonCommandeFichePage() {
                     <p className="dossier-tab-panel__intro">
                       Prestations et articles repris du devis source ({MONEY_UNIT_LABEL}).
                       {lab && bc.statut !== 'annule'
-                        ? ' Vous pouvez ajuster les quantités demandées par le client, puis enregistrer.'
+                        ? ' Vous pouvez ajuster les quantités commandées dans la limite du devis, puis enregistrer.'
                         : null}
                     </p>
                   </div>
@@ -556,13 +449,48 @@ export default function BonCommandeFichePage() {
                         mutQuantites.reset()
                         mutQuantites.mutate(qtyEdits)
                       }}
-                      disabled={mutQuantites.isPending || !qtyDirty}
+                      disabled={mutQuantites.isPending || !qtyDirty || qtyOverDevis}
                     >
                       {mutQuantites.isPending ? 'Enregistrement…' : 'Enregistrer les quantités'}
                     </button>
                   ) : null}
                 </div>
               </div>
+
+              {lab && ligneCount > 0 && bc.statut !== 'annule' && forfaitLignes.length > 0 ? (
+                <div className="planning-mass-actions bc-fiche__qty-mass">
+                  <div className="planning-mass-actions__head">
+                    <strong className="planning-mass-actions__title">
+                      Quantités forfait ({forfaitLignes.length} ligne{forfaitLignes.length > 1 ? 's' : ''})
+                    </strong>
+                    <p className="planning-mass-actions__hint text-muted">
+                      Saisissez une quantité puis appliquez aux lignes forfait (plafonnée à la qté devis par ligne) — enregistrez ensuite.
+                    </p>
+                  </div>
+                  <div className="planning-mass-actions__fields">
+                    <label className="planning-mass-actions__field">
+                      <span>Quantité</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        inputMode="decimal"
+                        value={massForfaitQty}
+                        onChange={(e) => setMassForfaitQty(e.target.value)}
+                        aria-label="Quantité à appliquer aux lignes forfait"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm planning-mass-actions__apply"
+                      disabled={!massForfaitQty.trim()}
+                      onClick={applyMassForfaitQty}
+                    >
+                      Appliquer aux lignes forfait
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               {ligneCount === 0 ? (
                 <p className="dossier-tab-empty">Aucune ligne sur ce bon de commande.</p>
@@ -572,6 +500,7 @@ export default function BonCommandeFichePage() {
                     <colgroup>
                       <col className="bc-lignes-table__col-libelle" />
                       <col className="bc-lignes-table__col-qty" />
+                      <col className="bc-lignes-table__col-qty" />
                       <col className="bc-lignes-table__col-money" />
                       <col className="bc-lignes-table__col-money" />
                     </colgroup>
@@ -579,7 +508,10 @@ export default function BonCommandeFichePage() {
                       <tr>
                         <th scope="col">Libellé</th>
                         <th scope="col" className="data-table__num">
-                          Qté
+                          Qté devis
+                        </th>
+                        <th scope="col" className="data-table__num">
+                          Qté BC
                         </th>
                         <th scope="col" className="data-table__num">
                           PU HT ({MONEY_UNIT_LABEL})
@@ -594,7 +526,7 @@ export default function BonCommandeFichePage() {
                         if (row.type === 'jalon_header') {
                           return (
                             <tr key={row.key} className="bc-lignes-table__jalon">
-                              <td colSpan={4}>
+                              <td colSpan={5}>
                                 {row.code ? (
                                   <>
                                     <span className="bc-lignes-table__jalon-code">{row.code}</span>
@@ -608,7 +540,9 @@ export default function BonCommandeFichePage() {
                         }
                         const l = row.ligne
                         const canEditQty = lab && bc.statut !== 'annule'
+                        const maxDevis = resolveQuantiteDevis(l)
                         const rawQty = qtyEdits[l.id] ?? qtyInputFromApi(l.quantite)
+                        const overDevis = canEditQty && qtyExceedsDevis(rawQty, maxDevis)
                         const previewQty = Number(String(rawQty).replace(',', '.'))
                         const lineHt =
                           Number.isFinite(previewQty) && previewQty >= 0
@@ -620,21 +554,38 @@ export default function BonCommandeFichePage() {
                             className={row.nested ? 'bc-lignes-table__product--nested' : undefined}
                           >
                             <td>{l.libelle}</td>
+                            <td className="data-table__num bc-lignes-table__qty-devis">
+                              {maxDevis != null ? formatQuantity(maxDevis) : '—'}
+                            </td>
                             <td className="data-table__num">
                               {canEditQty ? (
-                                <input
-                                  type="number"
-                                  className="bc-lignes-table__qty-input"
-                                  min={0}
-                                  step="any"
-                                  inputMode="decimal"
-                                  value={rawQty}
-                                  onChange={(e) => {
-                                    mutQuantites.reset()
-                                    setQtyEdits((s) => ({ ...s, [l.id]: e.target.value }))
-                                  }}
-                                  aria-label={`Quantité pour ${l.libelle}`}
-                                />
+                                <>
+                                  <input
+                                    type="number"
+                                    className={
+                                      overDevis
+                                        ? 'bc-lignes-table__qty-input bc-lignes-table__qty-input--over'
+                                        : 'bc-lignes-table__qty-input'
+                                    }
+                                    min={0}
+                                    max={maxDevis ?? undefined}
+                                    step="any"
+                                    inputMode="decimal"
+                                    value={rawQty}
+                                    onChange={(e) => {
+                                      mutQuantites.reset()
+                                      const next = clampQtyToDevis(e.target.value, maxDevis)
+                                      setQtyEdits((s) => ({ ...s, [l.id]: next }))
+                                    }}
+                                    aria-label={`Quantité BC pour ${l.libelle}`}
+                                    aria-invalid={overDevis || undefined}
+                                  />
+                                  {overDevis ? (
+                                    <span className="bc-lignes-table__qty-over-hint" role="alert">
+                                      Max. devis : {formatQuantity(maxDevis!)}
+                                    </span>
+                                  ) : null}
+                                </>
                               ) : (
                                 formatQuantity(l.quantite)
                               )}
@@ -647,7 +598,7 @@ export default function BonCommandeFichePage() {
                     </tbody>
                     <tfoot>
                       <tr>
-                        <td colSpan={3} className="data-table__foot-label">
+                        <td colSpan={4} className="data-table__foot-label">
                           Total HT{qtyDirty ? ' (aperçu)' : ''}
                         </td>
                         <td className="data-table__num data-table__foot-value">
@@ -655,7 +606,7 @@ export default function BonCommandeFichePage() {
                         </td>
                       </tr>
                       <tr>
-                        <td colSpan={3} className="data-table__foot-label">
+                        <td colSpan={4} className="data-table__foot-label">
                           Total TTC{qtyDirty ? ' (aperçu)' : ''}
                         </td>
                         <td className="data-table__num data-table__foot-value">
@@ -666,176 +617,15 @@ export default function BonCommandeFichePage() {
                   </table>
                 </div>
               )}
+              {qtyOverDevis ? (
+                <p className="error bc-fiche__qty-error" role="alert">
+                  Une ou plusieurs quantités dépassent le plafond du devis.
+                </p>
+              ) : null}
               {mutQuantites.isError ? (
                 <p className="error bc-fiche__qty-error">{(mutQuantites.error as Error).message}</p>
               ) : null}
             </section>
-
-            {lab && ligneCount > 0 ? (
-              <section className="card bc-fiche__planning">
-                <div className="bc-fiche__planning-header">
-                  <div>
-                    <h2 className="ds-form-section__title">Planification terrain</h2>
-                    <p className="bc-fiche__planning-intro text-muted">
-                      Périodes, technicien et livraison par ligne de commande.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={() => {
-                      setPlanningToast(null)
-                      mutLignes.mutate({ edits: ligneEdits, extras: ligneExtraEdits })
-                    }}
-                    disabled={mutLignes.isPending}
-                  >
-                    {mutLignes.isPending ? 'Enregistrement…' : 'Enregistrer la planification'}
-                  </button>
-                </div>
-
-                {mutLignes.isPending ? (
-                  <p className="bc-fiche__planning-status text-muted" role="status">
-                    Enregistrement de la planification en cours…
-                  </p>
-                ) : null}
-                {mutLignes.isSuccess && !mutLignes.isPending ? (
-                  <p className="bc-fiche__planning-status bc-fiche__planning-status--success" role="status">
-                    Planification enregistrée avec succès.
-                  </p>
-                ) : null}
-                {mutLignes.isError ? (
-                  <p className="error bc-fiche__planning-error">{(mutLignes.error as Error).message}</p>
-                ) : null}
-
-                <PlanningMassActionsBar
-                  assignees={techniciens}
-                  assigneeId={massTechnicienId}
-                  onAssigneeChange={setMassTechnicienId}
-                  dateDebut={massDebut}
-                  onDateDebutChange={handleMassDebutChange}
-                  dateFin={massFin}
-                  onDateFinChange={setMassFin}
-                  onApply={applyMassPlanning}
-                  applyLabel="Appliquer à toutes les lignes"
-                  totalCount={ligneCount}
-                  selectedCount={ligneCount}
-                  hint="Renseignez au moins un champ puis appliquez — enregistrez ensuite la planification."
-                />
-
-                <div className="bc-fiche__ligne-cards">
-                  {bc.lignes!.map((l) => (
-                    <article key={l.id} className="bc-fiche__ligne-card">
-                      <header className="bc-fiche__ligne-card-header">
-                        <h3 className="bc-fiche__ligne-card-title">{l.libelle}</h3>
-                        <span className="bc-fiche__ligne-card-meta text-muted">
-                          Qté {formatQuantity(l.quantite)} — {formatMoney(Number(l.montant_ht))} HT
-                        </span>
-                      </header>
-                      <div className="bc-fiche__ligne-card-grid">
-                        <label className="form-group">
-                          Début terrain (prévu)
-                          <input
-                            type="date"
-                            value={ligneEdits[l.id]?.debut ?? ''}
-                            onChange={(e) => {
-                              mutLignes.reset()
-                              const debut = e.target.value
-                              setLigneEdits((s) => ({
-                                ...s,
-                                [l.id]: { debut, fin: debut },
-                              }))
-                              setLigneExtraEdits((s) => ({
-                                ...s,
-                                [l.id]: {
-                                  technicien_id: s[l.id]?.technicien_id ?? null,
-                                  date_livraison: debut,
-                                  notes_ligne: s[l.id]?.notes_ligne ?? '',
-                                },
-                              }))
-                            }}
-                          />
-                        </label>
-                        <label className="form-group">
-                          Fin terrain (prévu)
-                          <input
-                            type="date"
-                            value={ligneEdits[l.id]?.fin ?? ''}
-                            onChange={(e) => {
-                              mutLignes.reset()
-                              setLigneEdits((s) => ({
-                                ...s,
-                                [l.id]: { debut: s[l.id]?.debut ?? '', fin: e.target.value },
-                              }))
-                            }}
-                          />
-                        </label>
-                        <label className="form-group">
-                          Technicien
-                          <select
-                            value={ligneExtraEdits[l.id]?.technicien_id ?? ''}
-                            onChange={(e) =>
-                              setLigneExtraEdits((s) => ({
-                                ...s,
-                                [l.id]: {
-                                  ...s[l.id],
-                                  technicien_id: e.target.value ? Number(e.target.value) : null,
-                                  date_livraison: s[l.id]?.date_livraison ?? '',
-                                  notes_ligne: s[l.id]?.notes_ligne ?? '',
-                                },
-                              }))
-                            }
-                          >
-                            <option value="">— Non assigné —</option>
-                            {techniciens.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {formatTechnicienOption(t)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="form-group">
-                          Date livraison
-                          <input
-                            type="date"
-                            value={ligneExtraEdits[l.id]?.date_livraison ?? ''}
-                            onChange={(e) =>
-                              setLigneExtraEdits((s) => ({
-                                ...s,
-                                [l.id]: {
-                                  ...s[l.id],
-                                  date_livraison: e.target.value,
-                                  technicien_id: s[l.id]?.technicien_id ?? null,
-                                  notes_ligne: s[l.id]?.notes_ligne ?? '',
-                                },
-                              }))
-                            }
-                          />
-                        </label>
-                        <label className="form-group bc-fiche__ligne-notes">
-                          Notes ligne
-                          <input
-                            type="text"
-                            value={ligneExtraEdits[l.id]?.notes_ligne ?? ''}
-                            placeholder="Commentaire interne…"
-                            onChange={(e) =>
-                              setLigneExtraEdits((s) => ({
-                                ...s,
-                                [l.id]: {
-                                  ...s[l.id],
-                                  notes_ligne: e.target.value,
-                                  technicien_id: s[l.id]?.technicien_id ?? null,
-                                  date_livraison: s[l.id]?.date_livraison ?? '',
-                                },
-                              }))
-                            }
-                          />
-                        </label>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            ) : null}
           </div>
 
           <aside className="bc-fiche__aside">
@@ -919,6 +709,14 @@ export default function BonCommandeFichePage() {
                 ) : null}
               </section>
             ) : null}
+
+            <EntityAttachmentsPanel
+              attachableType="bon_commande"
+              attachableId={bc.id}
+              canUpload={lab}
+              canDelete={isAdmin}
+              intro="Contrats signés, confirmations client, plans…"
+            />
 
             {lab ? (
               <ExtrafieldsForm

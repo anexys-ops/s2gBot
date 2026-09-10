@@ -203,6 +203,30 @@ export default function DocumentPdfTemplateOptionsEditor({ form, setForm, disabl
             />
             Afficher Total TTC
           </label>
+          {documentType === 'quote' && (
+            <>
+              <label className="pdf-layout-editor__check">
+                <input
+                  type="checkbox"
+                  checked={form.totals.show_discount}
+                  onChange={(e) => setForm((f) => ({ ...f, totals: { ...f.totals, show_discount: e.target.checked } }))}
+                  disabled={disabled}
+                />
+                Afficher la remise document
+              </label>
+              <label className="pdf-layout-editor__check">
+                <input
+                  type="checkbox"
+                  checked={form.totals.show_frais_supplementaires}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, totals: { ...f.totals, show_frais_supplementaires: e.target.checked } }))
+                  }
+                  disabled={disabled}
+                />
+                Afficher les frais supplémentaires (détail par ligne)
+              </label>
+            </>
+          )}
         </section>
       ) : null}
 

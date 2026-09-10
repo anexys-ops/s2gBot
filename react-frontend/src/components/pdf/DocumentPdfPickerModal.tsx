@@ -10,6 +10,9 @@ type Props = {
   documentLabel: string
   onClose: () => void
   onEmail?: (templateId: number) => Promise<void>
+  /** Présélectionne un modèle par slug (ex. bc-recap-dossier). */
+  initialTemplateSlug?: string
+  titleOverride?: string
 }
 
 export default function DocumentPdfPickerModal({
@@ -18,6 +21,8 @@ export default function DocumentPdfPickerModal({
   documentLabel,
   onClose,
   onEmail,
+  initialTemplateSlug,
+  titleOverride,
 }: Props) {
   const [templateId, setTemplateId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
@@ -31,9 +36,13 @@ export default function DocumentPdfPickerModal({
   const templates = data?.data ?? []
 
   const defaultId = useMemo(() => {
+    if (initialTemplateSlug) {
+      const bySlug = templates.find((t) => t.slug === initialTemplateSlug)
+      if (bySlug) return bySlug.id
+    }
     const def = templates.find((t) => t.is_default)
     return def?.id ?? templates[0]?.id ?? null
-  }, [templates])
+  }, [templates, initialTemplateSlug])
 
   const selectedId = templateId ?? defaultId
 
@@ -59,7 +68,9 @@ export default function DocumentPdfPickerModal({
   }
 
   const typeLabel = documentPdfTypeLabel(documentType)
-  const title = onEmail ? `Envoyer ${typeLabel} par email` : `Imprimer ${typeLabel}`
+  const title =
+    titleOverride ??
+    (onEmail ? `Envoyer ${typeLabel} par email` : `Imprimer ${typeLabel}`)
 
   return (
     <Modal title={title} onClose={() => !loading && onClose()}>
@@ -92,7 +103,7 @@ export default function DocumentPdfPickerModal({
       {error ? <p className="error">{error}</p> : null}
       <div className="crud-actions">
         <button type="button" className="btn btn-primary" disabled={loading || templates.length === 0} onClick={() => void handleConfirm()}>
-          {loading ? 'En cours…' : onEmail ? 'Envoyer' : 'Télécharger le PDF'}
+          {loading ? 'En cours…' : onEmail ? 'Envoyer' : 'Voir le PDF'}
         </button>
         <button type="button" className="btn btn-secondary" disabled={loading} onClick={onClose}>
           Annuler

@@ -21,8 +21,11 @@ import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
 import { quoteEmailRecipient } from '../lib/quoteEmailRecipient'
 import { shouldIgnoreTableRowClick } from '../lib/tableRowInteraction'
 
-function quoteBonCommande(q: Quote) {
-  return q.bon_commande ?? q.bonCommande ?? null
+function quoteBonCommandes(q: Quote): NonNullable<Quote['bons_commande']> {
+  const list = q.bons_commande ?? q.bonsCommande
+  if (Array.isArray(list) && list.length > 0) return list
+  const single = q.bon_commande ?? q.bonCommande
+  return single ? [single] : []
 }
 
 function chainCount(value: number | undefined): number {
@@ -299,9 +302,9 @@ export default function Devis() {
                 {quotes.map((q) => {
                   const st = quoteStatutBadgeProps(q.status)
                   const mode = quotePricingMode(q)
-                  const bc = quoteBonCommande(q)
-                  const blCount = chainCount(bc?.bons_livraison_count)
-                  const invoiceCount = chainCount(bc?.invoices_count)
+                  const bcs = quoteBonCommandes(q)
+                  const blCount = bcs.reduce((sum, bc) => sum + chainCount(bc.bons_livraison_count), 0)
+                  const invoiceCount = bcs.reduce((sum, bc) => sum + chainCount(bc.invoices_count), 0)
                   return (
                     <tr
                       key={q.id}
@@ -352,10 +355,17 @@ export default function Devis() {
                       )}
                       {isLab && visible.bc !== false && (
                         <td className="data-table__code">
-                          {bc ? (
-                            <Link to={`/bons-commande/${bc.id}`} className="link-inline">
-                              <code className="code-badge">{bc.numero}</code>
-                            </Link>
+                          {bcs.length > 0 ? (
+                            <span className="bc-chain-links">
+                              {bcs.map((bc, index) => (
+                                <span key={bc.id}>
+                                  {index > 0 ? ', ' : null}
+                                  <Link to={`/bons-commande/${bc.id}`} className="link-inline">
+                                    <code className="code-badge">{bc.numero}</code>
+                                  </Link>
+                                </span>
+                              ))}
+                            </span>
                           ) : (
                             <span className="text-muted">—</span>
                           )}
@@ -363,7 +373,7 @@ export default function Devis() {
                       )}
                       {isLab && visible.bl !== false && (
                         <td className="data-table__num">
-                          {bc ? (
+                          {bcs.length > 0 ? (
                             blCount
                           ) : (
                             <span className="text-muted">—</span>
@@ -372,7 +382,7 @@ export default function Devis() {
                       )}
                       {isLab && visible.invoices !== false && (
                         <td className="data-table__num">
-                          {bc ? (
+                          {bcs.length > 0 ? (
                             invoiceCount
                           ) : (
                             <span className="text-muted">—</span>

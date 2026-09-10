@@ -387,6 +387,39 @@ class QuotePdfPresentationTest extends TestCase
         $this->assertSame('m²', $rows[3]['unite']);
     }
 
+    public function test_build_context_includes_discount_breakdown(): void
+    {
+        $client = Client::query()->create(['name' => 'Client remise']);
+        $quote = Quote::query()->create([
+            'client_id' => $client->id,
+            'number' => 'DV-RM-1',
+            'quote_date' => '2026-06-16',
+            'amount_ht' => 900,
+            'amount_ttc' => 1080,
+            'tva_rate' => 20,
+            'discount_percent' => 10,
+            'discount_amount' => 0,
+            'status' => Quote::STATUS_DRAFT,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $quote->id,
+            'description' => 'Prestation remisable',
+            'quantity' => 1,
+            'unit_price' => 1000,
+            'total' => 1000,
+            'tva_rate' => 20,
+        ]);
+
+        $quote->load('quoteLines');
+        $ctx = (new QuotePdfPresentationService)->buildContext($quote);
+
+        $this->assertTrue($ctx['has_discount']);
+        $this->assertEqualsWithDelta(1000, $ctx['subtotal_ht'], 0.001);
+        $this->assertEqualsWithDelta(100, $ctx['discount_ht'], 0.001);
+        $this->assertEqualsWithDelta(20, $ctx['discount_tva'], 0.001);
+        $this->assertStringContainsString('10,00 %', $ctx['discount_label']);
+    }
+
     public function test_build_context_includes_frais_supplementaires_in_total_ttc(): void
     {
         $client = Client::query()->create(['name' => 'Client frais']);

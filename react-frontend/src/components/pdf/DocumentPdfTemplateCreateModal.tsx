@@ -15,6 +15,7 @@ const BLADE_LABELS: Record<string, string> = {
   'pdf.invoice': 'Facture classique',
   'pdf.invoice_detailed': 'Facture détaillée',
   'pdf.purchase_order': 'Bon de commande',
+  'pdf.purchase_order_dossier_recap': 'BC — Récap dossier',
   'pdf.delivery_note': 'Bon de livraison',
   'pdf.expense_report': 'Note de frais',
   'reports.order': 'Rapport commande',

@@ -178,11 +178,22 @@
         $totalHt = (float) ($ctx['total_ht'] ?? $quote->amount_ht);
         $totalTva = (float) ($ctx['total_tva'] ?? max(0, $quote->amount_ttc - $quote->amount_ht));
         $fraisSuppTtc = (float) ($ctx['frais_supplementaires_ttc'] ?? 0);
+        $fraisSuppItems = is_array($ctx['frais_supplementaires'] ?? null) ? $ctx['frais_supplementaires'] : [];
         $documentTtc = (float) $quote->amount_ttc;
         $totalTtc = (float) ($ctx['total_ttc'] ?? $documentTtc);
         $showTotalsBox = $showTotalHt || $showTotalTva || $showTotalTtc;
         $amountCols = ($showTotalHt ? 1 : 0) + ($showTotalTva ? 1 : 0) + ($showTotalTtc ? 1 : 0);
         $fraisPadColspan = max(1, $amountCols - ($showTotalTtc ? 1 : 0));
+        $hasDiscount = ($ctx['has_discount'] ?? false) && $showDiscount;
+        $subtotalHt = (float) ($ctx['subtotal_ht'] ?? 0);
+        $subtotalTva = (float) ($ctx['subtotal_tva'] ?? 0);
+        $subtotalTtc = (float) ($ctx['subtotal_ttc'] ?? 0);
+        $discountHt = (float) ($ctx['discount_ht'] ?? 0);
+        $discountTva = (float) ($ctx['discount_tva'] ?? 0);
+        $discountTtc = (float) ($ctx['discount_ttc'] ?? 0);
+        $discountLabel = $ctx['discount_label'] ?? 'Remise';
+        $showFraisRows = $showFraisSupplementaires && $fraisSuppTtc > 0 && $fraisSuppItems !== [];
+        $displayFinalTtc = $showFraisRows ? $totalTtc : ($fraisSuppTtc > 0 && ! $showFraisSupplementaires ? $documentTtc : $totalTtc);
     @endphp
 
     @if($showTotalsBox)
@@ -202,8 +213,34 @@
             </tr>
         </thead>
         <tbody>
+            @if($hasDiscount)
             <tr>
-                <td style="border:1px solid {{ $BORDER }};padding:5px 8px;">&nbsp;</td>
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;font-size:8.5pt;">Sous-total</td>
+                @if($showTotalHt)
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;text-align:center;font-size:8.5pt;">{{ $fmt($subtotalHt) }}</td>
+                @endif
+                @if($showTotalTva)
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;text-align:center;font-size:8.5pt;">{{ $fmt($subtotalTva) }}</td>
+                @endif
+                @if($showTotalTtc)
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;text-align:center;font-size:8.5pt;">{{ $fmt($subtotalTtc) }}</td>
+                @endif
+            </tr>
+            <tr>
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;font-size:8.5pt;">{{ $discountLabel }}</td>
+                @if($showTotalHt)
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;text-align:center;font-size:8.5pt;">-{{ $fmt($discountHt) }}</td>
+                @endif
+                @if($showTotalTva)
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;text-align:center;font-size:8.5pt;">-{{ $fmt($discountTva) }}</td>
+                @endif
+                @if($showTotalTtc)
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;text-align:center;font-size:8.5pt;">-{{ $fmt($discountTtc) }}</td>
+                @endif
+            </tr>
+            @endif
+            <tr>
+                <td style="border:1px solid {{ $BORDER }};padding:5px 8px;font-weight:bold;">{{ $hasDiscount ? 'Total' : '&nbsp;' }}</td>
                 @if($showTotalHt)
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;">{{ $fmt($totalHt) }}</td>
                 @endif
@@ -211,17 +248,25 @@
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;">{{ $fmt($totalTva) }}</td>
                 @endif
                 @if($showTotalTtc)
-                <td style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;">{{ $fmt($fraisSuppTtc > 0 ? $documentTtc : $totalTtc) }}</td>
+                <td style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;">{{ $fmt($showFraisRows ? $documentTtc : $displayFinalTtc) }}</td>
                 @endif
             </tr>
-            @if($fraisSuppTtc > 0 && $showTotalTtc)
+            @if($showFraisRows)
+            @foreach($fraisSuppItems as $fraisItem)
             <tr>
-                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;font-size:8.5pt;">+ Frais suppl. TTC</td>
-                @if($fraisPadColspan > 0)
-                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;" colspan="{{ $fraisPadColspan }}">&nbsp;</td>
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;font-size:8.5pt;">+ {{ $fraisItem['description'] ?? 'Frais supplémentaire' }}</td>
+                @if($showTotalHt)
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;text-align:center;font-size:8.5pt;">{{ $fmt((float) ($fraisItem['montant_ht'] ?? 0)) }}</td>
                 @endif
-                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;text-align:center;font-size:8.5pt;">{{ $fmt($fraisSuppTtc) }}</td>
+                @if($showTotalTva)
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;text-align:center;font-size:8.5pt;">{{ $fmt((float) ($fraisItem['tva'] ?? 0)) }}</td>
+                @endif
+                @if($showTotalTtc)
+                <td style="border:1px solid {{ $BORDER }};padding:4px 8px;text-align:center;font-size:8.5pt;">{{ $fmt((float) ($fraisItem['montant_ttc'] ?? 0)) }}</td>
+                @endif
             </tr>
+            @endforeach
+            @if($showTotalTtc)
             <tr>
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;font-weight:bold;">Total TTC</td>
                 @if($fraisPadColspan > 0)
@@ -229,6 +274,7 @@
                 @endif
                 <td style="border:1px solid {{ $BORDER }};padding:5px 8px;text-align:center;font-weight:bold;">{{ $fmt($totalTtc) }}</td>
             </tr>
+            @endif
             @endif
         </tbody>
     </table>

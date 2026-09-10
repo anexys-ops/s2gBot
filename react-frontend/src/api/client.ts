@@ -818,6 +818,8 @@ export type BonCommandeLigne = {
   libelle: string
   ordre?: number
   quantite: string | number
+  /** Plafond issu du devis source (snapshot à la création du BC). */
+  quantite_devis?: string | number | null
   prix_unitaire_ht: string | number
   tva_rate: string | number
   montant_ht: string | number
@@ -851,6 +853,8 @@ export type BonCommande = {
   dossier?: DossierRow
   quote?: Pick<Quote, 'id' | 'number' | 'status'> & { meta?: EntityMetaPayload }
   bons_livraison?: Array<Pick<BonLivraison, 'id' | 'numero' | 'statut' | 'date_livraison'>>
+  bons_livraison_count?: number
+  invoices_count?: number
 }
 
 export type BonLivraisonLigne = {
@@ -2447,6 +2451,8 @@ export interface Quote {
   quote_lines?: QuoteLine[]
   bon_commande?: QuoteBonCommandeChain | null
   bonCommande?: QuoteBonCommandeChain | null
+  bons_commande?: QuoteBonCommandeChain[]
+  bonsCommande?: QuoteBonCommandeChain[]
 }
 
 export type QuoteBonCommandeChain = {
@@ -2468,8 +2474,13 @@ export const quotesApi = {
     const s = q.toString()
     return api<LaravelPaginator<Quote>>(`/quotes${s ? `?${s}` : ''}`)
   },
-  /** Devis signés/acceptés avec dossier, sans BC existant — pour « Créer depuis un devis ». */
-  listEligibleForBc: () => quotesApi.list({ eligible_bc: true, per_page: 100 }),
+  /** Devis signés/acceptés avec dossier — pour « Créer depuis un devis » (plusieurs BC possibles). */
+  listEligibleForBc: (params?: { search?: string; per_page?: number }) =>
+    quotesApi.list({
+      eligible_bc: true,
+      per_page: params?.per_page ?? 100,
+      search: params?.search,
+    }),
   get: (id: number) => api<Quote>(`/quotes/${id}`),
   create: (body: QuoteCreateBody) => api<Quote>('/quotes', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: Partial<QuoteCreateBody> & { status?: string; meta?: EntityMetaPayload | null }) =>
@@ -2548,7 +2559,7 @@ export const pdfApi = {
     a.click()
     URL.revokeObjectURL(url)
   },
-  generate: async (type: string, id: number, templateId?: number) => {
+  generate: async (type: string, id: number, templateId?: number, options?: { download?: boolean }) => {
     const token = getToken()
     const res = await fetch(`${API_BASE}/pdf/generate`, {
       method: 'POST',
@@ -2568,11 +2579,20 @@ export const pdfApi = {
     }
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `document-${type}-${id}.pdf`
-    a.click()
-    URL.revokeObjectURL(url)
+    if (options?.download) {
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `document-${type}-${id}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      return
+    }
+    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+    if (!opened) {
+      URL.revokeObjectURL(url)
+      throw new Error('Impossible d’ouvrir le PDF — autorisez les pop-ups pour ce site.')
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 120_000)
   },
 }
 

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { buildBcLigneDisplayRows, resolveDevisDisplayMeta } from './bcLigneDisplay'
+import {
+  buildBcLigneDisplayRows,
+  clampQtyToDevis,
+  filterForfaitBcLignes,
+  isForfaitBcLigne,
+  qtyExceedsDevis,
+  resolveDevisDisplayMeta,
+} from './bcLigneDisplay'
 import type { BonCommandeLigne } from '../api/client'
 
 const line = (id: number, ref: number | null, ordre: number): BonCommandeLigne => ({
@@ -26,6 +33,45 @@ describe('resolveDevisDisplayMeta', () => {
         bon_commande: { quote: { meta } },
       }),
     ).toEqual(meta)
+  })
+})
+
+describe('quantite devis helpers', () => {
+  it('detects and clamps quantities above devis max', () => {
+    expect(qtyExceedsDevis('3', 2)).toBe(true)
+    expect(qtyExceedsDevis('2', 2)).toBe(false)
+    expect(clampQtyToDevis('5', 2)).toBe('2')
+    expect(clampQtyToDevis('1.5', 2)).toBe('1.5')
+  })
+})
+
+describe('forfait bc lignes', () => {
+  it('treats all lines as forfait when document is forfait', () => {
+    const meta = { mode_devis: 'forfait' }
+    expect(isForfaitBcLigne(line(1, 10, 0), meta)).toBe(true)
+    expect(isForfaitBcLigne(line(2, null, 1), meta)).toBe(true)
+    expect(filterForfaitBcLignes([line(1, 10, 0), line(2, null, 1)], meta)).toHaveLength(2)
+  })
+
+  it('filters lines linked to forfait jalons only', () => {
+    const meta = {
+      devis_jalons: [
+        {
+          id: 'j1',
+          libelle: 'Lot forfait',
+          mode: 'forfait',
+          product_ref_article_ids: [101],
+        },
+        {
+          id: 'j2',
+          libelle: 'Lot détaillé',
+          mode: 'detaille',
+          product_ref_article_ids: [200],
+        },
+      ],
+    }
+    const lignes = [line(1, 101, 0), line(2, 200, 1), line(3, null, 2)]
+    expect(filterForfaitBcLignes(lignes, meta).map((l) => l.id)).toEqual([1])
   })
 })
 

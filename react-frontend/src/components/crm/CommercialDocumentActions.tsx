@@ -60,6 +60,7 @@ export default function CommercialDocumentActions({
 }: Props) {
   const queryClient = useQueryClient()
   const [pdfOpen, setPdfOpen] = useState(false)
+  const [recapPdfOpen, setRecapPdfOpen] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -261,9 +262,20 @@ export default function CommercialDocumentActions({
             documentType === 'invoice' && !isLab ? (
               <InvoicePrintButton entityId={entityId} />
             ) : (
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPdfOpen(true)}>
-                Imprimer
-              </button>
+              <>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPdfOpen(true)}>
+                  Imprimer
+                </button>
+                {documentType === 'bon_commande' ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setRecapPdfOpen(true)}
+                  >
+                    Récap dossier
+                  </button>
+                ) : null}
+              </>
             )
           ) : null}
           {capabilities.canEmail ? (
@@ -299,6 +311,17 @@ export default function CommercialDocumentActions({
           documentId={entityId}
           documentLabel={entityLabel}
           onClose={() => setPdfOpen(false)}
+        />
+      ) : null}
+
+      {recapPdfOpen ? (
+        <DocumentPdfPickerModal
+          documentType={pdfType}
+          documentId={entityId}
+          documentLabel={entityLabel}
+          initialTemplateSlug="bc-recap-dossier"
+          titleOverride="Imprimer récap dossier"
+          onClose={() => setRecapPdfOpen(false)}
         />
       ) : null}
 

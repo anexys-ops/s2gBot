@@ -9490,6 +9490,38 @@ a.catalogue-tree__link-article:hover {
 .bc-fiche__aside-actions {
   margin-top: 0.65rem;
 }
+.entity-attachments-panel__intro {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+}
+.entity-attachments-panel__upload {
+  margin-bottom: 0.75rem;
+}
+.entity-attachments-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.entity-attachments-panel__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.65rem;
+}
+.entity-attachments-panel__filename {
+  text-align: left;
+  word-break: break-word;
+}
+.entity-attachments-panel__size {
+  font-size: 0.82rem;
+}
+.entity-attachments-panel__empty {
+  margin: 0;
+  font-size: 0.88rem;
+}
 .bc-fiche__planning {
   padding: 1rem 1.15rem 1.15rem;
 }
@@ -9636,6 +9668,21 @@ a.catalogue-tree__link-article:hover {
   outline-offset: 1px;
   border-color: #60a5fa;
 }
+.bc-lignes-table__qty-input--over {
+  border-color: var(--color-danger, #b42318);
+  background: #fef3f2;
+}
+.bc-lignes-table__qty-devis {
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}
+.bc-lignes-table__qty-over-hint {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--color-danger, #b42318);
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
 .bc-fiche__lines-header {
   display: flex;
   flex-wrap: wrap;
@@ -9645,6 +9692,9 @@ a.catalogue-tree__link-article:hover {
 }
 .bc-fiche__qty-error {
   margin: 0.75rem 1.25rem 1rem;
+}
+.bc-fiche__qty-mass {
+  margin: 0 1.25rem 1rem;
 }
 .bc-lignes-table__col-money {
   width: 8rem;

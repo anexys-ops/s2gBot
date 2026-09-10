@@ -101,24 +101,7 @@ class User extends Authenticatable
             return true;
         }
 
-        $groups = $this->relationLoaded('accessGroups')
-            ? $this->accessGroups
-            : $this->accessGroups()->get();
-
-        foreach ($groups as $group) {
-            $perms = $group->permissions ?? [];
-            if (! is_array($perms)) {
-                continue;
-            }
-            if (in_array(PermissionCatalog::ALL_MARKER, $perms, true)) {
-                return true;
-            }
-            if (in_array($permission, $perms, true)) {
-                return true;
-            }
-        }
-
-        return false;
+        return in_array($permission, $this->effectivePermissionKeys(), true);
     }
 
     /**
@@ -133,7 +116,7 @@ class User extends Authenticatable
         }
 
         $this->loadMissing('accessGroups');
-        $out = [];
+        $raw = [];
         foreach ($this->accessGroups as $group) {
             $perms = $group->permissions ?? [];
             if (! is_array($perms)) {
@@ -144,12 +127,12 @@ class User extends Authenticatable
             }
             foreach ($perms as $p) {
                 if (is_string($p)) {
-                    $out[$p] = true;
+                    $raw[] = $p;
                 }
             }
         }
 
-        return array_keys($out);
+        return PermissionCatalog::expandEffective($raw);
     }
 
     public function isLabAdmin(): bool

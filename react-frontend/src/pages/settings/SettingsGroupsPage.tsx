@@ -21,7 +21,17 @@ export default function SettingsGroupsPage() {
     queryFn: () => permissionsCatalogApi.get(),
     enabled: allowed,
   })
-  const permEntries = useMemo(() => Object.entries(cat?.permissions ?? {}), [cat])
+  const permSections = useMemo(() => {
+    const labels = cat?.permissions ?? {}
+    const grouped = cat?.groups
+    if (grouped && Object.keys(grouped).length > 0) {
+      return Object.entries(grouped).map(([title, keys]) => ({
+        title,
+        entries: keys.map((key) => [key, labels[key] ?? key] as const),
+      }))
+    }
+    return [{ title: 'Droits', entries: Object.entries(labels) }]
+  }, [cat])
 
   const { data: groupsRes, isLoading } = useQuery({
     queryKey: ['admin-access-groups'],
@@ -169,28 +179,40 @@ export default function SettingsGroupsPage() {
               <input value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
             <div className="form-group">
-              <label>Droits</label>
+              <label>Droits — modules visibles et fonctions</label>
+              <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '0.65rem' }}>
+                Cochez les <strong>modules</strong> visibles dans le menu, puis les fonctions fines (lecture/écriture).
+                Les utilisateurs du groupe héritent de ces droits.
+              </p>
               <div
+                className="permissions-editor"
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '0.5rem',
-                  maxHeight: 280,
+                  gap: '0.85rem',
+                  maxHeight: 360,
                   overflow: 'auto',
-                  padding: '0.5rem',
+                  padding: '0.65rem',
                   border: '1px solid var(--color-border, #e2e8f0)',
                   borderRadius: 8,
                 }}
               >
-                {permEntries.map(([key, label]) => (
-                  <label key={key} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                    <input type="checkbox" checked={perms.includes(key)} onChange={() => togglePerm(key)} />
-                    <span>
-                      <strong>{key}</strong>
-                      <br />
-                      <span style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>{label}</span>
-                    </span>
-                  </label>
+                {permSections.map((section) => (
+                  <section key={section.title}>
+                    <h4 style={{ margin: '0 0 0.45rem', fontSize: '0.88rem' }}>{section.title}</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                      {section.entries.map(([key, label]) => (
+                        <label key={key} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                          <input type="checkbox" checked={perms.includes(key)} onChange={() => togglePerm(key)} />
+                          <span>
+                            <strong>{key}</strong>
+                            <br />
+                            <span style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>{label}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </section>
                 ))}
               </div>
             </div>

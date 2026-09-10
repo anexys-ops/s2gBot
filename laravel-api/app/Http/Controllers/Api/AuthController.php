@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\PasswordResetMail;
 use App\Models\Agency;
 use App\Models\Client;
 use App\Models\Site;
@@ -15,6 +16,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
@@ -24,6 +27,73 @@ class AuthController extends Controller
         private ActivityLogger $activityLogger,
         private SessionPresenceService $presence,
     ) {}
+
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $message = 'Si cette adresse est reconnue, un e-mail de réinitialisation vient d\'être envoyé.';
+        $user = User::query()->where('email', $validated['email'])->first();
+
+        if ($user === null) {
+            $this->securityLogger->log('password_reset_requested', $validated['email'], [
+                'found' => false,
+            ]);
+
+            return response()->json(['message' => $message]);
+        }
+
+        $token = PasswordBroker::broker()->createToken($user);
+        $frontendUrl = rtrim((string) env('FRONTEND_URL', config('app.url')), '/');
+        $resetUrl = $frontendUrl.'/login/reinitialiser?token='.urlencode($token).'&email='.urlencode($user->email);
+
+        try {
+            Mail::to($user->email)->send(new PasswordResetMail($user, $resetUrl));
+        } catch (\Throwable $e) {
+            $this->securityLogger->log('password_reset_failed', $user->email, [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Envoi e-mail impossible pour le moment. Contactez l\'administrateur.',
+            ], 503);
+        }
+
+        $this->securityLogger->log('password_reset_requested', $user->email, [
+            'found' => true,
+        ]);
+
+        return response()->json(['message' => $message]);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => 'required|email',
+            'token' => 'required|string',
+            'password' => ['required', 'confirmed', Password::defaults()],
+        ]);
+
+        $status = PasswordBroker::broker()->reset(
+            $validated,
+            function (User $user, string $password): void {
+                $user->forceFill(['password' => Hash::make($password)])->saveQuietly();
+                $this->activityLogger->log($user, 'account.password.reset', $user);
+            }
+        );
+
+        if ($status === PasswordBroker::PASSWORD_RESET) {
+            return response()->json([
+                'message' => 'Mot de passe mis à jour. Vous pouvez vous connecter.',
+            ]);
+        }
+
+        return response()->json([
+            'message' => __($status),
+        ], 422);
+    }
 
     public function login(Request $request): JsonResponse
     {

@@ -77,6 +77,8 @@ use App\Http\Controllers\Api\Workflow\WorkflowDefinitionController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::get('/register/clients', [AuthController::class, 'registerClientList']);
 Route::get('/register/sites', [AuthController::class, 'registerSiteList']);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
+import { useAppConnectivity } from '../hooks/useAppConnectivity'
 import { getOfflineQueueLength } from '../lib/offlineQueue'
 import AppNavigation from './AppNavigation'
 import AppContextBar from './AppContextBar'
@@ -7,28 +8,14 @@ import AppVersionFooter from './AppVersionFooter'
 import SessionPresenceTracker from './SessionPresenceTracker'
 
 export default function Layout() {
-  const [online, setOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true))
+  const online = useAppConnectivity()
   const [queueN, setQueueN] = useState(0)
 
   useEffect(() => {
     const syncQueue = () => setQueueN(getOfflineQueueLength())
     syncQueue()
-    const onOnline = () => {
-      setOnline(true)
-      syncQueue()
-    }
-    const onOffline = () => {
-      setOnline(false)
-      syncQueue()
-    }
-    window.addEventListener('online', onOnline)
-    window.addEventListener('offline', onOffline)
     const id = window.setInterval(syncQueue, 8000)
-    return () => {
-      window.removeEventListener('online', onOnline)
-      window.removeEventListener('offline', onOffline)
-      window.clearInterval(id)
-    }
+    return () => window.clearInterval(id)
   }, [])
 
   return (

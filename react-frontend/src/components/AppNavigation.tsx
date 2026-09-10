@@ -6,8 +6,20 @@ import { brandingApi } from '../api/client'
 import { DEFAULT_APP_LOGO_ALT, DEFAULT_APP_LOGO_SRC, resolveAppLogoSrc } from '../lib/appBranding'
 import GlobalSearch from './GlobalSearch'
 import { isPortalUser } from '../lib/portalAccess'
+import {
+  canAccessOrdresMission,
+  canAccessStaffModule,
+  hasStaffCapability,
+  type StaffModuleKey,
+} from '../lib/staffAccess'
+import { canManageAppConfig, canManageGroups, canManageUsers } from '../lib/settingsAccess'
 
-type SubItem = { to: string; label: string; labOnly?: boolean }
+type SubItem = {
+  to: string
+  label: string
+  module?: StaffModuleKey
+  permission?: string
+}
 
 type MenuGroupId =
   | 'commercial'
@@ -21,13 +33,13 @@ type MenuGroupId =
 type MenuGroup = {
   id: MenuGroupId
   label: string
+  module: StaffModuleKey
   items: SubItem[]
 }
 
 function isCommercialActive(pathname: string): boolean {
   if (pathname === '/clients' || pathname.startsWith('/clients/')) return true
   if (pathname === '/sites' || pathname.startsWith('/sites/')) return true
-  if (pathname.startsWith('/dossiers')) return true
   if (pathname.startsWith('/devis')) return true
   if (pathname.startsWith('/bons-commande')) return true
   if (pathname.startsWith('/bons-livraison')) return true
@@ -75,7 +87,7 @@ function isReportsActive(pathname: string): boolean {
 function isGroupActive(id: MenuGroupId, pathname: string): boolean {
   switch (id) {
     case 'commercial':
-      return isCommercialActive(pathname)
+      return isCommercialActive(pathname) || pathname.startsWith('/dossiers')
     case 'terrain':
       return isTerrainActive(pathname)
     case 'laboratoire':
@@ -95,7 +107,6 @@ function isGroupActive(id: MenuGroupId, pathname: string): boolean {
 
 export default function AppNavigation() {
   const { user, logout } = useAuth()
-  const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const { data: branding } = useQuery({
     queryKey: ['branding'],
     queryFn: () => brandingApi.get(),
@@ -116,86 +127,132 @@ export default function AppNavigation() {
   const navRef = useRef<HTMLElement>(null)
 
   const groups: MenuGroup[] = useMemo(() => {
-    const filterItems = (items: SubItem[]) => items.filter((i) => !i.labOnly || isLab)
+    const canCommercial = canAccessStaffModule(user, 'commercial')
+    const canDossiers = canAccessStaffModule(user, 'dossiers')
+    const canTerrain = canAccessStaffModule(user, 'terrain')
+    const canLabo = canAccessStaffModule(user, 'laboratoire')
+    const canIngenierie = canAccessStaffModule(user, 'ingenierie')
+    const canCatalogue = canAccessStaffModule(user, 'catalogue')
+    const canRapports = canAccessStaffModule(user, 'rapports')
+    const canConfig = canAccessStaffModule(user, 'configuration')
+    const canOdm = canAccessOrdresMission(user)
 
-    return [
+    const filterItems = (items: SubItem[]) =>
+      items.filter((item) => {
+        if (item.permission && !hasStaffCapability(user, item.permission)) return false
+        if (item.module && !canAccessStaffModule(user, item.module)) return false
+        return true
+      })
+
+    const allGroups: MenuGroup[] = [
       {
-        id: 'commercial' as MenuGroupId,
+        id: 'commercial',
         label: 'Commercial',
+        module: 'commercial',
         items: filterItems([
-          { to: '/clients', label: 'Clients' },
-          { to: '/sites', label: 'Chantiers' },
-          { to: '/dossiers', label: 'Dossiers' },
-          { to: '/devis', label: 'Devis' },
-          { to: '/bons-commande', label: 'Bons de commande' },
-          { to: '/bons-livraison', label: 'Bons de livraison' },
-          { to: '/factures', label: 'Factures' },
+          { to: '/clients', label: 'Clients', module: 'commercial' },
+          { to: '/sites', label: 'Chantiers', module: 'commercial' },
+          { to: '/dossiers', label: 'Dossiers', module: 'dossiers' },
+          { to: '/devis', label: 'Devis', module: 'commercial' },
+          { to: '/bons-commande', label: 'Bons de commande', module: 'commercial' },
+          { to: '/bons-livraison', label: 'Bons de livraison', module: 'commercial' },
+          { to: '/factures', label: 'Factures', module: 'commercial' },
         ]),
       },
       {
-        id: 'terrain' as MenuGroupId,
+        id: 'terrain',
         label: 'Terrain',
+        module: 'terrain',
         items: filterItems([
-          { to: '/terrain/chantiers', label: 'Chantiers et carte GPS' },
-          { to: '/terrain/mesures', label: 'Mesures terrain' },
-          { to: '/ordres-mission?context=terrain&type=technicien', label: 'Ordres de mission' },
-          { to: '/terrain/taches', label: 'Tâches terrain' },
-          { to: '/terrain/planning', label: 'Planning terrain' },
-          { to: '/notes-de-frais', label: 'Notes de frais' },
+          { to: '/terrain/chantiers', label: 'Chantiers et carte GPS', module: 'terrain' },
+          { to: '/terrain/mesures', label: 'Mesures terrain', module: 'terrain' },
+          ...(canOdm
+            ? [{ to: '/ordres-mission?context=terrain&type=technicien', label: 'Ordres de mission', module: 'terrain' as StaffModuleKey }]
+            : []),
+          { to: '/terrain/taches', label: 'Tâches terrain', module: 'terrain' },
+          { to: '/terrain/planning', label: 'Planning terrain', module: 'terrain' },
+          { to: '/notes-de-frais', label: 'Notes de frais', module: 'terrain' },
         ]),
       },
       {
-        id: 'laboratoire' as MenuGroupId,
+        id: 'laboratoire',
         label: 'Laboratoire',
+        module: 'laboratoire',
         items: filterItems([
-          { to: '/labo/reception', label: 'Réception (FOLD)' },
-          { to: '/ordres-mission?context=labo&type=labo', label: 'Ordres de mission' },
-          { to: '/labo/taches', label: 'Tâches en cours' },
-          { to: '/labo/planning', label: 'Planning labo' },
-          { to: '/labo/rapports', label: "Rapports d'essais" },
-          { to: '/labo/fiches', label: 'Fiches techniques' },
-          { to: '/labo/transco', label: 'Transco FOLD', labOnly: true },
+          { to: '/labo/reception', label: 'Réception (FOLD)', module: 'laboratoire' },
+          ...(canOdm
+            ? [{ to: '/ordres-mission?context=labo&type=labo', label: 'Ordres de mission', module: 'laboratoire' as StaffModuleKey }]
+            : []),
+          { to: '/labo/taches', label: 'Tâches en cours', module: 'laboratoire' },
+          { to: '/labo/planning', label: 'Planning labo', module: 'laboratoire' },
+          { to: '/labo/rapports', label: "Rapports d'essais", module: 'laboratoire' },
+          { to: '/labo/fiches', label: 'Fiches techniques', module: 'laboratoire' },
+          { to: '/labo/transco', label: 'Transco FOLD', module: 'laboratoire', permission: 'config.manage' },
         ]),
       },
       {
-        id: 'ingenierie' as MenuGroupId,
+        id: 'ingenierie',
         label: 'Ingénierie',
+        module: 'ingenierie',
         items: filterItems([
-          { to: '/ordres-mission?context=ingenierie&type=ingenieur', label: 'Ordres de mission' },
-          { to: '/ingenierie/taches', label: 'Tâches ingénieur' },
-          { to: '/ingenierie/planning', label: 'Planning ingénieur' },
+          ...(canOdm
+            ? [{ to: '/ordres-mission?context=ingenierie&type=ingenieur', label: 'Ordres de mission', module: 'ingenierie' as StaffModuleKey }]
+            : []),
+          { to: '/ingenierie/taches', label: 'Tâches ingénieur', module: 'ingenierie' },
+          { to: '/ingenierie/planning', label: 'Planning ingénieur', module: 'ingenierie' },
         ]),
       },
       {
-        id: 'catalogue' as MenuGroupId,
+        id: 'catalogue',
         label: 'Catalogue',
+        module: 'catalogue',
         items: filterItems([
-          { to: '/catalogue', label: 'Articles & essais' },
-          { to: '/materiel/equipements', label: 'Matériel / Équipements' },
-          { to: '/labo/fiches', label: 'Fiches techniques dynamiques' },
+          { to: '/catalogue', label: 'Articles & essais', module: 'catalogue' },
+          { to: '/materiel/equipements', label: 'Matériel / Équipements', module: 'catalogue' },
+          { to: '/labo/fiches', label: 'Fiches techniques dynamiques', module: 'catalogue' },
         ]),
       },
       {
-        id: 'configuration' as MenuGroupId,
+        id: 'configuration',
         label: 'Configuration',
+        module: 'configuration',
         items: filterItems([
-          { to: '/config/agences', label: 'Agences', labOnly: true },
-          { to: '/settings/utilisateurs', label: 'Utilisateurs', labOnly: true },
-          { to: '/back-office/modeles-documents-pdf', label: 'PDF devis/factures', labOnly: true },
-          { to: '/back-office/configuration', label: 'Modules', labOnly: true },
+          ...(canManageAppConfig(user) || user?.role === 'lab_admin'
+            ? [{ to: '/config/agences', label: 'Agences', module: 'configuration' as StaffModuleKey }]
+            : []),
+          ...(canManageUsers(user)
+            ? [{ to: '/settings/utilisateurs', label: 'Utilisateurs', module: 'configuration' as StaffModuleKey }]
+            : []),
+          ...(canManageGroups(user)
+            ? [{ to: '/settings/groupes', label: 'Groupes & droits', module: 'configuration' as StaffModuleKey, permission: 'groups.manage' }]
+            : []),
+          ...(canManageAppConfig(user)
+            ? [
+                { to: '/back-office/modeles-documents-pdf', label: 'PDF devis/factures', module: 'configuration' as StaffModuleKey },
+                { to: '/back-office/configuration', label: 'Modules', module: 'configuration' as StaffModuleKey },
+              ]
+            : []),
         ]),
       },
       {
-        id: 'rapports' as MenuGroupId,
+        id: 'rapports',
         label: 'Rapports',
+        module: 'rapports',
         items: filterItems([
-          { to: '/rapports/ventes', label: 'Ventes' },
-          { to: '/rapports/compta', label: 'Comptabilité' },
-          { to: '/rapports/kpi', label: 'KPI' },
+          { to: '/rapports/ventes', label: 'Ventes', module: 'rapports' },
+          { to: '/rapports/compta', label: 'Comptabilité', module: 'rapports' },
+          { to: '/rapports/kpi', label: 'KPI', module: 'rapports' },
         ]),
       },
     ]
-  }, [isLab])
+
+    return allGroups.filter((group) => {
+      if (group.id === 'commercial' && !canCommercial && !canDossiers) return false
+      if (!canAccessStaffModule(user, group.module) && group.id !== 'commercial') return false
+      if (group.id === 'commercial' && (canCommercial || canDossiers)) return group.items.length > 0
+      return group.items.length > 0
+    })
+  }, [user])
 
   const closeAll = useCallback(() => {
     setOpenDropdown(null)

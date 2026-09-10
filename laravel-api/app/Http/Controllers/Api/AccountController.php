@@ -127,6 +127,7 @@ class AccountController extends Controller
     {
         return response()->json([
             'permissions' => PermissionCatalog::labels(),
+            'groups' => PermissionCatalog::groups(),
         ]);
     }
 

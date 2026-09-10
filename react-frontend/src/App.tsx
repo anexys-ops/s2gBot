@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, Outlet, useParams } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
 import DossiersListPage from './pages/dossiers/DossiersListPage'
 import DossierFichePage from './pages/dossiers/DossierFichePage'
 import DossierInfosTab from './pages/dossiers/tabs/DossierInfosTab'
@@ -13,6 +13,7 @@ import DossierNewPage from './pages/dossiers/DossierNewPage'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Orders from './pages/Orders'
@@ -107,6 +108,7 @@ import PortalInterventionsPage from './pages/portal/PortalInterventionsPage'
 import PortalRapportsPage from './pages/portal/PortalRapportsPage'
 import PortalRapportViewPage from './pages/portal/PortalRapportViewPage'
 import { hasPortalModule, isPortalUser, type PortalModuleKey } from './lib/portalAccess'
+import { canAccessStaffPath, staffHomePath } from './lib/staffAccess'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -136,6 +138,16 @@ function PortalModuleRoute({ module, children }: { module: PortalModuleKey; chil
   return <>{children}</>
 }
 
+function StaffPathGuard({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  const location = useLocation()
+  if (loading) return <div className="container">Chargement...</div>
+  if (!canAccessStaffPath(user, location.pathname)) {
+    return <Navigate to={staffHomePath(user)} replace />
+  }
+  return <>{children}</>
+}
+
 /** Ancienne URL /devis/:id → éditeur */
 function QuoteIdRedirect() {
   const { quoteId } = useParams<{ quoteId: string }>()
@@ -147,6 +159,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/login/reinitialiser" element={<ResetPasswordPage />} />
       <Route path="/register" element={<Register />} />
       <Route
         path="/portal"
@@ -210,7 +223,9 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <StaffRoute>
-              <Layout />
+              <StaffPathGuard>
+                <Layout />
+              </StaffPathGuard>
             </StaffRoute>
           </PrivateRoute>
         }

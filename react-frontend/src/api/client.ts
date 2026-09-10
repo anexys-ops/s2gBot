@@ -7,7 +7,7 @@ function getToken(): string | null {
   return localStorage.getItem('token')
 }
 
-const AUTH_PUBLIC_PATHS = new Set(['/login', '/register'])
+const AUTH_PUBLIC_PATHS = new Set(['/login', '/register', '/forgot-password', '/reset-password'])
 
 function authPathBase(path: string): string {
   return path.split('?')[0] ?? path
@@ -90,6 +90,16 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
+  forgotPassword: (email: string) =>
+    api<{ message: string }>('/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  resetPassword: (body: { email: string; token: string; password: string; password_confirmation: string }) =>
+    api<{ message: string }>('/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   register: (body: RegisterBody) =>
     api<{ user: User; token: string }>('/register', {
       method: 'POST',
@@ -139,7 +149,8 @@ export const accountApi = {
 }
 
 export const permissionsCatalogApi = {
-  get: () => api<{ permissions: Record<string, string> }>('/permissions/catalog'),
+  get: () =>
+    api<{ permissions: Record<string, string>; groups?: Record<string, string[]> }>('/permissions/catalog'),
 }
 
 export const adminUsersApi = {

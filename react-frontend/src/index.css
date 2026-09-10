@@ -3283,6 +3283,110 @@ a.ds-icon-btn {
   cursor: not-allowed;
 }
 
+.login-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.login-password-wrap {
+  position: relative;
+}
+
+.login-input--password {
+  padding-right: 5.5rem;
+}
+
+.login-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.65rem;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0.35rem;
+}
+
+.login-password-toggle:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.login-password-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-link-btn {
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.login-link-btn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.login-link-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-forgot-panel {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.login-forgot-title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.login-forgot-hint {
+  margin: 0 0 0.9rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.login-forgot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+
+.login-form--forgot {
+  gap: 0.9rem;
+}
+
+.login-forgot-back {
+  margin: 1rem 0 0;
+  text-align: center;
+  font-size: 0.88rem;
+}
+
+.login-forgot-back a {
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-forgot-back a:hover {
+  text-decoration: underline;
+}
+
 .login-alert {
   padding: 0.75rem 1rem;
   border-radius: 12px;
@@ -3291,6 +3395,25 @@ a.ds-icon-btn {
   color: #7f1d1d;
   background: #fef2f2;
   border: 1px solid #fecaca;
+}
+
+.login-alert--success {
+  color: #14532d;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.login-submit--secondary {
+  width: auto;
+  min-width: min(100%, 16rem);
+  background: linear-gradient(165deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.login-submit--link {
+  display: inline-flex;
+  text-decoration: none;
+  margin-top: 1rem;
 }
 
 .login-submit {

@@ -34,6 +34,7 @@ class Client extends Model
         'address',
         'city',
         'country',
+        'currency_code',
         'postal_code',
         'email',
         'phone',

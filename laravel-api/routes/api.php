@@ -40,6 +40,7 @@ use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\EquipmentMaintenancePlanController;
 use App\Http\Controllers\Api\MaterielAffectationController;
 use App\Http\Controllers\Api\ExamplePdfController;
+use App\Http\Controllers\Api\FxRateController;
 use App\Http\Controllers\Api\ExtrafieldDefinitionController;
 use App\Http\Controllers\Api\ExtrafieldValueController;
 use App\Http\Controllers\Api\InvoiceController;
@@ -347,6 +348,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('module-settings/{module_key}', [ModuleSettingController::class, 'show']);
     Route::put('module-settings/{module_key}', [ModuleSettingController::class, 'update']);
+
+    Route::get('currencies', [FxRateController::class, 'catalog']);
+    Route::get('fx-rates', [FxRateController::class, 'show']);
+    Route::get('fx-rates/settings', [FxRateController::class, 'settings']);
 
     // ── Actions par article & matériel requis ────────────────────────────────
     Route::get('articles/{article}/actions', [ArticleActionController::class, 'index']);

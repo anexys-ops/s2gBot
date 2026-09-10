@@ -41,7 +41,7 @@ class InvoiceEmailMailable extends Mailable
                 'recipientName' => $this->recipientName,
                 'customMessage' => $this->customMessage,
                 'senderName' => $this->senderName,
-                'currencyLabel' => config('app.currency_display', 'DH'),
+                'currencyLabel' => \App\Support\MoneyFormat::currencyLabel($this->invoice->currency_code),
                 'brandName' => \App\Support\AppDisplayName::resolve(),
             ],
         );

@@ -1,6 +1,8 @@
 /**
- * Locale Maroc : interface en français, devise dirham (ISO MAD, affichage DH).
+ * Locale Maroc : interface en français, devise par défaut dirham (ISO MAD, affichage DH).
  */
+import { currencyLabel, DEFAULT_CURRENCY, normalizeCurrencyCode } from './currencies'
+
 export const APP_LOCALE = 'fr-MA' as const
 
 const moneyFormatter = new Intl.NumberFormat(APP_LOCALE, {
@@ -12,9 +14,14 @@ const quantityFormatter = new Intl.NumberFormat(APP_LOCALE, {
   maximumFractionDigits: 0,
 })
 
-/** Montant avec séparateurs locaux et suffixe DH. */
-export function formatMoney(amount: number): string {
-  return `${moneyFormatter.format(amount)} DH`
+/** Montant avec séparateurs locaux et suffixe devise (DH, €, USD…). */
+export function formatMoney(amount: number, currencyCode?: string | null): string {
+  const code = normalizeCurrencyCode(currencyCode ?? DEFAULT_CURRENCY)
+  const label = currencyLabel(code)
+  if (code === 'EUR') {
+    return `${moneyFormatter.format(amount)} ${label}`
+  }
+  return `${moneyFormatter.format(amount)} ${label}`
 }
 
 /** Quantité entière (sans décimales affichées). */
@@ -25,6 +32,11 @@ export function formatQuantity(value: string | number): string {
 }
 
 /** Libellé unité pour en-têtes (ex. colonne « TTC (DH) »). */
+export function moneyUnitLabel(currencyCode?: string | null): string {
+  return currencyLabel(currencyCode ?? DEFAULT_CURRENCY)
+}
+
+/** @deprecated Préférer `moneyUnitLabel(currencyCode)` */
 export const MONEY_UNIT_LABEL = 'DH'
 
 /** Date du jour locale au format `YYYY-MM-DD` (champs `<input type="date">`, défauts formulaires). */

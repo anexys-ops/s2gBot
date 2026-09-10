@@ -9,6 +9,8 @@ use App\Support\ClientListEnrichment;
 use App\Services\DocumentActivityLogger;
 use App\Support\ClientPortalAccess;
 use App\Support\ClientPortalCatalog;
+use App\Support\CurrencyCode;
+use Illuminate\Validation\Rule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,7 +18,7 @@ class ClientController extends Controller
 {
     private const CLIENT_AUDIT_FIELDS = [
         'name', 'email', 'phone', 'whatsapp', 'siret', 'ice', 'ca_annuel_tva_regime', 'rc', 'city', 'address',
-        'commercial_id', 'portal_modules',
+        'commercial_id', 'portal_modules', 'currency_code',
     ];
 
     public function __construct(private DocumentActivityLogger $documentActivity) {}
@@ -242,6 +244,7 @@ class ClientController extends Controller
             'city'                        => 'nullable|string|max:128',
             'postal_code'                 => 'nullable|string|max:16',
             'country'                     => 'nullable|string|max:4',
+            'currency_code'               => ['nullable', 'string', 'size:3', Rule::in(array_keys(CurrencyCode::LABELS))],
             'email'                       => 'nullable|email',
             'phone'                       => 'nullable|string|max:50',
             'whatsapp'                    => 'nullable|string|max:50',

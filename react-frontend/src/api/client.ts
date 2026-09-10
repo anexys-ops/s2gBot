@@ -579,6 +579,36 @@ export const moduleSettingsApi = {
     }),
 }
 
+export type FxRatesSettings = {
+  enabled?: boolean
+  provider?: 'frankfurter'
+  base_currency?: string
+  cache_ttl_minutes?: number
+  fallback_rates?: Record<string, number>
+}
+
+export const fxRatesApi = {
+  catalog: () =>
+    api<{ base_currency: string; currencies: { code: string; label: string; name: string }[] }>(
+      '/currencies',
+    ),
+  get: (params: { from: string; to?: string; date?: string }) => {
+    const q = new URLSearchParams()
+    q.set('from', params.from)
+    if (params.to) q.set('to', params.to)
+    if (params.date) q.set('date', params.date)
+    return api<{
+      from: string
+      to: string
+      rate: number
+      date: string
+      label_from: string
+      label_to: string
+    }>(`/fx-rates?${q.toString()}`)
+  },
+  settings: () => api<FxRatesSettings>('/fx-rates/settings'),
+}
+
 export interface RefPackageRow {
   id: number
   ref_famille_package_id: number
@@ -2494,6 +2524,11 @@ export interface Quote {
   valid_until?: string
   amount_ht: number
   amount_ttc: number
+  currency_code?: string | null
+  exchange_rate?: number | null
+  exchange_rate_date?: string | null
+  amount_ht_base?: number | null
+  amount_ttc_base?: number | null
   tva_rate: number
   discount_percent?: number
   discount_amount?: number
@@ -2751,6 +2786,8 @@ export interface Client {
   /** Code tiers import PROLAB (ex. TI0002) */
   prolab_code?: string | null
   country?: string | null
+  /** ISO 4217 — devise des devis / factures client (défaut MAD). */
+  currency_code?: string | null
   address?: string
   city?: string | null
   postal_code?: string | null
@@ -3005,6 +3042,11 @@ export interface Invoice {
   due_date?: string
   amount_ht: number
   amount_ttc: number
+  currency_code?: string | null
+  exchange_rate?: number | null
+  exchange_rate_date?: string | null
+  amount_ht_base?: number | null
+  amount_ttc_base?: number | null
   tva_rate: number
   discount_percent?: number
   discount_amount?: number

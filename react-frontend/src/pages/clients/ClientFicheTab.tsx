@@ -6,6 +6,7 @@ import ClientFormModal from '../../components/clients/ClientFormModal'
 import EntityMetaCard from '../../components/module/EntityMetaCard'
 import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
 import { legalFormLabel } from '../../constants/moroccoClient'
+import { currencyName, currencyLabel } from '../../lib/currencies'
 import ClientPortalModulesPanel from '../../components/clients/ClientPortalModulesPanel'
 import type { ClientOutletContext } from './ClientLayout'
 
@@ -37,6 +38,7 @@ const emptyForm = (c: Client): Partial<Client> => ({
   responsable_recouvrement_id: c.responsable_recouvrement_id ?? null,
   lat: c.lat ?? null,
   lng: c.lng ?? null,
+  currency_code: c.currency_code ?? 'MAD',
 })
 
 const INTERNAL_ROLES = ['lab_admin', 'lab_technician', 'lab_manager', 'commercial', 'admin']
@@ -143,6 +145,12 @@ export default function ClientFicheTab() {
           <div><dt>Email</dt><dd>{client.email ?? '—'}</dd></div>
           <div><dt>Téléphone</dt><dd>{client.phone?.trim() ? client.phone : '—'}</dd></div>
           <div><dt>WhatsApp</dt><dd>{client.whatsapp?.trim() ? client.whatsapp : '—'}</dd></div>
+          <div>
+            <dt>Devise</dt>
+            <dd>
+              {currencyName(client.currency_code)} ({currencyLabel(client.currency_code)})
+            </dd>
+          </div>
           <div><dt>Ville</dt><dd>{client.city?.trim() ? client.city : '—'}</dd></div>
           <div><dt>Code postal</dt><dd>{client.postal_code?.trim() ? client.postal_code : '—'}</dd></div>
           <div style={{ gridColumn: '1 / -1' }}>

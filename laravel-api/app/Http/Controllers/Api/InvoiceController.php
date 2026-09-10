@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Mail\InvoiceEmailMailable;
 use App\Models\Agency;
+use App\Models\Client;
 use App\Models\DocumentSequence;
 use App\Models\Invoice;
 use App\Models\InvoiceLine;
@@ -17,6 +18,7 @@ use App\Support\ClientContactDocument;
 use Illuminate\Database\Eloquent\Builder;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\DocumentActivityLogger;
+use App\Services\DocumentCurrencyService;
 use App\Services\InvoiceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,6 +38,7 @@ class InvoiceController extends Controller
         private InvoiceService $invoiceService,
         private DocumentSequenceService $documentSequences,
         private DocumentActivityLogger $documentActivity,
+        private DocumentCurrencyService $documentCurrency,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -331,6 +334,9 @@ class InvoiceController extends Controller
             'meta' => $validated['meta'] ?? null,
         ]);
 
+        $client = Client::query()->findOrFail((int) $validated['client_id']);
+        $this->documentCurrency->applyInvoiceCurrencyOnCreate($invoice, $client);
+
         if (! empty($validated['lines'])) {
             foreach ($validated['lines'] as $line) {
                 $tva = isset($line['tva_rate']) ? (float) $line['tva_rate'] : $tvaRate;
@@ -359,10 +365,12 @@ class InvoiceController extends Controller
                 $tvaRate,
                 $caAnnuelTvaRegime,
             );
-            $invoice->update([
-                'amount_ht' => $validated['amount_ht'],
-                'amount_ttc' => $amountTtc,
-            ]);
+            $this->documentCurrency->syncInvoiceTotals(
+                $invoice,
+                (float) $validated['amount_ht'],
+                $amountTtc,
+                true,
+            );
         }
 
         $fresh = $invoice->fresh();

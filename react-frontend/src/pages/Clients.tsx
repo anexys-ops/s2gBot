@@ -21,6 +21,7 @@ function parseCapital(v: Client['capital_social']): number | undefined {
 }
 
 const emptyForm: Partial<Client> = {
+  currency_code: 'MAD',
   name: '',
   address: '',
   city: '',

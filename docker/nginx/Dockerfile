@@ -10,4 +10,5 @@ RUN npm run build
 
 FROM nginx:1.27-alpine
 COPY --from=frontend /app/dist /usr/share/nginx/html
+COPY docker/nginx/migration.html /usr/share/nginx/html/migration.html
 COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf

@@ -44,7 +44,7 @@ class QuoteEmailMailable extends Mailable
                 'recipientName' => $this->recipientName,
                 'customMessage' => $this->customMessage,
                 'senderName' => $this->senderName,
-                'currencyLabel' => config('app.currency_display', 'DH'),
+                'currencyLabel' => \App\Support\MoneyFormat::currencyLabel($this->quote->currency_code),
                 'brandName' => \App\Support\AppDisplayName::resolve(),
                 'pdfContext' => $presentation->buildContext($this->quote),
                 'letterheadPath' => AppBranding::devisLetterheadAbsolutePath(),

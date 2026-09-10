@@ -323,8 +323,16 @@ export default function Devis() {
                       )}
                       {visible.client !== false && <td>{q.client?.name ?? '—'}</td>}
                       {visible.date !== false && <td>{formatAppDate(q.quote_date)}</td>}
-                      {visible.ht !== false && <td className="data-table__num">{formatMoney(Number(q.amount_ht))}</td>}
-                      {visible.ttc !== false && <td className="data-table__num">{formatMoney(Number(q.amount_ttc))}</td>}
+                      {visible.ht !== false && (
+                        <td className="data-table__num">
+                          {formatMoney(Number(q.amount_ht), q.currency_code ?? q.client?.currency_code)}
+                        </td>
+                      )}
+                      {visible.ttc !== false && (
+                        <td className="data-table__num">
+                          {formatMoney(Number(q.amount_ttc), q.currency_code ?? q.client?.currency_code)}
+                        </td>
+                      )}
                       {visible.travel !== false && (
                         <td className="data-table__num">{formatMoney(Number(q.travel_fee_ht ?? 0))}</td>
                       )}

@@ -23,7 +23,7 @@ class InvoicePdfGenerator
             'template' => $template,
             'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
             'layoutConfig' => $layoutConfig,
-            'currencyLabel' => 'DH',
+            'currencyLabel' => \App\Support\MoneyFormat::currencyLabel($invoice->currency_code),
         ])->render();
 
         $pdf = Pdf::loadHTML($html);

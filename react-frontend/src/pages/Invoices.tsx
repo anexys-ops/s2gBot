@@ -652,10 +652,14 @@ export default function Invoices() {
                         </td>
                       )}
                       {visible.ht !== false && (
-                        <td className="data-table__num">{formatMoney(Number(inv.amount_ht))}</td>
+                        <td className="data-table__num">
+                          {formatMoney(Number(inv.amount_ht), inv.currency_code ?? inv.client?.currency_code)}
+                        </td>
                       )}
                       {visible.ttc !== false && (
-                        <td className="data-table__num">{formatMoney(Number(inv.amount_ttc))}</td>
+                        <td className="data-table__num">
+                          {formatMoney(Number(inv.amount_ttc), inv.currency_code ?? inv.client?.currency_code)}
+                        </td>
                       )}
                       {visible.travel !== false && (
                         <td className="data-table__num">{formatMoney(Number(inv.travel_fee_ht ?? 0))}</td>

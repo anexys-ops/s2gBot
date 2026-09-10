@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { bonsCommandeApi, ordresMissionApi } from '../../api/client'
+import { bonsCommandeApi, ordresMissionApi, type BonCommandeLigne } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import CommercialDocumentActions from '../../components/crm/CommercialDocumentActions'
 import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
@@ -30,6 +30,98 @@ function qtyInputFromApi(q: string | number | null | undefined): string {
   return String(n)
 }
 
+function applyMassQtyToLignes(
+  lignes: BonCommandeLigne[],
+  rawMassQty: string,
+  setQtyEdits: Dispatch<SetStateAction<Record<number, string>>>,
+  onInvalid: () => void,
+  onApplied: () => void,
+) {
+  const raw = rawMassQty.trim()
+  if (!raw || lignes.length === 0) return
+  const qty = Number(raw.replace(',', '.'))
+  if (!Number.isFinite(qty) || qty < 0) {
+    onInvalid()
+    return
+  }
+  onApplied()
+  setQtyEdits((prev) => {
+    const next = { ...prev }
+    for (const l of lignes) {
+      const maxDevis = resolveQuantiteDevis(l)
+      const capped = maxDevis != null && qty > maxDevis ? maxDevis : qty
+      next[l.id] = qtyInputFromApi(capped)
+    }
+    return next
+  })
+}
+
+type BcQtyMassActionsProps = {
+  massQty: string
+  onMassQtyChange: (value: string) => void
+  allCount: number
+  forfaitCount: number
+  onApplyAll: () => void
+  onApplyForfait: () => void
+  className?: string
+}
+
+function BcQtyMassActions({
+  massQty,
+  onMassQtyChange,
+  allCount,
+  forfaitCount,
+  onApplyAll,
+  onApplyForfait,
+  className,
+}: BcQtyMassActionsProps) {
+  const disabled = !massQty.trim()
+
+  return (
+    <div className={`planning-mass-actions bc-fiche__qty-mass${className ? ` ${className}` : ''}`}>
+      <div className="planning-mass-actions__head">
+        <strong className="planning-mass-actions__title">Quantités en masse</strong>
+        <p className="planning-mass-actions__hint text-muted">
+          Saisissez une quantité puis appliquez à toutes les lignes ou aux lignes forfait (plafonnée à la qté
+          devis par ligne) — enregistrez ensuite.
+        </p>
+      </div>
+      <div className="planning-mass-actions__fields bc-fiche__qty-mass-fields">
+        <label className="planning-mass-actions__field">
+          <span>Quantité</span>
+          <input
+            type="number"
+            min={0}
+            step="any"
+            inputMode="decimal"
+            value={massQty}
+            onChange={(e) => onMassQtyChange(e.target.value)}
+            aria-label="Quantité à appliquer en masse"
+          />
+        </label>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm planning-mass-actions__apply"
+          disabled={disabled}
+          onClick={onApplyAll}
+        >
+          Appliquer à toutes les lignes ({allCount})
+        </button>
+        {forfaitCount > 0 ? (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm planning-mass-actions__apply"
+            disabled={disabled}
+            onClick={onApplyForfait}
+          >
+            Appliquer aux lignes forfait ({forfaitCount})
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 export default function BonCommandeFichePage() {
   const { id } = useParams<{ id: string }>()
   const bcId = Number(id)
@@ -43,7 +135,7 @@ export default function BonCommandeFichePage() {
   const [qtyEdits, setQtyEdits] = useState<Record<number, string>>({})
   const [confirmAction, setConfirmAction] = useState<'confirmer' | 'bl' | null>(null)
   const [planningToast, setPlanningToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
-  const [massForfaitQty, setMassForfaitQty] = useState('')
+  const [massQty, setMassQty] = useState('')
 
   const { data: bc, isLoading, error } = useQuery({
     queryKey: ['bon-commande', bcId],
@@ -154,25 +246,14 @@ export default function BonCommandeFichePage() {
 
   const ligneCount = bc?.lignes?.length ?? 0
 
-  function applyMassForfaitQty() {
-    if (!forfaitLignes.length) return
-    const raw = massForfaitQty.trim()
-    if (!raw) return
-    const qty = Number(raw.replace(',', '.'))
-    if (!Number.isFinite(qty) || qty < 0) {
-      setPlanningToast({ message: 'Quantité forfait invalide.', variant: 'error' })
-      return
-    }
-    mutQuantites.reset()
-    setQtyEdits((prev) => {
-      const next = { ...prev }
-      for (const l of forfaitLignes) {
-        const maxDevis = resolveQuantiteDevis(l)
-        const capped = maxDevis != null && qty > maxDevis ? maxDevis : qty
-        next[l.id] = qtyInputFromApi(capped)
-      }
-      return next
-    })
+  function applyMassQty(lignes: BonCommandeLigne[]) {
+    applyMassQtyToLignes(
+      lignes,
+      massQty,
+      setQtyEdits,
+      () => setPlanningToast({ message: 'Quantité en masse invalide.', variant: 'error' }),
+      () => mutQuantites.reset(),
+    )
   }
 
   const devisDisplayMeta = useMemo(() => resolveDevisDisplayMeta(bc), [bc])
@@ -274,6 +355,38 @@ export default function BonCommandeFichePage() {
   const canGenerateBl = lab && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
   const canGenerateOm = lab && isAdmin && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
   const hasBonLivraison = (bc.bons_livraison?.length ?? 0) > 0
+  const canEditQuantites = lab && ligneCount > 0 && bc.statut !== 'annule'
+  const allLignes = bc.lignes ?? []
+
+  function saveQuantites() {
+    setPlanningToast(null)
+    mutQuantites.reset()
+    mutQuantites.mutate(qtyEdits)
+  }
+
+  const qtyMassActions =
+    canEditQuantites ? (
+      <BcQtyMassActions
+        massQty={massQty}
+        onMassQtyChange={setMassQty}
+        allCount={ligneCount}
+        forfaitCount={forfaitLignes.length}
+        onApplyAll={() => applyMassQty(allLignes)}
+        onApplyForfait={() => applyMassQty(forfaitLignes)}
+      />
+    ) : null
+
+  const saveQuantitesButton =
+    canEditQuantites ? (
+      <button
+        type="button"
+        className="btn btn-primary btn-sm"
+        onClick={saveQuantites}
+        disabled={mutQuantites.isPending || !qtyDirty || qtyOverDevis}
+      >
+        {mutQuantites.isPending ? 'Enregistrement…' : 'Enregistrer les quantités'}
+      </button>
+    ) : null
 
   return (
     <ModuleEntityShell
@@ -440,57 +553,11 @@ export default function BonCommandeFichePage() {
                         : null}
                     </p>
                   </div>
-                  {lab && ligneCount > 0 && bc.statut !== 'annule' ? (
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      onClick={() => {
-                        setPlanningToast(null)
-                        mutQuantites.reset()
-                        mutQuantites.mutate(qtyEdits)
-                      }}
-                      disabled={mutQuantites.isPending || !qtyDirty || qtyOverDevis}
-                    >
-                      {mutQuantites.isPending ? 'Enregistrement…' : 'Enregistrer les quantités'}
-                    </button>
-                  ) : null}
+                  {saveQuantitesButton}
                 </div>
               </div>
 
-              {lab && ligneCount > 0 && bc.statut !== 'annule' && forfaitLignes.length > 0 ? (
-                <div className="planning-mass-actions bc-fiche__qty-mass">
-                  <div className="planning-mass-actions__head">
-                    <strong className="planning-mass-actions__title">
-                      Quantités forfait ({forfaitLignes.length} ligne{forfaitLignes.length > 1 ? 's' : ''})
-                    </strong>
-                    <p className="planning-mass-actions__hint text-muted">
-                      Saisissez une quantité puis appliquez aux lignes forfait (plafonnée à la qté devis par ligne) — enregistrez ensuite.
-                    </p>
-                  </div>
-                  <div className="planning-mass-actions__fields">
-                    <label className="planning-mass-actions__field">
-                      <span>Quantité</span>
-                      <input
-                        type="number"
-                        min={0}
-                        step="any"
-                        inputMode="decimal"
-                        value={massForfaitQty}
-                        onChange={(e) => setMassForfaitQty(e.target.value)}
-                        aria-label="Quantité à appliquer aux lignes forfait"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm planning-mass-actions__apply"
-                      disabled={!massForfaitQty.trim()}
-                      onClick={applyMassForfaitQty}
-                    >
-                      Appliquer aux lignes forfait
-                    </button>
-                  </div>
-                </div>
-              ) : null}
+              {qtyMassActions}
 
               {ligneCount === 0 ? (
                 <p className="dossier-tab-empty">Aucune ligne sur ce bon de commande.</p>
@@ -617,6 +684,12 @@ export default function BonCommandeFichePage() {
                   </table>
                 </div>
               )}
+              {canEditQuantites ? (
+                <div className="bc-fiche__qty-footer">
+                  {qtyMassActions}
+                  <div className="bc-fiche__qty-footer-save">{saveQuantitesButton}</div>
+                </div>
+              ) : null}
               {qtyOverDevis ? (
                 <p className="error bc-fiche__qty-error" role="alert">
                   Une ou plusieurs quantités dépassent le plafond du devis.

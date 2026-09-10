@@ -18,7 +18,9 @@ use App\Models\User;
 use App\Models\DocumentSequence;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\DocumentActivityLogger;
+use App\Services\DocumentCurrencyService;
 use App\Services\QuotePricingService;
+use App\Models\Client;
 use App\Services\DocumentSequenceService;
 use App\Services\DocumentStatusService;
 use App\Support\ActivityChangeTracker;
@@ -40,6 +42,7 @@ class QuoteController extends Controller
     public function __construct(
         private readonly DocumentSequenceService $documentSequences,
         private readonly DocumentActivityLogger $documentActivity,
+        private readonly DocumentCurrencyService $documentCurrency,
     ) {}
 
     private const QUOTE_LINE_BASE = [
@@ -210,6 +213,9 @@ class QuoteController extends Controller
             'notes' => $validated['notes'] ?? null,
             'meta' => $validated['meta'] ?? null,
         ]);
+
+        $client = Client::query()->findOrFail($cid);
+        $this->documentCurrency->applyQuoteCurrencyOnCreate($quote, $client);
 
         $this->syncQuoteLines($quote, $validated['lines'], (float) $defaultTva);
         $this->recalculateQuoteTotals($quote);
@@ -664,10 +670,13 @@ class QuoteController extends Controller
             $caAnnuelTvaRegime,
         );
 
-        $quote->update([
-            'amount_ht' => $totals['amount_ht'],
-            'amount_ttc' => $totals['amount_ttc'],
-        ]);
+        $refreshRate = $quote->status === Quote::STATUS_DRAFT;
+        $this->documentCurrency->syncQuoteTotals(
+            $quote,
+            (float) $totals['amount_ht'],
+            (float) $totals['amount_ttc'],
+            $refreshRate,
+        );
     }
 
     /**

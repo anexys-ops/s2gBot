@@ -14,7 +14,7 @@ class BonLivraisonPdfGenerator
      */
     public function generate(BonLivraison $bonLivraison, ?int $requestTemplateId = null): array
     {
-        $bonLivraison->loadMissing(['client', 'bonCommande', 'lignes.bonCommandeLigne']);
+        $bonLivraison->loadMissing(['client', 'bonCommande.quote', 'lignes.bonCommandeLigne']);
 
         $template = PdfTemplateResolver::resolve('delivery_note', $requestTemplateId, null);
         $layoutConfig = PdfTemplateResolver::layoutConfig($template);
@@ -25,7 +25,7 @@ class BonLivraisonPdfGenerator
             'template' => $template,
             'layoutConfig' => $layoutConfig,
             'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
-            'currencyLabel' => 'DH',
+            'currencyLabel' => \App\Support\MoneyFormat::currencyLabel($bonLivraison->bonCommande?->quote?->currency_code),
         ])->render();
 
         $pdf = Pdf::loadHTML($html);

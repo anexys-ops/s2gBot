@@ -38,7 +38,7 @@ class BonCommandePdfGenerator
             'template' => $template,
             'layoutConfig' => $layoutConfig,
             'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
-            'currencyLabel' => 'DH',
+            'currencyLabel' => \App\Support\MoneyFormat::currencyLabel($bonCommande->quote?->currency_code),
             'pdfContext' => $isDossierRecap ? $this->presentation->buildContext($bonCommande) : [],
         ])->render();
 

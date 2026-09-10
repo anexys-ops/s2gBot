@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react'
 import type { Client } from '../../api/client'
+import { SUPPORTED_CURRENCIES } from '../../lib/currencies'
 import Modal from '../Modal'
 import ClientMoroccoFormFields from './ClientMoroccoFormFields'
 
@@ -86,6 +87,22 @@ export default function ClientFormModal({
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                   placeholder="contact@entreprise.ma"
                 />
+              </div>
+              <div className="form-group client-form-modal__field">
+                <label>Devise des documents</label>
+                <select
+                  value={form.currency_code ?? 'MAD'}
+                  onChange={(e) => setForm((f) => ({ ...f, currency_code: e.target.value }))}
+                >
+                  {SUPPORTED_CURRENCIES.map((currency) => (
+                    <option key={currency.code} value={currency.code}>
+                      {currency.name} ({currency.label})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-muted" style={{ margin: '0.35rem 0 0', fontSize: '0.85rem' }}>
+                  Devis, factures et PDF seront exprimés dans cette devise.
+                </p>
               </div>
             </div>
           </section>

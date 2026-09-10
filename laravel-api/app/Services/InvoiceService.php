@@ -7,6 +7,7 @@ use App\Models\BonCommande;
 use App\Models\DocumentSequence;
 use App\Models\Invoice;
 use App\Models\InvoiceLine;
+use App\Models\Client;
 use App\Models\ModuleSetting;
 use App\Models\Order;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,7 +15,8 @@ use Illuminate\Database\Eloquent\Builder;
 class InvoiceService
 {
     public function __construct(
-        private readonly DocumentSequenceService $documentSequences
+        private readonly DocumentSequenceService $documentSequences,
+        private readonly DocumentCurrencyService $documentCurrency,
     ) {}
 
     public function fromOrders(array $orderIds, ?int $clientId = null): Invoice
@@ -95,6 +97,8 @@ class InvoiceService
             }
         }
 
+        $client = Client::query()->findOrFail($clientId);
+        $this->documentCurrency->applyInvoiceCurrencyOnCreate($invoice, $client);
         $this->recalculateTotals($invoice);
 
         return $invoice->load(['client', 'orders', 'invoiceLines']);
@@ -182,6 +186,9 @@ class InvoiceService
 
         $hqId = Agency::query()->where('client_id', $clientId)->where('is_headquarters', true)->value('id');
 
+        $sourceCurrency = $first->quote?->currency_code;
+        $client = Client::query()->findOrFail($clientId);
+
         $invoice = Invoice::create([
             'number' => $this->documentSequences->next(DocumentSequence::TYPE_FACTURE),
             'client_id' => $clientId,
@@ -201,6 +208,8 @@ class InvoiceService
             'travel_fee_tva_rate' => 20,
             'status' => Invoice::STATUS_DRAFT,
         ]);
+
+        $this->documentCurrency->applyInvoiceCurrencyOnCreate($invoice, $client, $sourceCurrency);
 
         $invoice->bonsCommande()->attach($bcs->pluck('id'));
 
@@ -263,9 +272,12 @@ class InvoiceService
             $caAnnuelTvaRegime,
         );
 
-        $invoice->update([
-            'amount_ht' => $totals['amount_ht'],
-            'amount_ttc' => $totals['amount_ttc'],
-        ]);
+        $refreshRate = $invoice->status === Invoice::STATUS_DRAFT;
+        $this->documentCurrency->syncInvoiceTotals(
+            $invoice,
+            (float) $totals['amount_ht'],
+            (float) $totals['amount_ttc'],
+            $refreshRate,
+        );
     }
 }

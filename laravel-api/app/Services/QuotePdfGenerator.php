@@ -47,7 +47,7 @@ class QuotePdfGenerator
             'pdfContext' => $pdfContext,
             'itemRows' => $itemRows,
             'amountInWords' => $amountInWords,
-            'currencyLabel' => 'DH',
+            'currencyLabel' => \App\Support\MoneyFormat::currencyLabel($quote->currency_code),
         ])->render();
 
         $pdf = Pdf::loadHTML($html);

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fxRatesApi, moduleSettingsApi } from '../../api/client'
 import { formatAppDateTime } from '../../lib/appLocale'
-import { CORE_CURRENCIES, type CurrencyRow } from '../../lib/currencies'
+import { CORE_CURRENCIES } from '../../lib/currencies'
 
 type ExtraCurrency = { code: string; label: string; name: string }
 

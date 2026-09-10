@@ -18,7 +18,7 @@ import {
 } from '../../api/client'
 import Modal from '../../components/Modal'
 import { useAuth } from '../../contexts/AuthContext'
-import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import { formatMoney, MONEY_UNIT_LABEL, todayLocalDateInput } from '../../lib/appLocale'
 import { DEFAULT_EXPENSE_TAUX_KM, userExpenseBareme } from '../../lib/expenseBareme'
 
 function computeKmAmount(distanceKm: number, tauxKm: number): number {
@@ -51,7 +51,7 @@ export default function ExpenseLineModal({ reportId, initial, onClose, onSaved }
     category:       (initial?.category ?? 'Repas') as ExpenseCategory,
     amount:         initial?.amount ?? 0,
     payment_method: (initial?.payment_method ?? '') as ExpensePaymentMethod | '',
-    date:           initial?.date ?? new Date().toISOString().slice(0, 10),
+    date:           initial?.date ?? todayLocalDateInput(),
     description:    initial?.description ?? '',
     lieu_depart:    initial?.lieu_depart ?? '',
     lieu_arrivee:   initial?.lieu_arrivee ?? '',

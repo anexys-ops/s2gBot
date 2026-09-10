@@ -7,10 +7,10 @@ import PlanningMassActionsBar from '../../components/planning/PlanningMassAction
 import ErrorAlert from '../../components/errors/ErrorAlert'
 import { toggleAllSelection } from '../../lib/planningMassApply'
 import { formatTechnicienOption } from '../../lib/userRolePresentation'
-import { dateInputFromApi } from '../../lib/appLocale'
+import { dateInputFromApi, toLocalDateInput } from '../../lib/appLocale'
 
 function toYmd(d: Date): string {
-  return d.toISOString().slice(0, 10)
+  return toLocalDateInput(d)
 }
 
 function addDays(d: Date, n: number): string {

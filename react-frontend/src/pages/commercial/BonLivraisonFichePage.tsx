@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { bonsLivraisonApi } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import { QuotePdfButton } from '../../components/crm/QuoteListTableActions'
 import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
 import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
 import StatusBadge, { bonLivraisonStatutBadgeProps } from '../../components/ds/StatusBadge'
@@ -260,9 +261,7 @@ export default function BonLivraisonFichePage() {
       actions={
         lab && canEdit ? (
           <div className="bc-fiche__header-actions">
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPdfOpen(true)}>
-              PDF
-            </button>
+            <QuotePdfButton onClick={() => setPdfOpen(true)} />
             <button
               type="button"
               className="btn btn-primary btn-sm"

@@ -15,6 +15,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
 import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
+import { formatAppDate } from '../../lib/appLocale'
 
 const STATUT_LABELS: Record<DossierStatut, string> = {
   brouillon: 'Brouillon',
@@ -432,7 +433,7 @@ export default function DossiersListPage({ mode = 'staff' }: DossiersListPagePro
                       </td>
                     )}
                     {visible.dateDebut !== false && (
-                      <td>{d.date_debut ? new Date(d.date_debut).toLocaleDateString('fr-FR') : '—'}</td>
+                      <td>{d.date_debut ? formatAppDate(d.date_debut) : '—'}</td>
                     )}
                     {isLab && visible.actions !== false && (
                       <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>

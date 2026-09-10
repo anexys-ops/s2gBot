@@ -124,7 +124,7 @@ export default function PdfModule() {
           disabled={!resourceId || type === 'purchase_order' || type === 'delivery_note'}
           onClick={() => setPickerOpen(true)}
         >
-          Choisir le modèle et télécharger
+          Choisir le modèle et visualiser
         </button>
       </div>
 

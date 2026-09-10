@@ -14,6 +14,7 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import StatusChangeModal from '../../components/StatusChangeModal'
 import { useAuth } from '../../contexts/AuthContext'
 import { ordreMissionBonCommande, ordreMissionQuote } from '../../lib/ordreMissionDisplay'
+import { formatAppDate } from '../../lib/appLocale'
 
 const TYPE_ORDER = ['technicien', 'labo', 'ingenieur'] as const
 type OmType = (typeof TYPE_ORDER)[number]
@@ -322,7 +323,7 @@ export default function OrdresMissionPage() {
                         </StatusBadge>
                       )}
                     </td>
-                    <td>{om.date_prevue ? new Date(om.date_prevue).toLocaleDateString('fr-FR') : '—'}</td>
+                    <td>{om.date_prevue ? formatAppDate(om.date_prevue) : '—'}</td>
                     <td>{om.responsable?.name ?? '—'}</td>
                     <td>
                       <div className="crud-actions">

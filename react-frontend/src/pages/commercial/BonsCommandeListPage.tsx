@@ -12,7 +12,8 @@ import {
   BonCommandeRowActionCells,
   BonCommandeRowActionHeaders,
 } from '../../components/crm/BonCommandeListTableActions'
-import { QuotePdfButton } from '../../components/crm/QuoteListTableActions'
+import { IconEye, QuotePdfButton } from '../../components/crm/QuoteListTableActions'
+import TableIconHeader from '../../components/TableIconHeader'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import ClickableStatusBadge from '../../components/ds/ClickableStatusBadge'
 import StatusBadge, { bonCommandeStatutBadgeProps, quoteStatutBadgeProps } from '../../components/ds/StatusBadge'
@@ -473,7 +474,11 @@ export default function BonsCommandeListPage() {
                   {visible.status !== false && <th>Statut</th>}
                   {isLab && visible.bl !== false && <th className="data-table__num">BL</th>}
                   {isLab && visible.invoices !== false && <th className="data-table__num">Factures</th>}
-                  {isLab && visible.pdf !== false && <th className="data-table__pdf">PDF</th>}
+                  {isLab && visible.pdf !== false && (
+                    <th className="data-table__pdf">
+                      <TableIconHeader icon={<IconEye />} label="Voir le PDF" />
+                    </th>
+                  )}
                   {isLab && visible.actions !== false && <BonCommandeRowActionHeaders />}
                 </tr>
               </thead>
@@ -576,10 +581,7 @@ export default function BonsCommandeListPage() {
                       )}
                       {isLab && visible.pdf !== false && (
                         <td className="data-table__pdf">
-                          <QuotePdfButton
-                            label="Télécharger le PDF"
-                            onClick={() => setPdfTarget(bc)}
-                          />
+                          <QuotePdfButton onClick={() => setPdfTarget(bc)} />
                         </td>
                       )}
                       {isLab && visible.actions !== false ? (

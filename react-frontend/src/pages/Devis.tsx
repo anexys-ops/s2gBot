@@ -2,7 +2,13 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { quotesApi, type EntityMetaPayload, type Quote } from '../api/client'
-import { QuotePdfButton, QuoteRowActionCells, QuoteRowActionHeaders } from '../components/crm/QuoteListTableActions'
+import {
+  IconEye,
+  QuotePdfButton,
+  QuoteRowActionCells,
+  QuoteRowActionHeaders,
+} from '../components/crm/QuoteListTableActions'
+import TableIconHeader from '../components/TableIconHeader'
 import DocumentPdfPickerModal from '../components/pdf/DocumentPdfPickerModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ClickableStatusBadge from '../components/ds/ClickableStatusBadge'
@@ -294,7 +300,11 @@ export default function Devis() {
                   {isLab && visible.bc !== false && <th className="data-table__code">BC</th>}
                   {isLab && visible.bl !== false && <th className="data-table__num">BL</th>}
                   {isLab && visible.invoices !== false && <th className="data-table__num">Factures</th>}
-                  {isLab && visible.pdf !== false && <th className="data-table__pdf">PDF</th>}
+                  {isLab && visible.pdf !== false && (
+                    <th className="data-table__pdf">
+                      <TableIconHeader icon={<IconEye />} label="Voir le PDF" />
+                    </th>
+                  )}
                   {isLab && visible.actions !== false && <QuoteRowActionHeaders />}
                 </tr>
               </thead>

@@ -18,6 +18,7 @@ import {
 import ListTableToolbar, { PaginationBar } from '../../components/ListTableToolbar'
 import TableRowActions from '../../components/TableRowActions'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import { QuotePdfButton } from '../../components/crm/QuoteListTableActions'
 import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
 import ExpenseLineModal from './ExpenseLineModal'
 import NdfSendEmailModal from './NdfSendEmailModal'
@@ -409,7 +410,7 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
       actions={
         <div className="ndf-toolbar-actions ndf-no-print">
           <button type="button" className="btn btn-secondary btn-sm" onClick={onBack}>← Liste</button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPdfOpen(true)}>🖨 Imprimer PDF</button>
+          <QuotePdfButton onClick={() => setPdfOpen(true)} />
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEmailOpen(true)}>✉ Envoyer par mail</button>
         </div>
       }

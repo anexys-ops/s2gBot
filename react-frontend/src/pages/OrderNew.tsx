@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import PageBackNav from '../components/PageBackNav'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ordersApi, clientsApi, sitesApi, testTypesApi } from '../api/client'
+import { todayLocalDateInput } from '../lib/appLocale'
 
 interface OrderItemRow {
   test_type_id: number
@@ -14,7 +15,7 @@ export default function OrderNew() {
   const queryClient = useQueryClient()
   const [clientId, setClientId] = useState<number | ''>('')
   const [siteId, setSiteId] = useState<number | ''>('')
-  const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10))
+  const [orderDate, setOrderDate] = useState(todayLocalDateInput())
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<OrderItemRow[]>(() =>
     Array.from({ length: 5 }, () => ({ test_type_id: 0, quantity: 1 })),

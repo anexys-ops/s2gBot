@@ -2,261 +2,266 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Récap dossier — BC {{ $bonCommande->numero }}</title>
+    <title>Récap dossier — {{ $bonCommande->numero }}</title>
     <style>
-        @page { size: A4 portrait; margin: 12mm 14mm 14mm; }
+        @page { size: A4 portrait; margin: 10mm 12mm 12mm; }
         body {
             font-family: DejaVu Sans, sans-serif;
-            font-size: 9.5pt;
-            color: #111;
+            font-size: 9pt;
+            color: #000;
             margin: 0;
             padding: 0;
-        }
-        h1 { font-size: 14pt; margin: 0 0 4px; color: #1c3a6e; }
-        h2 {
-            font-size: 10pt;
-            margin: 0 0 8px;
-            color: #1c3a6e;
-            border-bottom: 1px solid #c0c0c0;
-            padding-bottom: 4px;
-        }
-        .meta { margin: 3px 0; color: #444; }
-        .section {
-            margin-bottom: 14px;
-            padding: 10px 12px;
-            border: 1px solid #d8d8d8;
-            background: #fafafa;
+            line-height: 1.35;
         }
         table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #333; padding: 5px 6px; text-align: left; vertical-align: top; }
-        th { background: #eee; font-size: 9pt; }
-        .info-grid { width: 100%; border-collapse: collapse; }
-        .info-grid td {
-            border: none;
-            padding: 2px 0;
+        th, td {
+            border: 1px solid #000;
+            padding: 4px 6px;
             vertical-align: top;
+            text-align: left;
         }
-        .info-grid td:first-child {
+        .form-meta {
+            text-align: right;
+            font-size: 8.5pt;
+            margin-bottom: 8px;
+        }
+        .form-title {
+            text-align: center;
+            font-size: 12pt;
             font-weight: bold;
-            white-space: nowrap;
-            width: 1%;
-            padding-right: 10px;
-            color: #333;
+            margin: 0 0 12px;
         }
-        .text-right { text-align: right; }
-        .subtitle { font-size: 10pt; color: #555; margin-bottom: 12px; }
+        .section-title {
+            font-weight: bold;
+            margin: 10px 0 4px;
+        }
+        .label-row td:first-child {
+            width: 18%;
+            font-weight: bold;
+            background: #f5f5f5;
+        }
+        .checkbox-grid td {
+            width: 25%;
+            border: 1px solid #000;
+            padding: 4px 6px;
+        }
+        .checkbox {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border: 1px solid #000;
+            margin-right: 5px;
+            text-align: center;
+            line-height: 10px;
+            font-size: 8pt;
+            vertical-align: middle;
+        }
+        .checkbox.checked::after {
+            content: 'X';
+            font-weight: bold;
+        }
+        .dotted {
+            border-bottom: 1px dotted #666;
+            min-height: 14px;
+            margin: 4px 0;
+        }
+        .signature-row td {
+            padding-top: 10px;
+        }
+        .muted { color: #444; }
+        .nowrap { white-space: nowrap; }
     </style>
 </head>
 <body>
 @php
-    extract(\App\Support\AppBranding::commercialLayoutViewVars($layoutConfig ?? []));
     $ctx = $pdfContext ?? [];
+    $form = is_array($ctx['form'] ?? null) ? $ctx['form'] : [];
     $client = is_array($ctx['client'] ?? null) ? $ctx['client'] : [];
+    $contact = is_array($ctx['contact'] ?? null) ? $ctx['contact'] : [];
     $dossier = is_array($ctx['dossier'] ?? null) ? $ctx['dossier'] : [];
-    $site = is_array($ctx['site'] ?? null) ? $ctx['site'] : [];
-    $dossierContacts = is_array($ctx['dossier_contacts'] ?? null) ? $ctx['dossier_contacts'] : [];
-    $currencyLabel = $currencyLabel ?? 'DH';
-    $fmt = fn ($n) => number_format((float) $n, 2, ',', ' ');
+    $projet = is_array($ctx['projet'] ?? null) ? $ctx['projet'] : [];
+    $devis = is_array($ctx['devis'] ?? null) ? $ctx['devis'] : [];
+    $documents = is_array($ctx['documents'] ?? null) ? $ctx['documents'] : [];
+    $prestationTypes = is_array($ctx['prestation_types'] ?? null) ? $ctx['prestation_types'] : [];
+    $priorite = $ctx['priorite'] ?? null;
+    $instructions = trim((string) ($ctx['instructions'] ?? ''));
+    $etabliPar = trim((string) ($ctx['etabli_par'] ?? ''));
+    $dossierRef = $dossier['reference'] ?? $bonCommande->dossier?->reference ?? $bonCommande->numero;
+    $clientAddress = $client['address_line'] ?? null;
+    if (!$clientAddress && !empty($client['code'])) {
+        $clientAddress = 'Code '.$client['code'];
+    }
 @endphp
 
-@include('pdf.partials.branding-header', ['layoutConfig' => $layoutConfig ?? [], 'brandingLogoDataUri' => $brandingLogoDataUri ?? null])
-
-<h1>Récapitulatif dossier</h1>
-<p class="subtitle">
-    Bon de commande n° <strong>{{ $bonCommande->numero }}</strong>
-    @if(!empty($ctx['bc_statut_label']))
-        — {{ $ctx['bc_statut_label'] }}
-    @endif
-    @if($bonCommande->date_commande)
-        — {{ $bonCommande->date_commande->format('d/m/Y') }}
-    @endif
-</p>
-
-<div class="section">
-    <h2>Client</h2>
-    <table class="info-grid">
-        @if(!empty($client['name']))
-        <tr><td>Raison sociale</td><td>{{ $client['name'] }}</td></tr>
-        @endif
-        @if(!empty($client['address_line']))
-        <tr><td>Adresse</td><td>{{ $client['address_line'] }}</td></tr>
-        @endif
-        @if(!empty($client['ice']))
-        <tr><td>ICE</td><td>{{ $client['ice'] }}</td></tr>
-        @endif
-        @if(!empty($client['rc']))
-        <tr><td>RC</td><td>{{ $client['rc'] }}</td></tr>
-        @endif
-        @if(!empty($client['siret']))
-        <tr><td>SIRET</td><td>{{ $client['siret'] }}</td></tr>
-        @endif
-        @if(!empty($client['email']))
-        <tr><td>Email</td><td>{{ $client['email'] }}</td></tr>
-        @endif
-        @if(!empty($client['phone']))
-        <tr><td>Téléphone</td><td>{{ $client['phone'] }}</td></tr>
-        @endif
-        @if(!empty($client['contact_name']))
-        <tr>
-            <td>Contact BC</td>
-            <td>
-                {{ $client['contact_name'] }}
-                @if(!empty($client['contact_role'])) — {{ $client['contact_role'] }} @endif
-                @if(!empty($client['contact_email']))<br>{{ $client['contact_email'] }}@endif
-                @if(!empty($client['contact_phone']))<br>{{ $client['contact_phone'] }}@endif
-            </td>
-        </tr>
-        @endif
-    </table>
+<div class="form-meta">
+    {{ $form['reference'] ?? 'En-M-05-12' }}v /v : {{ $form['version'] ?? '02' }}<br>
+    Màj:{{ $form['maj_date'] ?? '26/12/2024' }}
 </div>
 
-<div class="section">
-    <h2>Dossier</h2>
-    <table class="info-grid">
-        @if(!empty($dossier['reference']) || !empty($dossier['titre']))
-        <tr>
-            <td>Référence</td>
-            <td>
-                {{ $dossier['reference'] ?? '—' }}
-                @if(!empty($dossier['titre'])) — {{ $dossier['titre'] }} @endif
-            </td>
-        </tr>
+<h1 class="form-title">Dossier N° : {{ $dossierRef }}</h1>
+
+<div class="section-title">1. Information générales sur le client :</div>
+<table>
+    <tr>
+        <th>Nom du client</th>
+        <th>Adresse</th>
+    </tr>
+    <tr>
+        <td>{{ $client['name'] ?? '—' }}</td>
+        <td>{{ $clientAddress ?? '—' }}</td>
+    </tr>
+</table>
+
+<table style="margin-top: 6px;">
+    <tr>
+        <td colspan="2"><strong>Contact principale :</strong></td>
+    </tr>
+    <tr class="label-row">
+        <td>Nom :</td>
+        <td>E-mail :</td>
+    </tr>
+    <tr>
+        <td>{{ $contact['name'] ?? '—' }}</td>
+        <td>{{ $contact['email'] ?? '—' }}</td>
+    </tr>
+    <tr class="label-row">
+        <td>GSM :</td>
+        <td>Fixe :</td>
+    </tr>
+    <tr>
+        <td>{{ $contact['gsm'] ?? '—' }}</td>
+        <td>{{ $contact['fixe'] ?? '—' }}</td>
+    </tr>
+</table>
+
+<div class="section-title">2. Informations sur le projet :</div>
+<table>
+    <tr class="label-row">
+        <td>Projet :</td>
+        <td>{{ $projet['description'] ?? ($dossier['titre'] ?? '—') }}</td>
+    </tr>
+    <tr class="label-row">
+        <td>Entreprise/MO :</td>
+        <td>
+            {{ $projet['entreprise_mo'] ?? '—' }}
+            @if(!empty($projet['code']))
+                <span class="nowrap"> — Code : {{ $projet['code'] }}</span>
+            @endif
+        </td>
+    </tr>
+</table>
+
+<div style="margin-top: 6px;"><strong>Type de prestations</strong></div>
+<table class="checkbox-grid">
+    @foreach(array_chunk($prestationTypes, 2) as $row)
+    <tr>
+        @foreach($row as $type)
+        <td>
+            <span class="checkbox {{ !empty($type['checked']) ? 'checked' : '' }}"></span>
+            {{ $type['label'] ?? '' }}
+        </td>
+        @endforeach
+        @if(count($row) === 1)
+        <td></td>
         @endif
-        @if($showAffaire && !empty($ctx['affaire']))
-        <tr><td>Affaire</td><td>{{ $ctx['affaire'] }}</td></tr>
-        @endif
-        @if(!empty($dossier['statut_label']))
-        <tr><td>Statut dossier</td><td>{{ $dossier['statut_label'] }}</td></tr>
-        @endif
-        @if(!empty($site['name']))
-        <tr>
-            <td>Chantier</td>
-            <td>
-                {{ $site['name'] }}
-                @if(!empty($site['reference'])) ({{ $site['reference'] }}) @endif
-                @if(!empty($site['address']))<br>{{ $site['address'] }}@endif
-            </td>
-        </tr>
-        @endif
-        @if(!empty($dossier['mission']))
-        <tr><td>Mission</td><td>{{ $dossier['mission'] }}</td></tr>
-        @endif
-        @if(!empty($dossier['date_debut']) || !empty($dossier['date_fin_prevue']))
-        <tr>
-            <td>Calendrier</td>
-            <td>
-                @if(!empty($dossier['date_debut']))Début : {{ $dossier['date_debut'] }}@endif
-                @if(!empty($dossier['date_fin_prevue']))
-                    @if(!empty($dossier['date_debut'])) — @endif
-                    Fin prévue : {{ $dossier['date_fin_prevue'] }}
-                @endif
-            </td>
-        </tr>
-        @endif
-        @if(!empty($dossier['maitre_ouvrage']))
-        <tr><td>Maître d'ouvrage</td><td>{{ $dossier['maitre_ouvrage'] }}</td></tr>
-        @endif
-        @if(!empty($dossier['entreprise_chantier']))
-        <tr><td>Entreprise chantier</td><td>{{ $dossier['entreprise_chantier'] }}</td></tr>
-        @endif
-        @if(!empty($dossier['notes']))
-        <tr><td>Notes dossier</td><td>{{ $dossier['notes'] }}</td></tr>
-        @endif
-    </table>
+    </tr>
+    @endforeach
+</table>
+
+<div class="section-title">3. Détail du dossier</div>
+<table>
+    <tr>
+        <th>Devis N°</th>
+        <th>Etablie par :</th>
+        <th>Date :</th>
+        <th>Date BCC :</th>
+    </tr>
+    <tr>
+        <td>{{ $devis['number'] ?? '—' }}</td>
+        <td>{{ $devis['etabli_par'] ?? $etabliPar ?: '—' }}</td>
+        <td>{{ $devis['date'] ?? '—' }}</td>
+        <td>{{ $devis['date_bcc'] ?? '—' }}</td>
+    </tr>
+</table>
+
+<table style="margin-top: 6px;">
+    <tr>
+        <td colspan="4"><strong>Documents inclus dans le dossier :</strong></td>
+    </tr>
+    <tr>
+        <td><span class="checkbox {{ !empty($documents['plans']) ? 'checked' : '' }}"></span> Plans</td>
+        <td><span class="checkbox {{ !empty($documents['preliminaires']) ? 'checked' : '' }}"></span> Documents préliminaires</td>
+        <td colspan="2"><span class="checkbox {{ !empty($documents['cahier_charges']) ? 'checked' : '' }}"></span> Cahier des charges / Tdr</td>
+    </tr>
+    <tr>
+        <td colspan="4">
+            Autres :
+            @if(!empty($documents['autres']))
+                {{ $documents['autres'] }}
+            @else
+                .....................................................................
+            @endif
+        </td>
+    </tr>
+</table>
+
+<div style="margin-top: 8px;">
+    <strong>Priorité et délai :</strong>
+    Urgence :
+    <span class="checkbox {{ $priorite === 'normale' ? 'checked' : '' }}"></span> Normale
+    <span class="checkbox {{ $priorite === 'prioritaire' ? 'checked' : '' }}"></span> Prioritaire
+    <span class="checkbox {{ $priorite === 'tres_urgente' ? 'checked' : '' }}"></span> Très urgente
 </div>
 
-@if($dossierContacts !== [])
-<div class="section">
-    <h2>Contacts chantier</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Nom</th>
-                <th>Rôle</th>
-                <th>Email</th>
-                <th>Téléphone</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($dossierContacts as $contact)
-            <tr>
-                <td>{{ $contact['name'] ?? '—' }}</td>
-                <td>{{ $contact['role'] ?? '—' }}</td>
-                <td>{{ $contact['email'] ?? '—' }}</td>
-                <td>{{ $contact['phone'] ?? '—' }}</td>
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
-</div>
+<div style="margin-top: 8px;"><strong>Observation ou instructions spécifiques :</strong></div>
+@if($instructions !== '')
+    <div style="margin-top: 4px;">{{ $instructions }}</div>
+@else
+    <div class="dotted"></div>
+    <div class="dotted"></div>
 @endif
 
-<div class="section">
-    <h2>Commande</h2>
-    @if($showLinkedQuote && $bonCommande->quote)
-    <p class="meta">Devis source : {{ $bonCommande->quote->number }}</p>
-    @endif
-    @if($bonCommande->date_livraison_prevue)
-    <p class="meta">Livraison prévue : {{ $bonCommande->date_livraison_prevue->format('d/m/Y') }}</p>
-    @endif
-    @if(trim((string) ($bonCommande->notes ?? '')) !== '')
-    <p class="meta">Notes BC : {{ $bonCommande->notes }}</p>
-    @endif
+<table style="margin-top: 10px;" class="signature-row">
+    <tr>
+        <td colspan="3"><strong>Réception Service Technique</strong></td>
+    </tr>
+    <tr>
+        <td>Nom: ___________________________</td>
+        <td>Visa : _______________________</td>
+        <td>Date : ___________________</td>
+    </tr>
+</table>
 
-    <table style="margin-top: 10px;">
-        <thead>
-            <tr>
-                @if($showDesignation || $showArticleCode)
-                <th>Désignation</th>
-                @endif
-                @if($showQuantity)
-                <th>Qté</th>
-                @endif
-                @if($showPuPtCols)
-                <th>PU HT</th>
-                <th class="text-right">Total HT</th>
-                @endif
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($bonCommande->lignes as $ligne)
-            @php
-                $articleCode = trim((string) ($ligne->article?->code ?? $ligne->article?->s2g_code ?? ''));
-                $lineParts = [];
-                if ($showArticleCode && $articleCode !== '') { $lineParts[] = $articleCode; }
-                if ($showDesignation && !empty($ligne->libelle)) { $lineParts[] = $ligne->libelle; }
-                $lineLabel = $lineParts !== [] ? implode(' — ', $lineParts) : '—';
-            @endphp
-            <tr>
-                @if($showDesignation || $showArticleCode)
-                <td>{{ $lineLabel }}</td>
-                @endif
-                @if($showQuantity)
-                <td>{{ $ligne->quantite }}</td>
-                @endif
-                @if($showPuPtCols)
-                <td>{{ $fmt($ligne->prix_unitaire_ht ?? 0) }} {{ $currencyLabel }}</td>
-                <td class="text-right">{{ $fmt($ligne->montant_ht ?? 0) }} {{ $currencyLabel }}</td>
-                @endif
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
+<div class="section-title">4. Affectation interne :</div>
+<table>
+    <tr>
+        <th>Responsable dossier</th>
+        <th>Date d'affectation</th>
+        <th>Heure</th>
+    </tr>
+    <tr>
+        <td>&nbsp;</td>
+        <td>&nbsp;</td>
+        <td>&nbsp;</td>
+    </tr>
+</table>
 
-    @if($showTotalHt || $showTotalTva || $showTotalTtc)
-    <div style="margin-top: 14px; text-align: right;">
-        @if($showTotalHt)
-        <p>Total HT : {{ $fmt($bonCommande->montant_ht ?? 0) }} {{ $currencyLabel }}</p>
-        @endif
-        @if($showTotalTva)
-        @php $tva = max(0, (float) ($bonCommande->montant_ttc ?? 0) - (float) ($bonCommande->montant_ht ?? 0)); @endphp
-        <p>TVA : {{ $fmt($tva) }} {{ $currencyLabel }}</p>
-        @endif
-        @if($showTotalTtc)
-        <p><strong>Total TTC : {{ $fmt($bonCommande->montant_ttc ?? 0) }} {{ $currencyLabel }}</strong></p>
-        @endif
-    </div>
-    @endif
-</div>
+<table style="margin-top: 6px;">
+    <tr class="label-row">
+        <td>Nom:</td>
+        <td>&nbsp;</td>
+    </tr>
+    <tr class="label-row">
+        <td>Fonction :</td>
+        <td>&nbsp;</td>
+    </tr>
+    <tr>
+        <td colspan="2">Délai de traitement souhaité : _________________________</td>
+    </tr>
+</table>
+
+@if($etabliPar !== '')
+<div style="margin-top: 12px;"><strong>Etablie par :</strong> {{ $etabliPar }}</div>
+@endif
 </body>
 </html>

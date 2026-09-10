@@ -689,7 +689,7 @@ export default function Invoices() {
                             status={inv.status}
                             canEmail={!!emailRecipient}
                             canWhatsApp={!!whatsApp}
-                            onPdf={() => (isLab ? setPdfTarget(inv) : void invoicesApi.openInvoicePdf(inv.id))}
+                            onPdf={() => setPdfTarget(inv)}
                             onEmail={emailRecipient ? () => setSendTarget(inv) : undefined}
                             onWhatsApp={whatsApp ? () => void openWhatsApp(inv) : undefined}
                             onReminder={() => setReminderTarget(inv)}
@@ -829,6 +829,7 @@ export default function Invoices() {
           documentType="invoice"
           documentId={pdfTarget.id}
           documentLabel={pdfTarget.number}
+          signedInvoicePreview={!isLab}
           onClose={() => setPdfTarget(null)}
         />
       ) : null}

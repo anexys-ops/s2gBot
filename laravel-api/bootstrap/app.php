@@ -27,7 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('api', \App\Http\Middleware\LogApiHttpErrors::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        $exceptions->reportable(function (Throwable $e) {
+        $exceptions->reportable(function (\Throwable $e) {
             if (! app()->bound(SystemErrorLogger::class)) {
                 return;
             }

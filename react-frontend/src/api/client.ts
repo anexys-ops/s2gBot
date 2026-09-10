@@ -2037,6 +2037,14 @@ export const invoicesApi = {
     )
   },
   getPdfLink: (id: number) => api<{ url: string }>(`/invoices/${id}/pdf-link`),
+  fetchInvoicePdf: async (id: number) => {
+    const { url } = await invoicesApi.getPdfLink(id)
+    const res = await fetch(url)
+    if (!res.ok) {
+      throw new Error('Impossible de charger le PDF de la facture.')
+    }
+    return res.blob()
+  },
   openInvoicePdf: async (id: number) => {
     const { url } = await api<{ url: string }>(`/invoices/${id}/pdf-link`)
     window.open(url, '_blank', 'noopener,noreferrer')
@@ -2659,7 +2667,7 @@ export const pdfApi = {
     a.click()
     URL.revokeObjectURL(url)
   },
-  generate: async (type: string, id: number, templateId?: number, options?: { download?: boolean }) => {
+  fetchGenerate: async (type: string, id: number, templateId?: number) => {
     const token = getToken()
     const res = await fetch(`${API_BASE}/pdf/generate`, {
       method: 'POST',
@@ -2677,22 +2685,19 @@ export const pdfApi = {
       const data = await res.json().catch(() => ({}))
       throw new Error(data.message || 'Erreur génération PDF')
     }
-    const blob = await res.blob()
+    return res.blob()
+  },
+  downloadBlob: (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob)
-    if (options?.download) {
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `document-${type}-${id}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
-      return
-    }
-    const opened = window.open(url, '_blank', 'noopener,noreferrer')
-    if (!opened) {
-      URL.revokeObjectURL(url)
-      throw new Error('Impossible d’ouvrir le PDF — autorisez les pop-ups pour ce site.')
-    }
-    window.setTimeout(() => URL.revokeObjectURL(url), 120_000)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+  generate: async (type: string, id: number, templateId?: number) => {
+    const blob = await pdfApi.fetchGenerate(type, id, templateId)
+    pdfApi.downloadBlob(blob, `document-${type}-${id}.pdf`)
   },
 }
 

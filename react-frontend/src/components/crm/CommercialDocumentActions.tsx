@@ -9,6 +9,7 @@ import {
 } from '../../api/client'
 import ConfirmDialog from '../ConfirmDialog'
 import DocumentPdfPickerModal from '../pdf/DocumentPdfPickerModal'
+import { QuotePdfButton } from './QuoteListTableActions'
 import StatusChangeModal from '../StatusChangeModal'
 import {
   commercialDocumentCancelStatus,
@@ -260,12 +261,10 @@ export default function CommercialDocumentActions({
           ) : null}
           {capabilities.canPrint ? (
             documentType === 'invoice' && !isLab ? (
-              <InvoicePrintButton entityId={entityId} />
+              <InvoicePrintButton entityId={entityId} entityLabel={entityLabel} />
             ) : (
               <>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPdfOpen(true)}>
-                  Imprimer
-                </button>
+                <QuotePdfButton onClick={() => setPdfOpen(true)} />
                 {documentType === 'bon_commande' ? (
                   <button
                     type="button"
@@ -310,6 +309,7 @@ export default function CommercialDocumentActions({
           documentType={pdfType}
           documentId={entityId}
           documentLabel={entityLabel}
+          signedInvoicePreview={documentType === 'invoice' && !isLab}
           onClose={() => setPdfOpen(false)}
         />
       ) : null}
@@ -411,21 +411,22 @@ export default function CommercialDocumentActions({
   )
 }
 
-/** Bouton imprimer facture (client portail, lien PDF direct). */
-function InvoicePrintButton({ entityId }: { entityId: number }) {
-  const [loading, setLoading] = useState(false)
+/** Bouton aperçu facture (client portail, PDF signé). */
+function InvoicePrintButton({ entityId, entityLabel }: { entityId: number; entityLabel: string }) {
+  const [open, setOpen] = useState(false)
   return (
-    <button
-      type="button"
-      className="btn btn-secondary btn-sm"
-      disabled={loading}
-      onClick={() => {
-        setLoading(true)
-        void invoicesApi.openInvoicePdf(entityId).finally(() => setLoading(false))
-      }}
-    >
-      {loading ? 'PDF…' : 'Imprimer'}
-    </button>
+    <>
+      <QuotePdfButton onClick={() => setOpen(true)} />
+      {open ? (
+        <DocumentPdfPickerModal
+          documentType="invoice"
+          documentId={entityId}
+          documentLabel={entityLabel}
+          signedInvoicePreview
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
+    </>
   )
 }
 
@@ -437,18 +438,21 @@ export function InvoicePrintAction({
   invoice: Pick<Invoice, 'id' | 'number'>
   className?: string
 }) {
-  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
   return (
-    <button
-      type="button"
-      className={className}
-      disabled={loading}
-      onClick={() => {
-        setLoading(true)
-        void invoicesApi.openInvoicePdf(invoice.id).finally(() => setLoading(false))
-      }}
-    >
-      {loading ? 'PDF…' : 'Imprimer'}
-    </button>
+    <>
+      <button type="button" className={className} onClick={() => setOpen(true)}>
+        Voir le PDF
+      </button>
+      {open ? (
+        <DocumentPdfPickerModal
+          documentType="invoice"
+          documentId={invoice.id}
+          documentLabel={invoice.number}
+          signedInvoicePreview
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
+    </>
   )
 }

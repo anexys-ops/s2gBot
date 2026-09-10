@@ -27,9 +27,11 @@ class BonCommandePdfGenerator
         if ($isDossierRecap) {
             $bonCommande->loadMissing([
                 'clientContact',
+                'createur',
                 'dossier.site',
                 'dossier.contacts',
                 'dossier.mission',
+                'lignes.article.famille',
             ]);
         }
 

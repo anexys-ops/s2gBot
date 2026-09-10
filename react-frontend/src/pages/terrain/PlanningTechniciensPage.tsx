@@ -12,12 +12,12 @@ import StatusBadge from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import PlanningMassActionsBar from '../../components/planning/PlanningMassActionsBar'
 import { useAuth } from '../../contexts/AuthContext'
-import { dateInputFromApi } from '../../lib/appLocale'
+import { dateInputFromApi, toLocalDateInput } from '../../lib/appLocale'
 import { applyMassToLineIds, toggleAllSelection } from '../../lib/planningMassApply'
 import { formatTechnicienOption } from '../../lib/userRolePresentation'
 
 function toYmd(d: Date) {
-  return d.toISOString().slice(0, 10)
+  return toLocalDateInput(d)
 }
 
 function addDays(d: Date, n: number) {

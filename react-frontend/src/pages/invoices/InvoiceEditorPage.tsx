@@ -19,7 +19,7 @@ import {
   type Invoice,
 } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
-import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import { dateInputFromApi, formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import { invoiceReminderTone } from '../../lib/invoiceReminder'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -107,8 +107,8 @@ export default function InvoiceEditorPage() {
     if (!invoice) return
     setForm({
       status: invoice.status,
-      invoice_date: invoice.invoice_date?.slice(0, 10) ?? '',
-      due_date: invoice.due_date?.slice(0, 10) ?? '',
+      invoice_date: dateInputFromApi(invoice.invoice_date),
+      due_date: dateInputFromApi(invoice.due_date),
       tva_rate: Number(invoice.tva_rate),
       travel_fee_ht: Number(invoice.travel_fee_ht ?? 0),
       travel_fee_tva_rate: Number(invoice.travel_fee_tva_rate ?? 20),
@@ -119,7 +119,7 @@ export default function InvoiceEditorPage() {
       pdf_template_id: invoice.pdf_template_id ?? '',
       contact_id: invoice.contact_id != null && invoice.contact_id > 0 ? invoice.contact_id : '',
       notes: invoice.notes ?? '',
-      next_reminder_date: invoice.next_reminder_date?.slice(0, 10) ?? '',
+      next_reminder_date: dateInputFromApi(invoice.next_reminder_date),
       reminder_notes: invoice.reminder_notes ?? '',
     })
     setLines(

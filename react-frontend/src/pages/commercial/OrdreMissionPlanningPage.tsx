@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ordresMissionApi } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import { formatAppDate, toLocalDateInput } from '../../lib/appLocale'
 
 const TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
   labo:       { label: 'Labo',       color: '#10b981', bg: '#d1fae5' },
@@ -21,8 +22,8 @@ function monthRange(year: number, month: number) {
   const first = new Date(year, month, 1)
   const last  = new Date(year, month + 1, 0)
   return {
-    from: first.toISOString().slice(0, 10),
-    to:   last.toISOString().slice(0, 10),
+    from: toLocalDateInput(first),
+    to: toLocalDateInput(last),
     days: last.getDate(),
     firstDow: (first.getDay() + 6) % 7, // lundi = 0
   }
@@ -48,7 +49,8 @@ export default function OrdreMissionPlanningPage() {
   const byDay = new Map<number, typeof ordres>()
   for (const om of ordres) {
     if (!om.date_prevue) continue
-    const d = new Date(om.date_prevue).getDate()
+    const parts = String(om.date_prevue).match(/^(\d{4})-(\d{2})-(\d{2})/)
+    const d = parts ? Number(parts[3]) : new Date(om.date_prevue).getDate()
     if (!byDay.has(d)) byDay.set(d, [])
     byDay.get(d)!.push(om)
   }
@@ -183,7 +185,7 @@ export default function OrdreMissionPlanningPage() {
                       const meta = TYPE_META[om.type] ?? { color: '#6b7280', bg: '#f3f4f6', label: om.type }
                       return (
                         <tr key={om.id}>
-                          <td>{om.date_prevue ? new Date(om.date_prevue).toLocaleDateString('fr-FR') : '—'}</td>
+                          <td>{om.date_prevue ? formatAppDate(om.date_prevue) : '—'}</td>
                           <td className="data-table__code"><Link to={`/ordres-mission/${om.id}`} className="link-inline" style={{ fontWeight: 600 }}>{om.numero}</Link></td>
                           <td><span style={{ color: meta.color, fontWeight: 600, fontSize: '0.82rem' }}>{meta.label}</span></td>
                           <td>{om.client?.name ?? `#${om.client_id}`}</td>

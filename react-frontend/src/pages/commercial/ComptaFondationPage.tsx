@@ -9,7 +9,7 @@ import {
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import Modal from '../../components/Modal'
 import { useAuth } from '../../contexts/AuthContext'
-import { formatMoney } from '../../lib/appLocale'
+import { formatMoney, todayLocalDateInput } from '../../lib/appLocale'
 
 const PAYMENT_MODES = [
   { value: 'virement', label: 'Virement' },
@@ -293,7 +293,7 @@ export default function ComptaFondationPage() {
             </label>
             <label>
               Date de paiement *
-              <input name="payment_date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
+              <input name="payment_date" type="date" required defaultValue={todayLocalDateInput()} />
             </label>
             <label style={{ gridColumn: '1 / -1' }}>
               Notes

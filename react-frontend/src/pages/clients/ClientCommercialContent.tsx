@@ -7,6 +7,8 @@ import {
   commercialLinksApi,
   type ClientAddress,
 } from '../../api/client'
+import { IconEye, QuotePdfButton } from '../../components/crm/QuoteListTableActions'
+import TableIconHeader from '../../components/TableIconHeader'
 import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
 import type { PdfGenerateType } from '../../lib/documentPdfTypes'
 import { useAuth } from '../../contexts/AuthContext'
@@ -294,7 +296,9 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
               <th>Date</th>
               <th>Statut</th>
               <th>TTC</th>
-              <th>PDF</th>
+              <th className="data-table__pdf">
+                <TableIconHeader icon={<IconEye />} label="Voir le PDF" />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -304,10 +308,8 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
                 <td>{formatAppDate(q.quote_date)}</td>
                 <td>{q.status}</td>
                 <td>{formatMoney(Number(q.amount_ttc))}</td>
-                <td>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPdfTarget({ type: 'quote', id: q.id, label: q.number })}>
-                    Télécharger
-                  </button>
+                <td className="data-table__pdf">
+                  <QuotePdfButton onClick={() => setPdfTarget({ type: 'quote', id: q.id, label: q.number })} />
                 </td>
               </tr>
             ))}
@@ -324,24 +326,20 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
               <th>Date</th>
               <th>Statut</th>
               <th>TTC</th>
-              <th>PDF</th>
+              <th className="data-table__pdf">
+                <TableIconHeader icon={<IconEye />} label="Voir le PDF" />
+              </th>
             </tr>
           </thead>
           <tbody>
             {invoices.map((inv) => (
               <tr key={inv.id}>
                 <td className="data-table__code">{inv.number}</td>
-                <td>{new Date(inv.invoice_date).toLocaleDateString('fr-FR')}</td>
+                <td>{formatAppDate(inv.invoice_date)}</td>
                 <td>{inv.status}</td>
                 <td>{formatMoney(Number(inv.amount_ttc))}</td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setPdfTarget({ type: 'invoice', id: inv.id, label: inv.number })}
-                  >
-                    Télécharger
-                  </button>
+                <td className="data-table__pdf">
+                  <QuotePdfButton onClick={() => setPdfTarget({ type: 'invoice', id: inv.id, label: inv.number })} />
                 </td>
               </tr>
             ))}

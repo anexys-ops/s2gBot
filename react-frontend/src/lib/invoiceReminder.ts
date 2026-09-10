@@ -1,4 +1,5 @@
 import type { Invoice } from '../api/client'
+import { addLocalDays, dateInputFromApi, todayLocalDateInput } from './appLocale'
 
 const UNPAID = ['validated', 'signed', 'sent', 'relanced']
 
@@ -10,20 +11,19 @@ export function isInvoiceUnpaid(status: string): boolean {
 
 export function isInvoiceOverdue(inv: Invoice): boolean {
   if (!isInvoiceUnpaid(inv.status) || !inv.due_date) return false
-  const due = inv.due_date.slice(0, 10)
-  const today = new Date().toISOString().slice(0, 10)
+  const due = dateInputFromApi(inv.due_date)
+  const today = todayLocalDateInput()
   return due < today
 }
 
 export function invoiceReminderTone(inv: Invoice): InvoiceReminderTone {
   if (!isInvoiceUnpaid(inv.status)) return null
-  const today = new Date().toISOString().slice(0, 10)
-  if (inv.due_date && inv.due_date.slice(0, 10) < today) return 'danger'
-  if (inv.next_reminder_date && inv.next_reminder_date.slice(0, 10) <= today) return 'warning'
+  const today = todayLocalDateInput()
+  if (inv.due_date && dateInputFromApi(inv.due_date) < today) return 'danger'
+  if (inv.next_reminder_date && dateInputFromApi(inv.next_reminder_date) <= today) return 'warning'
   if (inv.next_reminder_date) {
-    const in7 = new Date()
-    in7.setDate(in7.getDate() + 7)
-    if (inv.next_reminder_date.slice(0, 10) <= in7.toISOString().slice(0, 10)) return 'warning'
+    const in7 = addLocalDays(today, 7)
+    if (dateInputFromApi(inv.next_reminder_date) <= in7) return 'warning'
   }
   return 'neutral'
 }

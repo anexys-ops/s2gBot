@@ -9,11 +9,11 @@ const stroke = {
   strokeLinejoin: 'round' as const,
 }
 
-function IconPdf() {
+export function IconEye() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" {...stroke} />
-      <path d="M14 2v6h6M9 13h6M9 17h4M9 9h1" {...stroke} />
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" {...stroke} />
+      <circle cx="12" cy="12" r="3" {...stroke} />
     </svg>
   )
 }
@@ -56,7 +56,7 @@ type PdfButtonProps = {
   label?: string
 }
 
-export function QuotePdfButton({ onClick, label = 'Télécharger le PDF' }: PdfButtonProps) {
+export function QuotePdfButton({ onClick, label = 'Voir le PDF' }: PdfButtonProps) {
   return (
     <button
       type="button"
@@ -65,7 +65,7 @@ export function QuotePdfButton({ onClick, label = 'Télécharger le PDF' }: PdfB
       aria-label={label}
       onClick={onClick}
     >
-      <IconPdf />
+      <IconEye />
     </button>
   )
 }

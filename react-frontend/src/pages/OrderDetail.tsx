@@ -17,6 +17,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useState, useEffect, useMemo } from 'react'
 import Modal from '../components/Modal'
 import type { Order, Report, Sample, SampleWriteBody } from '../api/client'
+import { formatAppDate } from '../lib/appLocale'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
@@ -345,7 +346,7 @@ export default function OrderDetail() {
         Client : {order.client?.name} — Chantier : {order.site?.name ?? '-'} — Statut :{' '}
         {STATUS_LABELS[order.status] ?? order.status}
       </p>
-      <p>Date : {new Date(order.order_date).toLocaleDateString('fr-FR')}</p>
+      <p>Date : {formatAppDate(order.order_date)}</p>
 
       {isLab && (
         <div className="card" style={{ marginBottom: '1rem' }}>

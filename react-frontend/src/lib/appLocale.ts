@@ -39,10 +39,22 @@ export function moneyUnitLabel(currencyCode?: string | null): string {
 /** @deprecated Préférer `moneyUnitLabel(currencyCode)` */
 export const MONEY_UNIT_LABEL = 'DH'
 
+/** Formate un objet `Date` en `YYYY-MM-DD` (calendrier local, sans UTC). */
+export function toLocalDateInput(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 /** Date du jour locale au format `YYYY-MM-DD` (champs `<input type="date">`, défauts formulaires). */
 export function todayLocalDateInput(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return toLocalDateInput(new Date())
+}
+
+/** Ajoute `days` jours calendaires locaux à une date `YYYY-MM-DD`. */
+export function addLocalDays(fromYmd: string, days: number): string {
+  const [y, m, d] = dateInputFromApi(fromYmd).split('-').map(Number)
+  const cur = new Date(y, m - 1, d)
+  cur.setDate(cur.getDate() + days)
+  return toLocalDateInput(cur)
 }
 
 function parseAppCalendarDate(value: string | number | Date): Date | null {

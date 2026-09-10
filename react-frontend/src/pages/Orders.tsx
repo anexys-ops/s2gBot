@@ -7,6 +7,7 @@ import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { ListTablePanelHeader } from '../components/ListTablePanel'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
+import { formatAppDate } from '../lib/appLocale'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
@@ -107,7 +108,7 @@ export default function Orders() {
                 {visible.reference !== false && <td className="data-table__reference">{o.reference}</td>}
                 {visible.client !== false && <td>{o.client?.name}</td>}
                 {visible.site !== false && <td>{o.site?.name ?? '-'}</td>}
-                {visible.date !== false && <td>{new Date(o.order_date).toLocaleDateString('fr-FR')}</td>}
+                {visible.date !== false && <td>{formatAppDate(o.order_date)}</td>}
                 {visible.status !== false && <td>{STATUS_LABELS[o.status] ?? o.status}</td>}
                 {visible.actions !== false && (
                   <td>

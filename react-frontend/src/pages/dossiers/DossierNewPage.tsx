@@ -16,7 +16,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import ClientSelectField from '../../components/clients/ClientSelectField'
 import SiteSelectField from '../../components/sites/SiteSelectField'
-import { dateInputFromApi } from '../../lib/appLocale'
+import { dateInputFromApi, todayLocalDateInput } from '../../lib/appLocale'
 
 const STATUTS: { v: DossierStatut; l: string }[] = [
   { v: 'brouillon', l: 'Brouillon' },
@@ -47,7 +47,7 @@ export default function DossierNewPage() {
   const [missionId, setMissionId] = useState<number | ''>('')
   const [titre, setTitre] = useState('')
   const [statut, setStatut] = useState<DossierStatut>('brouillon')
-  const [dateDebut, setDateDebut] = useState(() => new Date().toISOString().slice(0, 10))
+  const [dateDebut, setDateDebut] = useState(() => todayLocalDateInput())
   const [dateFin, setDateFin] = useState('')
   const [maitre, setMaitre] = useState('')
   const [entreprise, setEntreprise] = useState('')
@@ -71,7 +71,7 @@ export default function DossierNewPage() {
     setMissionId(existing.mission_id ?? '')
     setTitre(existing.titre ?? '')
     setStatut(existing.statut)
-    setDateDebut(dateInputFromApi(existing.date_debut) || new Date().toISOString().slice(0, 10))
+    setDateDebut(dateInputFromApi(existing.date_debut) || todayLocalDateInput())
     setDateFin(dateInputFromApi(existing.date_fin_prevue) || '')
     setMaitre(existing.maitre_ouvrage ?? '')
     setEntreprise(existing.entreprise_chantier ?? '')

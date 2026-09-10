@@ -28,7 +28,7 @@ import {
 } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
-import { formatMoney, todayLocalDateInput } from '../lib/appLocale'
+import { dateInputFromApi, formatMoney, todayLocalDateInput } from '../lib/appLocale'
 import { computeQuoteFormDocumentTotals, quoteFormPricingLines, lineLockedByForfaitJalon, sumFraisSupplementairesTtc } from '../lib/quoteTotals'
 import {
   getEffectiveDevisParcours,
@@ -263,10 +263,10 @@ export default function QuoteEditorPage() {
       contact_id: quote.contact_id ?? undefined,
       site_id: quote.site_id,
       dossier_id: quote.dossier_id ?? undefined,
-      quote_date: quote.quote_date?.slice(0, 10) ?? '',
-      order_date: quote.order_date?.slice(0, 10) ?? '',
-      site_delivery_date: quote.site_delivery_date?.slice(0, 10) ?? '',
-      valid_until: quote.valid_until?.slice(0, 10) ?? '',
+      quote_date: dateInputFromApi(quote.quote_date) || todayLocalDateInput(),
+      order_date: dateInputFromApi(quote.order_date),
+      site_delivery_date: dateInputFromApi(quote.site_delivery_date),
+      valid_until: dateInputFromApi(quote.valid_until),
       tva_rate: defaultTva,
       discount_percent: Number(quote.discount_percent ?? 0),
       discount_amount: Number(quote.discount_amount ?? 0),

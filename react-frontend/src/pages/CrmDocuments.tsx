@@ -11,7 +11,9 @@ import {
   quotesApi,
   invoicesApi,
 } from '../api/client'
+import { IconEye, QuotePdfButton } from '../components/crm/QuoteListTableActions'
 import DocumentPdfPickerModal from '../components/pdf/DocumentPdfPickerModal'
+import TableIconHeader from '../components/TableIconHeader'
 import type { PdfGenerateType } from '../lib/documentPdfTypes'
 import { useAuth } from '../contexts/AuthContext'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
@@ -272,7 +274,11 @@ export default function CrmDocuments() {
                   {visible.ht !== false && <th>HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.ttc !== false && <th>TTC ({MONEY_UNIT_LABEL})</th>}
                   {visible.travel !== false && <th>Dépl. HT ({MONEY_UNIT_LABEL})</th>}
-                  {visible.pdf !== false && <th>PDF</th>}
+                  {visible.pdf !== false && (
+                    <th className="data-table__pdf">
+                      <TableIconHeader icon={<IconEye />} label="Voir le PDF" />
+                    </th>
+                  )}
                   {isLab && visible.crm !== false && <th>Fiche</th>}
                   {showDocEditCol && visible.actions !== false && <th>Édition</th>}
                 </tr>
@@ -290,14 +296,8 @@ export default function CrmDocuments() {
                       <td className="data-table__num">{formatMoney(Number(q.travel_fee_ht ?? 0))}</td>
                     )}
                     {visible.pdf !== false && (
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => setPdfTarget({ type: 'quote', id: q.id, label: q.number })}
-                        >
-                          PDF
-                        </button>
+                      <td className="data-table__pdf">
+                        <QuotePdfButton onClick={() => setPdfTarget({ type: 'quote', id: q.id, label: q.number })} />
                       </td>
                     )}
                     {isLab && visible.crm !== false && (
@@ -401,7 +401,11 @@ export default function CrmDocuments() {
                   {visible.ht !== false && <th>HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.ttc !== false && <th>TTC ({MONEY_UNIT_LABEL})</th>}
                   {visible.travel !== false && <th>Dépl. HT ({MONEY_UNIT_LABEL})</th>}
-                  {visible.pdf !== false && <th>PDF</th>}
+                  {visible.pdf !== false && (
+                    <th className="data-table__pdf">
+                      <TableIconHeader icon={<IconEye />} label="Voir le PDF" />
+                    </th>
+                  )}
                   {isLab && visible.crm !== false && <th>Fiche</th>}
                   {showDocEditCol && visible.actions !== false && <th>Édition</th>}
                 </tr>
@@ -411,7 +415,7 @@ export default function CrmDocuments() {
                   <tr key={inv.id}>
                     {showClientCol && <td>{inv.client?.name ?? '—'}</td>}
                     {visible.number !== false && <td className="data-table__code">{inv.number}</td>}
-                    {visible.date !== false && <td>{new Date(inv.invoice_date).toLocaleDateString('fr-FR')}</td>}
+                    {visible.date !== false && <td>{formatAppDate(inv.invoice_date)}</td>}
                     {visible.status !== false && <td>{INVOICE_STATUS_LABELS[inv.status] ?? inv.status}</td>}
                     {visible.ht !== false && <td className="data-table__num">{formatMoney(Number(inv.amount_ht))}</td>}
                     {visible.ttc !== false && <td className="data-table__num">{formatMoney(Number(inv.amount_ttc))}</td>}
@@ -419,14 +423,8 @@ export default function CrmDocuments() {
                       <td className="data-table__num">{formatMoney(Number(inv.travel_fee_ht ?? 0))}</td>
                     )}
                     {visible.pdf !== false && (
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => setPdfTarget({ type: 'invoice', id: inv.id, label: inv.number })}
-                        >
-                          PDF
-                        </button>
+                      <td className="data-table__pdf">
+                        <QuotePdfButton onClick={() => setPdfTarget({ type: 'invoice', id: inv.id, label: inv.number })} />
                       </td>
                     )}
                     {isLab && visible.crm !== false && (

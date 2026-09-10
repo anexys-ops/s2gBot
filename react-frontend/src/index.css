@@ -1801,6 +1801,31 @@ th {
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
+.pdf-preview-modal {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.pdf-preview-modal__intro {
+  margin: 0 0 1rem;
+}
+.pdf-preview-modal__viewer {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-bottom: 1rem;
+}
+.pdf-preview-modal__frame {
+  display: block;
+  width: 100%;
+  height: min(70vh, 720px);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.pdf-preview-modal__actions {
+  margin-top: auto;
+}
 a.ds-icon-btn {
   text-decoration: none;
   box-sizing: border-box;

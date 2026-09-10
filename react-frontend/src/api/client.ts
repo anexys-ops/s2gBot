@@ -2358,6 +2358,8 @@ export type EntityMetaPayload = {
   delai_paiement?: string
   /** Conditions commerciales */
   conditions_commerciales?: string
+  /** Agence filiale client (numérotation documents par trigramme) */
+  filiale_agency_id?: number
 }
 
 export interface DashboardStatsPayload {

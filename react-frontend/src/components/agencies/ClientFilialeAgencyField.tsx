@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { agenciesApi, type AgencyRow, type Site, type User } from '../../api/client'
+import { agenciesApi, type Site, type User } from '../../api/client'
 import {
   filialeAgencyLabel,
   needsFilialeAgencyChoice,

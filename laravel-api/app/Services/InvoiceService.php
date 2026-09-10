@@ -237,7 +237,7 @@ class InvoiceService
 
     public function recalculateTotals(Invoice $invoice): void
     {
-        $invoice->load('invoiceLines');
+        $invoice->load(['invoiceLines', 'client']);
         $lines = [];
         foreach ($invoice->invoiceLines as $line) {
             $lines[] = [
@@ -250,6 +250,8 @@ class InvoiceService
             return;
         }
 
+        $caAnnuelTvaRegime = $invoice->client?->usesCaAnnuelTvaRegime() ?? false;
+
         $totals = CommercialDocumentTotalsService::computeTotals(
             $lines,
             (float) $invoice->discount_percent,
@@ -258,6 +260,7 @@ class InvoiceService
             (float) $invoice->shipping_tva_rate,
             (float) $invoice->travel_fee_ht,
             (float) $invoice->travel_fee_tva_rate,
+            $caAnnuelTvaRegime,
         );
 
         $invoice->update([

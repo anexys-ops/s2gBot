@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { attachmentsApi } from '../../api/client'
+import { formatAppDateTime } from '../../lib/appLocale'
 import ConfirmDialog from '../ConfirmDialog'
 
 export type AttachableType =
@@ -96,6 +97,11 @@ export default function EntityAttachmentsPanel({
               >
                 {att.original_filename}
               </button>
+              {att.created_at ? (
+                <span className="text-muted entity-attachments-panel__date" title="Date d'ajout">
+                  {formatAppDateTime(att.created_at)}
+                </span>
+              ) : null}
               <span className="text-muted entity-attachments-panel__size">
                 {Math.round(att.size_bytes / 1024)} Ko
               </span>

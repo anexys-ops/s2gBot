@@ -76,6 +76,17 @@ export default function DocumentPdfTemplateDetail() {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['document-pdf-templates'] }),
   })
 
+  const siblingCount = listData?.data.filter((t) => t.document_type === template?.document_type).length ?? 0
+  const canDelete = Boolean(template && !template.is_default && siblingCount > 1)
+
+  const deleteMut = useMutation({
+    mutationFn: () => documentPdfTemplatesApi.delete(templateId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['document-pdf-templates'] })
+      navigate('/back-office/modeles-documents-pdf')
+    },
+  })
+
   if (!isLab) {
     return (
       <div>
@@ -168,6 +179,7 @@ export default function DocumentPdfTemplateDetail() {
         ) : null}
 
         {saveMut.isError ? <p className="error">{(saveMut.error as Error).message}</p> : null}
+        {deleteMut.isError ? <p className="error">{(deleteMut.error as Error).message}</p> : null}
 
         <div className="crud-actions" style={{ marginTop: '1rem' }}>
           <button type="button" className="btn btn-primary" disabled={saveMut.isPending} onClick={() => saveMut.mutate()}>
@@ -176,6 +188,24 @@ export default function DocumentPdfTemplateDetail() {
           <Link to="/back-office/modeles-documents-pdf" className="btn btn-secondary">
             Annuler
           </Link>
+          <button
+            type="button"
+            className="btn btn-danger"
+            disabled={!canDelete || deleteMut.isPending}
+            title={
+              template.is_default
+                ? 'Choisissez un autre modèle par défaut avant la suppression.'
+                : siblingCount <= 1
+                  ? 'Impossible de supprimer le dernier modèle pour ce type.'
+                  : undefined
+            }
+            onClick={() => {
+              if (!window.confirm(`Supprimer le modèle « ${template.name} » ? Cette action est irréversible.`)) return
+              deleteMut.mutate()
+            }}
+          >
+            {deleteMut.isPending ? 'Suppression…' : 'Supprimer'}
+          </button>
         </div>
       </div>
     </div>

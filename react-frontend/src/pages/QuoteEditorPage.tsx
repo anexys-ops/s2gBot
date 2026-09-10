@@ -327,6 +327,12 @@ export default function QuoteEditorPage() {
     return { ht: form.travel_fee_ht ?? 0, tva: form.travel_fee_tva_rate ?? 20 }
   }, [allSites, form.apply_site_travel, form.site_id, form.travel_fee_ht, form.travel_fee_tva_rate])
 
+  const selectedClient = useMemo(
+    () => clients.find((c) => c.id === form.client_id),
+    [clients, form.client_id],
+  )
+  const caAnnuelTvaRegime = Boolean(selectedClient?.ca_annuel_tva_regime)
+
   const documentTotals = useMemo(() => {
     const defaultTva = form.tva_rate ?? 20
     const isForfait = form.meta?.mode_devis === 'forfait'
@@ -347,6 +353,7 @@ export default function QuoteEditorPage() {
       form.shipping_tva_rate ?? 20,
       travelForTotals.ht,
       travelForTotals.tva,
+      caAnnuelTvaRegime,
     )
   }, [
     form.lines,
@@ -360,11 +367,12 @@ export default function QuoteEditorPage() {
     form.shipping_tva_rate,
     travelForTotals.ht,
     travelForTotals.tva,
+    caAnnuelTvaRegime,
   ])
 
   const metaFraisTtc = useMemo(
-    () => sumFraisSupplementairesTtc(form.meta.frais_supplementaires),
-    [form.meta.frais_supplementaires],
+    () => sumFraisSupplementairesTtc(form.meta.frais_supplementaires, caAnnuelTvaRegime),
+    [form.meta.frais_supplementaires, caAnnuelTvaRegime],
   )
 
   const addLine = () => {

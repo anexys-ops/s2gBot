@@ -110,7 +110,13 @@
         <p><strong>Total HT :</strong> {{ number_format($quote->amount_ht, 2, ',', ' ') }} {{ $currencyLabel }}</p>
         @endif
         @if($showTotalTva)
-        <p><strong>Total TVA :</strong> {{ number_format(max(0, (float)$quote->amount_ttc - (float)$quote->amount_ht), 2, ',', ' ') }} {{ $currencyLabel }}</p>
+            @if(!empty($ctx['ca_annuel_tva_regime']))
+                <p><strong>TVA nominale (20&nbsp;%) :</strong> {{ number_format((float) ($ctx['tva_nominale'] ?? 0), 2, ',', ' ') }} {{ $currencyLabel }}</p>
+                <p><strong>TVA récupérable (25&nbsp;%) :</strong> {{ number_format((float) ($ctx['tva_recuperable'] ?? 0), 2, ',', ' ') }} {{ $currencyLabel }}</p>
+                <p><strong>TVA État (75&nbsp;%) :</strong> {{ number_format((float) ($ctx['tva_etat'] ?? max(0, (float)$quote->amount_ttc - (float)$quote->amount_ht)), 2, ',', ' ') }} {{ $currencyLabel }}</p>
+            @else
+                <p><strong>Total TVA :</strong> {{ number_format(max(0, (float)$quote->amount_ttc - (float)$quote->amount_ht), 2, ',', ' ') }} {{ $currencyLabel }}</p>
+            @endif
         @endif
         @if($showFraisRows)
         @foreach($fraisSuppItems as $fraisItem)

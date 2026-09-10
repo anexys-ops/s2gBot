@@ -173,7 +173,10 @@ class QuotePdfPresentationService
             $reglement = '100% PAR CHEQUE A TRENTE JOURS DE FACTURE';
         }
 
-        $fraisSupp = $this->sumFraisSupplementaires($meta);
+        $quote->loadMissing('client');
+        $caAnnuelTvaRegime = $quote->client?->usesCaAnnuelTvaRegime() ?? false;
+
+        $fraisSupp = $this->sumFraisSupplementaires($meta, $caAnnuelTvaRegime);
         $totalHt = (float) $quote->amount_ht;
         $totalTva = round(max(0, (float) $quote->amount_ttc - (float) $quote->amount_ht), 2);
         $totalTtc = round((float) $quote->amount_ttc + $fraisSupp['total_ttc'], 2);
@@ -195,6 +198,7 @@ class QuotePdfPresentationService
             (float) $quote->shipping_tva_rate,
             (float) $quote->travel_fee_ht,
             (float) $quote->travel_fee_tva_rate,
+            $caAnnuelTvaRegime,
         );
 
         $linesHtSubtotal = $computed['lines_ht_subtotal'];
@@ -242,6 +246,10 @@ class QuotePdfPresentationService
             'frais_supplementaires' => $fraisSupp['items'],
             'is_forfait' => ($meta['mode_devis'] ?? '') === 'forfait',
             'forfait_ht' => $this->resolveForfaitHt($quote, $meta, $quote->quoteLines),
+            'ca_annuel_tva_regime' => $caAnnuelTvaRegime,
+            'tva_nominale' => $computed['tva_nominale'],
+            'tva_recuperable' => $computed['tva_recuperable'],
+            'tva_etat' => $computed['tva_etat'],
         ];
     }
 
@@ -291,7 +299,7 @@ class QuotePdfPresentationService
      * @param  array<string, mixed>  $meta
      * @return array{items: list<array<string, mixed>>, total_ht: float, total_tva: float, total_ttc: float}
      */
-    private function sumFraisSupplementaires(array $meta): array
+    private function sumFraisSupplementaires(array $meta, bool $caAnnuelTvaRegime = false): array
     {
         $rows = $meta['frais_supplementaires'] ?? [];
         if (! is_array($rows)) {
@@ -309,7 +317,10 @@ class QuotePdfPresentationService
             }
             $lineHt = max(0, (float) ($row['montant_ht'] ?? 0));
             $rate = max(0, min(100, (float) ($row['tva_rate'] ?? 0)));
-            $lineTva = round($lineHt * ($rate / 100), 2);
+            $lineTvaNominal = round($lineHt * ($rate / 100), 2);
+            $lineTva = $caAnnuelTvaRegime
+                ? CommercialDocumentTotalsService::applyCaAnnuelTvaRegime($lineTvaNominal)['amount_tva']
+                : $lineTvaNominal;
             $lineTtc = round($lineHt + $lineTva, 2);
             $description = trim((string) ($row['description'] ?? ''));
 

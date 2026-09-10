@@ -105,7 +105,19 @@
         <p><strong>Total HT :</strong> {{ number_format($invoice->amount_ht, 2, ',', ' ') }} {{ $currencyLabel }}</p>
         @endif
         @if($showTotalTva)
-        <p><strong>Total TVA :</strong> {{ number_format(max(0, (float)$invoice->amount_ttc - (float)$invoice->amount_ht), 2, ',', ' ') }} {{ $currencyLabel }}</p>
+            @php
+                $caRegime = (bool) ($invoice->client?->ca_annuel_tva_regime ?? false);
+                $tvaEtat = max(0, (float) $invoice->amount_ttc - (float) $invoice->amount_ht);
+                $tvaNominale = $caRegime ? round($tvaEtat / 0.75, 2) : $tvaEtat;
+                $tvaRecuperable = $caRegime ? round($tvaNominale - $tvaEtat, 2) : 0;
+            @endphp
+            @if($caRegime)
+                <p><strong>TVA nominale (20&nbsp;%) :</strong> {{ number_format($tvaNominale, 2, ',', ' ') }} {{ $currencyLabel }}</p>
+                <p><strong>TVA récupérable (25&nbsp;%) :</strong> {{ number_format($tvaRecuperable, 2, ',', ' ') }} {{ $currencyLabel }}</p>
+                <p><strong>TVA État (75&nbsp;%) :</strong> {{ number_format($tvaEtat, 2, ',', ' ') }} {{ $currencyLabel }}</p>
+            @else
+                <p><strong>Total TVA :</strong> {{ number_format($tvaEtat, 2, ',', ' ') }} {{ $currencyLabel }}</p>
+            @endif
         @endif
         @if($showTotalTtc)
         <p><strong>Total TTC :</strong> {{ number_format($invoice->amount_ttc, 2, ',', ' ') }} {{ $currencyLabel }}</p>

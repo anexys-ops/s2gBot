@@ -29,6 +29,11 @@ export default function DocumentPdfTemplates() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['document-pdf-templates'] }),
   })
 
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => documentPdfTemplatesApi.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['document-pdf-templates'] }),
+  })
+
   if (!isLab) {
     return (
       <div>
@@ -83,7 +88,12 @@ export default function DocumentPdfTemplates() {
           rows={typeRows}
           isAdmin={isAdmin}
           togglePending={toggleActiveMut.isPending}
+          deletePending={deleteMut.isPending}
           onToggleActive={(id, is_active) => toggleActiveMut.mutate({ id, is_active })}
+          onDelete={(row) => {
+            if (!window.confirm(`Supprimer le modèle « ${row.name} » ? Cette action est irréversible.`)) return
+            deleteMut.mutate(row.id)
+          }}
         />
       ))}
 
@@ -93,7 +103,9 @@ export default function DocumentPdfTemplates() {
         </div>
       ) : null}
 
-      {toggleActiveMut.isError && <p className="error">{(toggleActiveMut.error as Error).message}</p>}
+      {(toggleActiveMut.isError || deleteMut.isError) && (
+        <p className="error">{String((toggleActiveMut.error ?? deleteMut.error) as Error)}</p>
+      )}
 
       {showCreate && (
         <DocumentPdfTemplateCreateModal
@@ -115,13 +127,17 @@ function TemplateTypeTable({
   rows,
   isAdmin,
   togglePending,
+  deletePending,
   onToggleActive,
+  onDelete,
 }: {
   title: string
   rows: DocumentPdfTemplateRow[]
   isAdmin: boolean
   togglePending: boolean
+  deletePending: boolean
   onToggleActive: (id: number, is_active: boolean) => void
+  onDelete: (row: DocumentPdfTemplateRow) => void
 }) {
   return (
     <div className="card" style={{ marginBottom: '1rem' }}>
@@ -153,6 +169,21 @@ function TemplateTypeTable({
                     onClick={() => onToggleActive(t.id, t.is_active === false)}
                   >
                     {t.is_active !== false ? 'Désactiver' : 'Activer'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-sm"
+                    disabled={deletePending || t.is_default || rows.length <= 1}
+                    title={
+                      t.is_default
+                        ? 'Choisissez un autre modèle par défaut avant la suppression.'
+                        : rows.length <= 1
+                          ? 'Impossible de supprimer le dernier modèle pour ce type.'
+                          : undefined
+                    }
+                    onClick={() => onDelete(t)}
+                  >
+                    Supprimer
                   </button>
                 </td>
               )}

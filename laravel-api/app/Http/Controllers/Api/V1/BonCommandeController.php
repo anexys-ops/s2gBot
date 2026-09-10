@@ -229,7 +229,7 @@ class BonCommandeController extends Controller
 
     private function recalculateBonCommandeTotals(BonCommande $bonCommande): void
     {
-        $bonCommande->load('lignes');
+        $bonCommande->load(['lignes', 'client']);
         $rows = [];
         foreach ($bonCommande->lignes as $l) {
             $rows[] = [
@@ -237,7 +237,8 @@ class BonCommandeController extends Controller
                 'tva_rate' => (float) $l->tva_rate,
             ];
         }
-        $totals = CommercialDocumentTotalsService::computeTotals($rows, 0, 0, 0, 0);
+        $caAnnuelTvaRegime = $bonCommande->client?->usesCaAnnuelTvaRegime() ?? false;
+        $totals = CommercialDocumentTotalsService::computeTotals($rows, 0, 0, 0, 0, 0, 20, $caAnnuelTvaRegime);
         $bonCommande->update([
             'montant_ht' => $totals['amount_ht'],
             'montant_ttc' => $totals['amount_ttc'],

@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\CommercialDocumentLinkController;
 use App\Http\Controllers\Api\CommercialOfferingController;
 use App\Http\Controllers\Api\CorrectiveActionController;
 use App\Http\Controllers\Api\DocumentPdfTemplateController;
+use App\Http\Controllers\Api\DocumentStatusDefinitionController;
 use App\Http\Controllers\Api\DocumentStatusHistoryController;
 use App\Http\Controllers\Api\DossierController;
 use App\Http\Controllers\Api\EquipmentController;
@@ -329,6 +330,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('document-pdf-templates', [DocumentPdfTemplateController::class, 'store']);
     Route::get('document-pdf-templates/{document_pdf_template}', [DocumentPdfTemplateController::class, 'show']);
     Route::put('document-pdf-templates/{document_pdf_template}', [DocumentPdfTemplateController::class, 'update']);
+    Route::delete('document-pdf-templates/{document_pdf_template}', [DocumentPdfTemplateController::class, 'destroy']);
+
+    Route::get('document-status-definitions/document-types', [DocumentStatusDefinitionController::class, 'documentTypes']);
+    Route::get('document-status-definitions', [DocumentStatusDefinitionController::class, 'index']);
+    Route::post('document-status-definitions', [DocumentStatusDefinitionController::class, 'store']);
+    Route::put('document-status-definitions/{document_status_definition}', [DocumentStatusDefinitionController::class, 'update']);
+    Route::delete('document-status-definitions/{document_status_definition}', [DocumentStatusDefinitionController::class, 'destroy']);
 
     Route::get('extrafield-definitions', [ExtrafieldDefinitionController::class, 'index']);
     Route::post('extrafield-definitions', [ExtrafieldDefinitionController::class, 'store']);

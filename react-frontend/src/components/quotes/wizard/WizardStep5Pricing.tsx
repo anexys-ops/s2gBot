@@ -347,9 +347,15 @@ export default function WizardStep5Pricing({
                 <strong>{formatMoney(totals.amount_ht)}</strong>
               </div>
               <div className="qw-totals-row">
-                <span>TVA</span>
+                <span>{totals.ca_annuel_tva_regime ? 'TVA État (75 %)' : 'TVA'}</span>
                 <strong>{formatMoney(totals.amount_tva)}</strong>
               </div>
+              {totals.ca_annuel_tva_regime && totals.tva_recuperable != null ? (
+                <div className="qw-totals-row qw-totals-row--muted">
+                  <span>TVA récupérable (25 %)</span>
+                  <span>{formatMoney(totals.tva_recuperable)}</span>
+                </div>
+              ) : null}
               {metaFraisTtc > 0 ? (
                 <div className="qw-totals-row qw-totals-row--muted">
                   <span>Frais suppl. TTC</span>

@@ -1160,8 +1160,14 @@ export default function QuoteFormFields({
               <strong>Total HT (aperçu) :</strong> {formatMoney(totals.amount_ht)}
             </li>
             <li>
-              <strong>Total TVA (aperçu) :</strong> {formatMoney(totals.amount_tva)}
+              <strong>{totals.ca_annuel_tva_regime ? 'TVA État (75 %)' : 'Total TVA (aperçu)'} :</strong>{' '}
+              {formatMoney(totals.amount_tva)}
             </li>
+            {totals.ca_annuel_tva_regime && totals.tva_recuperable != null ? (
+              <li>
+                <strong>TVA récupérable (25 %) :</strong> {formatMoney(totals.tva_recuperable)}
+              </li>
+            ) : null}
             <li>
               <strong>Total TTC (aperçu) :</strong> {formatMoney(totals.amount_ttc)}
             </li>

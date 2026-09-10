@@ -15,7 +15,7 @@ use Illuminate\Http\Request;
 class ClientController extends Controller
 {
     private const CLIENT_AUDIT_FIELDS = [
-        'name', 'email', 'phone', 'whatsapp', 'siret', 'ice', 'rc', 'city', 'address',
+        'name', 'email', 'phone', 'whatsapp', 'siret', 'ice', 'ca_annuel_tva_regime', 'rc', 'city', 'address',
         'commercial_id', 'portal_modules',
     ];
 
@@ -247,6 +247,7 @@ class ClientController extends Controller
             'whatsapp'                    => 'nullable|string|max:50',
             'siret'                       => 'nullable|string|max:20',
             'ice'                         => 'nullable|string|max:32',
+            'ca_annuel_tva_regime'        => 'nullable|boolean',
             'rc'                          => 'nullable|string|max:80',
             'patente'                     => 'nullable|string|max:64',
             'if_number'                   => 'nullable|string|max:32',

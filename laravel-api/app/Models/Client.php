@@ -40,6 +40,7 @@ class Client extends Model
         'whatsapp',
         'siret',
         'ice',
+        'ca_annuel_tva_regime',
         'rc',
         'patente',
         'if_number',
@@ -64,9 +65,15 @@ class Client extends Model
             'meta'            => 'array',
             'portal_modules'  => 'array',
             'capital_social' => 'decimal:2',
+            'ca_annuel_tva_regime' => 'boolean',
             'lat'            => 'float',
             'lng'            => 'float',
         ];
+    }
+
+    public function usesCaAnnuelTvaRegime(): bool
+    {
+        return (bool) $this->ca_annuel_tva_regime;
     }
 
     // ----------------------------------------------------------------

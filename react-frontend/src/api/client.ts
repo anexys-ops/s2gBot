@@ -283,6 +283,7 @@ export interface Attachment {
   mime_type?: string
   size_bytes: number
   uploaded_by?: number
+  created_at?: string
 }
 
 export interface CommercialDocumentLink {
@@ -434,6 +435,7 @@ export const documentPdfTemplatesApi = {
       layout_config?: PdfLayoutConfig
     },
   ) => api<DocumentPdfTemplateRow>(`/document-pdf-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api<void>(`/document-pdf-templates/${id}`, { method: 'DELETE' }),
 }
 
 export type ExtrafieldEntityType =
@@ -463,6 +465,63 @@ export interface ExtrafieldDefinitionRow {
   select_options?: ExtrafieldSelectOption[] | null
   sort_order: number
   required: boolean
+}
+
+export type DocumentStatusDefinitionRow = {
+  id: number
+  document_type: string
+  code: string
+  label: string
+  sort_order: number
+  is_initial: boolean
+  is_terminal: boolean
+  color_key: string | null
+  active: boolean
+}
+
+export type DocumentStatusDocumentType = {
+  type: string
+  label: string
+}
+
+export const documentStatusDefinitionsApi = {
+  documentTypes: () =>
+    api<{ data: DocumentStatusDocumentType[] }>('/document-status-definitions/document-types'),
+  list: (documentType?: string, activeOnly = false) => {
+    const params = new URLSearchParams()
+    if (documentType) params.set('document_type', documentType)
+    if (activeOnly) params.set('active_only', '1')
+    const qs = params.toString()
+    return api<{ data: DocumentStatusDefinitionRow[] }>(
+      qs ? `/document-status-definitions?${qs}` : '/document-status-definitions',
+    )
+  },
+  create: (body: {
+    document_type: string
+    code: string
+    label: string
+    sort_order?: number
+    is_initial?: boolean
+    is_terminal?: boolean
+    color_key?: string | null
+    active?: boolean
+  }) => api<DocumentStatusDefinitionRow>('/document-status-definitions', { method: 'POST', body: JSON.stringify(body) }),
+  update: (
+    id: number,
+    body: Partial<{
+      label: string
+      sort_order: number
+      is_initial: boolean
+      is_terminal: boolean
+      color_key: string | null
+      active: boolean
+    }>,
+  ) =>
+    api<DocumentStatusDefinitionRow>(`/document-status-definitions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  delete: (id: number) => api(`/document-status-definitions/${id}`, { method: 'DELETE' }),
 }
 
 export const extrafieldDefinitionsApi = {
@@ -2692,6 +2751,8 @@ export interface Client {
   siret?: string
   /** Maroc — Identifiant Commun de l’Entreprise */
   ice?: string | null
+  /** Régime TVA CA annuel : 25 % récupérable, 75 % reversée à l’État */
+  ca_annuel_tva_regime?: boolean
   rc?: string | null
   patente?: string | null
   if_number?: string | null

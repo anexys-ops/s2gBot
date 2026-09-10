@@ -155,14 +155,35 @@ export default function ClientMoroccoFormFields({
 
   const legalFields = showLegal ? (
     <FieldWrap layout={layout} className={gridClass}>
-      <div className={fieldClass}>
+      <div className={`${fieldClass} client-form-modal__field--wide`}>
         <label>ICE (Identifiant Commun de l’Entreprise)</label>
-        <input
-          value={form.ice ?? ''}
-          onChange={(e) => setForm((f) => ({ ...f, ice: e.target.value }))}
-          placeholder="15 chiffres habituellement"
-          maxLength={32}
-        />
+        <div className="client-ice-ca-row">
+          <input
+            value={form.ice ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, ice: e.target.value }))}
+            placeholder="15 chiffres habituellement"
+            maxLength={32}
+            className="client-ice-ca-row__ice"
+          />
+          <label className="client-ice-ca-row__checkbox">
+            <input
+              type="checkbox"
+              checked={Boolean(form.ca_annuel_tva_regime)}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  ca_annuel_tva_regime: e.target.checked,
+                }))
+              }
+            />
+            CA de l&apos;année
+          </label>
+        </div>
+        {form.ca_annuel_tva_regime ? (
+          <p className="form-hint client-ice-ca-row__hint">
+            TVA calculée avec 25&nbsp;% récupérable et 75&nbsp;% reversée à l&apos;État (TTC différent du taux 20&nbsp;% standard).
+          </p>
+        ) : null}
       </div>
 
       <div className={fieldClass}>

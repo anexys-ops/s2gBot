@@ -352,10 +352,16 @@ class InvoiceController extends Controller
             }
             $this->invoiceService->recalculateTotals($invoice);
         } elseif (isset($validated['amount_ht'])) {
-            $amountTtc = $validated['amount_ht'] * (1 + $tvaRate / 100);
+            $invoice->load('client');
+            $caAnnuelTvaRegime = $invoice->client?->usesCaAnnuelTvaRegime() ?? false;
+            $amountTtc = CommercialDocumentTotalsService::ttcFromHt(
+                (float) $validated['amount_ht'],
+                $tvaRate,
+                $caAnnuelTvaRegime,
+            );
             $invoice->update([
                 'amount_ht' => $validated['amount_ht'],
-                'amount_ttc' => round($amountTtc, 2),
+                'amount_ttc' => $amountTtc,
             ]);
         }
 

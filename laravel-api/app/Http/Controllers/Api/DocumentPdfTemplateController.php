@@ -172,6 +172,32 @@ class DocumentPdfTemplateController extends Controller
         return response()->json($this->serializeTemplate($documentPdfTemplate->fresh()));
     }
 
+    public function destroy(Request $request, DocumentPdfTemplate $documentPdfTemplate): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        if ($documentPdfTemplate->is_default) {
+            return response()->json([
+                'message' => 'Impossible de supprimer le modèle par défaut. Choisissez d’abord un autre modèle par défaut.',
+            ], 422);
+        }
+
+        $siblingCount = DocumentPdfTemplate::query()
+            ->where('document_type', $documentPdfTemplate->document_type)
+            ->count();
+        if ($siblingCount <= 1) {
+            return response()->json([
+                'message' => 'Impossible de supprimer le dernier modèle pour ce type de document.',
+            ], 422);
+        }
+
+        $documentPdfTemplate->delete();
+
+        return response()->json(null, 204);
+    }
+
     private function uniqueSlug(string $name): string
     {
         $base = Str::slug($name);

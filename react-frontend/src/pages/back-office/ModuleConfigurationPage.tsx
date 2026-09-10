@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { canManageAppConfig } from '../../lib/settingsAccess'
 import Modal from '../../components/Modal'
 import ConfigCatalogueProductsPanel from '../../components/config/ConfigCatalogueProductsPanel'
+import DocumentStatusDefinitionsPanel from '../../components/config/DocumentStatusDefinitionsPanel'
 
 const ENTITY_TABS: { type: ExtrafieldEntityType; label: string }[] = [
   { type: 'article', label: 'Articles' },
@@ -46,7 +47,7 @@ const MODULE_KEYS = [
   { key: 'commercial_catalog', label: 'Catalogue commercial / matériel' },
 ] as const
 
-type MainTab = 'extrafields' | 'modules' | 'catalogue'
+type MainTab = 'extrafields' | 'statuses' | 'modules' | 'catalogue'
 
 export default function ModuleConfigurationPage() {
   const { user } = useAuth()
@@ -86,6 +87,13 @@ export default function ModuleConfigurationPage() {
         </button>
         <button
           type="button"
+          className={`btn btn-sm ${mainTab === 'statuses' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setMainTab('statuses')}
+        >
+          Statuts documentaires
+        </button>
+        <button
+          type="button"
           className={`btn btn-sm ${mainTab === 'modules' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setMainTab('modules')}
         >
@@ -101,6 +109,8 @@ export default function ModuleConfigurationPage() {
       </div>
 
       {mainTab === 'catalogue' && <ConfigCatalogueProductsPanel />}
+
+      {mainTab === 'statuses' && <DocumentStatusDefinitionsPanel />}
 
       {mainTab === 'extrafields' && (
         <>

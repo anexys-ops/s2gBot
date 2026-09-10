@@ -185,6 +185,10 @@ export default function ClientFicheTab() {
         </h3>
         <dl className="module-fiche-grid">
           <div><dt>ICE</dt><dd>{client.ice?.trim() ? client.ice : '—'}</dd></div>
+          <div>
+            <dt>CA de l&apos;année (TVA)</dt>
+            <dd>{client.ca_annuel_tva_regime ? 'Oui — 25 % récup. / 75 % État' : 'Non'}</dd>
+          </div>
           <div><dt>RC</dt><dd>{client.rc?.trim() ? client.rc : '—'}</dd></div>
           <div><dt>Patente</dt><dd>{client.patente?.trim() ? client.patente : '—'}</dd></div>
           <div><dt>IF (identifiant fiscal)</dt><dd>{client.if_number?.trim() ? client.if_number : '—'}</dd></div>

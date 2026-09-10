@@ -9490,6 +9490,28 @@ a.catalogue-tree__link-article:hover {
 .bc-fiche__aside-actions {
   margin-top: 0.65rem;
 }
+.client-ice-ca-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+}
+.client-ice-ca-row__ice {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+}
+.client-ice-ca-row__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.92rem;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.client-ice-ca-row__hint {
+  margin: 0.35rem 0 0;
+}
 .entity-attachments-panel__intro {
   margin: 0 0 0.75rem;
   font-size: 0.88rem;
@@ -9515,6 +9537,7 @@ a.catalogue-tree__link-article:hover {
   text-align: left;
   word-break: break-word;
 }
+.entity-attachments-panel__date,
 .entity-attachments-panel__size {
   font-size: 0.82rem;
 }

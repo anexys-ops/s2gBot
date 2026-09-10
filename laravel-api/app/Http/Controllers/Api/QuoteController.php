@@ -649,8 +649,9 @@ class QuoteController extends Controller
 
     private function recalculateQuoteTotals(Quote $quote): void
     {
-        $quote->load('quoteLines');
+        $quote->load(['quoteLines', 'client']);
         $lines = QuotePricingService::totalsLines($quote);
+        $caAnnuelTvaRegime = $quote->client?->usesCaAnnuelTvaRegime() ?? false;
 
         $totals = CommercialDocumentTotalsService::computeTotals(
             $lines,
@@ -660,6 +661,7 @@ class QuoteController extends Controller
             (float) $quote->shipping_tva_rate,
             (float) $quote->travel_fee_ht,
             (float) $quote->travel_fee_tva_rate,
+            $caAnnuelTvaRegime,
         );
 
         $quote->update([

@@ -35,7 +35,7 @@ class AttachmentController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        return response()->json($model->attachments()->orderByDesc('id')->get());
+        return response()->json($model->attachments()->orderByDesc('created_at')->get());
     }
 
     public function store(Request $request): JsonResponse

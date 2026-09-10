@@ -1,4 +1,5 @@
 import { lineKeyForRow } from './devisParcours'
+import { applyCaAnnuelTvaRegime } from './caAnnuelTva'
 import { forfaitJalonTotalHt } from './quoteForfaitJalon'
 
 /**
@@ -27,6 +28,10 @@ export type DocumentTotalsResult = {
   document_scaled_line_tva: number
   shipping_tva: number
   travel_tva: number
+  tva_nominale?: number
+  tva_recuperable?: number
+  tva_etat?: number
+  ca_annuel_tva_regime?: boolean
 }
 
 /**
@@ -40,6 +45,7 @@ export function computeDocumentTotals(
   shippingTvaRate: number,
   travelFeeHt: number,
   travelFeeTvaRate: number,
+  caAnnuelTvaRegime = false,
 ): DocumentTotalsResult {
   let linesHt = 0
   let linesTva = 0
@@ -65,7 +71,21 @@ export function computeDocumentTotals(
   const travelTva = round2(travelHt * (trRate / 100))
 
   const totalHt = round2(afterDiscount + shippingAmountHt + travelHt)
-  const totalTva = round2(scaledTva + shipTva + travelTva)
+  const totalTvaNominal = round2(scaledTva + shipTva + travelTva)
+
+  let totalTva = totalTvaNominal
+  let tvaNominale = totalTvaNominal
+  let tvaRecuperable = 0
+  let tvaEtat = totalTvaNominal
+
+  if (caAnnuelTvaRegime) {
+    const split = applyCaAnnuelTvaRegime(totalTvaNominal)
+    totalTva = split.amount_tva
+    tvaNominale = split.tva_nominale
+    tvaRecuperable = split.tva_recuperable
+    tvaEtat = split.tva_etat
+  }
+
   const totalTtc = round2(totalHt + totalTva)
 
   return {
@@ -77,6 +97,10 @@ export function computeDocumentTotals(
     document_scaled_line_tva: scaledTva,
     shipping_tva: shipTva,
     travel_tva: travelTva,
+    tva_nominale: tvaNominale,
+    tva_recuperable: tvaRecuperable,
+    tva_etat: tvaEtat,
+    ca_annuel_tva_regime: caAnnuelTvaRegime,
   }
 }
 
@@ -90,6 +114,7 @@ export function computeQuoteFormDocumentTotals(
   shippingTvaRate: number,
   travelFeeHt: number,
   travelFeeTvaRate: number,
+  caAnnuelTvaRegime = false,
 ): DocumentTotalsResult {
   const lines = formLines.map((l) => {
     const tva = l.tva_rate ?? defaultTva
@@ -105,6 +130,7 @@ export function computeQuoteFormDocumentTotals(
     shippingTvaRate,
     travelFeeHt,
     travelFeeTvaRate,
+    caAnnuelTvaRegime,
   )
 }
 
@@ -208,13 +234,18 @@ function clamp(min: number, max: number, n: number): number {
 type FraisSupp = { montant_ht: number; tva_rate: number }
 
 /** HT + TVA (non inclus dans le recalcul API Laravel) */
-export function sumFraisSupplementairesTtc(rows: FraisSupp[] | undefined): number {
+export function sumFraisSupplementairesTtc(
+  rows: FraisSupp[] | undefined,
+  caAnnuelTvaRegime = false,
+): number {
   if (!rows?.length) return 0
   let ttc = 0
   for (const f of rows) {
     const ht = Math.max(0, f.montant_ht)
     const rate = clamp(0, 100, f.tva_rate)
-    ttc = round2(ttc + (ht + round2(ht * (rate / 100))))
+    const nominalTva = round2(ht * (rate / 100))
+    const tva = caAnnuelTvaRegime ? applyCaAnnuelTvaRegime(nominalTva).amount_tva : nominalTva
+    ttc = round2(ttc + (ht + tva))
   }
   return round2(ttc)
 }

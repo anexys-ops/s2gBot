@@ -10,6 +10,7 @@ import {
   EXPENSE_PAYMENT_METHODS,
   EXPENSE_STATUT_LABELS,
   ordresMissionApi,
+  type ExpensePaymentMethod,
   type FraisDeplacement,
   type FraisType,
   type User,
@@ -34,7 +35,7 @@ const EMPTY_FORM = {
   user_id: '',
   date: '',
   amount: '',
-  payment_method: '',
+  payment_method: '' as ExpensePaymentMethod | '',
   description: '',
   lieu_depart: '',
   lieu_arrivee: '',
@@ -78,7 +79,7 @@ export default function OmExpensePanel({ omId, frais, users }: Props) {
         type: form.type,
         user_id: Number(form.user_id),
         date: form.date,
-        payment_method: form.payment_method || undefined,
+        payment_method: form.payment_method ? (form.payment_method as ExpensePaymentMethod) : undefined,
         description: form.description || undefined,
         notes: form.description || undefined,
       }
@@ -211,7 +212,12 @@ export default function OmExpensePanel({ omId, frais, users }: Props) {
             </label>
             <label>
               Mode de paiement
-              <select value={form.payment_method} onChange={(e) => setForm((f) => ({ ...f, payment_method: e.target.value }))}>
+              <select
+                value={form.payment_method}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, payment_method: e.target.value as ExpensePaymentMethod | '' }))
+                }
+              >
                 <option value="">—</option>
                 {EXPENSE_PAYMENT_METHODS.map((m) => (
                   <option key={m} value={m}>{EXPENSE_PAYMENT_METHOD_LABELS[m]}</option>

@@ -168,6 +168,9 @@ export const adminUsersApi = {
     password: string
     phone?: string | null
     poste?: string | null
+    expense_taux_km?: number | null
+    expense_plafond_repas?: number | null
+    expense_forfait_repas?: number | null
     role: string
     client_id?: number | null
     site_id?: number | null
@@ -183,6 +186,9 @@ export const adminUsersApi = {
       password: string
       phone: string | null
       poste: string | null
+      expense_taux_km: number | null
+      expense_plafond_repas: number | null
+      expense_forfait_repas: number | null
       role: string
       client_id: number | null
       site_id: number | null

@@ -116,6 +116,7 @@ jobs:
               --exclude='*.pptx' \
               --include='docker/nginx/migration.html' \
               --exclude='*.html' \
+              --exclude='backups/' \
               --exclude='cursor-tasks/' \
               -e "ssh -i ~/.ssh/deploy_key -p 167 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 -o ControlMaster=auto -o ControlPath=/tmp/ssh-s2g-master" \
               ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/" && break

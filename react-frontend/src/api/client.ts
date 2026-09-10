@@ -2625,6 +2625,7 @@ export const quotesApi = {
 export interface QuoteCreateBody {
   client_id: number
   contact_id?: number | null
+  filiale_agency_id?: number
   site_id?: number
   dossier_id?: number | null
   meta?: EntityMetaPayload | null
@@ -2858,6 +2859,8 @@ export interface Client {
 export interface Site {
   id: number
   client_id: number
+  agency_id?: number | null
+  agency?: AgencyRow | null
   name: string
   address?: string
   latitude?: number | string | null

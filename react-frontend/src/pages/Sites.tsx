@@ -13,6 +13,7 @@ import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import TableRowActions from '../components/TableRowActions'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ClientSelectField from '../components/clients/ClientSelectField'
+import ClientFilialeAgencyField from '../components/agencies/ClientFilialeAgencyField'
 import { formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
 import SiteStatusPill from '../components/SiteStatusPill'
 import ClickableStatusBadge from '../components/ds/ClickableStatusBadge'
@@ -30,6 +31,7 @@ function normalizeClientsList(data: unknown): Client[] {
 
 const emptyForm: Partial<Site> = {
   client_id: 0,
+  agency_id: undefined,
   name: '',
   address: '',
   reference: '',
@@ -381,9 +383,19 @@ export default function Sites() {
               label="Client"
               clients={clients}
               value={form.client_id}
-              onChange={(id) => setForm((f) => ({ ...f, client_id: id }))}
+              onChange={(id) => setForm((f) => ({ ...f, client_id: id, agency_id: undefined }))}
               required
             />
+            {form.client_id ? (
+              <ClientFilialeAgencyField
+                clientId={Number(form.client_id)}
+                user={user ?? undefined}
+                value={form.agency_id ?? undefined}
+                onChange={(agencyId) => setForm((f) => ({ ...f, agency_id: agencyId }))}
+                required
+                hint="Trigramme par défaut pour les documents créés sur ce chantier (ex. DEV-2026-0001/PAR)."
+              />
+            ) : null}
             <div className="form-group">
               <label>Nom du chantier *</label>
               <input value={form.name ?? ''} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />

@@ -10,6 +10,7 @@ use App\Models\DocumentSequence;
 use App\Models\Quote;
 use App\Models\QuoteLine;
 use App\Models\User;
+use App\Support\ClientFilialeResolver;
 use Illuminate\Support\Facades\DB;
 
 class CommercialDocumentWorkflowService
@@ -31,7 +32,10 @@ class CommercialDocumentWorkflowService
         $quote->load('quoteLines');
 
         return DB::transaction(function () use ($quote, $user) {
-            $numero = $this->sequences->next(DocumentSequence::TYPE_BON_COMMANDE);
+            $numero = $this->sequences->next(
+                DocumentSequence::TYPE_BON_COMMANDE,
+                ClientFilialeResolver::codeForQuote($quote),
+            );
 
             $bc = BonCommande::query()->create([
                 'numero' => $numero,
@@ -92,7 +96,11 @@ class CommercialDocumentWorkflowService
         $bc->load('lignes');
 
         return DB::transaction(function () use ($bc, $user) {
-            $numero = $this->sequences->next(DocumentSequence::TYPE_BON_LIVRAISON);
+            $bc->loadMissing('quote.site', 'dossier.site');
+            $filialeCode = $bc->quote
+                ? ClientFilialeResolver::codeForQuote($bc->quote)
+                : ClientFilialeResolver::codeForSite($bc->dossier?->site);
+            $numero = $this->sequences->next(DocumentSequence::TYPE_BON_LIVRAISON, $filialeCode);
 
             $bl = BonLivraison::query()->create([
                 'numero' => $numero,

@@ -10,6 +10,7 @@ use App\Models\InvoiceLine;
 use App\Models\Client;
 use App\Models\ModuleSetting;
 use App\Models\Order;
+use App\Support\ClientFilialeResolver;
 use Illuminate\Database\Eloquent\Builder;
 
 class InvoiceService
@@ -44,10 +45,12 @@ class InvoiceService
             throw new \InvalidArgumentException('Toutes les commandes doivent appartenir à la même agence.');
         }
 
-        $number = $this->documentSequences->next(DocumentSequence::TYPE_FACTURE);
-
-        $hqId = Agency::query()->where('client_id', $clientId)->where('is_headquarters', true)->value('id');
-        $agencyId = $agencyIds->first() ?? $hqId;
+        $agencyId = $agencyIds->first() ?? ClientFilialeResolver::headquartersId((int) $clientId);
+        $filialeCode = ClientFilialeResolver::codeForAgencyId(
+            $agencyId ? (int) $agencyId : null,
+            (int) $clientId,
+        );
+        $number = $this->documentSequences->next(DocumentSequence::TYPE_FACTURE, $filialeCode);
 
         $invoice = Invoice::create([
             'number' => $number,
@@ -184,16 +187,22 @@ class InvoiceService
             }
         }
 
-        $hqId = Agency::query()->where('client_id', $clientId)->where('is_headquarters', true)->value('id');
-
+        $first->loadMissing('quote.site', 'dossier.site');
+        $filialeAgencyId = $first->quote
+            ? ClientFilialeResolver::filialeAgencyIdFromQuote($first->quote)
+            : ($first->dossier?->site?->agency_id ? (int) $first->dossier->site->agency_id : ClientFilialeResolver::headquartersId((int) $clientId));
+        $filialeCode = ClientFilialeResolver::codeForAgencyId(
+            $filialeAgencyId ? (int) $filialeAgencyId : null,
+            (int) $clientId,
+        );
         $sourceCurrency = $first->quote?->currency_code;
         $client = Client::query()->findOrFail($clientId);
 
         $invoice = Invoice::create([
-            'number' => $this->documentSequences->next(DocumentSequence::TYPE_FACTURE),
+            'number' => $this->documentSequences->next(DocumentSequence::TYPE_FACTURE, $filialeCode),
             'client_id' => $clientId,
             'contact_id' => $first->contact_id,
-            'agency_id' => $hqId,
+            'agency_id' => $filialeAgencyId,
             'invoice_date' => now()->toDateString(),
             'due_date' => now()->addDays(30)->toDateString(),
             'order_date' => $first->date_commande?->toDateString(),

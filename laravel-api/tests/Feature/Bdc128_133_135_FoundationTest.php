@@ -44,10 +44,13 @@ class Bdc128_133_135_FoundationTest extends TestCase
     public function test_document_sequence_service_increments(): void
     {
         $s = new DocumentSequenceService;
-        $a = $s->next(DocumentSequence::TYPE_DEVIS);
-        $b = $s->next(DocumentSequence::TYPE_DEVIS);
+        $a = $s->next(DocumentSequence::TYPE_DEVIS, 'HQ');
+        $b = $s->next(DocumentSequence::TYPE_DEVIS, 'HQ');
         $this->assertNotSame($a, $b);
-        $this->assertSame(2, (int) DocumentSequence::query()->where('type', DocumentSequence::TYPE_DEVIS)->value('last_number'));
+        $this->assertSame(2, (int) DocumentSequence::query()
+            ->where('type', DocumentSequence::TYPE_DEVIS)
+            ->where('agency_code', 'HQ')
+            ->value('last_number'));
     }
 
     public function test_quote_status_change_writes_document_status_history(): void

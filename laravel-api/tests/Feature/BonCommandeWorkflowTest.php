@@ -104,7 +104,7 @@ class BonCommandeWorkflowTest extends TestCase
 
         $r = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc");
         $r->assertCreated();
-        $r->assertJsonPath('numero', 'BCC-2026-0001');
+        $r->assertJsonPath('numero', 'BCC-2026-0001/HQ');
         $r->assertJsonPath('lignes.0.libelle', 'Essai A');
         $r->assertJsonPath('lignes.0.quantite_devis', 1);
         $this->assertNotNull(Quote::query()->find($q->id)->meta);
@@ -413,7 +413,7 @@ class BonCommandeWorkflowTest extends TestCase
 
         $bl = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/transformer-bl");
         $bl->assertCreated();
-        $bl->assertJsonPath('numero', 'BLC-2026-0001');
+        $bl->assertJsonPath('numero', 'BLC-2026-0001/HQ');
         $blId = (int) $bl->json('id');
         $lineId = (int) $bl->json('lignes.0.id');
 
@@ -570,11 +570,11 @@ class BonCommandeWorkflowTest extends TestCase
 
         $first = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc");
         $first->assertCreated();
-        $first->assertJsonPath('numero', 'BCC-2026-0001');
+        $first->assertJsonPath('numero', 'BCC-2026-0001/HQ');
 
         $second = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc");
         $second->assertCreated();
-        $second->assertJsonPath('numero', 'BCC-2026-0002');
+        $second->assertJsonPath('numero', 'BCC-2026-0002/HQ');
         $this->assertNotSame($first->json('id'), $second->json('id'));
 
         $this->assertSame(2, BonCommande::query()->where('quote_id', $q->id)->count());

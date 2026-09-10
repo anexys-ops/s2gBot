@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { QuoteFormState, ContextMode } from '../QuoteFormFields'
 import type { Site, DossierRow } from '../../../api/client'
+import { useAuth } from '../../../contexts/AuthContext'
+import ClientFilialeAgencyField from '../../agencies/ClientFilialeAgencyField'
 import { resolveUniqueDossierForChantier } from '../../../lib/resolveDossierForChantier'
 
 type Props = {
@@ -14,6 +16,7 @@ type Props = {
 const PICKER_HINT_THRESHOLD = 12
 
 export default function WizardStep1Context({ form, setForm, clients, allSites, dossiers }: Props) {
+  const { user } = useAuth()
   const searchRef = useRef<HTMLInputElement>(null)
   const [search, setSearch] = useState('')
   const [selectedClientId, setSelectedClientId] = useState<number | null>(
@@ -64,6 +67,11 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
 
   const linkedDossier =
     form.dossier_id != null ? dossiers.find((d) => d.id === form.dossier_id) : undefined
+
+  const selectedSite = useMemo(
+    () => allSites.find((s) => s.id === form.site_id) ?? null,
+    [allSites, form.site_id],
+  )
 
   return (
     <div className="qw-body">
@@ -219,6 +227,19 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
             {linkedDossier.titre}
           </strong>
         </p>
+      )}
+
+      {form.client_id > 0 && (
+        <div style={{ marginTop: '1rem' }}>
+          <ClientFilialeAgencyField
+            clientId={form.client_id}
+            site={selectedSite}
+            user={user ?? undefined}
+            value={form.filiale_agency_id}
+            onChange={(agencyId) => setForm((f) => ({ ...f, filiale_agency_id: agencyId }))}
+            required
+          />
+        </div>
       )}
 
       {mode === 'dossier' && (

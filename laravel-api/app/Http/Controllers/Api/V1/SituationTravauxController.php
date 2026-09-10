@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\DocumentSequence;
+use App\Models\Dossier;
 use App\Models\SituationTravaux;
 use App\Services\DocumentSequenceService;
 use App\Support\AgencyAccess;
+use App\Support\ClientFilialeResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -46,7 +48,11 @@ class SituationTravauxController extends Controller
             'amount_ht' => 'sometimes|numeric|min:0',
             'status' => 'sometimes|string|max:32',
         ]);
-        $numero = $this->sequences->next(DocumentSequence::TYPE_SITUATION);
+        $dossier = Dossier::query()->with('site')->findOrFail((int) $data['dossier_id']);
+        $numero = $this->sequences->next(
+            DocumentSequence::TYPE_SITUATION,
+            ClientFilialeResolver::codeForSite($dossier->site),
+        );
         $row = SituationTravaux::query()->create(array_merge($data, [
             'numero' => $numero,
             'created_by' => $request->user()->id,

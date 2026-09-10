@@ -23,6 +23,7 @@ use App\Services\DocumentCurrencyService;
 use App\Services\QuotePricingService;
 use App\Models\Client;
 use App\Services\DocumentSequenceService;
+use App\Support\ClientFilialeResolver;
 use App\Services\DocumentStatusService;
 use App\Support\ActivityChangeTracker;
 use App\Support\AgencyAccess;
@@ -153,6 +154,7 @@ class QuoteController extends Controller
             'travel_fee_ht' => 'nullable|numeric|min:0',
             'travel_fee_tva_rate' => 'nullable|numeric|min:0|max:100',
             'apply_site_travel' => 'nullable|boolean',
+            'filiale_agency_id' => 'nullable|integer|exists:agencies,id',
             'meta' => 'nullable|array',
         ], [
             'lines' => 'required|array|min:0',
@@ -174,7 +176,16 @@ class QuoteController extends Controller
         );
         $this->assertLinesNoDualRef($validated['lines']);
 
-        $number = $this->documentSequences->next(DocumentSequence::TYPE_DEVIS);
+        $cid = (int) $validated['client_id'];
+        $siteId = isset($validated['site_id']) ? (int) $validated['site_id'] : null;
+        $filialeAgencyId = ClientFilialeResolver::resolveAgencyId(
+            $request->user(),
+            $cid,
+            $siteId,
+            isset($validated['filiale_agency_id']) ? (int) $validated['filiale_agency_id'] : null,
+        );
+        $filialeCode = ClientFilialeResolver::codeForAgencyId($filialeAgencyId, $cid);
+        $number = $this->documentSequences->next(DocumentSequence::TYPE_DEVIS, $filialeCode);
         $defaultTva = $validated['tva_rate'] ?? 20;
 
         $travelHt = (float) ($validated['travel_fee_ht'] ?? 0);
@@ -185,8 +196,8 @@ class QuoteController extends Controller
             }
         }
 
-        $cid = (int) $validated['client_id'];
         $agencyId = self::resolveLabAgencyIdForQuote($request->user(), $validated['site_id'] ?? null, $cid);
+        $meta = ClientFilialeResolver::mergeFilialeMeta($validated['meta'] ?? null, $filialeAgencyId);
 
         $quote = Quote::create([
             'number' => $number,
@@ -213,7 +224,7 @@ class QuoteController extends Controller
             'pdf_template_id' => $validated['pdf_template_id'] ?? null,
             'status' => Quote::STATUS_DRAFT,
             'notes' => $validated['notes'] ?? null,
-            'meta' => $validated['meta'] ?? null,
+            'meta' => $meta,
         ]);
 
         $client = Client::query()->findOrFail($cid);
@@ -298,12 +309,25 @@ class QuoteController extends Controller
             'travel_fee_ht' => 'nullable|numeric|min:0',
             'travel_fee_tva_rate' => 'nullable|numeric|min:0|max:100',
             'apply_site_travel' => 'nullable|boolean',
+            'filiale_agency_id' => 'nullable|integer|exists:agencies,id',
             'meta' => 'nullable|array',
         ], [
             'lines' => 'sometimes|array|min:0',
         ], self::QUOTE_LINE_BASE, self::TACHES_RULES));
 
-        $fill = collect($validated)->except(['lines', 'apply_site_travel', 'taches'])->toArray();
+        $fill = collect($validated)->except(['lines', 'apply_site_travel', 'taches', 'filiale_agency_id'])->toArray();
+        if (array_key_exists('filiale_agency_id', $validated)) {
+            $filialeAgencyId = ClientFilialeResolver::resolveAgencyId(
+                $request->user(),
+                (int) $quote->client_id,
+                isset($validated['site_id']) ? (int) $validated['site_id'] : ($quote->site_id ? (int) $quote->site_id : null),
+                (int) $validated['filiale_agency_id'],
+            );
+            $fill['meta'] = ClientFilialeResolver::mergeFilialeMeta(
+                is_array($fill['meta'] ?? null) ? $fill['meta'] : (is_array($quote->meta) ? $quote->meta : []),
+                $filialeAgencyId,
+            );
+        }
         if (! empty($validated['apply_site_travel']) && ($validated['site_id'] ?? $quote->site_id)) {
             $sid = $validated['site_id'] ?? $quote->site_id;
             $site = Site::find($sid);

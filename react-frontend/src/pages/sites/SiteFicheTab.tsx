@@ -9,6 +9,8 @@ import type { SiteOutletContext } from './SiteLayout'
 import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import SiteMiniMap from '../../components/maps/SiteMiniMap'
 import SiteStatusPill from '../../components/SiteStatusPill'
+import ClientFilialeAgencyField from '../../components/agencies/ClientFilialeAgencyField'
+import { filialeAgencyLabel } from '../../lib/clientFilialeAgency'
 import { SITE_STATUS_KEYS, SITE_STATUS_LABELS } from '../../lib/siteStatusPresentation'
 
 function strCoord(v: unknown): string {
@@ -18,6 +20,7 @@ function strCoord(v: unknown): string {
 
 const emptyForm = (s: Site): Partial<Site> & { latitude?: string; longitude?: string } => ({
   client_id: s.client_id,
+  agency_id: s.agency_id ?? undefined,
   name: s.name,
   address: s.address ?? '',
   reference: s.reference ?? '',
@@ -126,6 +129,10 @@ export default function SiteFicheTab() {
             <dd>{site.client?.name ?? `#${site.client_id}`}</dd>
           </div>
           <div>
+            <dt>Agence filiale (trigramme)</dt>
+            <dd>{filialeAgencyLabel(site.agency ?? null)}</dd>
+          </div>
+          <div>
             <dt>Statut chantier</dt>
             <dd>
               <SiteStatusPill status={site.status} size="md" />
@@ -196,6 +203,16 @@ export default function SiteFicheTab() {
                 ))}
               </select>
             </div>
+            {form.client_id ? (
+              <ClientFilialeAgencyField
+                clientId={Number(form.client_id)}
+                site={site}
+                user={user ?? undefined}
+                value={form.agency_id ?? undefined}
+                onChange={(agencyId) => setForm((f) => ({ ...f, agency_id: agencyId }))}
+                required
+              />
+            ) : null}
             <div className="form-group">
               <label>Nom du chantier *</label>
               <input value={form.name ?? ''} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />

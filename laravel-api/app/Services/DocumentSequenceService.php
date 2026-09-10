@@ -8,17 +8,19 @@ use Illuminate\Support\Facades\DB;
 class DocumentSequenceService
 {
     /**
-     * Génère la prochaine référence unique du type (format PREFIX-YYYY-NNNN).
+     * Génère la prochaine référence unique du type (format PREFIX-YYYY-NNNN/TRIGRAMME).
      */
-    public function next(string $type, ?int $year = null): string
+    public function next(string $type, ?string $agencyCode = null, ?int $year = null): string
     {
         $year = $year ?? (int) now()->format('Y');
         $prefix = $this->prefixFor($type);
+        $agencyCode = $this->normalizeAgencyCode($agencyCode);
 
-        return DB::transaction(function () use ($type, $year, $prefix) {
+        return DB::transaction(function () use ($type, $year, $prefix, $agencyCode) {
             $row = DocumentSequence::query()
                 ->where('type', $type)
                 ->where('year', $year)
+                ->where('agency_code', $agencyCode)
                 ->lockForUpdate()
                 ->first();
 
@@ -26,6 +28,7 @@ class DocumentSequenceService
                 $row = DocumentSequence::query()->create([
                     'type' => $type,
                     'year' => $year,
+                    'agency_code' => $agencyCode,
                     'last_number' => 0,
                 ]);
             }
@@ -33,8 +36,15 @@ class DocumentSequenceService
             $row->last_number = (int) $row->last_number + 1;
             $row->save();
 
-            return sprintf('%s-%d-%04d', $prefix, $year, $row->last_number);
+            return sprintf('%s-%d-%04d/%s', $prefix, $year, $row->last_number, $agencyCode);
         });
+    }
+
+    public function normalizeAgencyCode(?string $agencyCode): string
+    {
+        $normalized = strtoupper(trim((string) $agencyCode));
+
+        return $normalized !== '' ? $normalized : 'HQ';
     }
 
     public function prefixFor(string $type): string

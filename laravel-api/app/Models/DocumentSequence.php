@@ -27,6 +27,7 @@ class DocumentSequence extends Model
     protected $fillable = [
         'type',
         'year',
+        'agency_code',
         'last_number',
     ];
 }

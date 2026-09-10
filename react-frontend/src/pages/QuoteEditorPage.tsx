@@ -73,6 +73,7 @@ function emptyForm(): QuoteFormState {
     contextMode: 'client',
     client_id: 0,
     contact_id: undefined,
+    filiale_agency_id: undefined,
     site_id: undefined,
     dossier_id: undefined,
     quote_date: todayLocalDateInput(),
@@ -261,6 +262,8 @@ export default function QuoteEditorPage() {
       contextMode: inferContextMode(quote),
       client_id: quote.client_id,
       contact_id: quote.contact_id ?? undefined,
+      filiale_agency_id:
+        typeof meta.filiale_agency_id === 'number' ? meta.filiale_agency_id : undefined,
       site_id: quote.site_id,
       dossier_id: quote.dossier_id ?? undefined,
       quote_date: dateInputFromApi(quote.quote_date) || todayLocalDateInput(),

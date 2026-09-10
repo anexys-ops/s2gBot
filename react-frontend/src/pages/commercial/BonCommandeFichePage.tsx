@@ -581,7 +581,7 @@ export default function BonCommandeFichePage() {
                               <td className="data-table__num bc-lignes-table__qty-devis" aria-hidden="true">
                                 —
                               </td>
-                              <td className="data-table__num bc-lignes-table__jalon-mass">
+                              <td colSpan={3} className="data-table__num bc-lignes-table__jalon-mass">
                                 {showJalonMassQty ? (
                                   <BcJalonQtyMass
                                     jalonLabel={row.label}
@@ -594,7 +594,6 @@ export default function BonCommandeFichePage() {
                                   />
                                 ) : null}
                               </td>
-                              <td colSpan={2} />
                             </tr>
                           )
                         }

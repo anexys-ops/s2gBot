@@ -15,6 +15,7 @@ use App\Services\DocumentSequenceService;
 use App\Support\ActivityChangeTracker;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
+use App\Support\ClientFilialeResolver;
 use Illuminate\Database\Eloquent\Builder;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\DocumentActivityLogger;
@@ -291,6 +292,8 @@ class InvoiceController extends Controller
             'lines.*.discount_percent' => 'nullable|numeric|min:0|max:100',
             'meta' => 'nullable|array',
             'contact_id' => 'nullable|exists:client_contacts,id',
+            'filiale_agency_id' => 'nullable|integer|exists:agencies,id',
+            'site_id' => 'nullable|exists:sites,id',
         ]);
 
         ClientContactDocument::assertBelongsToClient(
@@ -300,14 +303,19 @@ class InvoiceController extends Controller
 
         $tvaRate = $validated['tva_rate'] ?? 20;
 
-        $agencyId = Agency::query()
-            ->where('client_id', $validated['client_id'])
-            ->where('is_headquarters', true)
-            ->value('id');
+        $clientId = (int) $validated['client_id'];
+        $siteId = isset($validated['site_id']) ? (int) $validated['site_id'] : null;
+        $agencyId = ClientFilialeResolver::resolveAgencyId(
+            $request->user(),
+            $clientId,
+            $siteId,
+            isset($validated['filiale_agency_id']) ? (int) $validated['filiale_agency_id'] : null,
+        );
+        $filialeCode = ClientFilialeResolver::codeForAgencyId($agencyId, $clientId);
 
         $number = isset($validated['number']) && trim((string) $validated['number']) !== ''
             ? (string) $validated['number']
-            : $this->documentSequences->next(DocumentSequence::TYPE_FACTURE);
+            : $this->documentSequences->next(DocumentSequence::TYPE_FACTURE, $filialeCode);
 
         $invoice = Invoice::create([
             'number' => $number,

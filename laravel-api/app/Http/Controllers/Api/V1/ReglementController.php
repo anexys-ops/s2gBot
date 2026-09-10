@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\DocumentSequence;
 use App\Models\Reglement;
 use App\Services\DocumentSequenceService;
+use App\Models\Invoice;
 use App\Support\AgencyAccess;
+use App\Support\ClientFilialeResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -49,7 +51,14 @@ class ReglementController extends Controller
             'payment_date' => 'required|date',
             'notes' => 'nullable|string',
         ]);
-        $numero = $this->sequences->next(DocumentSequence::TYPE_REGLEMENT);
+        $filialeCode = ClientFilialeResolver::headquartersCode((int) $data['client_id']);
+        if (! empty($data['invoice_id'])) {
+            $invoice = Invoice::query()->find((int) $data['invoice_id']);
+            if ($invoice) {
+                $filialeCode = ClientFilialeResolver::codeForInvoice($invoice);
+            }
+        }
+        $numero = $this->sequences->next(DocumentSequence::TYPE_REGLEMENT, $filialeCode);
         $row = Reglement::query()->create(array_merge($data, [
             'numero' => $numero,
             'created_by' => $request->user()->id,

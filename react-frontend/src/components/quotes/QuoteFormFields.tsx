@@ -35,6 +35,7 @@ export type QuoteFormState = {
   contextMode: ContextMode
   client_id: number
   contact_id?: number | null
+  filiale_agency_id?: number
   site_id?: number
   dossier_id?: number
   quote_date: string

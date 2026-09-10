@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceCredit;
 use App\Services\DocumentSequenceService;
 use App\Support\AgencyAccess;
+use App\Support\ClientFilialeResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -52,7 +53,10 @@ class InvoiceCreditController extends Controller
         if ((int) $inv->client_id !== (int) $data['client_id']) {
             return response()->json(['message' => 'Le client ne correspond pas à la facture source.'], 422);
         }
-        $numero = $this->sequences->next(DocumentSequence::TYPE_AVOIR);
+        $numero = $this->sequences->next(
+            DocumentSequence::TYPE_AVOIR,
+            ClientFilialeResolver::codeForInvoice($inv),
+        );
         $row = InvoiceCredit::query()->create(array_merge($data, [
             'numero' => $numero,
             'created_by' => $request->user()->id,

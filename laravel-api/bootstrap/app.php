@@ -2,7 +2,6 @@
 
 use App\Services\SystemErrorLogger;
 use Illuminate\Foundation\Application;
-use Throwable;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;

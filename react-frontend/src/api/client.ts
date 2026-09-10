@@ -2705,6 +2705,9 @@ export interface User {
   email: string
   phone?: string | null
   poste?: string | null
+  expense_taux_km?: number | null
+  expense_plafond_repas?: number | null
+  expense_forfait_repas?: number | null
   role: string
   client_id?: number
   site_id?: number
@@ -3140,21 +3143,31 @@ export interface OrdreMission {
 }
 
 /** Ligne de déplacement km — stockée dans expense_lines (note de frais / NDF). */
+export type FraisType = 'repas' | 'deplacement' | 'autres'
+
 export interface FraisDeplacement {
   id: number
   ordre_mission_id: number
   expense_report_id: number
   expense_report_number: string
   ndf_statut: ExpenseReportStatut
+  type: FraisType
+  category?: string
   user_id: number
   date: string
   lieu_depart?: string | null
   lieu_arrivee?: string | null
-  distance_km: number
-  taux_km: number
+  distance_km?: number | null
+  taux_km?: number | null
   montant: number
-  type_transport: string
+  amount?: number
+  payment_method?: ExpensePaymentMethod | null
+  description?: string | null
+  type_transport?: string
   notes?: string | null
+  receipt_path?: string | null
+  receipt_filename?: string | null
+  is_validated?: boolean
   /** Alias legacy — préférer ndf_statut */
   statut: 'draft' | 'valide' | 'rembourse'
   user?: { id: number; name: string } | null
@@ -3624,7 +3637,9 @@ export const EXPENSE_STATUT_OPTIONS: { value: ExpenseReportStatut; label: string
 export interface ExpenseReport {
   id: number
   unique_number: string
-  ordre_mission_id: number
+  ordre_mission_id?: number | null
+  user_id?: number | null
+  user?: { id: number; name: string }
   ordre_mission?: {
     id: number
     unique_number?: string
@@ -3667,7 +3682,7 @@ export const expenseReportsApi = {
 
   get: (id: number) => api<ExpenseReport>(`/expense-reports/${id}`),
 
-  create: (body: { ordre_mission_id: number; notes?: string }) =>
+  create: (body: { ordre_mission_id?: number | null; user_id?: number | null; notes?: string }) =>
     api<ExpenseReport>('/expense-reports', { method: 'POST', body: JSON.stringify(body) }),
 
   update: (id: number, body: Partial<Pick<ExpenseReport, 'statut' | 'notes' | 'private_notes' | 'advance_amount'>>) =>

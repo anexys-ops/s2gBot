@@ -16,6 +16,8 @@ import { canManageUsers } from '../../lib/settingsAccess'
 import ListTableToolbar, { PaginationBar } from '../../components/ListTableToolbar'
 import { ListTablePanelHeader } from '../../components/ListTablePanel'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import { DEFAULT_EXPENSE_TAUX_KM } from '../../lib/expenseBareme'
 import { userPosteLabel, userRoleLabel, userRoleTone } from '../../lib/userRolePresentation'
 
 const ROLES: { value: string; label: string }[] = [
@@ -48,6 +50,9 @@ function emptyForm(agencyId: number | '' = '') {
     password: '',
     phone: '',
     poste: '',
+    expense_taux_km: String(DEFAULT_EXPENSE_TAUX_KM),
+    expense_plafond_repas: '',
+    expense_forfait_repas: '',
     role: 'lab_technician',
     client_id: '' as number | '',
     site_id: '' as number | '',
@@ -167,6 +172,9 @@ export default function SettingsUsersPage() {
         password: form.password,
         phone: form.phone.trim() || null,
         poste: form.poste.trim() || null,
+        expense_taux_km: form.expense_taux_km.trim() ? Number(form.expense_taux_km) : null,
+        expense_plafond_repas: form.expense_plafond_repas.trim() ? Number(form.expense_plafond_repas) : null,
+        expense_forfait_repas: form.expense_forfait_repas.trim() ? Number(form.expense_forfait_repas) : null,
         role: form.role,
         client_id: form.client_id === '' ? undefined : form.client_id,
         site_id: form.site_id === '' ? undefined : form.site_id,
@@ -190,6 +198,9 @@ export default function SettingsUsersPage() {
         email: form.email.trim(),
         phone: form.phone.trim() || null,
         poste: form.poste.trim() || null,
+        expense_taux_km: form.expense_taux_km.trim() ? Number(form.expense_taux_km) : null,
+        expense_plafond_repas: form.expense_plafond_repas.trim() ? Number(form.expense_plafond_repas) : null,
+        expense_forfait_repas: form.expense_forfait_repas.trim() ? Number(form.expense_forfait_repas) : null,
         role: form.role,
         client_id: form.client_id === '' ? null : form.client_id,
         site_id: form.site_id === '' ? null : form.site_id,
@@ -229,6 +240,9 @@ export default function SettingsUsersPage() {
       password: '',
       phone: u.phone ?? '',
       poste: u.poste ?? '',
+      expense_taux_km: u.expense_taux_km != null ? String(u.expense_taux_km) : String(DEFAULT_EXPENSE_TAUX_KM),
+      expense_plafond_repas: u.expense_plafond_repas != null ? String(u.expense_plafond_repas) : '',
+      expense_forfait_repas: u.expense_forfait_repas != null ? String(u.expense_forfait_repas) : '',
       role: u.role,
       client_id: u.client_id ?? '',
       site_id: u.site_id ?? '',
@@ -438,6 +452,49 @@ export default function SettingsUsersPage() {
                     </p>
                   </div>
                 </div>
+
+                <h4 className="ds-form-section__title" style={{ marginTop: '1rem' }}>Barème notes de frais</h4>
+                <div className="quote-form-grid user-admin-form__grid">
+                  <div className="form-group">
+                    <label htmlFor="user-expense-taux-km">Taux kilométrique ({MONEY_UNIT_LABEL}/km)</label>
+                    <input
+                      id="user-expense-taux-km"
+                      type="number"
+                      min={0}
+                      step="0.0001"
+                      value={form.expense_taux_km}
+                      onChange={(e) => setForm((f) => ({ ...f, expense_taux_km: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="user-expense-plafond-repas">Plafond repas ({MONEY_UNIT_LABEL})</label>
+                    <input
+                      id="user-expense-plafond-repas"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={form.expense_plafond_repas}
+                      onChange={(e) => setForm((f) => ({ ...f, expense_plafond_repas: e.target.value }))}
+                      placeholder="Ex. 150"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="user-expense-forfait-repas">Forfait repas ({MONEY_UNIT_LABEL})</label>
+                    <input
+                      id="user-expense-forfait-repas"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={form.expense_forfait_repas}
+                      onChange={(e) => setForm((f) => ({ ...f, expense_forfait_repas: e.target.value }))}
+                      placeholder="Montant par défaut"
+                    />
+                  </div>
+                </div>
+                <p className="text-muted user-admin-form__hint">
+                  Utilisé pour pré-remplir les NDF (déplacements et repas) depuis les ODM et le module Notes de frais.
+                </p>
+
                 <div className="user-admin-form__rh-card">
                   <p className="user-admin-form__rh-card-title">Aperçu fiche RH</p>
                   <dl className="user-admin-form__rh-dl">

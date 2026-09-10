@@ -20,6 +20,7 @@ class ExpenseReport extends Model
     protected $fillable = [
         'unique_number',
         'ordre_mission_id',
+        'user_id',
         'statut',
         'notes',
         'private_notes',
@@ -46,6 +47,11 @@ class ExpenseReport extends Model
     public function ordreMission(): BelongsTo
     {
         return $this->belongsTo(OrdreMission::class, 'ordre_mission_id');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'user_id');
     }
 
     public function createdBy(): BelongsTo

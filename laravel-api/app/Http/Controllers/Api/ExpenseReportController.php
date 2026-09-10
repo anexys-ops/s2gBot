@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\ExpenseLine;
 use App\Models\ExpenseReport;
 use App\Models\OrdreMission;
+use App\Models\User;
+use App\Support\UserExpenseBareme;
 use App\Mail\ExpenseReportEmailMailable;
 use App\Models\MailLog;
 use App\Services\ExpenseReportService;
@@ -22,7 +24,7 @@ class ExpenseReportController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $q = ExpenseReport::with(['ordreMission.dossier', 'ordreMission.client', 'ordreMission.site', 'createdBy', 'validatedBy', 'lines'])
+        $q = ExpenseReport::with(['ordreMission.dossier', 'ordreMission.client', 'ordreMission.site', 'user', 'createdBy', 'validatedBy', 'lines'])
             ->withCount([
                 'lines',
                 'lines as lines_validated_count' => fn ($qb) => $qb->where('is_validated', true),
@@ -37,6 +39,7 @@ class ExpenseReportController extends Controller
                 $like = '%'.$term.'%';
                 $qb->where(function ($sub) use ($like) {
                     $sub->where('unique_number', 'like', $like)
+                        ->orWhereHas('user', fn ($uq) => $uq->where('name', 'like', $like))
                         ->orWhereHas('ordreMission', function ($om) use ($like) {
                             $om->where('numero', 'like', $like)
                                 ->orWhere('unique_number', 'like', $like)
@@ -76,14 +79,20 @@ class ExpenseReportController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'ordre_mission_id' => 'required|exists:ordres_mission,id',
+            'ordre_mission_id' => 'nullable|exists:ordres_mission,id',
+            'user_id'          => 'nullable|exists:users,id',
             'notes'            => 'nullable|string',
         ]);
+
+        if (empty($data['ordre_mission_id']) && empty($data['user_id'])) {
+            $data['user_id'] = Auth::id();
+        }
+
         $data['created_by'] = Auth::id();
         $data['statut']     = ExpenseReport::STATUT_BROUILLON;
 
         $report = ExpenseReport::create($data);
-        $report->load(['ordreMission', 'createdBy', 'lines']);
+        $report->load(['ordreMission', 'user', 'createdBy', 'lines']);
 
         return response()->json($report, 201);
     }
@@ -92,7 +101,7 @@ class ExpenseReportController extends Controller
 
     public function show(ExpenseReport $expenseReport): JsonResponse
     {
-        $expenseReport->load(['ordreMission.dossier', 'ordreMission.client', 'ordreMission.site', 'createdBy', 'validatedBy', 'lines.user']);
+        $expenseReport->load(['ordreMission.dossier', 'ordreMission.client', 'ordreMission.site', 'user', 'createdBy', 'validatedBy', 'lines.user']);
         $expenseReport->append('total');
 
         return response()->json($expenseReport);
@@ -156,14 +165,25 @@ class ExpenseReportController extends Controller
             'type_transport' => 'nullable|in:voiture,moto,velo,transports_commun,autre',
         ]);
 
+        $lineUser = User::query()->find($data['user_id']);
+        $bareme = UserExpenseBareme::forUser($lineUser);
+
         if (
             isset($data['distance_km']) &&
             ($data['amount'] ?? null) === null
         ) {
             $data['amount'] = $expenseReports->computeDeplacementAmount(
                 (float) $data['distance_km'],
-                (float) ($data['taux_km'] ?? 0.401),
+                (float) ($data['taux_km'] ?? $bareme['taux_km']),
             );
+        }
+
+        if (! isset($data['taux_km']) && isset($data['distance_km'])) {
+            $data['taux_km'] = $bareme['taux_km'];
+        }
+
+        if ($data['category'] === 'Repas' && $bareme['forfait_repas'] !== null && ($data['amount'] ?? 0) <= 0) {
+            $data['amount'] = $bareme['forfait_repas'];
         }
 
         $data['amount'] = max(0, (float) ($data['amount'] ?? 0));
@@ -199,7 +219,8 @@ class ExpenseReportController extends Controller
 
         if ($line->isDeplacement() || isset($data['distance_km'])) {
             $distance = (float) ($data['distance_km'] ?? $line->distance_km ?? 0);
-            $taux = (float) ($data['taux_km'] ?? $line->taux_km ?? 0.401);
+            $lineUser = User::query()->find($data['user_id'] ?? $line->user_id);
+            $taux = (float) ($data['taux_km'] ?? $line->taux_km ?? UserExpenseBareme::defaultTauxKm($lineUser));
             if (! array_key_exists('amount', $data)) {
                 $data['amount'] = $expenseReports->computeDeplacementAmount($distance, $taux);
             }

@@ -115,6 +115,34 @@ class ExpenseLineCrudTest extends TestCase
         $this->assertDatabaseMissing('expense_lines', ['id' => $lineId]);
     }
 
+    public function test_create_expense_report_without_ordre_mission(): void
+    {
+        $user = User::factory()->create([
+            'expense_taux_km'       => 0.55,
+            'expense_forfait_repas' => 120,
+        ]);
+        Sanctum::actingAs($user);
+
+        $create = $this->postJson('/api/expense-reports', [
+            'notes' => 'NDF autonome',
+        ]);
+
+        $create->assertCreated();
+        $create->assertJsonPath('ordre_mission_id', null);
+        $create->assertJsonPath('user_id', $user->id);
+        $create->assertJsonPath('statut', ExpenseReport::STATUT_BROUILLON);
+
+        $reportId = $create->json('id');
+
+        $this->postJson("/api/expense-reports/{$reportId}/lines", [
+            'user_id'  => $user->id,
+            'category' => 'Repas',
+            'amount'   => 120,
+            'date'     => '2026-09-10',
+        ])->assertCreated()
+            ->assertJsonPath('amount', 120);
+    }
+
     public function test_line_mutations_blocked_when_not_brouillon(): void
     {
         $user = User::factory()->create();

@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\ExpenseLine;
 use App\Models\ExpenseReport;
 use App\Models\OrdreMission;
+use App\Models\User;
+use App\Support\UserExpenseBareme;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 
@@ -22,12 +24,35 @@ class ExpenseReportService
     }
 
     /** @return Builder<ExpenseLine> */
+    public function expenseLinesQuery(ExpenseReport $report): Builder
+    {
+        return ExpenseLine::query()->where('expense_report_id', $report->id);
+    }
+
+    /** @return Builder<ExpenseLine> */
     public function deplacementLinesQuery(ExpenseReport $report): Builder
     {
-        return ExpenseLine::query()
-            ->where('expense_report_id', $report->id)
+        return $this->expenseLinesQuery($report)
             ->where('category', 'Voyage')
             ->whereNotNull('distance_km');
+    }
+
+    public function resolveFraisType(ExpenseLine $line): string
+    {
+        if ($line->isDeplacement()) {
+            return 'deplacement';
+        }
+
+        return $line->category === 'Repas' ? 'repas' : 'autres';
+    }
+
+    public function categoryForFraisType(string $type): string
+    {
+        return match ($type) {
+            'repas'       => 'Repas',
+            'deplacement' => 'Voyage',
+            default       => 'Divers',
+        };
     }
 
     public function computeDeplacementAmount(float $distanceKm, float $tauxKm): float
@@ -52,9 +77,10 @@ class ExpenseReportService
     /**
      * @return array<string, mixed>
      */
-    public function deplacementLineToFraisPayload(ExpenseLine $line, ExpenseReport $report): array
+    public function expenseLineToFraisPayload(ExpenseLine $line, ExpenseReport $report): array
     {
-        $line->loadMissing('user:id,name');
+        $line->loadMissing('user:id,name,expense_taux_km,expense_plafond_repas,expense_forfait_repas');
+        $type = $this->resolveFraisType($line);
 
         return [
             'id'                    => $line->id,
@@ -62,18 +88,41 @@ class ExpenseReportService
             'expense_report_id'     => $report->id,
             'expense_report_number' => $report->unique_number,
             'ndf_statut'            => $report->statut,
+            'type'                  => $type,
+            'category'              => $line->category,
             'user_id'               => $line->user_id,
             'date'                  => $line->date?->format('Y-m-d'),
             'lieu_depart'           => $line->lieu_depart,
             'lieu_arrivee'          => $line->lieu_arrivee,
-            'distance_km'           => (float) ($line->distance_km ?? 0),
-            'taux_km'               => (float) ($line->taux_km ?? 0),
+            'distance_km'           => $line->distance_km !== null ? (float) $line->distance_km : null,
+            'taux_km'               => $line->taux_km !== null ? (float) $line->taux_km : null,
             'montant'               => (float) $line->amount,
+            'amount'                => (float) $line->amount,
+            'payment_method'        => $line->payment_method,
             'type_transport'        => $line->type_transport ?? 'voiture',
+            'description'           => $line->description,
             'notes'                 => $line->description,
+            'receipt_path'          => $line->receipt_path,
+            'receipt_filename'      => $line->receipt_filename,
+            'is_validated'          => (bool) $line->is_validated,
             'statut'                => $this->legacyStatutFromReport($report->statut),
             'user'                  => $line->user,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function deplacementLineToFraisPayload(ExpenseLine $line, ExpenseReport $report): array
+    {
+        return $this->expenseLineToFraisPayload($line, $report);
+    }
+
+    public function defaultTauxKmForUserId(int $userId): float
+    {
+        $user = User::query()->find($userId);
+
+        return UserExpenseBareme::defaultTauxKm($user);
     }
 
     public function legacyStatutFromReport(string $reportStatut): string
@@ -131,7 +180,7 @@ class ExpenseReportService
         ]));
     }
 
-    public function assertDeplacementLineBelongsToOrdreMission(
+    public function assertLineBelongsToOrdreMission(
         ExpenseLine $line,
         OrdreMission $ordreMission,
     ): ExpenseReport {
@@ -139,6 +188,15 @@ class ExpenseReportService
         $report = $line->expenseReport;
         abort_if($report === null, 404);
         abort_if((int) $report->ordre_mission_id !== (int) $ordreMission->id, 404);
+
+        return $report;
+    }
+
+    public function assertDeplacementLineBelongsToOrdreMission(
+        ExpenseLine $line,
+        OrdreMission $ordreMission,
+    ): ExpenseReport {
+        $report = $this->assertLineBelongsToOrdreMission($line, $ordreMission);
         abort_if(! $line->isDeplacement(), 404);
 
         return $report;

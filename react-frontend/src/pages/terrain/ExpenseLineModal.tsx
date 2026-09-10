@@ -19,6 +19,7 @@ import {
 import Modal from '../../components/Modal'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import { DEFAULT_EXPENSE_TAUX_KM, userExpenseBareme } from '../../lib/expenseBareme'
 
 function computeKmAmount(distanceKm: number, tauxKm: number): number {
   return Math.round(Math.max(0, distanceKm) * Math.max(0, tauxKm) * 2 * 100) / 100
@@ -55,10 +56,13 @@ export default function ExpenseLineModal({ reportId, initial, onClose, onSaved }
     lieu_depart:    initial?.lieu_depart ?? '',
     lieu_arrivee:   initial?.lieu_arrivee ?? '',
     distance_km:    initial?.distance_km ?? '',
-    taux_km:        initial?.taux_km ?? 0.401,
+    taux_km:        initial?.taux_km ?? DEFAULT_EXPENSE_TAUX_KM,
     type_transport: (initial?.type_transport ?? 'voiture') as ExpenseTransportType,
     useKmCalc:      isVoyage && initial?.distance_km != null,
   })
+
+  const selectedUser = users.find((u) => u.id === form.user_id)
+  const bareme = userExpenseBareme(selectedUser)
 
   const showKmFields = form.category === 'Voyage' && (
     form.useKmCalc ||
@@ -134,7 +138,19 @@ export default function ExpenseLineModal({ reportId, initial, onClose, onSaved }
           </label>
           <label>
             Personnel *
-            <select value={form.user_id} onChange={(e) => setForm({ ...form, user_id: Number(e.target.value) })}>
+            <select
+              value={form.user_id}
+              onChange={(e) => {
+                const user = users.find((u) => u.id === Number(e.target.value))
+                const b = userExpenseBareme(user)
+                setForm((f) => ({
+                  ...f,
+                  user_id: Number(e.target.value),
+                  taux_km: b.taux_km,
+                  amount: f.category === 'Repas' && b.forfait_repas != null ? b.forfait_repas : f.amount,
+                }))
+              }}
+            >
               <option value={0}>— sélectionner —</option>
               {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
@@ -162,6 +178,11 @@ export default function ExpenseLineModal({ reportId, initial, onClose, onSaved }
                 onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
                 required
               />
+              {form.category === 'Repas' && bareme.plafond_repas != null ? (
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  Plafond barème : {formatMoney(bareme.plafond_repas)}
+                </span>
+              ) : null}
             </label>
           ) : (
             <label>

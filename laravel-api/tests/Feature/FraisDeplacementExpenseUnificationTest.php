@@ -67,6 +67,7 @@ class FraisDeplacementExpenseUnificationTest extends TestCase
         ]);
 
         $response = $this->postJson("/api/ordres-mission/{$om->id}/frais", [
+            'type'           => 'deplacement',
             'user_id'        => $user->id,
             'date'           => '2026-09-09',
             'lieu_depart'    => 'casa',

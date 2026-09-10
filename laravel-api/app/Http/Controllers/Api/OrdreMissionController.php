@@ -293,12 +293,12 @@ class OrdreMissionController extends Controller
         }
 
         $lines = $expenseReports
-            ->deplacementLinesQuery($report)
-            ->with('user:id,name')
+            ->expenseLinesQuery($report)
+            ->with('user:id,name,expense_taux_km,expense_plafond_repas,expense_forfait_repas')
             ->orderBy('date')
             ->orderBy('id')
             ->get()
-            ->map(fn (ExpenseLine $line) => $expenseReports->deplacementLineToFraisPayload($line, $report));
+            ->map(fn (ExpenseLine $line) => $expenseReports->expenseLineToFraisPayload($line, $report));
 
         return response()->json($lines);
     }
@@ -306,40 +306,59 @@ class OrdreMissionController extends Controller
     public function fraisStore(Request $request, OrdreMission $ordreMission, ExpenseReportService $expenseReports): JsonResponse
     {
         $validated = $request->validate([
+            'type'            => 'required|in:repas,deplacement,autres',
             'user_id'         => 'required|exists:users,id',
             'date'            => 'required|date',
+            'amount'          => 'nullable|numeric|min:0',
+            'payment_method'  => 'nullable|in:' . implode(',', ExpenseLine::PAYMENT_METHODS),
+            'description'     => 'nullable|string|max:512',
             'lieu_depart'     => 'nullable|string|max:255',
             'lieu_arrivee'    => 'nullable|string|max:255',
-            'distance_km'     => 'required|numeric|min:0',
+            'distance_km'     => 'nullable|numeric|min:0',
             'taux_km'         => 'nullable|numeric|min:0',
             'type_transport'  => 'nullable|in:voiture,moto,velo,transports_commun,autre',
             'notes'           => 'nullable|string',
         ]);
 
-        $distance = (float) $validated['distance_km'];
-        $taux = (float) ($validated['taux_km'] ?? 0.401);
-
+        $type = $validated['type'];
         $report = $expenseReports->firstOrCreateForOrdreMission($ordreMission, (int) $validated['user_id']);
+        $taux = (float) ($validated['taux_km'] ?? $expenseReports->defaultTauxKmForUserId((int) $validated['user_id']));
 
-        $line = $report->lines()->create([
-            'user_id'        => $validated['user_id'],
-            'category'       => 'Voyage',
-            'amount'         => $expenseReports->computeDeplacementAmount($distance, $taux),
-            'date'           => $validated['date'],
-            'description'    => $expenseReports->buildDeplacementDescription(
-                $validated['lieu_depart'] ?? null,
-                $validated['lieu_arrivee'] ?? null,
-                $validated['notes'] ?? null,
-            ),
-            'lieu_depart'    => $validated['lieu_depart'] ?? null,
-            'lieu_arrivee'   => $validated['lieu_arrivee'] ?? null,
-            'distance_km'    => $distance,
-            'taux_km'        => $taux,
-            'type_transport' => $validated['type_transport'] ?? 'voiture',
-        ]);
+        if ($type === 'deplacement') {
+            abort_if(! isset($validated['distance_km']), 422, 'La distance est requise pour un déplacement.');
+            $distance = (float) $validated['distance_km'];
+            $line = $report->lines()->create([
+                'user_id'        => $validated['user_id'],
+                'category'       => 'Voyage',
+                'amount'         => $expenseReports->computeDeplacementAmount($distance, $taux),
+                'date'           => $validated['date'],
+                'description'    => $expenseReports->buildDeplacementDescription(
+                    $validated['lieu_depart'] ?? null,
+                    $validated['lieu_arrivee'] ?? null,
+                    $validated['notes'] ?? $validated['description'] ?? null,
+                ),
+                'lieu_depart'    => $validated['lieu_depart'] ?? null,
+                'lieu_arrivee'   => $validated['lieu_arrivee'] ?? null,
+                'distance_km'    => $distance,
+                'taux_km'        => $taux,
+                'type_transport' => $validated['type_transport'] ?? 'voiture',
+                'payment_method' => $validated['payment_method'] ?? null,
+            ]);
+        } else {
+            $amount = (float) ($validated['amount'] ?? 0);
+            abort_if($amount <= 0, 422, 'Le montant est requis.');
+            $line = $report->lines()->create([
+                'user_id'        => $validated['user_id'],
+                'category'       => $expenseReports->categoryForFraisType($type),
+                'amount'         => $amount,
+                'date'           => $validated['date'],
+                'description'    => $validated['description'] ?? $validated['notes'] ?? null,
+                'payment_method' => $validated['payment_method'] ?? null,
+            ]);
+        }
 
         return response()->json(
-            $expenseReports->deplacementLineToFraisPayload($line->fresh(), $report->fresh()),
+            $expenseReports->expenseLineToFraisPayload($line->fresh(), $report->fresh()),
             201,
         );
     }
@@ -350,39 +369,55 @@ class OrdreMissionController extends Controller
         ExpenseLine $frais,
         ExpenseReportService $expenseReports,
     ): JsonResponse {
-        $report = $expenseReports->assertDeplacementLineBelongsToOrdreMission($frais, $ordreMission);
+        $report = $expenseReports->assertLineBelongsToOrdreMission($frais, $ordreMission);
 
-        $validated = $request->validate([
-            'date'           => 'sometimes|date',
-            'lieu_depart'    => 'nullable|string|max:255',
-            'lieu_arrivee'   => 'nullable|string|max:255',
-            'distance_km'    => 'sometimes|numeric|min:0',
-            'taux_km'        => 'nullable|numeric|min:0',
-            'type_transport' => 'nullable|in:voiture,moto,velo,transports_commun,autre',
-            'notes'          => 'nullable|string',
-        ]);
+        if ($frais->isDeplacement()) {
+            $validated = $request->validate([
+                'date'           => 'sometimes|date',
+                'lieu_depart'    => 'nullable|string|max:255',
+                'lieu_arrivee'   => 'nullable|string|max:255',
+                'distance_km'    => 'sometimes|numeric|min:0',
+                'taux_km'        => 'nullable|numeric|min:0',
+                'type_transport' => 'nullable|in:voiture,moto,velo,transports_commun,autre',
+                'notes'          => 'nullable|string',
+                'payment_method' => 'nullable|in:' . implode(',', ExpenseLine::PAYMENT_METHODS),
+            ]);
 
-        $distance = array_key_exists('distance_km', $validated)
-            ? (float) $validated['distance_km']
-            : (float) ($frais->distance_km ?? 0);
-        $taux = array_key_exists('taux_km', $validated)
-            ? (float) ($validated['taux_km'] ?? 0.401)
-            : (float) ($frais->taux_km ?? 0.401);
+            $distance = array_key_exists('distance_km', $validated)
+                ? (float) $validated['distance_km']
+                : (float) ($frais->distance_km ?? 0);
+            $taux = array_key_exists('taux_km', $validated)
+                ? (float) ($validated['taux_km'] ?? $expenseReports->defaultTauxKmForUserId((int) $frais->user_id))
+                : (float) ($frais->taux_km ?? $expenseReports->defaultTauxKmForUserId((int) $frais->user_id));
 
-        $lieuDepart = array_key_exists('lieu_depart', $validated) ? $validated['lieu_depart'] : $frais->lieu_depart;
-        $lieuArrivee = array_key_exists('lieu_arrivee', $validated) ? $validated['lieu_arrivee'] : $frais->lieu_arrivee;
-        $notes = array_key_exists('notes', $validated) ? $validated['notes'] : $frais->description;
+            $lieuDepart = array_key_exists('lieu_depart', $validated) ? $validated['lieu_depart'] : $frais->lieu_depart;
+            $lieuArrivee = array_key_exists('lieu_arrivee', $validated) ? $validated['lieu_arrivee'] : $frais->lieu_arrivee;
+            $notes = array_key_exists('notes', $validated) ? $validated['notes'] : $frais->description;
 
-        $frais->update([
-            ...$validated,
-            'amount'      => $expenseReports->computeDeplacementAmount($distance, $taux),
-            'distance_km' => $distance,
-            'taux_km'     => $taux,
-            'description' => $expenseReports->buildDeplacementDescription($lieuDepart, $lieuArrivee, $notes),
-        ]);
+            $frais->update([
+                ...$validated,
+                'amount'      => $expenseReports->computeDeplacementAmount($distance, $taux),
+                'distance_km' => $distance,
+                'taux_km'     => $taux,
+                'description' => $expenseReports->buildDeplacementDescription($lieuDepart, $lieuArrivee, $notes),
+            ]);
+        } else {
+            $validated = $request->validate([
+                'date'           => 'sometimes|date',
+                'amount'         => 'sometimes|numeric|min:0',
+                'description'    => 'nullable|string|max:512',
+                'notes'          => 'nullable|string',
+                'payment_method' => 'nullable|in:' . implode(',', ExpenseLine::PAYMENT_METHODS),
+            ]);
+
+            $frais->update([
+                ...$validated,
+                'description' => $validated['description'] ?? $validated['notes'] ?? $frais->description,
+            ]);
+        }
 
         return response()->json(
-            $expenseReports->deplacementLineToFraisPayload($frais->fresh()->load('user:id,name'), $report->fresh()),
+            $expenseReports->expenseLineToFraisPayload($frais->fresh()->load('user:id,name'), $report->fresh()),
         );
     }
 
@@ -391,7 +426,7 @@ class OrdreMissionController extends Controller
         ExpenseLine $frais,
         ExpenseReportService $expenseReports,
     ): JsonResponse {
-        $report = $expenseReports->assertDeplacementLineBelongsToOrdreMission($frais, $ordreMission);
+        $report = $expenseReports->assertLineBelongsToOrdreMission($frais, $ordreMission);
         $frais->delete();
 
         if (! $report->lines()->exists()) {

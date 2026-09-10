@@ -9,14 +9,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { adminUsersApi, ordresMissionApi, type FraisDeplacement, type OrdreMission, type OrdreMissionLigne, type User } from '../../api/client'
+import { adminUsersApi, ordresMissionApi, type OrdreMission, type OrdreMissionLigne, type User } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import OmExpensePanel from '../../components/ordres-mission/OmExpensePanel'
 import OmLigneAddPanel from '../../components/ordres-mission/OmLigneAddPanel'
 import SaveButton from '../../components/ds/SaveButton'
 import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
-import { dateInputFromApi, formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import { dateInputFromApi, formatAppDate } from '../../lib/appLocale'
 import {
   ordreMissionBonCommande,
   ordreMissionDossier,
@@ -108,7 +109,7 @@ export default function OrdreMissionFichePage() {
   const { data: frais = [] } = useQuery({
     queryKey: ['ordre-mission-frais', omId],
     queryFn: () => ordresMissionApi.fraisList(omId),
-    enabled: om?.type === 'technicien',
+    enabled: om?.type === 'technicien' || om?.type === 'ingenieur',
     staleTime: 30_000,
   })
 
@@ -167,37 +168,6 @@ export default function OrdreMissionFichePage() {
     }))
   }
 
-  // Frais de déplacement
-  const [showFraisForm, setShowFraisForm] = useState(false)
-  const [fraisForm, setFraisForm] = useState({ user_id: '', date: '', lieu_depart: '', lieu_arrivee: '', distance_km: '', taux_km: '0.4010', type_transport: 'voiture', notes: '' })
-
-  const createFraisMut = useMutation({
-    mutationFn: () => ordresMissionApi.fraisCreate(omId, {
-      user_id: Number(fraisForm.user_id),
-      date: fraisForm.date,
-      lieu_depart: fraisForm.lieu_depart || undefined,
-      lieu_arrivee: fraisForm.lieu_arrivee || undefined,
-      distance_km: Number(fraisForm.distance_km),
-      taux_km: Number(fraisForm.taux_km),
-      type_transport: fraisForm.type_transport,
-      notes: fraisForm.notes || undefined,
-    }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['ordre-mission-frais', omId] })
-      void qc.invalidateQueries({ queryKey: ['expense-reports'] })
-      setShowFraisForm(false)
-      setFraisForm({ user_id: '', date: '', lieu_depart: '', lieu_arrivee: '', distance_km: '', taux_km: '0.4010', type_transport: 'voiture', notes: '' })
-    },
-  })
-
-  const deleteFraisMut = useMutation({
-    mutationFn: (fraisId: number) => ordresMissionApi.fraisDelete(omId, fraisId),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['ordre-mission-frais', omId] })
-      void qc.invalidateQueries({ queryKey: ['expense-reports'] })
-    },
-  })
-
   const deleteLigneMut = useMutation({
     mutationFn: (ligneId: number) => ordresMissionApi.deleteLigne(omId, ligneId),
     onSuccess: () => {
@@ -252,9 +222,6 @@ export default function OrdreMissionFichePage() {
   const quote = ordreMissionQuote(om)
   const dossier = ordreMissionDossier(om)
   const dossierId = ordreMissionDossierId(om)
-  const totalFrais = frais.reduce((s, f) => s + f.montant, 0)
-  const expenseReportId = frais[0]?.expense_report_id
-  const expenseReportNumber = frais[0]?.expense_report_number
   const statutBadge = ordreMissionStatutBadgeProps(omDraft.statut)
 
   return (
@@ -561,111 +528,8 @@ export default function OrdreMissionFichePage() {
         {(om.lignes ?? []).length === 0 && <p style={{ padding: '1rem' }} className="text-muted">Aucune ligne.</p>}
       </div>
 
-      {/* Notes de frais — déplacement (technicien uniquement) */}
-      {om.type === 'technicien' && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <div>
-              <span style={{ fontWeight: 600 }}>Notes de frais — déplacement</span>
-              {frais.length > 0 && <span className="text-muted" style={{ marginLeft: '0.5rem', fontSize: '0.85rem' }}>Total : {formatMoney(totalFrais)}</span>}
-              {expenseReportId ? (
-                <p className="text-muted" style={{ margin: '0.35rem 0 0', fontSize: '0.82rem' }}>
-                  Liée à la NDF{' '}
-                  <Link to={`/notes-de-frais/${expenseReportId}`} className="link-inline">
-                    {expenseReportNumber ?? `#${expenseReportId}`}
-                  </Link>
-                  {' '}— validation dans Terrain → Notes de frais
-                </p>
-              ) : null}
-            </div>
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowFraisForm((v) => !v)}>+ Ajouter</button>
-          </div>
-
-          {showFraisForm && (
-            <form
-              style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}
-              onSubmit={(e) => { e.preventDefault(); createFraisMut.mutate() }}
-            >
-              <div className="quote-form-grid">
-                <label>
-                  Technicien *
-                  <select value={fraisForm.user_id} onChange={(e) => setFraisForm((f) => ({ ...f, user_id: e.target.value }))} required>
-                    <option value="">Choisir…</option>
-                    {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                  </select>
-                </label>
-                <label>
-                  Date *
-                  <input type="date" value={fraisForm.date} onChange={(e) => setFraisForm((f) => ({ ...f, date: e.target.value }))} required />
-                </label>
-                <label>
-                  Départ
-                  <input value={fraisForm.lieu_depart} onChange={(e) => setFraisForm((f) => ({ ...f, lieu_depart: e.target.value }))} placeholder="Ville départ" />
-                </label>
-                <label>
-                  Arrivée
-                  <input value={fraisForm.lieu_arrivee} onChange={(e) => setFraisForm((f) => ({ ...f, lieu_arrivee: e.target.value }))} placeholder="Ville arrivée" />
-                </label>
-                <label>
-                  Distance aller (km) *
-                  <input type="number" min={0} step="0.1" value={fraisForm.distance_km} onChange={(e) => setFraisForm((f) => ({ ...f, distance_km: e.target.value }))} required />
-                </label>
-                <label>
-                  Taux {MONEY_UNIT_LABEL}/km
-                  <input type="number" min={0} step="0.0001" value={fraisForm.taux_km} onChange={(e) => setFraisForm((f) => ({ ...f, taux_km: e.target.value }))} />
-                </label>
-              </div>
-              {fraisForm.distance_km && fraisForm.taux_km && (
-                <p style={{ fontSize: '0.85rem', margin: '0.25rem 0' }}>
-                  Montant estimé (A/R) : <strong>{formatMoney(Number(fraisForm.distance_km) * Number(fraisForm.taux_km) * 2)}</strong>
-                </p>
-              )}
-              <div className="crud-actions" style={{ marginTop: '0.5rem' }}>
-                <button type="submit" className="btn btn-primary btn-sm" disabled={createFraisMut.isPending}>Enregistrer</button>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowFraisForm(false)}>Annuler</button>
-              </div>
-            </form>
-          )}
-
-          <div className="table-wrap">
-            <table className="data-table data-table--compact">
-              <thead>
-                <tr>
-                  <th>Technicien</th>
-                  <th>Date</th>
-                  <th>Trajet</th>
-                  <th>Distance</th>
-                  <th>Montant A/R</th>
-                  <th>Statut</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {frais.map((f: FraisDeplacement) => (
-                  <tr key={f.id}>
-                    <td>{f.user?.name ?? `#${f.user_id}`}</td>
-                    <td>{new Date(f.date).toLocaleDateString('fr-FR')}</td>
-                    <td>{[f.lieu_depart, f.lieu_arrivee].filter(Boolean).join(' → ') || '—'}</td>
-                    <td>{f.distance_km} km</td>
-                    <td><strong>{formatMoney(f.montant)}</strong></td>
-                    <td><span className="badge">{f.ndf_statut ?? f.statut}</span></td>
-                    <td>
-                      <button type="button" className="btn btn-secondary btn-sm btn-danger-outline"
-                        onClick={() => { if (window.confirm('Supprimer ?')) deleteFraisMut.mutate(f.id) }}>
-                        ✕
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {frais.length === 0 && !showFraisForm && (
-            <p style={{ padding: '1rem' }} className="text-muted">
-              Aucune ligne de déplacement. Chaque saisie crée ou complète la note de frais (NDF) de l’OM.
-            </p>
-          )}
-        </div>
+      {(om.type === 'technicien' || om.type === 'ingenieur') && (
+        <OmExpensePanel omId={omId} frais={frais} users={users} />
       )}
 
       {deleteLigneTarget ? (

@@ -42,6 +42,9 @@ class User extends Authenticatable
         'email',
         'phone',
         'poste',
+        'expense_taux_km',
+        'expense_plafond_repas',
+        'expense_forfait_repas',
         'password',
         'role',
         'client_id',
@@ -57,8 +60,11 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'email_verified_at'     => 'datetime',
+            'password'              => 'hashed',
+            'expense_taux_km'       => 'float',
+            'expense_plafond_repas' => 'float',
+            'expense_forfait_repas' => 'float',
         ];
     }
 

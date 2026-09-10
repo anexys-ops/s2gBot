@@ -78,6 +78,7 @@ function ReportContextRow({ report }: { report: ExpenseReport }) {
   const dossier = om?.dossier
   const client = om?.client
   const site = om?.site
+  const porteur = report.user
 
   return (
     <div className="ndf-context-row">
@@ -86,7 +87,17 @@ function ReportContextRow({ report }: { report: ExpenseReport }) {
           <span className="ndf-context-chip__label">OM</span>
           <strong>{om.unique_number ?? om.numero}</strong>
         </span>
-      ) : null}
+      ) : porteur ? (
+        <span className="ndf-context-chip">
+          <span className="ndf-context-chip__label">Hors OM</span>
+          <strong>{porteur.name}</strong>
+        </span>
+      ) : (
+        <span className="ndf-context-chip">
+          <span className="ndf-context-chip__label">Hors OM</span>
+          <strong>Autonome</strong>
+        </span>
+      )}
       {dossier ? (
         <span className="ndf-context-chip">
           <span className="ndf-context-chip__label">Dossier</span>
@@ -112,7 +123,7 @@ function ReportContextRow({ report }: { report: ExpenseReport }) {
 function ReportContextCell({ report }: { report: ExpenseReport }) {
   const om = report.ordre_mission
   const parts = [
-    om ? (om.unique_number ?? om.numero) : null,
+    om ? (om.unique_number ?? om.numero) : (report.user?.name ? `Hors OM · ${report.user.name}` : 'Hors OM'),
     om?.dossier?.reference ?? om?.dossier?.titre ?? null,
     om?.client?.name ?? null,
     om?.site?.nom ?? om?.site?.name ?? null,
@@ -558,6 +569,7 @@ export default function ExpenseReportsPage() {
   const reportId = id ? Number(id) : null
 
   const [creating, setCreating] = useState(false)
+  const [createMode, setCreateMode] = useState<'with_om' | 'without_om'>('without_om')
   const [selectedOM, setSelectedOM] = useState<number | ''>('')
   const [searchInput, setSearchInput] = useState('')
   const [filterStatut, setFilterStatut] = useState('')
@@ -590,16 +602,21 @@ export default function ExpenseReportsPage() {
   const { data: eligibleOMs = [] } = useQuery({
     queryKey: ['expense-eligible-oms'],
     queryFn: () => expenseReportsApi.eligibleOMs(),
-    enabled: creating,
+    enabled: creating && createMode === 'with_om',
     staleTime: 60_000,
   })
 
   const createMut = useMutation({
-    mutationFn: () => expenseReportsApi.create({ ordre_mission_id: Number(selectedOM) }),
+    mutationFn: () => expenseReportsApi.create(
+      createMode === 'with_om'
+        ? { ordre_mission_id: Number(selectedOM) }
+        : {},
+    ),
     onSuccess: (report) => {
       void qc.invalidateQueries({ queryKey: ['expense-reports'] })
       setCreating(false)
       setSelectedOM('')
+      setCreateMode('without_om')
       navigate(`/notes-de-frais/${report.id}`)
     },
   })
@@ -671,26 +688,65 @@ export default function ExpenseReportsPage() {
         />
 
         {creating && (
-          <div className="card ndf-no-print" style={{ padding: '0.85rem', marginBottom: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <label style={{ flex: 1, minWidth: 220 }}>
-              <span className="filter-label">Ordre de mission *</span>
-              <select
-                value={selectedOM}
-                onChange={(e) => setSelectedOM(e.target.value === '' ? '' : Number(e.target.value))}
-                style={{ display: 'block', width: '100%', marginTop: 4 }}
+          <div className="card ndf-no-print ndf-create-card">
+            <div className="ndf-create-mode">
+              <label className={`ndf-create-mode__option${createMode === 'without_om' ? ' ndf-create-mode__option--active' : ''}`}>
+                <input
+                  type="radio"
+                  name="ndf-create-mode"
+                  checked={createMode === 'without_om'}
+                  onChange={() => setCreateMode('without_om')}
+                />
+                <span>
+                  <strong>Sans ordre de mission</strong>
+                  <small>NDF autonome (automatisation, frais divers)</small>
+                </span>
+              </label>
+              <label className={`ndf-create-mode__option${createMode === 'with_om' ? ' ndf-create-mode__option--active' : ''}`}>
+                <input
+                  type="radio"
+                  name="ndf-create-mode"
+                  checked={createMode === 'with_om'}
+                  onChange={() => setCreateMode('with_om')}
+                />
+                <span>
+                  <strong>Liée à un OM</strong>
+                  <small>Rattacher à un ordre de mission existant</small>
+                </span>
+              </label>
+            </div>
+            {createMode === 'with_om' ? (
+              <label style={{ flex: 1, minWidth: 220, marginTop: '0.75rem' }}>
+                <span className="filter-label">Ordre de mission *</span>
+                <select
+                  value={selectedOM}
+                  onChange={(e) => setSelectedOM(e.target.value === '' ? '' : Number(e.target.value))}
+                  style={{ display: 'block', width: '100%', marginTop: 4 }}
+                >
+                  <option value="">— sélectionner —</option>
+                  {eligibleOMs.map((om) => (
+                    <option key={om.id} value={om.id}>
+                      {om.unique_number ?? om.numero} — {om.type} — {(om as { client?: { name: string } }).client?.name ?? ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <p className="text-muted" style={{ margin: '0.75rem 0 0', fontSize: '0.85rem' }}>
+                La NDF sera créée pour votre compte, sans rattachement à un OM. Vous pourrez y ajouter des lignes (repas, déplacement, autres).
+              </p>
+            )}
+            <div className="crud-actions" style={{ marginTop: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={(createMode === 'with_om' && !selectedOM) || createMut.isPending}
+                onClick={() => createMut.mutate()}
               >
-                <option value="">— sélectionner —</option>
-                {eligibleOMs.map((om) => (
-                  <option key={om.id} value={om.id}>
-                    {om.unique_number ?? om.numero} — {om.type} — {(om as { client?: { name: string } }).client?.name ?? ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="button" className="btn btn-primary btn-sm" disabled={!selectedOM || createMut.isPending} onClick={() => createMut.mutate()}>
-              {createMut.isPending ? '…' : 'Créer'}
-            </button>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCreating(false)}>Annuler</button>
+                {createMut.isPending ? '…' : 'Créer'}
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCreating(false)}>Annuler</button>
+            </div>
           </div>
         )}
 

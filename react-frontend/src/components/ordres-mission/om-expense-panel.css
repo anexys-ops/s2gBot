@@ -1,0 +1,120 @@
+.om-ndf-panel {
+  padding: 0;
+  overflow: hidden;
+  margin-top: 1rem;
+}
+
+.om-ndf-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  background: linear-gradient(180deg, #f8fafc, #fff);
+}
+
+.om-ndf-panel__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.om-ndf-panel__subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.om-ndf-panel__total {
+  margin-left: 0.35rem;
+}
+
+.om-ndf-panel__ndf-link {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.om-ndf-panel__form {
+  padding: 1rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.om-ndf-type-picker {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.om-ndf-type-picker__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.om-ndf-type-picker__btn:hover {
+  border-color: #93c5fd;
+}
+
+.om-ndf-type-picker__btn--active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.om-ndf-type-picker__icon {
+  font-size: 1rem;
+}
+
+.om-ndf-panel__grid {
+  margin-top: 0.25rem;
+}
+
+.om-ndf-panel__grid-span-2 {
+  grid-column: 1 / -1;
+}
+
+.om-ndf-panel__hint,
+.om-ndf-panel__bareme-hint,
+.om-ndf-panel__estimate {
+  display: block;
+  font-size: 0.78rem;
+  margin-top: 0.25rem;
+}
+
+.om-ndf-panel__estimate {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+}
+
+.om-ndf-panel__type-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.om-ndf-panel__detail {
+  max-width: 220px;
+  font-size: 0.85rem;
+}
+
+.om-ndf-panel__empty {
+  padding: 1rem;
+  margin: 0;
+}

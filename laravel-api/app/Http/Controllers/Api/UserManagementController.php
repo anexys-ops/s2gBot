@@ -40,6 +40,9 @@ class UserManagementController extends Controller
             'password' => ['required', Password::defaults()],
             'phone' => 'nullable|string|max:40',
             'poste' => 'nullable|string|max:128',
+            'expense_taux_km' => 'nullable|numeric|min:0',
+            'expense_plafond_repas' => 'nullable|numeric|min:0',
+            'expense_forfait_repas' => 'nullable|numeric|min:0',
             'role' => ['required', Rule::in([
                 User::ROLE_LAB_ADMIN,
                 User::ROLE_LAB_TECHNICIAN,
@@ -100,6 +103,9 @@ class UserManagementController extends Controller
             'password' => ['nullable', Password::defaults()],
             'phone' => 'nullable|string|max:40',
             'poste' => 'nullable|string|max:128',
+            'expense_taux_km' => 'nullable|numeric|min:0',
+            'expense_plafond_repas' => 'nullable|numeric|min:0',
+            'expense_forfait_repas' => 'nullable|numeric|min:0',
             'role' => ['sometimes', Rule::in([
                 User::ROLE_LAB_ADMIN,
                 User::ROLE_LAB_TECHNICIAN,

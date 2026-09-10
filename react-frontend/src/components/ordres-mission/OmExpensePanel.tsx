@@ -185,7 +185,7 @@ export default function OmExpensePanel({ omId, frais, users }: Props) {
             ))}
           </div>
 
-          <div className="quote-form-grid om-ndf-panel__grid">
+          <div className="om-ndf-panel__grid">
             <label>
               Personnel *
               <select
@@ -224,10 +224,6 @@ export default function OmExpensePanel({ omId, frais, users }: Props) {
                 ))}
               </select>
             </label>
-            <label>
-              Justificatif
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)} />
-            </label>
 
             {form.type === 'deplacement' ? (
               <>
@@ -249,32 +245,42 @@ export default function OmExpensePanel({ omId, frais, users }: Props) {
                 </label>
               </>
             ) : (
-              <>
-                <label>
-                  Montant TTC ({MONEY_UNIT_LABEL}) *
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={form.amount}
-                    onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                    required
-                  />
-                  {form.type === 'repas' && bareme.plafond_repas != null ? (
-                    <span className="om-ndf-panel__hint">Plafond barème : {formatMoney(bareme.plafond_repas)}</span>
-                  ) : null}
-                </label>
-                <label className="om-ndf-panel__grid-span-2">
-                  Description
-                  <textarea
-                    rows={2}
-                    value={form.description}
-                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                    placeholder={form.type === 'repas' ? 'Ex. déjeuner client, restaurant…' : 'Détail de la dépense…'}
-                  />
-                </label>
-              </>
+              <label>
+                Montant TTC ({MONEY_UNIT_LABEL}) *
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.amount}
+                  onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                  required
+                />
+                {form.type === 'repas' && bareme.plafond_repas != null ? (
+                  <span className="om-ndf-panel__hint">Plafond barème : {formatMoney(bareme.plafond_repas)}</span>
+                ) : null}
+              </label>
             )}
+
+            <label className="om-ndf-panel__grid-span-2">
+              Description
+              <textarea
+                rows={3}
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder={
+                  form.type === 'repas'
+                    ? 'Ex. déjeuner client, restaurant…'
+                    : form.type === 'deplacement'
+                      ? 'Commentaire sur le trajet (optionnel)…'
+                      : 'Détail de la dépense…'
+                }
+              />
+            </label>
+
+            <label className="om-ndf-panel__grid-span-2">
+              Justificatif
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)} />
+            </label>
           </div>
 
           {estimatedKm != null ? (

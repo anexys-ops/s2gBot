@@ -442,12 +442,11 @@ export default function OrdreMissionFichePage() {
                       <div>{ligne.libelle}</div>
                       {ligne.articleAction && <small className="text-muted">{ligne.articleAction.duree_heures}h estimé</small>}
                     </td>
-                    <td>
+                    <td className="om-ligne-article-cell">
                       {ligne.article ? (
-                        <Link to={`/catalogue/articles/${ligne.article.id}`} className="link-inline">
+                        <Link to={`/catalogue/articles/${ligne.article.id}`} className="om-ligne-article-cell__link">
                           <code className="code-badge">{ligne.article.code}</code>
-                          {' '}
-                          {ligne.article.libelle}
+                          <span className="om-ligne-article-cell__libelle">{ligne.article.libelle}</span>
                         </Link>
                       ) : ligne.ref_article_id ? (
                         <Link to={`/catalogue/articles/${ligne.ref_article_id}`} className="link-inline">

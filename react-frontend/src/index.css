@@ -7588,6 +7588,25 @@ a.catalogue-tree__link-article:hover {
   font-size: 0.88rem;
 }
 
+.om-ligne-article-cell {
+  max-width: 14rem;
+}
+
+.om-ligne-article-cell__link {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  text-decoration: none;
+}
+
+.om-ligne-article-cell__libelle {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--color-text-muted, #64748b);
+  overflow-wrap: anywhere;
+}
+
 .om-fiche__title-row {
   display: flex;
   flex-wrap: wrap;

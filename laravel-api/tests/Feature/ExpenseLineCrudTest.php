@@ -157,4 +157,38 @@ class ExpenseLineCrudTest extends TestCase
             'date'     => '2026-09-09',
         ])->assertStatus(422);
     }
+
+    public function test_can_delete_line_and_report_when_soumis(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $report = $this->makeReport($user);
+
+        $line = ExpenseLine::query()->create([
+            'expense_report_id' => $report->id,
+            'user_id'           => $user->id,
+            'category'          => 'Repas',
+            'amount'            => 25,
+            'date'              => '2026-09-09',
+        ]);
+
+        $report->update(['statut' => ExpenseReport::STATUT_SOUMIS]);
+
+        $this->deleteJson("/api/expense-reports/{$report->id}/lines/{$line->id}")
+            ->assertOk();
+
+        $this->assertDatabaseMissing('expense_lines', ['id' => $line->id]);
+        $this->assertSoftDeleted('expense_reports', ['id' => $report->id]);
+    }
+
+    public function test_cannot_delete_rembourse_expense_report(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $report = $this->makeReport($user);
+        $report->update(['statut' => ExpenseReport::STATUT_REMBOURSE]);
+
+        $this->deleteJson("/api/expense-reports/{$report->id}")
+            ->assertStatus(422);
+    }
 }

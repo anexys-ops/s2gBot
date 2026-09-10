@@ -16,6 +16,7 @@ import {
   type ExpenseReportStatut,
 } from '../../api/client'
 import ListTableToolbar, { PaginationBar } from '../../components/ListTableToolbar'
+import TableRowActions from '../../components/TableRowActions'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
 import ExpenseLineModal from './ExpenseLineModal'
@@ -36,6 +37,10 @@ const STATUT_COLORS: Record<ExpenseReportStatut, string> = {
 function paymentLabel(method?: ExpensePaymentMethod | null): string {
   if (!method) return '—'
   return EXPENSE_PAYMENT_METHOD_LABELS[method] ?? method
+}
+
+function canDeleteExpenseReport(statut: ExpenseReportStatut): boolean {
+  return statut !== 'rembourse'
 }
 
 function reportTotal(report: ExpenseReport): number {
@@ -172,12 +177,14 @@ function LineRow({
   line,
   reportId,
   canEdit,
+  canDelete,
   canValidate,
   onEdit,
 }: {
   line: ExpenseLine
   reportId: number
   canEdit: boolean
+  canDelete: boolean
   canValidate: boolean
   onEdit: (line: ExpenseLine) => void
 }) {
@@ -248,16 +255,20 @@ function LineRow({
         )}
       </td>
       <td>{line.user?.name || `#${line.user_id}`}</td>
-      {canEdit && (
+      {(canEdit || canDelete) && (
         <td className="ndf-no-print">
           <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => onEdit(line)} title="Modifier">✏️</button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm btn-danger-outline"
-              disabled={deleteMut.isPending}
-              onClick={() => { if (window.confirm('Supprimer cette ligne ?')) deleteMut.mutate() }}
-            >✕</button>
+            {canEdit ? (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => onEdit(line)} title="Modifier">✏️</button>
+            ) : null}
+            {canDelete ? (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm btn-danger-outline"
+                disabled={deleteMut.isPending}
+                onClick={() => { if (window.confirm('Supprimer cette ligne ?')) deleteMut.mutate() }}
+              >✕</button>
+            ) : null}
           </div>
         </td>
       )}
@@ -366,10 +377,12 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
   }
 
   const canEdit = report.statut === 'brouillon'
+  const canDelete = canDeleteExpenseReport(report.statut)
   const canValidate = report.statut !== 'brouillon'
+  const canDeleteLines = canDelete
   const lines = report.lines ?? []
   const total = reportTotal(report)
-  const colCount = canEdit ? 9 : 8
+  const colCount = canEdit || canDeleteLines ? 9 : 8
 
   const notesDirty = notesDraft !== null && notesDraft !== (report.notes ?? '')
   const privateDirty = privateNotesDraft !== null && privateNotesDraft !== (report.private_notes ?? '')
@@ -483,13 +496,18 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
           {report.statut === 'valide' && (
             <button type="button" className="btn btn-primary btn-sm" disabled={updateMut.isPending} onClick={() => updateMut.mutate({ statut: 'rembourse' })}>Marquer remboursé</button>
           )}
-          {canEdit && (
+          {canDelete && (
             <button
               type="button"
               className="btn btn-secondary btn-sm btn-danger-outline"
               style={{ marginLeft: 'auto' }}
               disabled={deleteMut.isPending}
-              onClick={() => { if (window.confirm('Supprimer cette note de frais ?')) deleteMut.mutate() }}
+              onClick={() => {
+                const msg = report.statut === 'brouillon'
+                  ? 'Supprimer cette note de frais ?'
+                  : `Supprimer la note de frais ${report.unique_number} (statut : ${EXPENSE_STATUT_LABELS[report.statut]}) ?`
+                if (window.confirm(msg)) deleteMut.mutate()
+              }}
             >
               Supprimer
             </button>
@@ -508,7 +526,7 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
                 <th>Description</th>
                 <th>Justificatif</th>
                 <th>Personnel</th>
-                {canEdit && <th className="ndf-no-print"></th>}
+                {(canEdit || canDeleteLines) && <th className="ndf-no-print"></th>}
               </tr>
             </thead>
             <tbody>
@@ -518,6 +536,7 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
                   line={l}
                   reportId={reportId}
                   canEdit={canEdit}
+                  canDelete={canDeleteLines}
                   canValidate={canValidate}
                   onEdit={(line) => setLineModal(line)}
                 />
@@ -624,6 +643,11 @@ export default function ExpenseReportsPage() {
   const statusMut = useMutation({
     mutationFn: ({ id: rid, statut }: { id: number; statut: ExpenseReportStatut }) =>
       expenseReportsApi.update(rid, { statut }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['expense-reports'] }),
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => expenseReportsApi.delete(id),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['expense-reports'] }),
   })
 
@@ -801,8 +825,21 @@ export default function ExpenseReportsPage() {
                         <td style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>{r.created_at?.slice(0, 10)}</td>
                       )}
                       {visible.actions !== false && (
-                        <td>
-                          <Link to={`/notes-de-frais/${r.id}`} className="btn btn-secondary btn-sm">Modifier</Link>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <div className="data-table__actions-inner">
+                            <Link to={`/notes-de-frais/${r.id}`} className="btn btn-secondary btn-sm">Ouvrir</Link>
+                            {canDeleteExpenseReport(r.statut) ? (
+                              <TableRowActions
+                                deleteLabel={`Supprimer ${r.unique_number}`}
+                                onDelete={() => {
+                                  const msg = r.statut === 'brouillon'
+                                    ? `Supprimer la note de frais ${r.unique_number} ?`
+                                    : `Supprimer ${r.unique_number} (statut : ${EXPENSE_STATUT_LABELS[r.statut]}) ?`
+                                  if (window.confirm(msg)) deleteMut.mutate(r.id)
+                                }}
+                              />
+                            ) : null}
+                          </div>
                         </td>
                       )}
                     </tr>

@@ -134,7 +134,11 @@ class ExpenseReportController extends Controller
 
     public function destroy(ExpenseReport $expenseReport): JsonResponse
     {
-        abort_if($expenseReport->statut !== ExpenseReport::STATUT_BROUILLON, 422, 'Seules les NDF en brouillon peuvent être supprimées.');
+        abort_if(
+            $expenseReport->statut === ExpenseReport::STATUT_REMBOURSE,
+            422,
+            'Une note de frais remboursée ne peut pas être supprimée.',
+        );
 
         foreach ($expenseReport->lines as $line) {
             $this->deleteReceiptFile($line);
@@ -236,7 +240,7 @@ class ExpenseReportController extends Controller
     public function destroyLine(ExpenseReport $expenseReport, ExpenseLine $line): JsonResponse
     {
         $this->ensureLineBelongs($expenseReport, $line);
-        $this->ensureBrouillon($expenseReport);
+        $this->ensureLineDeletable($expenseReport);
 
         $this->deleteReceiptFile($line);
         $line->delete();
@@ -364,6 +368,15 @@ class ExpenseReportController extends Controller
             $expenseReport->statut !== ExpenseReport::STATUT_BROUILLON,
             422,
             'Cette note de frais n\'est plus modifiable.',
+        );
+    }
+
+    private function ensureLineDeletable(ExpenseReport $expenseReport): void
+    {
+        abort_if(
+            $expenseReport->statut === ExpenseReport::STATUT_REMBOURSE,
+            422,
+            'Impossible de supprimer une ligne sur une note de frais remboursée.',
         );
     }
 

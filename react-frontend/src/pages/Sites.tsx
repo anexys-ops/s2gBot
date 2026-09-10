@@ -41,7 +41,7 @@ const emptyForm: Partial<Site> = {
 
 export default function Sites() {
   const { user } = useAuth()
-  const isAdmin = user?.role === 'lab_admin'
+  const canManage = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const queryClient = useQueryClient()
   const location = useLocation()
   const navigate = useNavigate()
@@ -87,7 +87,7 @@ export default function Sites() {
   const { data: clientsData } = useQuery({
     queryKey: ['clients', 'select-options'],
     queryFn: () => clientsApi.list(),
-    enabled: isAdmin,
+    enabled: canManage,
     staleTime: 60_000,
   })
 
@@ -95,12 +95,12 @@ export default function Sites() {
 
   useEffect(() => {
     const st = location.state as { openCreate?: boolean } | null
-    if (!st?.openCreate || !isAdmin) return
+    if (!st?.openCreate || !canManage) return
     setForm(emptyForm)
     setEditingId(null)
     setModal('create')
     navigate('.', { replace: true, state: {} })
-  }, [location.state, navigate, isAdmin])
+  }, [location.state, navigate, canManage])
 
   useEffect(() => {
     if (modal !== 'create' || form.client_id) return
@@ -229,7 +229,7 @@ export default function Sites() {
           : 'Aucun chantier pour cette vue'
       }
       actions={
-        isAdmin ? (
+        canManage ? (
           <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
             Nouveau chantier
           </button>
@@ -249,7 +249,7 @@ export default function Sites() {
           { id: 'address', label: 'Adresse' },
           { id: 'travelQuote', label: 'Dépl. devis (HT)' },
           { id: 'travelInvoice', label: 'Dépl. facture (HT)' },
-          ...(isAdmin ? [{ id: 'actions', label: 'Actions' }] : []),
+          ...(canManage ? [{ id: 'actions', label: 'Actions' }] : []),
         ]}
         visibleColumns={visible}
         onToggleColumn={toggle}
@@ -287,7 +287,7 @@ export default function Sites() {
               {visible.address !== false && <th>Adresse</th>}
               {visible.travelQuote !== false && <th>Dépl. devis (HT)</th>}
               {visible.travelInvoice !== false && <th>Dépl. facture (HT)</th>}
-              {isAdmin && visible.actions !== false && <th className="data-table__actions">Actions</th>}
+              {canManage && visible.actions !== false && <th className="data-table__actions">Actions</th>}
             </tr>
             </thead>
           <tbody>
@@ -310,7 +310,7 @@ export default function Sites() {
                 {visible.client !== false && <td>{s.client?.name}</td>}
                 {visible.status !== false && (
                   <td className="data-table__status">
-                    {isAdmin ? (
+                    {canManage ? (
                       (() => {
                         const st = siteStatutBadgeProps(s.status)
                         return (
@@ -340,9 +340,11 @@ export default function Sites() {
                 {visible.travelInvoice !== false && (
                   <td className="data-table__num">{formatMoney(Number(s.travel_fee_invoice_ht ?? 0))}</td>
                 )}
-                {isAdmin && visible.actions !== false && (
+                {canManage && visible.actions !== false && (
                   <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
                     <TableRowActions
+                      editLabel="Modifier le chantier"
+                      onEdit={() => openEdit(s)}
                       deleteLabel="Supprimer le chantier"
                       onDelete={() => setSiteToDelete(s)}
                     />
@@ -361,7 +363,7 @@ export default function Sites() {
               { id: 'address', kind: 'text' },
               { id: 'travelQuote', kind: 'money' },
               { id: 'travelInvoice', kind: 'money' },
-              ...(isAdmin ? [{ id: 'actions', kind: 'text' as const }] : []),
+              ...(canManage ? [{ id: 'actions', kind: 'text' as const }] : []),
             ]}
             visible={visible}
             totals={totals}
@@ -372,7 +374,7 @@ export default function Sites() {
         <PaginationBar page={currentPage} lastPage={lastPage} onPage={setPage} />
       </div>
 
-      {modal && isAdmin && (
+      {modal && canManage && (
         <Modal title={modal === 'create' ? 'Nouveau chantier' : 'Modifier le chantier'} onClose={() => setModal(null)}>
           <form onSubmit={handleSubmit}>
             <ClientSelectField

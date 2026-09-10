@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Agency;
 use App\Models\Site;
 use App\Support\AgencyAccess;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -47,7 +48,7 @@ class SiteController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $request->user()->isLab()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -98,7 +99,7 @@ class SiteController extends Controller
 
     public function update(Request $request, Site $site): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $request->user()->isLab()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -132,11 +133,17 @@ class SiteController extends Controller
 
     public function destroy(Request $request, Site $site): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $request->user()->isLab()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $site->delete();
+        try {
+            $site->delete();
+        } catch (QueryException) {
+            return response()->json([
+                'message' => 'Impossible de supprimer ce chantier : des dossiers ou missions y sont encore rattachés.',
+            ], 422);
+        }
 
         return response()->json(null, 204);
     }

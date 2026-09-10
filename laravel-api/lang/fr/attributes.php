@@ -55,7 +55,7 @@ return [
     'country' => 'pays',
     'siret' => 'SIRET',
     'ice' => 'ICE',
-    'ca_annuel_tva_regime' => 'CA de l’année (TVA)',
+    'ca_annuel_tva_regime' => 'TVA État',
     'rc' => 'RC',
     'patente' => 'patente',
     'if_number' => 'IF',

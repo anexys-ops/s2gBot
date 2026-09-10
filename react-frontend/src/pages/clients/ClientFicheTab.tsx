@@ -194,7 +194,7 @@ export default function ClientFicheTab() {
         <dl className="module-fiche-grid">
           <div><dt>ICE</dt><dd>{client.ice?.trim() ? client.ice : '—'}</dd></div>
           <div>
-            <dt>CA de l&apos;année (TVA)</dt>
+            <dt>TVA État</dt>
             <dd>{client.ca_annuel_tva_regime ? 'Oui — 25 % récup. / 75 % État' : 'Non'}</dd>
           </div>
           <div><dt>RC</dt><dd>{client.rc?.trim() ? client.rc : '—'}</dd></div>

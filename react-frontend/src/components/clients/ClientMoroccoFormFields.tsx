@@ -180,7 +180,7 @@ export default function ClientMoroccoFormFields({
                 }))
               }
             />
-            <span>CA de l&apos;année</span>
+            <span>TVA État</span>
           </label>
         </div>
         {form.ca_annuel_tva_regime ? (

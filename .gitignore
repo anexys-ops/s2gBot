@@ -26,6 +26,9 @@ laravel-api/bootstrap/cache/*.php
 *.tsbuildinfo
 laravel-api/.phpunit.result.cache
 
+# Sauvegardes MySQL prod (docker-prod-refresh.sh)
+/backups/
+
 # Données / exports locaux (volumineux, hors dépôt)
 /PROLAB/
 /BD_S2G_PROLAB/

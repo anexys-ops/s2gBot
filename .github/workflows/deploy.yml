@@ -189,8 +189,8 @@ jobs:
             echo "RUN_LAB_AGENCY_SETUP=1" >> .env.docker
           fi
 
-          echo "▶ Exécution docker-prod-refresh.sh (NO_CACHE=0 — cache Docker actif)"
-          NO_CACHE=0 ./scripts/docker-prod-refresh.sh
+          echo "▶ Exécution docker-prod-refresh.sh (NO_CACHE=1 — rebuild complet + backup MySQL)"
+          NO_CACHE=1 ./scripts/docker-prod-refresh.sh
           if ! grep -q '^LAB_AGENCY_SETUP_DONE=1' .env.docker 2>/dev/null; then
             echo "LAB_AGENCY_SETUP_DONE=1" >> .env.docker
             echo "✓ Setup agences labo terminé (LAB_AGENCY_SETUP_DONE=1)"

@@ -32,7 +32,7 @@ fi
 NO_CACHE="${NO_CACHE:-1}"
 DC=(docker compose --env-file "$ENV_FILE")
 
-echo "=== 0/6 Contexte déploiement ==="
+echo "=== 0/7 Contexte déploiement ==="
 echo "ENV_FILE=$ENV_FILE"
 echo "GIT_COMMIT_SHORT=${GIT_COMMIT_SHORT:-}"
 echo "NO_CACHE=$NO_CACHE (NO_CACHE=0 pour un build avec cache Docker)"
@@ -42,18 +42,39 @@ else
   echo "APP_VERSION : non défini dans $ENV_FILE (recommandé pour /api/version)"
 fi
 
-echo "=== 1/6 Caches Laravel (optimize:clear) si l’ancien conteneur app répond ==="
+echo "=== 1/7 Backup MySQL (volume db conservé ; sauvegarde fichier avant rebuild) ==="
+BACKUP_DIR="$ROOT/backups/mysql"
+mkdir -p "$BACKUP_DIR"
+env_val() { grep "^$1=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'"; }
+DB_ROOT_PASS="$(env_val DB_ROOT_PASSWORD)"
+DB_NAME="$(env_val DB_DATABASE)"
+DB_NAME="${DB_NAME:-lab_btp}"
+if [[ -n "$DB_ROOT_PASS" ]] && timeout 15 "${DC[@]}" exec -T db mysqladmin ping -h 127.0.0.1 -uroot -p"${DB_ROOT_PASS}" --silent 2>/dev/null; then
+  TS="$(date +%Y%m%d-%H%M%S)"
+  BACKUP_FILE="$BACKUP_DIR/${DB_NAME}-pre-refresh-${TS}.sql.gz"
+  if "${DC[@]}" exec -T db mysqldump -uroot -p"${DB_ROOT_PASS}" --single-transaction --routines --triggers "${DB_NAME}" | gzip -9 > "$BACKUP_FILE"; then
+    echo "✓ Backup : $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
+    ls -1t "$BACKUP_DIR"/*.sql.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
+    echo "  (conservation des 5 derniers dumps)"
+  else
+    echo "⚠ Backup MySQL échoué — déploiement poursuivi (volume db intact)."
+  fi
+else
+  echo "db absent ou non joignable — backup ignoré."
+fi
+
+echo "=== 2/7 Caches Laravel (optimize:clear) si l’ancien conteneur app répond ==="
 if timeout 20 "${DC[@]}" exec -T app true 2>/dev/null; then
   timeout 60 "${DC[@]}" exec -T app php artisan optimize:clear || true
 else
   echo "app absent ou non joignable — étape ignorée."
 fi
 
-echo "=== 2/6 Arrêt et suppression des conteneurs app et web uniquement (db intact) ==="
+echo "=== 3/7 Arrêt et suppression des conteneurs app et web uniquement (db intact) ==="
 "${DC[@]}" stop app web 2>/dev/null || true
 "${DC[@]}" rm -f app web 2>/dev/null || true
 
-echo "=== 3/6 Build images app + web (--pull uniquement si NO_CACHE=1) ==="
+echo "=== 4/7 Build images app + web (--pull uniquement si NO_CACHE=1) ==="
 BUILD_OPTS=()
 if [[ "$NO_CACHE" == "1" ]]; then
   BUILD_OPTS+=(--no-cache --pull)
@@ -71,10 +92,10 @@ for attempt in $(seq 1 "$build_attempts"); do
   sleep 15
 done
 
-echo "=== 4/6 Démarrage app + web ==="
+echo "=== 5/7 Démarrage app + web ==="
 "${DC[@]}" up -d app web
 
-echo "=== 5/6 Attente du conteneur app puis migrations + config Laravel ==="
+echo "=== 6/7 Attente du conteneur app puis migrations + config Laravel ==="
 # migrate --force : appliqué ici (complète docker-entrypoint au boot) — ne pas retirer (déploiement / prod).
 for _ in $(seq 1 30); do
   if "${DC[@]}" exec -T app php artisan --version >/dev/null 2>&1; then
@@ -106,7 +127,7 @@ fi
 "${DC[@]}" exec -T app php artisan config:clear
 "${DC[@]}" exec -T app php artisan config:cache
 
-echo "=== 6/6 État compose + version effective dans le conteneur app ==="
+echo "=== 7/7 État compose + version effective dans le conteneur app ==="
 "${DC[@]}" ps
 echo "--- printenv (app) ---"
 "${DC[@]}" exec -T app sh -c 'printf "APP_VERSION=%s\nGIT_COMMIT_SHORT=%s\n" "${APP_VERSION:-}" "${GIT_COMMIT_SHORT:-}"'

@@ -9740,6 +9740,37 @@ a.catalogue-tree__link-article:hover {
   width: max-content;
   max-width: 100%;
 }
+.bc-lignes-table--qty-edit {
+  table-layout: fixed;
+  width: 100%;
+  max-width: 100%;
+}
+.bc-lignes-table--qty-edit .bc-lignes-table__col-libelle {
+  width: auto;
+  min-width: 12rem;
+}
+.bc-lignes-table--qty-edit .bc-lignes-table__col-qty {
+  width: 5.5rem;
+}
+.bc-lignes-table--qty-edit .bc-lignes-table__col-money {
+  width: 7.5rem;
+}
+.bc-lignes-table__qty-cell {
+  vertical-align: middle;
+}
+.bc-lignes-table__qty-editor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  margin-left: auto;
+  max-width: 100%;
+}
+.bc-lignes-table__qty-cap {
+  font-size: 0.68rem;
+  line-height: 1.1;
+  white-space: nowrap;
+}
 .bc-lignes-table__col-libelle {
   width: auto;
   min-width: 6rem;

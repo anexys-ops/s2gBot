@@ -64,6 +64,24 @@ export function filterForfaitBcLignes<T extends Pick<BonCommandeLigne, 'id' | 'r
   return lignes.filter((l) => isForfaitBcLigne(l, meta))
 }
 
+/** Jalon modifiable en masse (forfait document ou jalon forfait). */
+export function isForfaitBcJalon(jalonId: string, meta?: EntityMetaPayload | null): boolean {
+  if (isDocumentForfaitMeta(meta)) return true
+  const jalon = meta?.devis_jalons?.find((j) => j.id === jalonId)
+  return jalon?.mode === 'forfait'
+}
+
+export function filterForfaitBcLigneIds(
+  ligneIds: number[],
+  lignesById: ReadonlyMap<number, Pick<BonCommandeLigne, 'ref_article_id'>>,
+  meta?: EntityMetaPayload | null,
+): number[] {
+  return ligneIds.filter((id) => {
+    const l = lignesById.get(id)
+    return l != null && isForfaitBcLigne(l, meta)
+  })
+}
+
 export function resolveQuantiteDevis(ligne: Pick<BonCommandeLigne, 'quantite_devis' | 'quantite'>): number | null {
   if (ligne.quantite_devis == null || ligne.quantite_devis === '') return null
   const n = Number(ligne.quantite_devis)

@@ -14,6 +14,10 @@ import ClientContactPicker from '../../components/clients/ClientContactPicker'
 import {
   buildBcLigneDisplayRows,
   clampQtyToDevis,
+  filterForfaitBcLigneIds,
+  filterForfaitBcLignes,
+  isForfaitBcJalon,
+  isForfaitBcLigne,
   qtyExceedsDevis,
   resolveDevisDisplayMeta,
   resolveQuantiteDevis,
@@ -153,10 +157,16 @@ export default function BonCommandeFichePage() {
     },
   })
 
+  const devisDisplayMeta = useMemo(() => resolveDevisDisplayMeta(bc), [bc])
+  const forfaitLignes = useMemo(
+    () => filterForfaitBcLignes(bc?.lignes ?? [], devisDisplayMeta),
+    [bc?.lignes, devisDisplayMeta],
+  )
+
   const mutQuantites = useMutation({
     mutationFn: async (edits: Record<number, string>) => {
-      if (!bc?.lignes?.length) return
-      for (const l of bc.lignes) {
+      if (!forfaitLignes.length) return
+      for (const l of forfaitLignes) {
         const raw = edits[l.id]
         if (raw === undefined) continue
         const qty = Number(String(raw).replace(',', '.'))
@@ -215,14 +225,14 @@ export default function BonCommandeFichePage() {
 
   const ligneCount = bc?.lignes?.length ?? 0
 
-  const devisDisplayMeta = useMemo(() => resolveDevisDisplayMeta(bc), [bc])
   const ligneById = useMemo(
     () => new Map((bc?.lignes ?? []).map((l) => [l.id, l])),
     [bc?.lignes],
   )
 
   function applyJalonMassQty(jalonId: string, ligneIds: number[]) {
-    const lignes = ligneIds
+    const editableIds = filterForfaitBcLigneIds(ligneIds, ligneById, devisDisplayMeta)
+    const lignes = editableIds
       .map((id) => ligneById.get(id))
       .filter((l): l is BonCommandeLigne => l != null)
     applyMassQtyToLignes(
@@ -238,23 +248,23 @@ export default function BonCommandeFichePage() {
     [bc?.lignes, devisDisplayMeta],
   )
   const qtyDirty = useMemo(() => {
-    if (!bc?.lignes?.length) return false
-    return bc.lignes.some((l) => {
+    if (!forfaitLignes.length) return false
+    return forfaitLignes.some((l) => {
       const raw = qtyEdits[l.id]
       if (raw === undefined) return false
       const n = Number(String(raw).replace(',', '.'))
       if (!Number.isFinite(n)) return true
       return Math.abs(n - Number(l.quantite)) >= 1e-9
     })
-  }, [bc?.lignes, qtyEdits])
+  }, [forfaitLignes, qtyEdits])
   const qtyOverDevis = useMemo(() => {
-    if (!bc?.lignes?.length) return false
-    return bc.lignes.some((l) => {
+    if (!forfaitLignes.length) return false
+    return forfaitLignes.some((l) => {
       const raw = qtyEdits[l.id]
       if (raw === undefined) return false
       return qtyExceedsDevis(raw, resolveQuantiteDevis(l))
     })
-  }, [bc?.lignes, qtyEdits])
+  }, [forfaitLignes, qtyEdits])
   const previewTotals = useMemo(() => {
     if (!bc?.lignes?.length) return null
     let ht = 0
@@ -327,7 +337,7 @@ export default function BonCommandeFichePage() {
   const canGenerateBl = lab && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
   const canGenerateOm = lab && isAdmin && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
   const hasBonLivraison = (bc.bons_livraison?.length ?? 0) > 0
-  const canEditQuantites = lab && ligneCount > 0 && bc.statut !== 'annule'
+  const canEditQuantites = lab && forfaitLignes.length > 0 && bc.statut !== 'annule'
 
   function saveQuantites() {
     setPlanningToast(null)
@@ -507,8 +517,8 @@ export default function BonCommandeFichePage() {
                     <h2 className="ds-form-section__title">Lignes de commande</h2>
                     <p className="dossier-tab-panel__intro">
                       Prestations et articles repris du devis source ({MONEY_UNIT_LABEL}).
-                      {lab && bc.statut !== 'annule'
-                        ? ' Ajustez les quantités par ligne ou en masse depuis chaque jalon (plafond = qté devis), puis enregistrez.'
+                      {canEditQuantites
+                        ? ' Seules les lignes forfait sont modifiables (plafond = qté devis), par ligne ou en masse depuis chaque jalon forfait.'
                         : null}
                     </p>
                   </div>
@@ -520,7 +530,7 @@ export default function BonCommandeFichePage() {
                 <p className="dossier-tab-empty">Aucune ligne sur ce bon de commande.</p>
               ) : (
                 <div className="table-wrap">
-                  <table className="data-table data-table--compact bc-lignes-table">
+                  <table className="data-table data-table--compact bc-lignes-table bc-lignes-table--qty-edit">
                     <colgroup>
                       <col className="bc-lignes-table__col-libelle" />
                       <col className="bc-lignes-table__col-qty" />
@@ -548,6 +558,15 @@ export default function BonCommandeFichePage() {
                     <tbody>
                       {ligneDisplayRows.map((row) => {
                         if (row.type === 'jalon_header') {
+                          const editableJalonIds = filterForfaitBcLigneIds(
+                            row.ligneIds,
+                            ligneById,
+                            devisDisplayMeta,
+                          )
+                          const showJalonMassQty =
+                            canEditQuantites &&
+                            isForfaitBcJalon(row.jalonId, devisDisplayMeta) &&
+                            editableJalonIds.length > 0
                           return (
                             <tr key={row.key} className="bc-lignes-table__jalon">
                               <td className="bc-lignes-table__jalon-label">
@@ -559,13 +578,15 @@ export default function BonCommandeFichePage() {
                                 ) : null}
                                 {row.label}
                               </td>
-                              <td />
-                              <td className="bc-lignes-table__jalon-mass">
-                                {canEditQuantites && row.ligneIds.length > 0 ? (
+                              <td className="data-table__num bc-lignes-table__qty-devis" aria-hidden="true">
+                                —
+                              </td>
+                              <td className="data-table__num bc-lignes-table__jalon-mass">
+                                {showJalonMassQty ? (
                                   <BcJalonQtyMass
                                     jalonLabel={row.label}
                                     value={jalonMassQty[row.jalonId] ?? ''}
-                                    lineCount={row.ligneIds.length}
+                                    lineCount={editableJalonIds.length}
                                     onChange={(value) =>
                                       setJalonMassQty((prev) => ({ ...prev, [row.jalonId]: value }))
                                     }
@@ -578,7 +599,8 @@ export default function BonCommandeFichePage() {
                           )
                         }
                         const l = row.ligne
-                        const canEditQty = lab && bc.statut !== 'annule'
+                        const isForfaitLine = isForfaitBcLigne(l, devisDisplayMeta)
+                        const canEditQty = canEditQuantites && isForfaitLine
                         const maxDevis = resolveQuantiteDevis(l)
                         const rawQty = qtyEdits[l.id] ?? qtyInputFromApi(l.quantite)
                         const overDevis = canEditQty && qtyExceedsDevis(rawQty, maxDevis)
@@ -596,9 +618,9 @@ export default function BonCommandeFichePage() {
                             <td className="data-table__num bc-lignes-table__qty-devis">
                               {maxDevis != null ? formatQuantity(maxDevis) : '—'}
                             </td>
-                            <td className="data-table__num">
+                            <td className="data-table__num bc-lignes-table__qty-cell">
                               {canEditQty ? (
-                                <>
+                                <div className="bc-lignes-table__qty-editor">
                                   <input
                                     type="number"
                                     className={
@@ -616,15 +638,26 @@ export default function BonCommandeFichePage() {
                                       const next = clampQtyToDevis(e.target.value, maxDevis)
                                       setQtyEdits((s) => ({ ...s, [l.id]: next }))
                                     }}
+                                    onBlur={(e) => {
+                                      const next = clampQtyToDevis(e.target.value, maxDevis)
+                                      if (next !== e.target.value) {
+                                        setQtyEdits((s) => ({ ...s, [l.id]: next }))
+                                      }
+                                    }}
                                     aria-label={`Quantité BC pour ${l.libelle}`}
                                     aria-invalid={overDevis || undefined}
                                   />
+                                  {maxDevis != null ? (
+                                    <span className="bc-lignes-table__qty-cap text-muted">
+                                      max. {formatQuantity(maxDevis)}
+                                    </span>
+                                  ) : null}
                                   {overDevis ? (
                                     <span className="bc-lignes-table__qty-over-hint" role="alert">
                                       Max. devis : {formatQuantity(maxDevis!)}
                                     </span>
                                   ) : null}
-                                </>
+                                </div>
                               ) : (
                                 formatQuantity(l.quantite)
                               )}

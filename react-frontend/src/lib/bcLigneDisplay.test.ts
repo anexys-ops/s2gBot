@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   buildBcLigneDisplayRows,
   clampQtyToDevis,
+  filterForfaitBcLigneIds,
   filterForfaitBcLignes,
+  isForfaitBcJalon,
   isForfaitBcLigne,
   qtyExceedsDevis,
   resolveDevisDisplayMeta,
@@ -51,6 +53,22 @@ describe('forfait bc lignes', () => {
     expect(isForfaitBcLigne(line(1, 10, 0), meta)).toBe(true)
     expect(isForfaitBcLigne(line(2, null, 1), meta)).toBe(true)
     expect(filterForfaitBcLignes([line(1, 10, 0), line(2, null, 1)], meta)).toHaveLength(2)
+  })
+
+  it('detects forfait jalons for mass qty', () => {
+    const meta = {
+      devis_jalons: [
+        { id: 'j1', libelle: 'Lot forfait', mode: 'forfait', product_ref_article_ids: [101] },
+        { id: 'j2', libelle: 'Lot détaillé', mode: 'detaille', product_ref_article_ids: [200] },
+      ],
+    }
+    expect(isForfaitBcJalon('j1', meta)).toBe(true)
+    expect(isForfaitBcJalon('j2', meta)).toBe(false)
+    const byId = new Map([
+      [1, line(1, 101, 0)],
+      [2, line(2, 200, 1)],
+    ])
+    expect(filterForfaitBcLigneIds([1, 2], byId, meta)).toEqual([1])
   })
 
   it('filters lines linked to forfait jalons only', () => {

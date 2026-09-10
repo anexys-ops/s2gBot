@@ -6423,6 +6423,61 @@ a.ds-icon-btn {
 .client-form-modal__field--wide {
   grid-column: 1 / -1;
 }
+.client-form-modal__grid--legal {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+}
+.client-legal-ice__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+.client-legal-ice__input {
+  width: 100%;
+  min-width: 0;
+}
+.client-legal-ice__ca {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.5rem 0.85rem;
+  min-height: 2.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.client-legal-ice__ca:hover {
+  background: #f1f5f9;
+}
+.client-legal-ice__ca:has(input:checked) {
+  border-color: #b45309;
+  background: #fffbeb;
+  color: #92400e;
+}
+.client-legal-ice__ca input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: #b45309;
+  cursor: pointer;
+}
+.client-legal-ice__ca span {
+  line-height: 1.2;
+}
+.client-legal-ice__hint {
+  grid-column: 1 / -1;
+  margin: 0.4rem 0 0;
+}
 .client-form-modal__field label,
 .client-form-modal__staff-field label {
   font-size: 0.78rem;
@@ -6472,6 +6527,15 @@ a.ds-icon-btn {
   }
   .client-form-modal__sections {
     padding: 0.85rem 0.85rem 0.35rem;
+  }
+  .client-form-modal__grid--legal {
+    grid-template-columns: 1fr;
+  }
+  .client-legal-ice__controls {
+    grid-template-columns: 1fr;
+  }
+  .client-legal-ice__ca {
+    justify-content: center;
   }
 }
 
@@ -9489,28 +9553,6 @@ a.catalogue-tree__link-article:hover {
 }
 .bc-fiche__aside-actions {
   margin-top: 0.65rem;
-}
-.client-ice-ca-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.65rem 1rem;
-}
-.client-ice-ca-row__ice {
-  flex: 1 1 12rem;
-  min-width: 10rem;
-}
-.client-ice-ca-row__checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.92rem;
-  white-space: nowrap;
-  cursor: pointer;
-  user-select: none;
-}
-.client-ice-ca-row__hint {
-  margin: 0.35rem 0 0;
 }
 .entity-attachments-panel__intro {
   margin: 0 0 0.75rem;

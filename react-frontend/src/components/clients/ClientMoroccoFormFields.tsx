@@ -100,7 +100,10 @@ export default function ClientMoroccoFormFields({
 }: Props) {
   const showLocation = part === 'all' || part === 'location'
   const showLegal = part === 'all' || part === 'legal'
-  const gridClass = layout === 'grid' ? 'quote-form-grid client-form-modal__grid' : undefined
+  const gridClass =
+    layout === 'grid'
+      ? `quote-form-grid client-form-modal__grid${showLegal && !showLocation ? ' client-form-modal__grid--legal' : ''}`
+      : undefined
   const fieldClass = layout === 'grid' ? 'form-group client-form-modal__field' : 'form-group'
 
   const locationFields = showLocation ? (
@@ -155,17 +158,18 @@ export default function ClientMoroccoFormFields({
 
   const legalFields = showLegal ? (
     <FieldWrap layout={layout} className={gridClass}>
-      <div className={`${fieldClass} client-form-modal__field--wide`}>
-        <label>ICE (Identifiant Commun de l’Entreprise)</label>
-        <div className="client-ice-ca-row">
+      <div className={`${fieldClass} client-form-modal__field--wide client-legal-ice`}>
+        <label htmlFor="client-ice">ICE (Identifiant Commun de l’Entreprise)</label>
+        <div className="client-legal-ice__controls">
           <input
+            id="client-ice"
             value={form.ice ?? ''}
             onChange={(e) => setForm((f) => ({ ...f, ice: e.target.value }))}
             placeholder="15 chiffres habituellement"
             maxLength={32}
-            className="client-ice-ca-row__ice"
+            className="client-legal-ice__input"
           />
-          <label className="client-ice-ca-row__checkbox">
+          <label className="client-legal-ice__ca">
             <input
               type="checkbox"
               checked={Boolean(form.ca_annuel_tva_regime)}
@@ -176,11 +180,11 @@ export default function ClientMoroccoFormFields({
                 }))
               }
             />
-            CA de l&apos;année
+            <span>CA de l&apos;année</span>
           </label>
         </div>
         {form.ca_annuel_tva_regime ? (
-          <p className="form-hint client-ice-ca-row__hint">
+          <p className="form-hint client-legal-ice__hint">
             TVA calculée avec 25&nbsp;% récupérable et 75&nbsp;% reversée à l&apos;État (TTC différent du taux 20&nbsp;% standard).
           </p>
         ) : null}

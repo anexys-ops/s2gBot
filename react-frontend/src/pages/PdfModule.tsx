@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ordersApi, quotesApi, invoicesApi } from '../api/client'
+import { bonsCommandeApi, ordersApi, quotesApi, invoicesApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import PageBackNav from '../components/PageBackNav'
 import DocumentPdfPickerModal from '../components/pdf/DocumentPdfPickerModal'
@@ -37,16 +37,24 @@ export default function PdfModule() {
     enabled: isLab && type === 'report',
   })
 
+  const { data: bcsData } = useQuery({
+    queryKey: ['bons-commande'],
+    queryFn: () => bonsCommandeApi.list(),
+    enabled: isLab && type === 'purchase_order',
+  })
+
   const quotes = quotesData?.data ?? []
   const invoices = invoicesData?.data ?? []
   const orders = ordersData?.data ?? []
+  const bcs = bcsData ?? []
 
   const options = useMemo(() => {
-    if (type === 'quote') return quotes.map((q) => ({ id: q.id, label: `${q.number} - ${q.client?.name}` }))
-    if (type === 'invoice') return invoices.map((i) => ({ id: i.id, label: `${i.number} - ${i.client?.name}` }))
-    if (type === 'report') return orders.map((o) => ({ id: o.id, label: `${o.reference} - ${o.client?.name}` }))
+    if (type === 'quote') return quotes.map((q) => ({ id: q.id, label: `${q.number} — ${q.client?.name ?? ''}` }))
+    if (type === 'invoice') return invoices.map((i) => ({ id: i.id, label: `${i.number} — ${i.client?.name ?? ''}` }))
+    if (type === 'report') return orders.map((o) => ({ id: o.id, label: `${o.reference} — ${o.client?.name ?? ''}` }))
+    if (type === 'purchase_order') return bcs.map((bc) => ({ id: bc.id, label: `${bc.numero} — ${bc.client?.name ?? ''}` }))
     return []
-  }, [type, quotes, invoices, orders])
+  }, [type, quotes, invoices, orders, bcs])
 
   const filteredOptions = useMemo(() => {
     const q = debouncedDocSearch.trim().toLowerCase()
@@ -89,7 +97,7 @@ export default function PdfModule() {
             ))}
           </select>
         </div>
-        {(type === 'quote' || type === 'invoice' || type === 'report') && (
+        {(type === 'quote' || type === 'invoice' || type === 'report' || type === 'purchase_order') && (
           <>
             <div className="form-group">
               <label>Filtrer les documents (vue liste)</label>
@@ -113,15 +121,15 @@ export default function PdfModule() {
             </div>
           </>
         )}
-        {(type === 'purchase_order' || type === 'delivery_note') && (
+        {type === 'delivery_note' && (
           <p className="text-muted" style={{ fontSize: '0.9rem' }}>
-            Ouvrez la fiche BC ou BL depuis le module Commercial pour générer le PDF avec choix du modèle.
+            Ouvrez la fiche BL depuis le module Commercial pour générer le PDF avec choix du modèle.
           </p>
         )}
         <button
           type="button"
           className="btn btn-primary"
-          disabled={!resourceId || type === 'purchase_order' || type === 'delivery_note'}
+          disabled={!resourceId || type === 'delivery_note'}
           onClick={() => setPickerOpen(true)}
         >
           Choisir le modèle et visualiser

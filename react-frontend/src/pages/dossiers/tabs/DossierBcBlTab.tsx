@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { dossiersApi } from '../../../api/client'
@@ -11,12 +11,14 @@ import StatusBadge, {
 import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../../lib/appLocale'
 import { sumNumeric } from '../../../lib/listTableTotals'
 import { shouldIgnoreTableRowClick } from '../../../lib/tableRowInteraction'
+import DocumentPdfPickerModal from '../../../components/pdf/DocumentPdfPickerModal'
 
 export default function DossierBcBlTab() {
   const { id } = useParams<{ id: string }>()
   const dossierId = Number(id)
   const navigate = useNavigate()
   const { dossier } = useOutletContext<DossierFicheOutletContext>()
+  const [pdfBcId, setPdfBcId] = useState<number | null>(null)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['dossier-bons', dossierId],
@@ -70,6 +72,7 @@ export default function DossierBcBlTab() {
                   <th>Date</th>
                   <th>Montant HT ({MONEY_UNIT_LABEL})</th>
                   <th>Montant TTC ({MONEY_UNIT_LABEL})</th>
+                  <th style={{ width: '1%', whiteSpace: 'nowrap' }}>PDF Récap</th>
                 </tr>
               </thead>
               <tbody>
@@ -97,6 +100,16 @@ export default function DossierBcBlTab() {
                       <td>{formatAppDate(bc.date_commande)}</td>
                       <td className="data-table__num">{formatMoney(Number(bc.montant_ht))}</td>
                       <td className="data-table__num">{formatMoney(Number(bc.montant_ttc))}</td>
+                      <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-secondary"
+                          title="Générer le PDF récap dossier pour ce BC"
+                          onClick={() => setPdfBcId(bc.id)}
+                        >
+                          PDF
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
@@ -108,8 +121,9 @@ export default function DossierBcBlTab() {
                   { id: 'date', kind: 'text' },
                   { id: 'ht', kind: 'money' },
                   { id: 'ttc', kind: 'money' },
+                  { id: 'actions', kind: 'text' },
                 ]}
-                visible={{ number: true, status: true, date: true, ht: true, ttc: true }}
+                visible={{ number: true, status: true, date: true, ht: true, ttc: true, actions: true }}
                 totals={bcTotals}
               />
             </table>
@@ -118,6 +132,16 @@ export default function DossierBcBlTab() {
           <p className="dossier-tab-empty">Aucun bon de commande pour ce dossier.</p>
         )}
       </div>
+
+      {pdfBcId ? (
+        <DocumentPdfPickerModal
+          documentType="purchase_order"
+          documentId={pdfBcId}
+          documentLabel={bcs.find((bc) => bc.id === pdfBcId)?.numero ?? String(pdfBcId)}
+          initialTemplateSlug="bc-recap-dossier"
+          onClose={() => setPdfBcId(null)}
+        />
+      ) : null}
 
       <div className="card dossier-tab-panel dossier-tab-panel--table">
         <ListTablePanelHeader title="Bons de livraison" count={bls.length} />

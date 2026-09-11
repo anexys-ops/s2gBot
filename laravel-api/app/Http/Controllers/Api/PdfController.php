@@ -171,8 +171,15 @@ class PdfController extends Controller
             ->exists();
     }
 
+    private function sanitizeFilename(string $filename): string
+    {
+        return str_replace(['/', '\\'], '-', $filename);
+    }
+
     private function inlinePdfResponse(string $pdfBytes, string $filename): Response
     {
+        $filename = $this->sanitizeFilename($filename);
+
         return response($pdfBytes, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="'.$filename.'"',
@@ -194,7 +201,7 @@ class PdfController extends Controller
 
         return response()->streamDownload(
             fn () => print($pdfBytes),
-            $filename,
+            $this->sanitizeFilename($filename),
             ['Content-Type' => 'application/pdf']
         );
     }
@@ -238,7 +245,7 @@ class PdfController extends Controller
 
         return response()->streamDownload(
             fn () => print($pdfBytes),
-            $filename,
+            $this->sanitizeFilename($filename),
             ['Content-Type' => 'application/pdf']
         );
     }
@@ -257,7 +264,7 @@ class PdfController extends Controller
 
         return response()->streamDownload(
             fn () => print($pdfBytes),
-            $filename,
+            $this->sanitizeFilename($filename),
             ['Content-Type' => 'application/pdf']
         );
     }
@@ -276,7 +283,7 @@ class PdfController extends Controller
 
         return response()->streamDownload(
             fn () => print($pdfBytes),
-            $filename,
+            $this->sanitizeFilename($filename),
             ['Content-Type' => 'application/pdf']
         );
     }
@@ -297,7 +304,7 @@ class PdfController extends Controller
             'layoutConfig' => $layoutConfig,
             'currencyLabel' => 'DH',
         ])->render();
-        $filename = 'facture-'.$invoice->number.'.pdf';
+        $filename = 'facture-'.str_replace(['/', '\\'], '-', $invoice->number).'.pdf';
 
         $pdf = Pdf::loadHTML($html);
         $pdf->getDomPDF()->setPaper('A4', 'portrait');
@@ -309,7 +316,7 @@ class PdfController extends Controller
 
         return response()->streamDownload(
             fn () => print($pdfBytes),
-            $filename,
+            $this->sanitizeFilename($filename),
             ['Content-Type' => 'application/pdf']
         );
     }

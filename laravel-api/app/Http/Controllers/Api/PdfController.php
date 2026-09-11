@@ -90,7 +90,7 @@ class PdfController extends Controller
                 'layoutConfig' => $layoutConfig,
                 'showEquipmentOnQuotePdf' => $showEquipmentOnQuotePdf,
             ])->render();
-            $filename = 'devis-'.$quote->number.'.pdf';
+            $filename = 'devis-'.str_replace(['/', '\\'], '-', $quote->number).'.pdf';
         } elseif ($type === 'invoice') {
             $invoice = Invoice::with(['client', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate'])->find($id);
             if (! $invoice) {
@@ -136,7 +136,7 @@ class PdfController extends Controller
             'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
             'layoutConfig' => $layoutConfig,
         ])->render();
-        $filename = 'facture-'.$invoice->number.'.pdf';
+        $filename = 'facture-'.str_replace(['/', '\\'], '-', $invoice->number).'.pdf';
 
         $pdf = Pdf::loadHTML($html);
         $pdf->getDomPDF()->setPaper('A4', 'portrait');

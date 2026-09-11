@@ -559,7 +559,7 @@ export default function S2gCataloguePickerModal({ onClose, onPick }: Props) {
         </div>
       ) : null}
 
-      {showQualificationWizard ? (
+      {showQualificationWizard || productsReady ? (
         <div className="s2g-picker__filters">
           <input
             type="search"
@@ -567,7 +567,7 @@ export default function S2gCataloguePickerModal({ onClose, onPick }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="s2g-picker__search"
-            autoFocus
+            autoFocus={showQualificationWizard}
           />
           <SortSelect value={sort} onChange={setSort} showCount={step === 'qualification' || step === 'jalon'} />
         </div>

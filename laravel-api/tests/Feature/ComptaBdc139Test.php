@@ -50,7 +50,7 @@ class ComptaBdc139Test extends TestCase
             'payment_date' => now()->toDateString(),
         ]);
         $r->assertCreated();
-        $r->assertJsonPath('numero', 'REG-2026-0001');
+        $r->assertJsonPath('numero', 'REG-2026-0001/HQ');
     }
 
     public function test_lab_creates_invoice_credit(): void
@@ -76,6 +76,6 @@ class ComptaBdc139Test extends TestCase
             'reason' => 'Erreur de facturation',
         ]);
         $r->assertCreated();
-        $r->assertJsonPath('numero', 'AVO-2026-0001');
+        $r->assertJsonPath('numero', 'AVO-2026-0001/HQ');
     }
 }

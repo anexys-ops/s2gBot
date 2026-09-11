@@ -144,7 +144,11 @@ export default function BonCommandeFichePage() {
     const nextQty: Record<number, string> = {}
     const nextPrix: Record<number, string> = {}
     for (const l of bc.lignes) {
-      nextQty[l.id] = qtyInputFromApi(l.quantite)
+      const useDevisQty =
+        Number(l.quantite) === 0 &&
+        l.quantite_devis != null &&
+        Number(l.quantite_devis) > 0
+      nextQty[l.id] = useDevisQty ? qtyInputFromApi(l.quantite_devis) : qtyInputFromApi(l.quantite)
       nextPrix[l.id] = prixInputFromApi(l.prix_unitaire_ht)
     }
     setQtyEdits(nextQty)
@@ -306,6 +310,7 @@ export default function BonCommandeFichePage() {
     }
     return {
       ht: Math.round(ht * 100) / 100,
+      tva: Math.round(tva * 100) / 100,
       ttc: Math.round((ht + tva) * 100) / 100,
     }
   }, [bc?.lignes, qtyEdits, prixEdits])
@@ -560,6 +565,7 @@ export default function BonCommandeFichePage() {
                       <col className="bc-lignes-table__col-qty" />
                       <col className="bc-lignes-table__col-qty" />
                       <col className="bc-lignes-table__col-money" />
+                      <col className="bc-lignes-table__col-tva" />
                       <col className="bc-lignes-table__col-money" />
                     </colgroup>
                     <thead>
@@ -573,6 +579,9 @@ export default function BonCommandeFichePage() {
                         </th>
                         <th scope="col" className="data-table__num">
                           PU HT ({MONEY_UNIT_LABEL})
+                        </th>
+                        <th scope="col" className="data-table__num">
+                          TVA
                         </th>
                         <th scope="col" className="data-table__num">
                           Montant HT ({MONEY_UNIT_LABEL})
@@ -605,7 +614,7 @@ export default function BonCommandeFichePage() {
                               <td className="data-table__num bc-lignes-table__qty-devis" aria-hidden="true">
                                 —
                               </td>
-                              <td colSpan={3} className="data-table__num bc-lignes-table__jalon-mass">
+                              <td colSpan={4} className="data-table__num bc-lignes-table__jalon-mass">
                                 {showJalonMassQty ? (
                                   <BcJalonQtyMass
                                     jalonLabel={row.label}
@@ -687,6 +696,9 @@ export default function BonCommandeFichePage() {
                                 formatMoney(Number(l.prix_unitaire_ht))
                               )}
                             </td>
+                            <td className="data-table__num bc-lignes-table__tva-cell">
+                              {Number(l.tva_rate) > 0 ? `${Number(l.tva_rate)} %` : '—'}
+                            </td>
                             <td className="data-table__num">{formatMoney(lineHt)}</td>
                           </tr>
                         )
@@ -694,7 +706,7 @@ export default function BonCommandeFichePage() {
                     </tbody>
                     <tfoot>
                       <tr>
-                        <td colSpan={4} className="data-table__foot-label">
+                        <td colSpan={5} className="data-table__foot-label">
                           Total HT{qtyDirty ? ' (aperçu)' : ''}
                         </td>
                         <td className="data-table__num data-table__foot-value">
@@ -702,7 +714,18 @@ export default function BonCommandeFichePage() {
                         </td>
                       </tr>
                       <tr>
-                        <td colSpan={4} className="data-table__foot-label">
+                        <td colSpan={5} className="data-table__foot-label">
+                          TVA{qtyDirty ? ' (aperçu)' : ''}
+                        </td>
+                        <td className="data-table__num data-table__foot-value">
+                          {formatMoney(
+                            previewTotals?.tva ??
+                              (Number(bc.montant_ttc) - Number(bc.montant_ht)),
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan={5} className="data-table__foot-label">
                           Total TTC{qtyDirty ? ' (aperçu)' : ''}
                         </td>
                         <td className="data-table__num data-table__foot-value">

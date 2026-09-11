@@ -13,12 +13,10 @@ import EntityAttachmentsPanel from '../../components/attachments/EntityAttachmen
 import ClientContactPicker from '../../components/clients/ClientContactPicker'
 import {
   buildBcLigneDisplayRows,
-  clampQtyToDevis,
   filterForfaitBcLigneIds,
   filterForfaitBcLignes,
   isForfaitBcJalon,
   isForfaitBcLigne,
-  qtyExceedsDevis,
   resolveDevisDisplayMeta,
   resolveQuantiteDevis,
 } from '../../lib/bcLigneDisplay'
@@ -51,9 +49,7 @@ function applyMassQtyToLignes(
   setQtyEdits((prev) => {
     const next = { ...prev }
     for (const l of lignes) {
-      const maxDevis = resolveQuantiteDevis(l)
-      const capped = maxDevis != null && qty > maxDevis ? maxDevis : qty
-      next[l.id] = qtyInputFromApi(capped)
+      next[l.id] = qtyInputFromApi(qty)
     }
     return next
   })
@@ -173,12 +169,6 @@ export default function BonCommandeFichePage() {
         if (!Number.isFinite(qty) || qty < 0) {
           throw new Error(`Quantité invalide pour « ${l.libelle} ».`)
         }
-        const maxDevis = resolveQuantiteDevis(l)
-        if (maxDevis != null && qty > maxDevis + 1e-9) {
-          throw new Error(
-            `La quantité pour « ${l.libelle} » ne peut pas dépasser celle du devis (${formatQuantity(maxDevis)}).`,
-          )
-        }
         if (Math.abs(qty - Number(l.quantite)) < 1e-9) continue
         await bonsCommandeApi.updateLigne(bcId, l.id, { quantite: qty })
       }
@@ -255,14 +245,6 @@ export default function BonCommandeFichePage() {
       const n = Number(String(raw).replace(',', '.'))
       if (!Number.isFinite(n)) return true
       return Math.abs(n - Number(l.quantite)) >= 1e-9
-    })
-  }, [forfaitLignes, qtyEdits])
-  const qtyOverDevis = useMemo(() => {
-    if (!forfaitLignes.length) return false
-    return forfaitLignes.some((l) => {
-      const raw = qtyEdits[l.id]
-      if (raw === undefined) return false
-      return qtyExceedsDevis(raw, resolveQuantiteDevis(l))
     })
   }, [forfaitLignes, qtyEdits])
   const previewTotals = useMemo(() => {
@@ -351,7 +333,7 @@ export default function BonCommandeFichePage() {
         type="button"
         className="btn btn-primary btn-sm"
         onClick={saveQuantites}
-        disabled={mutQuantites.isPending || !qtyDirty || qtyOverDevis}
+        disabled={mutQuantites.isPending || !qtyDirty}
       >
         {mutQuantites.isPending ? 'Enregistrement…' : 'Enregistrer les quantités'}
       </button>
@@ -602,7 +584,6 @@ export default function BonCommandeFichePage() {
                         const canEditQty = canEditQuantites && isForfaitLine
                         const maxDevis = resolveQuantiteDevis(l)
                         const rawQty = qtyEdits[l.id] ?? qtyInputFromApi(l.quantite)
-                        const overDevis = canEditQty && qtyExceedsDevis(rawQty, maxDevis)
                         const previewQty = Number(String(rawQty).replace(',', '.'))
                         const lineHt =
                           Number.isFinite(previewQty) && previewQty >= 0
@@ -622,38 +603,20 @@ export default function BonCommandeFichePage() {
                                 <div className="bc-lignes-table__qty-editor">
                                   <input
                                     type="number"
-                                    className={
-                                      overDevis
-                                        ? 'bc-lignes-table__qty-input bc-lignes-table__qty-input--over'
-                                        : 'bc-lignes-table__qty-input'
-                                    }
+                                    className="bc-lignes-table__qty-input"
                                     min={0}
-                                    max={maxDevis ?? undefined}
                                     step="any"
                                     inputMode="decimal"
                                     value={rawQty}
                                     onChange={(e) => {
                                       mutQuantites.reset()
-                                      const next = clampQtyToDevis(e.target.value, maxDevis)
-                                      setQtyEdits((s) => ({ ...s, [l.id]: next }))
-                                    }}
-                                    onBlur={(e) => {
-                                      const next = clampQtyToDevis(e.target.value, maxDevis)
-                                      if (next !== e.target.value) {
-                                        setQtyEdits((s) => ({ ...s, [l.id]: next }))
-                                      }
+                                      setQtyEdits((s) => ({ ...s, [l.id]: e.target.value }))
                                     }}
                                     aria-label={`Quantité BC pour ${l.libelle}`}
-                                    aria-invalid={overDevis || undefined}
                                   />
                                   {maxDevis != null ? (
                                     <span className="bc-lignes-table__qty-cap text-muted">
-                                      max. {formatQuantity(maxDevis)}
-                                    </span>
-                                  ) : null}
-                                  {overDevis ? (
-                                    <span className="bc-lignes-table__qty-over-hint" role="alert">
-                                      Max. devis : {formatQuantity(maxDevis!)}
+                                      devis : {formatQuantity(maxDevis)}
                                     </span>
                                   ) : null}
                                 </div>
@@ -688,11 +651,6 @@ export default function BonCommandeFichePage() {
                   </table>
                 </div>
               )}
-              {qtyOverDevis ? (
-                <p className="error bc-fiche__qty-error" role="alert">
-                  Une ou plusieurs quantités dépassent le plafond du devis.
-                </p>
-              ) : null}
               {mutQuantites.isError ? (
                 <p className="error bc-fiche__qty-error">{(mutQuantites.error as Error).message}</p>
               ) : null}

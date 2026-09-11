@@ -1082,6 +1082,7 @@ export const bonsCommandeApi = {
       date_livraison?: string | null
       notes_ligne?: string | null
       quantite?: number
+      prix_unitaire_ht?: number
     },
   ) =>
     api<BonCommandeLigne>(`/v1/bons-commande/${bcId}/lignes/${ligneId}`, { method: 'PUT', body: JSON.stringify(body) }),

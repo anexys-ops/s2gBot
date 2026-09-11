@@ -31,6 +31,14 @@ function qtyInputFromApi(q: string | number | null | undefined): string {
   return String(n)
 }
 
+function prixInputFromApi(p: string | number | null | undefined): string {
+  if (p == null || p === '') return '0'
+  const n = Number(p)
+  if (!Number.isFinite(n)) return '0'
+  if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n))
+  return String(Math.round(n * 10000) / 10000)
+}
+
 function applyMassQtyToLignes(
   lignes: BonCommandeLigne[],
   rawMassQty: string,
@@ -102,6 +110,7 @@ export default function BonCommandeFichePage() {
   const [notes, setNotes] = useState('')
   const [contactId, setContactId] = useState<number | null>(null)
   const [qtyEdits, setQtyEdits] = useState<Record<number, string>>({})
+  const [prixEdits, setPrixEdits] = useState<Record<number, string>>({})
   const [confirmAction, setConfirmAction] = useState<'confirmer' | 'bl' | null>(null)
   const [planningToast, setPlanningToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
   const [jalonMassQty, setJalonMassQty] = useState<Record<string, string>>({})
@@ -121,7 +130,7 @@ export default function BonCommandeFichePage() {
   const serverLignesKey = useMemo(
     () =>
       (bc?.lignes ?? [])
-        .map((l) => [l.id, qtyInputFromApi(l.quantite)].join(':'))
+        .map((l) => [l.id, qtyInputFromApi(l.quantite), String(l.prix_unitaire_ht)].join(':'))
         .join('|'),
     [bc?.lignes],
   )
@@ -129,13 +138,17 @@ export default function BonCommandeFichePage() {
   useEffect(() => {
     if (!bc?.lignes?.length) {
       setQtyEdits({})
+      setPrixEdits({})
       return
     }
     const nextQty: Record<number, string> = {}
+    const nextPrix: Record<number, string> = {}
     for (const l of bc.lignes) {
       nextQty[l.id] = qtyInputFromApi(l.quantite)
+      nextPrix[l.id] = prixInputFromApi(l.prix_unitaire_ht)
     }
     setQtyEdits(nextQty)
+    setPrixEdits(nextPrix)
   }, [bc?.id, serverLignesKey])
 
   const mutUpdate = useMutation({
@@ -160,27 +173,43 @@ export default function BonCommandeFichePage() {
   )
 
   const mutQuantites = useMutation({
-    mutationFn: async (edits: Record<number, string>) => {
+    mutationFn: async (edits: { qty: Record<number, string>; prix: Record<number, string> }) => {
       if (!forfaitLignes.length) return
       for (const l of forfaitLignes) {
-        const raw = edits[l.id]
-        if (raw === undefined) continue
-        const qty = Number(String(raw).replace(',', '.'))
-        if (!Number.isFinite(qty) || qty < 0) {
-          throw new Error(`Quantité invalide pour « ${l.libelle} ».`)
+        const body: { quantite?: number; prix_unitaire_ht?: number } = {}
+        const rawQty = edits.qty[l.id]
+        if (rawQty !== undefined) {
+          const qty = Number(String(rawQty).replace(',', '.'))
+          if (!Number.isFinite(qty) || qty < 0) {
+            throw new Error(`Quantité invalide pour « ${l.libelle} ».`)
+          }
+          if (Math.abs(qty - Number(l.quantite)) >= 1e-9) {
+            body.quantite = qty
+          }
         }
-        if (Math.abs(qty - Number(l.quantite)) < 1e-9) continue
-        await bonsCommandeApi.updateLigne(bcId, l.id, { quantite: qty })
+        const rawPrix = edits.prix[l.id]
+        if (rawPrix !== undefined) {
+          const prix = Number(String(rawPrix).replace(',', '.'))
+          if (!Number.isFinite(prix) || prix < 0) {
+            throw new Error(`Prix invalide pour « ${l.libelle} ».`)
+          }
+          if (Math.abs(prix - Number(l.prix_unitaire_ht)) >= 1e-9) {
+            body.prix_unitaire_ht = prix
+          }
+        }
+        if (Object.keys(body).length > 0) {
+          await bonsCommandeApi.updateLigne(bcId, l.id, body)
+        }
       }
     },
     onSuccess: () => {
-      setPlanningToast({ message: 'Quantités enregistrées.', variant: 'success' })
+      setPlanningToast({ message: 'Lignes enregistrées.', variant: 'success' })
       void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
       void qc.invalidateQueries({ queryKey: ['bons-commande'] })
     },
     onError: (err) => {
       setPlanningToast({
-        message: toastErrorMessage(err, 'Échec de l’enregistrement des quantités.'),
+        message: toastErrorMessage(err, "Échec de l'enregistrement des lignes."),
         variant: 'error',
       })
     },
@@ -240,24 +269,37 @@ export default function BonCommandeFichePage() {
   const qtyDirty = useMemo(() => {
     if (!forfaitLignes.length) return false
     return forfaitLignes.some((l) => {
-      const raw = qtyEdits[l.id]
-      if (raw === undefined) return false
-      const n = Number(String(raw).replace(',', '.'))
-      if (!Number.isFinite(n)) return true
-      return Math.abs(n - Number(l.quantite)) >= 1e-9
+      const rawQty = qtyEdits[l.id]
+      if (rawQty !== undefined) {
+        const n = Number(String(rawQty).replace(',', '.'))
+        if (!Number.isFinite(n)) return true
+        if (Math.abs(n - Number(l.quantite)) >= 1e-9) return true
+      }
+      const rawPrix = prixEdits[l.id]
+      if (rawPrix !== undefined) {
+        const p = Number(String(rawPrix).replace(',', '.'))
+        if (!Number.isFinite(p)) return true
+        if (Math.abs(p - Number(l.prix_unitaire_ht)) >= 1e-9) return true
+      }
+      return false
     })
-  }, [forfaitLignes, qtyEdits])
+  }, [forfaitLignes, qtyEdits, prixEdits])
   const previewTotals = useMemo(() => {
     if (!bc?.lignes?.length) return null
     let ht = 0
     let tva = 0
     for (const l of bc.lignes) {
-      const raw = qtyEdits[l.id]
+      const rawQty = qtyEdits[l.id]
+      const rawPrix = prixEdits[l.id]
       const qty =
-        raw !== undefined && Number.isFinite(Number(String(raw).replace(',', '.')))
-          ? Number(String(raw).replace(',', '.'))
+        rawQty !== undefined && Number.isFinite(Number(String(rawQty).replace(',', '.')))
+          ? Number(String(rawQty).replace(',', '.'))
           : Number(l.quantite)
-      const lineHt = Math.round(qty * Number(l.prix_unitaire_ht) * 100) / 100
+      const prix =
+        rawPrix !== undefined && Number.isFinite(Number(String(rawPrix).replace(',', '.')))
+          ? Number(String(rawPrix).replace(',', '.'))
+          : Number(l.prix_unitaire_ht)
+      const lineHt = Math.round(qty * prix * 100) / 100
       const rate = Number(l.tva_rate) || 0
       ht += lineHt
       tva += Math.round(lineHt * (rate / 100) * 100) / 100
@@ -266,7 +308,7 @@ export default function BonCommandeFichePage() {
       ht: Math.round(ht * 100) / 100,
       ttc: Math.round((ht + tva) * 100) / 100,
     }
-  }, [bc?.lignes, qtyEdits])
+  }, [bc?.lignes, qtyEdits, prixEdits])
   const bls = bc?.bons_livraison ?? []
   const statutBadge = useMemo(
     () => (bc ? bonCommandeStatutBadgeProps(bc.statut) : null),
@@ -324,7 +366,7 @@ export default function BonCommandeFichePage() {
   function saveQuantites() {
     setPlanningToast(null)
     mutQuantites.reset()
-    mutQuantites.mutate(qtyEdits)
+    mutQuantites.mutate({ qty: qtyEdits, prix: prixEdits })
   }
 
   const saveQuantitesButton =
@@ -335,7 +377,7 @@ export default function BonCommandeFichePage() {
         onClick={saveQuantites}
         disabled={mutQuantites.isPending || !qtyDirty}
       >
-        {mutQuantites.isPending ? 'Enregistrement…' : 'Enregistrer les quantités'}
+        {mutQuantites.isPending ? 'Enregistrement…' : 'Enregistrer les lignes'}
       </button>
     ) : null
 
@@ -500,7 +542,7 @@ export default function BonCommandeFichePage() {
                     <p className="dossier-tab-panel__intro">
                       Prestations et articles repris du devis source ({MONEY_UNIT_LABEL}).
                       {canEditQuantites
-                        ? ' Seules les lignes forfait sont modifiables (plafond = qté devis), par ligne ou en masse depuis chaque jalon forfait.'
+                        ? ' Quantités et prix unitaires des lignes forfait sont modifiables. Application en masse par jalon possible.'
                         : null}
                     </p>
                   </div>
@@ -584,10 +626,12 @@ export default function BonCommandeFichePage() {
                         const canEditQty = canEditQuantites && isForfaitLine
                         const maxDevis = resolveQuantiteDevis(l)
                         const rawQty = qtyEdits[l.id] ?? qtyInputFromApi(l.quantite)
+                        const rawPrix = prixEdits[l.id] ?? prixInputFromApi(l.prix_unitaire_ht)
                         const previewQty = Number(String(rawQty).replace(',', '.'))
+                        const previewPrix = Number(String(rawPrix).replace(',', '.'))
                         const lineHt =
-                          Number.isFinite(previewQty) && previewQty >= 0
-                            ? Math.round(previewQty * Number(l.prix_unitaire_ht) * 100) / 100
+                          Number.isFinite(previewQty) && previewQty >= 0 && Number.isFinite(previewPrix)
+                            ? Math.round(previewQty * previewPrix * 100) / 100
                             : Number(l.montant_ht)
                         return (
                           <tr
@@ -624,7 +668,25 @@ export default function BonCommandeFichePage() {
                                 formatQuantity(l.quantite)
                               )}
                             </td>
-                            <td className="data-table__num">{formatMoney(Number(l.prix_unitaire_ht))}</td>
+                            <td className="data-table__num bc-lignes-table__prix-cell">
+                              {canEditQty ? (
+                                <input
+                                  type="number"
+                                  className="bc-lignes-table__qty-input"
+                                  min={0}
+                                  step="any"
+                                  inputMode="decimal"
+                                  value={rawPrix}
+                                  onChange={(e) => {
+                                    mutQuantites.reset()
+                                    setPrixEdits((s) => ({ ...s, [l.id]: e.target.value }))
+                                  }}
+                                  aria-label={`Prix unitaire HT pour ${l.libelle}`}
+                                />
+                              ) : (
+                                formatMoney(Number(l.prix_unitaire_ht))
+                              )}
+                            </td>
                             <td className="data-table__num">{formatMoney(lineHt)}</td>
                           </tr>
                         )

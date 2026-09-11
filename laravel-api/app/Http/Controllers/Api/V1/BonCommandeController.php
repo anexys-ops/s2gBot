@@ -155,6 +155,7 @@ class BonCommandeController extends Controller
             'date_livraison' => 'sometimes|nullable|date',
             'notes_ligne' => 'sometimes|nullable|string|max:500',
             'quantite' => 'sometimes|numeric|min:0',
+            'prix_unitaire_ht' => 'sometimes|numeric|min:0',
         ]);
         if ($data === []) {
             $ligne->load(['planningAffectations.user', 'technicien']);
@@ -196,12 +197,18 @@ class BonCommandeController extends Controller
                 ], 422);
             }
             $ligne->quantite = $qty;
+            $qtyChanged = true;
+        }
+        if (array_key_exists('prix_unitaire_ht', $data)) {
+            $ligne->prix_unitaire_ht = round((float) $data['prix_unitaire_ht'], 4);
+            $qtyChanged = true;
+        }
+        if ($qtyChanged) {
             $ligne->montant_ht = CommercialDocumentTotalsService::lineHt(
-                $qty,
+                (float) $ligne->quantite,
                 (float) $ligne->prix_unitaire_ht,
                 0,
             );
-            $qtyChanged = true;
         }
         if ($ligne->date_debut_prevue && $ligne->date_fin_prevue
             && $ligne->date_debut_prevue->format('Y-m-d') > $ligne->date_fin_prevue->format('Y-m-d')

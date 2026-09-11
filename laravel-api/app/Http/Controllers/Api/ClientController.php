@@ -244,7 +244,7 @@ class ClientController extends Controller
             'city'                        => 'nullable|string|max:128',
             'postal_code'                 => 'nullable|string|max:16',
             'country'                     => 'nullable|string|max:4',
-            'currency_code'               => ['nullable', 'string', 'size:3', Rule::in(array_keys(CurrencyCode::LABELS))],
+            'currency_code'               => ['nullable', 'string', 'size:3', Rule::in(array_keys(CurrencyCode::labels()))],
             'email'                       => 'nullable|email',
             'phone'                       => 'nullable|string|max:50',
             'whatsapp'                    => 'nullable|string|max:50',

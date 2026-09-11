@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\LabReport;
+use App\Support\ClientPortalAccess;
 use App\Models\LabReportSection;
 use App\Models\Sequence;
 use Illuminate\Http\JsonResponse;
@@ -13,10 +14,14 @@ class LabReportController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $user = $request->user();
         $query = LabReport::with([
             'sections',
             'technician:id,name,email',
+            'dossier:id,reference,titre',
         ]);
+
+        ClientPortalAccess::applyLabReportScope($query, $user);
 
         if ($status = $request->query('status')) {
             $query->where('status', $status);
@@ -38,6 +43,10 @@ class LabReportController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if (ClientPortalAccess::isPortalUser($request->user())) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
         $validated = $request->validate([
             'title'         => 'required|string|max:255',
             'bc_id'         => 'nullable|exists:bon_commandes,id',
@@ -86,7 +95,7 @@ class LabReportController extends Controller
         );
     }
 
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
         $report = LabReport::with([
             'sections.essaiArticle',
@@ -95,13 +104,22 @@ class LabReportController extends Controller
             'technician:id,name,email',
             'validator:id,name,email',
             'agency',
+            'dossier:id,reference,titre',
         ])->findOrFail($id);
+
+        if (! ClientPortalAccess::userMayAccessLabReport($request->user(), $report)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
 
         return response()->json($report);
     }
 
     public function update(Request $request, int $id): JsonResponse
     {
+        if (ClientPortalAccess::isPortalUser($request->user())) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
         $report = LabReport::findOrFail($id);
 
         $validated = $request->validate([
@@ -123,6 +141,10 @@ class LabReportController extends Controller
 
     public function destroy(Request $request, int $id): JsonResponse
     {
+        if (ClientPortalAccess::isPortalUser($request->user())) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
         $report = LabReport::findOrFail($id);
 
         if ($report->status !== 'brouillon') {
@@ -136,6 +158,10 @@ class LabReportController extends Controller
 
     public function transition(Request $request, int $id): JsonResponse
     {
+        if (ClientPortalAccess::isPortalUser($request->user())) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
         $report = LabReport::findOrFail($id);
 
         $validated = $request->validate([
@@ -172,6 +198,10 @@ class LabReportController extends Controller
 
     public function addSection(Request $request, int $id): JsonResponse
     {
+        if (ClientPortalAccess::isPortalUser($request->user())) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
         $report = LabReport::findOrFail($id);
 
         $validated = $request->validate([

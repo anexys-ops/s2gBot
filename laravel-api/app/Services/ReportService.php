@@ -4,8 +4,9 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\Report;
-use App\Models\ReportPdfTemplate;
+use App\Models\DocumentPdfTemplate;
 use App\Support\AppBranding;
+use App\Support\PdfTemplateResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 
@@ -58,17 +59,18 @@ class ReportService
         return $report->fresh(['pdfTemplate']);
     }
 
-    private function resolveTemplate(?int $templateId): ReportPdfTemplate
+    private function resolveTemplate(?int $templateId): DocumentPdfTemplate
     {
-        if ($templateId) {
-            $t = ReportPdfTemplate::find($templateId);
-            if ($t) {
-                return $t;
-            }
+        $template = PdfTemplateResolver::resolve('report', $templateId, null);
+        if ($template) {
+            return $template;
         }
 
-        return ReportPdfTemplate::query()->where('is_default', true)->first()
-            ?? ReportPdfTemplate::query()->firstOrFail();
+        return DocumentPdfTemplate::query()
+            ->where('document_type', 'report')
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->firstOrFail();
     }
 
     private function writePdfToDisk(Order $order, Report $report, string $bladeView, array $formData): void

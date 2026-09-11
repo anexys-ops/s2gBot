@@ -25,6 +25,7 @@ class Sample extends Model
     public const STATUS_EN_ESSAI    = 'en_essai';
     public const STATUS_TERMINE     = 'termine';
     public const STATUS_REJETE      = 'rejete';
+    public const STATUS_ANNULE      = 'annule';
 
     public const STATUSES_RECEPTION = [
         self::STATUS_EN_TRANSIT,
@@ -32,6 +33,7 @@ class Sample extends Model
         self::STATUS_EN_ESSAI,
         self::STATUS_TERMINE,
         self::STATUS_REJETE,
+        self::STATUS_ANNULE,
     ];
 
     public const TYPES = ['sol', 'eau', 'beton', 'granulat', 'roche', 'enrobe', 'autre'];
@@ -48,10 +50,14 @@ class Sample extends Model
         'depth_bottom_m',
         // v1.2.0 réception
         'fold_number',
+        'transco_number',
+        'reception_index',
+        'reception_batch_total',
         'dossier_id',
         'mission_order_id',
         'task_id',
         'product_id',
+        'bon_commande_ligne_id',
         'description',
         'sample_type',
         'origin_location',
@@ -60,6 +66,9 @@ class Sample extends Model
         'collected_at',
         'received_by',
         'received_at',
+        'cancelled_at',
+        'cancelled_by',
+        'cancellation_reason',
         'condition_state',
         'storage_location',
         'photo_path',
@@ -74,6 +83,7 @@ class Sample extends Model
         return [
             'received_at'    => 'datetime',
             'collected_at'   => 'datetime',
+            'cancelled_at'   => 'datetime',
             'depth_top_m'    => 'decimal:3',
             'depth_bottom_m' => 'decimal:3',
             'depth_m'        => 'decimal:3',
@@ -126,6 +136,11 @@ class Sample extends Model
         return $this->belongsTo(Article::class, 'product_id');
     }
 
+    public function bonCommandeLigne(): BelongsTo
+    {
+        return $this->belongsTo(BonCommandeLigne::class, 'bon_commande_ligne_id');
+    }
+
     public function collectedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'collected_by');
@@ -134,6 +149,11 @@ class Sample extends Model
     public function receivedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'received_by');
+    }
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 
     public function testResults(): HasMany

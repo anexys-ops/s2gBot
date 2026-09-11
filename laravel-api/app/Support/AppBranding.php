@@ -13,6 +13,20 @@ class AppBranding
 {
     public const MODULE_KEY = 'app_branding';
 
+    private static ?string $cachedLogoDataUri = null;
+
+    private static ?string $cachedLetterheadDataUri = null;
+
+    private static bool $logoDataUriResolved = false;
+
+    private static bool $letterheadDataUriResolved = false;
+
+    /** @var list<string> */
+    private const DEFAULT_LOGO_PUBLIC_FILES = [
+        'branding/s2g-app-logo.png',
+        'branding/s2g-devis-letterhead.png',
+    ];
+
     public static function settings(): array
     {
         $row = ModuleSetting::query()->where('module_key', self::MODULE_KEY)->first();
@@ -28,17 +42,29 @@ class AppBranding
         return is_string($path) && $path !== '' ? $path : null;
     }
 
+    public static function hasCustomLogo(): bool
+    {
+        $rel = self::logoPublicPath();
+
+        return $rel !== null && Storage::disk('public')->exists($rel);
+    }
+
     /**
      * URL absolue du logo pour le navigateur (header app).
      */
     public static function logoHttpUrl(Request $request): ?string
     {
         $rel = self::logoPublicPath();
-        if ($rel === null) {
-            return null;
+        if ($rel !== null && Storage::disk('public')->exists($rel)) {
+            return $request->getSchemeAndHttpHost().Storage::disk('public')->url($rel);
         }
 
-        return $request->getSchemeAndHttpHost().Storage::disk('public')->url($rel);
+        $default = self::defaultLogoPublicPath();
+        if ($default !== null) {
+            return $request->getSchemeAndHttpHost().'/'.ltrim($default, '/');
+        }
+
+        return null;
     }
 
     /**
@@ -46,7 +72,106 @@ class AppBranding
      */
     public static function logoDataUriForPdf(): ?string
     {
-        $rel = self::logoPublicPath();
+        if (self::$logoDataUriResolved) {
+            return self::$cachedLogoDataUri;
+        }
+
+        self::$logoDataUriResolved = true;
+        $uri = self::fileToDataUri(self::logoPublicPath());
+        if ($uri !== null) {
+            return self::$cachedLogoDataUri = $uri;
+        }
+
+        foreach (self::DEFAULT_LOGO_PUBLIC_FILES as $rel) {
+            $uri = self::absolutePathToDataUri(public_path($rel));
+            if ($uri !== null) {
+                return self::$cachedLogoDataUri = $uri;
+            }
+        }
+
+        return self::$cachedLogoDataUri = null;
+    }
+
+    /** Chemin relatif sous public/ pour le logo S2G embarqué, ou null. */
+    public static function defaultLogoPublicPath(): ?string
+    {
+        foreach (self::DEFAULT_LOGO_PUBLIC_FILES as $rel) {
+            if (is_readable(public_path($rel))) {
+                return $rel;
+            }
+        }
+
+        return null;
+    }
+
+    /** Chemin absolu de l'en-tête devis (email / PDF), ou null. */
+    public static function devisLetterheadAbsolutePath(): ?string
+    {
+        foreach (['branding/s2g-devis-letterhead.png', 'branding/s2g-devis-letterhead.jpg'] as $rel) {
+            $abs = public_path($rel);
+            if (is_readable($abs)) {
+                return $abs;
+            }
+        }
+
+        $default = self::defaultLogoPublicPath();
+
+        return $default !== null ? public_path($default) : null;
+    }
+
+    /** En-tête pleine largeur pour PDF devis S2G (priorité sur le logo compact). */
+    public static function devisLetterheadDataUriForPdf(): ?string
+    {
+        if (self::$letterheadDataUriResolved) {
+            return self::$cachedLetterheadDataUri;
+        }
+
+        self::$letterheadDataUriResolved = true;
+        $settings = self::settings();
+        $rel = $settings['devis_letterhead_public_path'] ?? null;
+        if (is_string($rel) && $rel !== '') {
+            $uri = self::fileToDataUri($rel);
+            if ($uri !== null) {
+                return self::$cachedLetterheadDataUri = $uri;
+            }
+        }
+
+        foreach ([
+            public_path('branding/s2g-devis-letterhead.png'),
+            public_path('branding/s2g-devis-letterhead.jpg'),
+        ] as $abs) {
+            $uri = self::absolutePathToDataUri($abs);
+            if ($uri !== null) {
+                return self::$cachedLetterheadDataUri = $uri;
+            }
+        }
+
+        foreach (['branding/s2g-devis-letterhead.png', 'branding/s2g-devis-letterhead.jpg', 'branding/devis-letterhead.jpg'] as $fallback) {
+            $uri = self::fileToDataUri($fallback);
+            if ($uri !== null) {
+                return self::$cachedLetterheadDataUri = $uri;
+            }
+        }
+
+        return self::$cachedLetterheadDataUri = self::logoDataUriForPdf();
+    }
+
+    private static function absolutePathToDataUri(string $abs): ?string
+    {
+        if (! is_readable($abs)) {
+            return null;
+        }
+        $bin = @file_get_contents($abs);
+        if ($bin === false) {
+            return null;
+        }
+        $mime = mime_content_type($abs) ?: 'image/png';
+
+        return 'data:'.$mime.';base64,'.base64_encode($bin);
+    }
+
+    private static function fileToDataUri(?string $rel): ?string
+    {
         if ($rel === null || ! Storage::disk('public')->exists($rel)) {
             return null;
         }
@@ -74,11 +199,71 @@ class AppBranding
                 'photo_slots' => 0,
             ],
             'extra_fields' => [],
+            /** Affichage du cadre totaux sur les PDF devis (ignoré par les rapports). */
+            'totals' => [
+                'show_total_ht' => true,
+                'show_total_tva' => true,
+                'show_total_ttc' => true,
+                'show_discount' => true,
+                'show_frais_supplementaires' => true,
+            ],
+            /** Colonnes et montants des lignes (devis / factures / BC / BL). */
+            'lines' => [
+                'show_prices' => true,
+                'show_pu_pt_columns' => true,
+                'show_tva_column' => true,
+                'show_designation' => true,
+                'show_article_code' => true,
+                'show_quantity' => true,
+                'show_unit' => true,
+                'show_line_details' => true,
+            ],
+            /** Bloc en-tête (client, dossier, références liées). */
+            'meta' => [
+                'show_client_name' => true,
+                'show_dossier_reference' => true,
+                'show_linked_quote' => true,
+                'show_affaire' => true,
+            ],
         ];
     }
 
     public static function mergeLayoutConfig(?array $stored): array
     {
         return array_replace_recursive(self::defaultLayoutConfig(), $stored ?? []);
+    }
+
+    /**
+     * Variables Blade pour les modèles commerciaux (devis, factures, BC, BL, NDF).
+     * À appeler dans la vue parente via extract() — un @include du partial ne propage pas ces variables.
+     *
+     * @return array<string, bool>
+     */
+    public static function commercialLayoutViewVars(?array $layoutConfig): array
+    {
+        $layoutConfig = self::mergeLayoutConfig($layoutConfig);
+        $linesCfg = is_array($layoutConfig['lines'] ?? null) ? $layoutConfig['lines'] : [];
+        $metaCfg = is_array($layoutConfig['meta'] ?? null) ? $layoutConfig['meta'] : [];
+        $totalsCfg = is_array($layoutConfig['totals'] ?? null) ? $layoutConfig['totals'] : [];
+        $showLinePrices = ($linesCfg['show_prices'] ?? true) !== false;
+
+        return [
+            'showLinePrices' => $showLinePrices,
+            'showPuPtCols' => $showLinePrices && (($linesCfg['show_pu_pt_columns'] ?? true) !== false),
+            'showDesignation' => ($linesCfg['show_designation'] ?? true) !== false,
+            'showArticleCode' => ($linesCfg['show_article_code'] ?? true) !== false,
+            'showQuantity' => ($linesCfg['show_quantity'] ?? true) !== false,
+            'showUnit' => ($linesCfg['show_unit'] ?? true) !== false,
+            'showLineDetails' => ($linesCfg['show_line_details'] ?? true) !== false,
+            'showTotalHt' => ($totalsCfg['show_total_ht'] ?? true) !== false,
+            'showTotalTva' => ($totalsCfg['show_total_tva'] ?? true) !== false,
+            'showTotalTtc' => ($totalsCfg['show_total_ttc'] ?? true) !== false,
+            'showDiscount' => ($totalsCfg['show_discount'] ?? true) !== false,
+            'showFraisSupplementaires' => ($totalsCfg['show_frais_supplementaires'] ?? true) !== false,
+            'showClientName' => ($metaCfg['show_client_name'] ?? true) !== false,
+            'showDossierReference' => ($metaCfg['show_dossier_reference'] ?? true) !== false,
+            'showLinkedQuote' => ($metaCfg['show_linked_quote'] ?? true) !== false,
+            'showAffaire' => ($metaCfg['show_affaire'] ?? true) !== false,
+        ];
     }
 }

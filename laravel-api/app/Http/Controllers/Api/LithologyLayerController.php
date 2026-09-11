@@ -41,7 +41,7 @@ class LithologyLayerController extends Controller
         $validated = $request->validate([
             'depth_from_m' => 'required|numeric|min:0',
             'depth_to_m' => 'required|numeric|min:0|gte:depth_from_m',
-            'description' => 'required|string',
+            'description' => 'nullable|string',
             'rqd' => 'nullable|numeric|min:0|max:100',
             'sort_order' => 'nullable|integer|min:0',
         ]);
@@ -49,6 +49,9 @@ class LithologyLayerController extends Controller
         $validated['borehole_id'] = $borehole->id;
         if (! isset($validated['sort_order'])) {
             $validated['sort_order'] = 0;
+        }
+        if (! isset($validated['description'])) {
+            $validated['description'] = '';
         }
 
         $layer = LithologyLayer::create($validated);

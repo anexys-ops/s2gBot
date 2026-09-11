@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\BcLignePlanningAffectation;
+use App\Models\BonCommande;
+use App\Models\BonCommandeLigne;
 use App\Models\Client;
 use App\Models\Dossier;
 use App\Models\Quote;
@@ -14,6 +17,56 @@ use Tests\TestCase;
 class BonCommandeWorkflowTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_quotes_index_includes_document_chain_from_bon_commande(): void
+    {
+        $client = Client::query()->create(['name' => 'Quote Chain Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site QC']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0200',
+            'titre' => 'D chain',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-CHAIN',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 50,
+            'amount_ttc' => 60,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'L chain',
+            'quantity' => 1,
+            'unit_price' => 50,
+            'tva_rate' => 20,
+            'total' => 50,
+        ]);
+
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $bcId = (int) $bc['id'];
+        $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/confirmer")->assertOk();
+
+        $bl = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/transformer-bl")->assertCreated()->json();
+        $this->actingAs($lab, 'sanctum')->postJson('/api/invoices/from-bons-commande', [
+            'bon_commande_ids' => [$bcId],
+        ])->assertCreated();
+
+        $list = $this->actingAs($lab, 'sanctum')->getJson('/api/quotes?search=Q-CHAIN');
+        $list->assertOk();
+        $list->assertJsonPath('data.0.bons_commande.0.numero', $bc['numero']);
+        $list->assertJsonPath('data.0.bons_commande.0.bons_livraison_count', 1);
+        $list->assertJsonPath('data.0.bons_commande.0.invoices_count', 1);
+    }
 
     public function test_lab_transforms_signed_quote_to_bon_commande(): void
     {
@@ -51,9 +104,271 @@ class BonCommandeWorkflowTest extends TestCase
 
         $r = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc");
         $r->assertCreated();
-        $r->assertJsonPath('numero', 'BCC-2026-0001');
+        $r->assertJsonPath('numero', 'BCC-2026-0001/HQ');
         $r->assertJsonPath('lignes.0.libelle', 'Essai A');
+        $r->assertJsonPath('lignes.0.quantite_devis', 1);
         $this->assertNotNull(Quote::query()->find($q->id)->meta);
+    }
+
+    public function test_update_bc_ligne_persists_planning_extra_fields(): void
+    {
+        $client = Client::query()->create(['name' => 'BC Ligne Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site L']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $tech = User::factory()->create(['role' => User::ROLE_LAB_TECHNICIAN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0010',
+            'titre' => 'D10',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-10',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 100,
+            'amount_ttc' => 120,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai planif',
+            'quantity' => 1,
+            'unit_price' => 100,
+            'tva_rate' => 20,
+            'total' => 100,
+        ]);
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $bcId = (int) $bc['id'];
+        $ligneId = (int) $bc['lignes'][0]['id'];
+
+        $r = $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-commande/{$bcId}/lignes/{$ligneId}", [
+            'technicien_id' => $tech->id,
+            'date_livraison' => '2026-03-15',
+            'notes_ligne' => 'Accès chantier nord',
+        ]);
+        $r->assertOk();
+        $r->assertJsonPath('technicien_id', $tech->id);
+        $r->assertJsonPath('date_livraison', '2026-03-15');
+        $r->assertJsonPath('notes_ligne', 'Accès chantier nord');
+
+        $ligne = BonCommandeLigne::query()->findOrFail($ligneId);
+        $this->assertSame($tech->id, $ligne->technicien_id);
+        $this->assertSame('2026-03-15', $ligne->date_livraison?->format('Y-m-d'));
+        $this->assertSame('Accès chantier nord', $ligne->notes_ligne);
+    }
+
+    public function test_update_bc_ligne_quantity_recalculates_line_and_totals(): void
+    {
+        $client = Client::query()->create(['name' => 'BC Qty Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site Qty']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0012',
+            'titre' => 'D12',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-12-QTY',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 100,
+            'amount_ttc' => 120,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai qty',
+            'quantity' => 2,
+            'unit_price' => 50,
+            'tva_rate' => 20,
+            'total' => 100,
+        ]);
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $bcId = (int) $bc['id'];
+        $ligneId = (int) $bc['lignes'][0]['id'];
+
+        $r = $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-commande/{$bcId}/lignes/{$ligneId}", [
+            'quantite' => 2,
+        ]);
+        $r->assertOk();
+        $r->assertJsonPath('quantite', 2);
+        $r->assertJsonPath('quantite_devis', 2);
+        $r->assertJsonPath('montant_ht', 100);
+
+        $bcFresh = BonCommande::query()->findOrFail($bcId);
+        $this->assertEquals(100.0, (float) $bcFresh->montant_ht);
+        $this->assertEquals(120.0, (float) $bcFresh->montant_ttc);
+
+        $ligne = BonCommandeLigne::query()->findOrFail($ligneId);
+        $this->assertEquals(2.0, (float) $ligne->quantite);
+        $this->assertEquals(2.0, (float) $ligne->quantite_devis);
+        $this->assertEquals(100.0, (float) $ligne->montant_ht);
+    }
+
+    public function test_update_bc_ligne_quantity_rejects_above_devis(): void
+    {
+        $client = Client::query()->create(['name' => 'BC Qty Max Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site Qty Max']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0013',
+            'titre' => 'D13',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-13-QTY-MAX',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 100,
+            'amount_ttc' => 120,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai qty max',
+            'quantity' => 2,
+            'unit_price' => 50,
+            'tva_rate' => 20,
+            'total' => 100,
+        ]);
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $bcId = (int) $bc['id'];
+        $ligneId = (int) $bc['lignes'][0]['id'];
+
+        $r = $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-commande/{$bcId}/lignes/{$ligneId}", [
+            'quantite' => 5,
+        ]);
+        $r->assertStatus(422);
+        $r->assertJsonFragment(['message' => 'La quantité ne peut pas dépasser celle du devis (2).']);
+    }
+
+    public function test_update_bc_ligne_quantity_rejects_below_delivered(): void
+    {
+        $client = Client::query()->create(['name' => 'BC Qty Floor Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site Qty2']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0013',
+            'titre' => 'D13',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-13-QTY',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 100,
+            'amount_ttc' => 120,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai floor',
+            'quantity' => 5,
+            'unit_price' => 20,
+            'tva_rate' => 20,
+            'total' => 100,
+        ]);
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $bcId = (int) $bc['id'];
+        $ligneId = (int) $bc['lignes'][0]['id'];
+        $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/confirmer")->assertOk();
+        $bl = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/transformer-bl")->assertCreated()->json();
+        $blId = (int) $bl['id'];
+        $blLineId = (int) $bl['lignes'][0]['id'];
+        $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-livraison/{$blId}", [
+            'lignes' => [['id' => $blLineId, 'quantite_livree' => 3]],
+        ])->assertOk();
+        $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-livraison/{$blId}/valider")->assertOk();
+
+        $r = $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-commande/{$bcId}/lignes/{$ligneId}", [
+            'quantite' => 2,
+        ]);
+        $r->assertStatus(422);
+        $r->assertJsonFragment(['message' => 'La quantité ne peut pas être inférieure à la quantité déjà livrée (3).']);
+    }
+
+    public function test_update_bc_ligne_syncs_terrain_planning_affectation(): void
+    {
+        $client = Client::query()->create(['name' => 'BC Sync Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site S']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $tech = User::factory()->create(['role' => User::ROLE_LAB_TECHNICIAN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0011',
+            'titre' => 'D11',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-11',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 100,
+            'amount_ttc' => 120,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai sync',
+            'quantity' => 1,
+            'unit_price' => 100,
+            'tva_rate' => 20,
+            'total' => 100,
+        ]);
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $bcId = (int) $bc['id'];
+        $ligneId = (int) $bc['lignes'][0]['id'];
+
+        $r = $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-commande/{$bcId}/lignes/{$ligneId}", [
+            'date_debut_prevue' => '2026-04-10',
+            'date_fin_prevue' => '2026-04-14',
+            'technicien_id' => $tech->id,
+            'notes_ligne' => 'Mission terrain',
+        ]);
+        $r->assertOk();
+        $r->assertJsonPath('date_debut_prevue', '2026-04-10');
+        $r->assertJsonPath('date_fin_prevue', '2026-04-14');
+
+        $aff = BcLignePlanningAffectation::query()->where('bon_commande_ligne_id', $ligneId)->first();
+        $this->assertNotNull($aff);
+        $this->assertSame($tech->id, $aff->user_id);
+        $this->assertSame('2026-04-10', $aff->date_debut->format('Y-m-d'));
+        $this->assertSame('2026-04-14', $aff->date_fin->format('Y-m-d'));
+        $this->assertSame('Mission terrain', $aff->notes);
     }
 
     public function test_gest_confirmer_transformer_bl_valider(): void
@@ -98,7 +413,7 @@ class BonCommandeWorkflowTest extends TestCase
 
         $bl = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/transformer-bl");
         $bl->assertCreated();
-        $bl->assertJsonPath('numero', 'BLC-2026-0001');
+        $bl->assertJsonPath('numero', 'BLC-2026-0001/HQ');
         $blId = (int) $bl->json('id');
         $lineId = (int) $bl->json('lignes.0.id');
 
@@ -117,5 +432,447 @@ class BonCommandeWorkflowTest extends TestCase
     public function test_guest_cannot_transform_devis(): void
     {
         $this->postJson('/api/v1/devis/1/transformer-bc')->assertUnauthorized();
+    }
+
+    public function test_quotes_eligible_bc_filter_includes_signed_accepted_with_or_without_bc(): void
+    {
+        $client = Client::query()->create(['name' => 'Eligible BC Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site E']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0003',
+            'titre' => 'D3',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+
+        $eligible = Quote::query()->create([
+            'number' => 'Q-ELIG',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 100,
+            'amount_ttc' => 120,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_ACCEPTED,
+        ]);
+        Quote::query()->create([
+            'number' => 'Q-DRAFT',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 50,
+            'amount_ttc' => 60,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_DRAFT,
+        ]);
+        $withBc = Quote::query()->create([
+            'number' => 'Q-HASBC',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 80,
+            'amount_ttc' => 96,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        BonCommande::query()->create([
+            'numero' => 'BCC-TEST-1',
+            'quote_id' => $withBc->id,
+            'dossier_id' => $dossier->id,
+            'client_id' => $client->id,
+            'date_commande' => '2026-02-02',
+            'montant_ht' => 80,
+            'montant_ttc' => 96,
+            'statut' => BonCommande::STATUT_BROUILLON,
+            'created_by' => $lab->id,
+        ]);
+
+        $r = $this->actingAs($lab, 'sanctum')->getJson('/api/quotes?eligible_bc=1');
+        $r->assertOk();
+        $ids = collect($r->json('data'))->pluck('id')->all();
+        $this->assertContains($eligible->id, $ids);
+        $this->assertContains($withBc->id, $ids);
+        $this->assertCount(2, $ids);
+    }
+
+    public function test_quotes_eligible_bc_search_matches_dossier_reference(): void
+    {
+        $client = Client::query()->create(['name' => 'Search BC Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site S']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-SEARCH-BC',
+            'titre' => 'Chantier recherche BC',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $quote = Quote::query()->create([
+            'number' => 'Q-SEARCH',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 100,
+            'amount_ttc' => 120,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_ACCEPTED,
+        ]);
+
+        $r = $this->actingAs($lab, 'sanctum')->getJson('/api/quotes?eligible_bc=1&search=DOS-SEARCH-BC');
+        $r->assertOk();
+        $ids = collect($r->json('data'))->pluck('id')->all();
+        $this->assertSame([$quote->id], $ids);
+    }
+
+    public function test_lab_can_create_multiple_bons_commande_from_same_accepted_quote(): void
+    {
+        $client = Client::query()->create(['name' => 'Multi BC Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site M']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0099',
+            'titre' => 'D multi',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-MULTI',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 200,
+            'amount_ttc' => 240,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_ACCEPTED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Lot A',
+            'quantity' => 2,
+            'unit_price' => 100,
+            'tva_rate' => 20,
+            'total' => 200,
+        ]);
+
+        $first = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc");
+        $first->assertCreated();
+        $first->assertJsonPath('numero', 'BCC-2026-0001/HQ');
+
+        $second = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc");
+        $second->assertCreated();
+        $second->assertJsonPath('numero', 'BCC-2026-0002/HQ');
+        $this->assertNotSame($first->json('id'), $second->json('id'));
+
+        $this->assertSame(2, BonCommande::query()->where('quote_id', $q->id)->count());
+
+        $meta = Quote::query()->find($q->id)->meta;
+        $this->assertSame($second->json('id'), $meta['bon_commande_id']);
+        $this->assertSame([$first->json('id'), $second->json('id')], $meta['bon_commande_ids']);
+
+        $list = $this->actingAs($lab, 'sanctum')->getJson('/api/quotes?search=Q-MULTI');
+        $list->assertOk();
+        $list->assertJsonCount(2, 'data.0.bons_commande');
+    }
+
+    public function test_bl_show_includes_delivery_tracking_on_lignes(): void
+    {
+        [$lab, $bcId, $blId, $blLineId, $bcLineId] = $this->seedBcWithBl();
+
+        BonCommandeLigne::query()->whereKey($bcLineId)->update(['quantite' => 5]);
+
+        $show = $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-livraison/{$blId}");
+        $show->assertOk();
+        $show->assertJsonPath('lignes.0.quantite_commandee', 5);
+        $show->assertJsonPath('lignes.0.quantite_deja_livree', 0);
+        $show->assertJsonPath('lignes.0.quantite_restante', 5);
+
+        $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-livraison/{$blId}", [
+            'lignes' => [['id' => $blLineId, 'quantite_livree' => 2]],
+        ])->assertOk();
+        $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-livraison/{$blId}/valider")->assertOk();
+
+        $bl2 = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/transformer-bl");
+        $bl2->assertCreated();
+        $bl2Id = (int) $bl2->json('id');
+
+        $show2 = $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-livraison/{$bl2Id}");
+        $show2->assertOk();
+        $show2->assertJsonPath('lignes.0.quantite_commandee', 5);
+        $show2->assertJsonPath('lignes.0.quantite_deja_livree', 2);
+        $show2->assertJsonPath('lignes.0.quantite_restante', 3);
+        $show2->assertJsonPath('autres_bons_livraison.0.id', $blId);
+    }
+
+    public function test_bl_show_includes_devis_display_meta_from_quote(): void
+    {
+        [$lab, $bcId, $blId] = array_slice($this->seedBcWithBl(), 0, 3);
+
+        $bc = BonCommande::query()->findOrFail($bcId);
+        $quote = Quote::query()->findOrFail((int) $bc->quote_id);
+        $quote->update([
+            'meta' => [
+                'devis_jalons' => [
+                    [
+                        'id' => 'j-bl-1',
+                        'libelle' => 'Lot livraison',
+                        's2g_code' => 'J-BL-01',
+                        'product_ref_article_ids' => [],
+                    ],
+                ],
+                'devis_parcours' => [
+                    ['kind' => 'jalon', 'id' => 'j-bl-1'],
+                ],
+            ],
+        ]);
+
+        $show = $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-livraison/{$blId}");
+        $show->assertOk();
+        $show->assertJsonPath('devis_display_meta.devis_jalons.0.libelle', 'Lot livraison');
+        $show->assertJsonPath('bon_commande.quote.meta.devis_jalons.0.libelle', 'Lot livraison');
+    }
+
+    public function test_bl_rejects_quantity_over_remaining(): void
+    {
+        [$lab, $bcId, $blId, $blLineId, $bcLineId] = $this->seedBcWithBl();
+
+        BonCommandeLigne::query()->whereKey($bcLineId)->update(['quantite' => 5]);
+
+        $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-livraison/{$blId}", [
+            'lignes' => [['id' => $blLineId, 'quantite_livree' => 3]],
+        ])->assertOk();
+        $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-livraison/{$blId}/valider")->assertOk();
+
+        $bl2 = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/transformer-bl");
+        $bl2Id = (int) $bl2->json('id');
+        $bl2LineId = (int) $bl2->json('lignes.0.id');
+
+        $over = $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-livraison/{$bl2Id}", [
+            'lignes' => [['id' => $bl2LineId, 'quantite_livree' => 3]],
+        ]);
+        $over->assertStatus(422);
+
+        $ok = $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-livraison/{$bl2Id}", [
+            'lignes' => [['id' => $bl2LineId, 'quantite_livree' => 2]],
+        ]);
+        $ok->assertOk();
+        $ok->assertJsonPath('lignes.0.quantite_livree', 2);
+    }
+
+    public function test_invoice_eligible_bons_commande_and_from_bons_commande(): void
+    {
+        [$lab, $bcId] = array_slice($this->seedBcWithBl(), 0, 2);
+
+        $eligible = $this->actingAs($lab, 'sanctum')->getJson('/api/invoices/eligible-bons-commande');
+        $eligible->assertOk();
+        $eligible->assertJsonFragment(['id' => $bcId]);
+
+        $invoice = $this->actingAs($lab, 'sanctum')->postJson('/api/invoices/from-bons-commande', [
+            'bon_commande_ids' => [$bcId],
+        ]);
+        $invoice->assertCreated();
+        $invoice->assertJsonPath('status', 'draft');
+        $this->assertNotEmpty($invoice->json('invoice_lines'));
+
+        $again = $this->actingAs($lab, 'sanctum')->getJson('/api/invoices/eligible-bons-commande');
+        $again->assertOk();
+        $ids = collect($again->json('data'))->pluck('id')->all();
+        $this->assertNotContains($bcId, $ids);
+    }
+
+    public function test_bl_brouillon_quantities_not_counted_as_deja_livree(): void
+    {
+        [$lab, $bcId, $blId, $blLineId, $bcLineId] = $this->seedBcWithBl();
+
+        BonCommandeLigne::query()->whereKey($bcLineId)->update(['quantite' => 5]);
+
+        $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-livraison/{$blId}", [
+            'lignes' => [['id' => $blLineId, 'quantite_livree' => 4]],
+        ])->assertOk();
+
+        $bl2 = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/transformer-bl");
+        $bl2Id = (int) $bl2->json('id');
+
+        $show2 = $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-livraison/{$bl2Id}");
+        $show2->assertJsonPath('lignes.0.quantite_deja_livree', 0);
+        $show2->assertJsonPath('lignes.0.quantite_restante', 5);
+    }
+
+    public function test_bons_commande_planning_list_includes_brouillon(): void
+    {
+        $client = Client::query()->create(['name' => 'BC Planning Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site P']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0099',
+            'titre' => 'D99',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-99',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 100,
+            'amount_ttc' => 120,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai planning',
+            'quantity' => 1,
+            'unit_price' => 100,
+            'tva_rate' => 20,
+            'total' => 100,
+        ]);
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $this->assertSame(BonCommande::STATUT_BROUILLON, $bc['statut']);
+
+        BonCommande::query()->create([
+            'numero' => 'BCC-2099-ANNULE',
+            'dossier_id' => $dossier->id,
+            'client_id' => $client->id,
+            'quote_id' => null,
+            'date_commande' => '2026-02-01',
+            'montant_ht' => 10,
+            'montant_ttc' => 12,
+            'statut' => BonCommande::STATUT_ANNULE,
+            'created_by' => $lab->id,
+        ]);
+
+        $list = $this->actingAs($lab, 'sanctum')->getJson('/api/v1/bons-commande?planning=1');
+        $list->assertOk();
+        $numeros = collect($list->json())->pluck('numero')->all();
+        $this->assertContains($bc['numero'], $numeros);
+        $this->assertNotContains('BCC-2099-ANNULE', $numeros);
+    }
+
+    public function test_planning_terrain_store_accepts_brouillon_bc_line(): void
+    {
+        $client = Client::query()->create(['name' => 'BC Terrain Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site T']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $tech = User::factory()->create(['role' => User::ROLE_LAB_TECHNICIAN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0100',
+            'titre' => 'D100',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-100',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 100,
+            'amount_ttc' => 120,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai terrain',
+            'quantity' => 1,
+            'unit_price' => 100,
+            'tva_rate' => 20,
+            'total' => 100,
+        ]);
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $ligneId = (int) $bc['lignes'][0]['id'];
+        $this->assertSame(BonCommande::STATUT_BROUILLON, $bc['statut']);
+
+        $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-commande/{$bc['id']}/lignes/{$ligneId}", [
+            'date_debut_prevue' => '2026-05-01',
+            'date_fin_prevue' => '2026-05-10',
+        ])->assertOk();
+
+        $r = $this->actingAs($lab, 'sanctum')->postJson('/api/v1/planning-terrain', [
+            'bon_commande_ligne_id' => $ligneId,
+            'user_id' => $tech->id,
+            'date_debut' => '2026-05-02',
+            'date_fin' => '2026-05-05',
+            'notes' => 'Affectation brouillon',
+        ]);
+        $r->assertCreated();
+        $r->assertJsonPath('user_id', $tech->id);
+
+        $ligne = BonCommandeLigne::query()->findOrFail($ligneId);
+        $this->assertSame($tech->id, $ligne->technicien_id);
+        $this->assertSame('2026-05-02', $ligne->date_debut_prevue?->format('Y-m-d'));
+        $this->assertSame('2026-05-05', $ligne->date_fin_prevue?->format('Y-m-d'));
+
+        $aff = BcLignePlanningAffectation::query()->where('bon_commande_ligne_id', $ligneId)->first();
+        $this->assertNotNull($aff);
+        $this->assertSame('Affectation brouillon', $aff->notes);
+    }
+
+    /**
+     * @return array{0: User, 1: int, 2: int, 3: int, 4: int}
+     */
+    private function seedBcWithBl(): array
+    {
+        $client = Client::query()->create(['name' => 'BL Delivery Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site BL']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0099',
+            'titre' => 'D BL',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-BL-DEL',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 50,
+            'amount_ttc' => 60,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai livraison',
+            'quantity' => 1,
+            'unit_price' => 50,
+            'tva_rate' => 20,
+            'total' => 50,
+        ]);
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->json();
+        $bcId = (int) $bc['id'];
+        $bcLineId = (int) $bc['lignes'][0]['id'];
+        $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/confirmer")->assertOk();
+        $bl = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/bons-commande/{$bcId}/transformer-bl")->json();
+        $blId = (int) $bl['id'];
+        $blLineId = (int) $bl['lignes'][0]['id'];
+
+        return [$lab, $bcId, $blId, $blLineId, $bcLineId];
     }
 }

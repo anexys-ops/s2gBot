@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Catalogue;
 
+use App\Models\Catalogue\Article;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -23,7 +24,7 @@ class ArticleResource extends JsonResource
             'description' => $this->description,
             'description_commerciale' => $this->description_commerciale,
             'description_technique' => $this->description_technique,
-            'tags' => $this->tags,
+            'tags' => ($this->resource->isJalon() || $this->resource->isProduct()) ? null : $this->tags,
             'unite' => $this->unite,
             'hfsql_unite' => $this->hfsql_unite,
             'prix_unitaire_ht' => $this->prix_unitaire_ht,
@@ -33,6 +34,9 @@ class ArticleResource extends JsonResource
             'duree_estimee' => $this->duree_estimee,
             'normes' => $this->normes,
             'actif' => $this->actif,
+            'is_multi_site' => (bool) ($this->is_multi_site ?? true),
+            'kind' => $this->kind ?? Article::KIND_LEGACY,
+            'famille_label' => $this->famille_label,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'famille' => $this->whenLoaded('famille', fn () => $this->famille),
@@ -58,6 +62,47 @@ class ArticleResource extends JsonResource
             }),
             'parametres_essai' => $this->whenLoaded('parametresEssai', fn () => $this->parametresEssai),
             'resultats' => $this->whenLoaded('resultats', fn () => $this->resultats),
+            'qualification_tags' => $this->whenLoaded('qualificationTags', fn () => $this->qualificationTags->map(fn ($tag) => [
+                'id' => $tag->id,
+                'code' => $tag->code,
+                'label' => $tag->label,
+                'display_label' => $tag->displayLabel(),
+                'groupe' => $tag->groupe,
+            ])),
+            'jalon_products' => $this->whenLoaded('jalonProductLinks', fn () => $this->jalonProductLinks->map(fn ($link) => [
+                'id' => $link->id,
+                'ordre' => $link->ordre,
+                'tache_code' => $link->tache_code,
+                'tache_label' => $link->tache_label,
+                'product' => $link->product ? [
+                    'id' => $link->product->id,
+                    'code' => $link->product->code,
+                    'libelle' => $link->product->libelle,
+                    'unite' => $link->product->unite,
+                    'prix_unitaire_ht' => $link->product->prix_unitaire_ht,
+                    'tva_rate' => $link->product->tva_rate,
+                    'kind' => $link->product->kind,
+                    'actif' => $link->product->actif,
+                ] : null,
+            ])),
+            'product_jalons' => $this->whenLoaded('productJalonLinks', fn () => $this->productJalonLinks->map(fn ($link) => [
+                'id' => $link->id,
+                'ordre' => $link->ordre,
+                'jalon' => $link->jalon ? [
+                    'id' => $link->jalon->id,
+                    'code' => $link->jalon->code,
+                    'libelle' => $link->jalon->libelle,
+                    'famille_label' => $link->jalon->famille_label,
+                    'kind' => $link->jalon->kind,
+                    'actif' => $link->jalon->actif,
+                ] : null,
+            ])),
+            'visible_lab_agencies' => $this->whenLoaded('visibleLabAgencies', fn () => $this->visibleLabAgencies->map(fn ($a) => [
+                'id' => $a->id,
+                'name' => $a->name,
+                'code' => $a->code,
+                'is_siege' => (bool) $a->is_siege,
+            ])),
         ];
     }
 }

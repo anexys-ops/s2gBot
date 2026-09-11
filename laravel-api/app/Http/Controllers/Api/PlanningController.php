@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\BcLignePlanningAffectation;
 use App\Models\PlanningEquipment;
 use App\Models\PlanningHuman;
 use App\Models\StockEquipment;
@@ -62,7 +63,7 @@ class PlanningController extends Controller
     /** GET /planning/equipments?from=&to=&equipment_id= */
     public function equipmentsIndex(Request $request): JsonResponse
     {
-        $q = PlanningEquipment::query()->with(['equipment:id,name,code', 'missionTask:id,statut']);
+        $q = PlanningEquipment::query()->with(['equipment:id,name,code', 'missionTask:id,statut', 'user:id,name']);
 
         if ($from = $request->string('from')) {
             $q->where('date_fin', '>=', $from);
@@ -83,6 +84,7 @@ class PlanningController extends Controller
         $data = $request->validate([
             'equipment_id'    => 'required|exists:equipments,id',
             'mission_task_id' => 'nullable|exists:mission_tasks,id',
+            'user_id'         => 'nullable|exists:users,id',
             'date_debut'      => 'required|date',
             'date_fin'        => 'required|date|after_or_equal:date_debut',
             'type_evenement'  => 'in:utilisation,maintenance,indispo,autre',
@@ -90,7 +92,7 @@ class PlanningController extends Controller
         ]);
 
         $slot = PlanningEquipment::create($data);
-        return response()->json($slot->load(['equipment:id,name,code', 'missionTask:id,statut']), 201);
+        return response()->json($slot->load(['equipment:id,name,code', 'missionTask:id,statut', 'user:id,name']), 201);
     }
 
     /** DELETE /planning/equipments/{id} */
@@ -215,6 +217,16 @@ class PlanningController extends Controller
                 ->where('date_fin', '>=', $from)
                 ->where('date_debut', '<=', $to)
                 ->with('equipment:id,name,code')
+                ->get(),
+            'terrain_bc' => BcLignePlanningAffectation::query()
+                ->where('date_debut', '<=', $to)
+                ->where('date_fin', '>=', $from)
+                ->with([
+                    'user:id,name',
+                    'bonCommandeLigne:id,bon_commande_id,libelle',
+                    'bonCommandeLigne.bonCommande:id,numero,dossier_id',
+                ])
+                ->orderBy('date_debut')
                 ->get(),
         ]);
     }

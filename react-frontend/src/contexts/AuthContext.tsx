@@ -4,7 +4,7 @@ import { authApi, type User } from '../api/client'
 interface AuthContextValue {
   user: User | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<User>
   logout: () => Promise<void>
   setUser: (u: User | null) => void
   refreshUser: () => Promise<void>
@@ -38,14 +38,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadUser()
   }, [loadUser])
 
-  const login = useCallback(
-    async (email: string, password: string) => {
-      const { user: u, token } = await authApi.login(email, password)
-      localStorage.setItem('token', token)
-      setUser(u)
-    },
-    []
-  )
+  useEffect(() => {
+    const onSessionExpired = () => setUser(null)
+    window.addEventListener('s2g:session-expired', onSessionExpired)
+    return () => window.removeEventListener('s2g:session-expired', onSessionExpired)
+  }, [])
+
+  const login = useCallback(async (email: string, password: string) => {
+    const { user: u, token } = await authApi.login(email, password)
+    localStorage.setItem('token', token)
+    setUser(u)
+    return u
+  }, [])
 
   const logout = useCallback(async () => {
     try {

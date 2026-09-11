@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { catalogueApi, type RefArticleRow, type RefFamilleArticleRow, type RefPackageRow } from '../../api/client'
+import { formatMoney } from '../../lib/appLocale'
 
 type Props = {
   onSelectArticle?: (article: RefArticleRow) => void
@@ -45,7 +46,7 @@ function PackageNode({ p }: { p: RefPackageRow }) {
       <span className="catalogue-tree__label">{p.libelle}</span>
       {p.prix_ht && (
         <span className="catalogue-tree__meta">
-          {p.prix_ht} € HT — TVA {p.tva_rate} %
+          {formatMoney(Number(p.prix_ht))} HT — TVA {p.tva_rate} %
         </span>
       )}
     </li>

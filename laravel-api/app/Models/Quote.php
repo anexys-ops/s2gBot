@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Quote extends Model
@@ -56,6 +57,11 @@ class Quote extends Model
         'valid_until',
         'amount_ht',
         'amount_ttc',
+        'currency_code',
+        'exchange_rate',
+        'exchange_rate_date',
+        'amount_ht_base',
+        'amount_ttc_base',
         'tva_rate',
         'discount_percent',
         'discount_amount',
@@ -80,6 +86,10 @@ class Quote extends Model
             'valid_until' => 'date',
             'amount_ht' => 'decimal:2',
             'amount_ttc' => 'decimal:2',
+            'exchange_rate' => 'decimal:6',
+            'exchange_rate_date' => 'date',
+            'amount_ht_base' => 'decimal:2',
+            'amount_ttc_base' => 'decimal:2',
             'tva_rate' => 'decimal:2',
             'discount_percent' => 'decimal:2',
             'discount_amount' => 'decimal:2',
@@ -139,6 +149,17 @@ class Quote extends Model
     public function devisTaches(): HasMany
     {
         return $this->hasMany(DevisTache::class, 'quote_id')->orderBy('ordre');
+    }
+
+    public function bonsCommande(): HasMany
+    {
+        return $this->hasMany(BonCommande::class, 'quote_id')->orderByDesc('id');
+    }
+
+    /** Dernier BC créé — rétrocompatibilité API / écrans legacy. */
+    public function bonCommande(): HasOne
+    {
+        return $this->hasOne(BonCommande::class, 'quote_id')->latestOfMany();
     }
 
     public function attachments(): MorphMany

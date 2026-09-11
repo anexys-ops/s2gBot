@@ -26,6 +26,26 @@ class AuthApiTest extends TestCase
         $response->assertJsonStructure(['user', 'token', 'token_type']);
     }
 
+    public function test_login_does_not_invalidate_previous_spa_token(): void
+    {
+        User::factory()->create([
+            'email' => 'test@example.com',
+            'password' => 'password',
+        ]);
+
+        $first = $this->postJson('/api/login', [
+            'email' => 'test@example.com',
+            'password' => 'password',
+        ])->assertOk()->json('token');
+
+        $this->postJson('/api/login', [
+            'email' => 'test@example.com',
+            'password' => 'password',
+        ])->assertOk();
+
+        $this->withToken($first)->getJson('/api/user')->assertOk();
+    }
+
     public function test_login_fails_with_invalid_credentials(): void
     {
         $response = $this->postJson('/api/login', [

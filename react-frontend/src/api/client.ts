@@ -1,4 +1,5 @@
 import { enqueueOfflineRequest } from '../lib/offlineQueue'
+import { parseApiErrorResponse } from '../lib/errors'
 
 const API_BASE = '/api'
 
@@ -6,11 +7,40 @@ function getToken(): string | null {
   return localStorage.getItem('token')
 }
 
+const AUTH_PUBLIC_PATHS = new Set(['/login', '/register', '/forgot-password', '/reset-password'])
+
+function authPathBase(path: string): string {
+  return path.split('?')[0] ?? path
+}
+
+/** Invalidate SPA session after a protected API returned 401 (expired / revoked token). */
+function invalidateSessionAndRedirect(): void {
+  localStorage.removeItem('token')
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('s2g:session-expired'))
+    if (!window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login'
+    }
+  }
+}
+
+function handleApiUnauthorized(path: string, hadToken: boolean): never {
+  const base = authPathBase(path)
+  if (AUTH_PUBLIC_PATHS.has(base)) {
+    throw new Error(base === '/login' ? 'Identifiants invalides' : 'Non autorisé')
+  }
+  if (hadToken) {
+    invalidateSessionAndRedirect()
+  }
+  throw new Error('Session expirée — reconnectez-vous.')
+}
+
 export async function api<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
   const token = getToken()
+  const hadToken = Boolean(token)
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -31,25 +61,17 @@ export async function api<T>(
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
   if (res.status === 401) {
-    localStorage.removeItem('token')
-    window.location.href = '/login'
-    throw new Error('Unauthorized')
+    handleApiUnauthorized(path, hadToken)
   }
-  const data = await res.json().catch(() => ({}))
+  const contentType = res.headers.get('content-type') ?? ''
+  let data: unknown = {}
+  if (contentType.includes('application/json')) {
+    data = await res.json().catch(() => ({}))
+  } else if (!res.ok) {
+    throw await parseApiErrorResponse(res)
+  }
   if (!res.ok) {
-    let msg =
-      typeof data.message === 'string' && data.message.trim() !== ''
-        ? data.message
-        : `Erreur ${res.status}`
-    if (data.errors && typeof data.errors === 'object') {
-      const parts = Object.values(data.errors)
-        .flat(2)
-        .filter((x): x is string => typeof x === 'string' && x.trim() !== '')
-      if (parts.length) {
-        msg = parts.join(' ')
-      }
-    }
-    throw new Error(msg)
+    throw await parseApiErrorResponse(res, data)
   }
   return data as T
 }
@@ -67,6 +89,16 @@ export const authApi = {
     api<{ user: User; token: string }>('/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+    }),
+  forgotPassword: (email: string) =>
+    api<{ message: string }>('/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  resetPassword: (body: { email: string; token: string; password: string; password_confirmation: string }) =>
+    api<{ message: string }>('/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(body),
     }),
   register: (body: RegisterBody) =>
     api<{ user: User; token: string }>('/register', {
@@ -117,7 +149,8 @@ export const accountApi = {
 }
 
 export const permissionsCatalogApi = {
-  get: () => api<{ permissions: Record<string, string> }>('/permissions/catalog'),
+  get: () =>
+    api<{ permissions: Record<string, string>; groups?: Record<string, string[]> }>('/permissions/catalog'),
 }
 
 export const adminUsersApi = {
@@ -134,11 +167,16 @@ export const adminUsersApi = {
     email: string
     password: string
     phone?: string | null
+    poste?: string | null
+    expense_taux_km?: number | null
+    expense_plafond_repas?: number | null
+    expense_forfait_repas?: number | null
     role: string
     client_id?: number | null
     site_id?: number | null
     access_group_ids?: number[]
     agency_ids?: number[]
+    agency_id?: number | null
   }) => api<User>('/admin/users', { method: 'POST', body: JSON.stringify(body) }),
   update: (
     id: number,
@@ -147,11 +185,16 @@ export const adminUsersApi = {
       email: string
       password: string
       phone: string | null
+      poste: string | null
+      expense_taux_km: number | null
+      expense_plafond_repas: number | null
+      expense_forfait_repas: number | null
       role: string
       client_id: number | null
       site_id: number | null
       access_group_ids: number[]
       agency_ids: number[]
+      agency_id?: number | null
     }>,
   ) => api<User>(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/admin/users/${id}`, { method: 'DELETE' }),
@@ -192,10 +235,37 @@ export const clientsApi = {
     const s = q.toString()
     return api<Client[]>(`/clients${s ? `?${s}` : ''}`)
   },
+  listPaginated: (params?: {
+    search?: string
+    commercial_id?: number
+    view?: string
+    page?: number
+    per_page?: number
+  }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    if (params?.commercial_id) q.set('commercial_id', String(params.commercial_id))
+    if (params?.view && params.view !== 'all') q.set('view', params.view)
+    q.set('page', String(params?.page ?? 1))
+    q.set('per_page', String(params?.per_page ?? 20))
+    return api<LaravelPaginator<Client>>(`/clients?${q.toString()}`)
+  },
   get: (id: number) => api<Client>(`/clients/${id}`),
   create: (body: Partial<Client>) => api<Client>('/clients', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: Partial<Client>) => api<Client>(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/clients/${id}`, { method: 'DELETE' }),
+  syncLabAgencies: (id: number, labAgencyIds: number[]) =>
+    api<Client>(`/clients/${id}/lab-agencies`, {
+      method: 'PUT',
+      body: JSON.stringify({ lab_agency_ids: labAgencyIds }),
+    }),
+  portalCatalog: () =>
+    api<{ modules: { key: string; label: string }[]; defaults: string[] }>('/clients/portal/catalog'),
+  syncPortalModules: (id: number, portalModules: string[]) =>
+    api<{ portal_modules: string[] }>(`/clients/${id}/portal-modules`, {
+      method: 'PUT',
+      body: JSON.stringify({ portal_modules: portalModules }),
+    }),
   commercialOverview: (id: number) => api<ClientCommercialOverview>(`/clients/${id}/commercial-overview`),
 }
 
@@ -219,6 +289,7 @@ export interface Attachment {
   mime_type?: string
   size_bytes: number
   uploaded_by?: number
+  created_at?: string
 }
 
 export interface CommercialDocumentLink {
@@ -240,6 +311,7 @@ export interface DocumentPdfTemplateRow {
   name: string
   blade_view: string
   is_default: boolean
+  is_active?: boolean
   layout_config?: PdfLayoutConfig
 }
 
@@ -298,9 +370,7 @@ export const attachmentsApi = {
       body: fd,
     })
     if (res.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
-      throw new Error('Unauthorized')
+      handleApiUnauthorized('/attachments', Boolean(token))
     }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data.message || `Erreur ${res.status}`)
@@ -313,11 +383,8 @@ export const attachmentsApi = {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
     if (res.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
-      throw new Error('Unauthorized')
+      handleApiUnauthorized(`/attachments/${attachmentId}/download`, Boolean(token))
     }
-    if (!res.ok) throw new Error('Téléchargement impossible')
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -342,14 +409,39 @@ export const commercialLinksApi = {
 }
 
 export const documentPdfTemplatesApi = {
-  list: (documentType?: string) =>
-    api<{ data: DocumentPdfTemplateRow[] }>(
-      documentType ? `/document-pdf-templates?document_type=${documentType}` : '/document-pdf-templates'
-    ),
+  list: (documentType?: string, activeOnly?: boolean) => {
+    const q = new URLSearchParams()
+    if (documentType) q.set('document_type', documentType)
+    if (activeOnly) q.set('active_only', '1')
+    const s = q.toString()
+    return api<{ data: DocumentPdfTemplateRow[] }>(
+      s ? `/document-pdf-templates?${s}` : '/document-pdf-templates',
+    )
+  },
+  options: () =>
+    api<{ document_types: string[]; blade_views: Record<string, string[]> }>('/document-pdf-templates/options'),
+  get: (id: number) => api<DocumentPdfTemplateRow>(`/document-pdf-templates/${id}`),
+  create: (body: {
+    document_type: string
+    name: string
+    slug?: string
+    blade_view?: string
+    layout_config?: PdfLayoutConfig
+    is_default?: boolean
+    is_active?: boolean
+    clone_from_id?: number
+  }) => api<DocumentPdfTemplateRow>('/document-pdf-templates', { method: 'POST', body: JSON.stringify(body) }),
   update: (
     id: number,
-    body: { is_default?: boolean; name?: string; layout_config?: PdfLayoutConfig },
+    body: {
+      is_default?: boolean
+      is_active?: boolean
+      name?: string
+      blade_view?: string
+      layout_config?: PdfLayoutConfig
+    },
   ) => api<DocumentPdfTemplateRow>(`/document-pdf-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api<void>(`/document-pdf-templates/${id}`, { method: 'DELETE' }),
 }
 
 export type ExtrafieldEntityType =
@@ -379,6 +471,63 @@ export interface ExtrafieldDefinitionRow {
   select_options?: ExtrafieldSelectOption[] | null
   sort_order: number
   required: boolean
+}
+
+export type DocumentStatusDefinitionRow = {
+  id: number
+  document_type: string
+  code: string
+  label: string
+  sort_order: number
+  is_initial: boolean
+  is_terminal: boolean
+  color_key: string | null
+  active: boolean
+}
+
+export type DocumentStatusDocumentType = {
+  type: string
+  label: string
+}
+
+export const documentStatusDefinitionsApi = {
+  documentTypes: () =>
+    api<{ data: DocumentStatusDocumentType[] }>('/document-status-definitions/document-types'),
+  list: (documentType?: string, activeOnly = false) => {
+    const params = new URLSearchParams()
+    if (documentType) params.set('document_type', documentType)
+    if (activeOnly) params.set('active_only', '1')
+    const qs = params.toString()
+    return api<{ data: DocumentStatusDefinitionRow[] }>(
+      qs ? `/document-status-definitions?${qs}` : '/document-status-definitions',
+    )
+  },
+  create: (body: {
+    document_type: string
+    code: string
+    label: string
+    sort_order?: number
+    is_initial?: boolean
+    is_terminal?: boolean
+    color_key?: string | null
+    active?: boolean
+  }) => api<DocumentStatusDefinitionRow>('/document-status-definitions', { method: 'POST', body: JSON.stringify(body) }),
+  update: (
+    id: number,
+    body: Partial<{
+      label: string
+      sort_order: number
+      is_initial: boolean
+      is_terminal: boolean
+      color_key: string | null
+      active: boolean
+    }>,
+  ) =>
+    api<DocumentStatusDefinitionRow>(`/document-status-definitions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  delete: (id: number) => api(`/document-status-definitions/${id}`, { method: 'DELETE' }),
 }
 
 export const extrafieldDefinitionsApi = {
@@ -430,6 +579,53 @@ export const moduleSettingsApi = {
     }),
 }
 
+export type FxRatesSettings = {
+  enabled?: boolean
+  provider?: 'frankfurter'
+  base_currency?: string
+  cache_ttl_minutes?: number
+  fallback_rates?: Record<string, number>
+  extra_currencies?: { code: string; label: string; name: string }[]
+}
+
+export type FxRateStatusRow = {
+  code: string
+  label: string
+  name: string
+  rate: number | null
+  fetched_at: string | null
+  source: 'api' | 'fallback' | null
+}
+
+export type FxRatesStatus = FxRatesSettings & {
+  last_refresh_at: string | null
+  rates: FxRateStatusRow[]
+}
+
+export const fxRatesApi = {
+  catalog: () =>
+    api<{ base_currency: string; currencies: { code: string; label: string; name: string }[] }>(
+      '/currencies',
+    ),
+  get: (params: { from: string; to?: string; date?: string }) => {
+    const q = new URLSearchParams()
+    q.set('from', params.from)
+    if (params.to) q.set('to', params.to)
+    if (params.date) q.set('date', params.date)
+    return api<{
+      from: string
+      to: string
+      rate: number
+      date: string
+      label_from: string
+      label_to: string
+    }>(`/fx-rates?${q.toString()}`)
+  },
+  settings: () => api<FxRatesSettings>('/fx-rates/settings'),
+  status: () => api<FxRatesStatus>('/fx-rates/status'),
+  refresh: () => api<FxRatesStatus>('/fx-rates/refresh', { method: 'POST' }),
+}
+
 export interface RefPackageRow {
   id: number
   ref_famille_package_id: number
@@ -474,6 +670,36 @@ export interface RefParametreEssaiRow {
   ordre: number
 }
 
+export interface RefQualificationTagRow {
+  id: number
+  code: string
+  label: string
+  display_label: string
+  groupe: string
+}
+
+export interface RefArticleJalonProductRow {
+  id: number
+  ordre: number
+  tache_code?: string | null
+  tache_label?: string | null
+  product?: Pick<
+    RefArticleRow,
+    'id' | 'code' | 'libelle' | 'unite' | 'prix_unitaire_ht' | 'tva_rate' | 'kind' | 'actif'
+  > | null
+}
+
+export interface RefArticleProductJalonRow {
+  id: number
+  ordre: number
+  jalon?: Pick<
+    RefArticleRow,
+    'id' | 'code' | 'libelle' | 'famille_label' | 'kind' | 'actif'
+  > | null
+}
+
+export type RefArticleKind = 'jalon' | 'product' | 'legacy'
+
 export interface RefArticleRow {
   id: number
   ref_famille_article_id: number
@@ -497,12 +723,32 @@ export interface RefArticleRow {
   duree_estimee: number
   normes?: string | null
   actif: boolean
+  /** Multi-site : visible par toutes les agences labo. */
+  is_multi_site?: boolean
+  visible_lab_agencies?: Pick<Agency, 'id' | 'name' | 'code' | 'is_siege'>[]
+  /** S2G : jalon (regroupement) | product (descriptif) | legacy (PROLAB / hors jeu). */
+  kind?: RefArticleKind
+  /** Libellé famille legacy S2G (jalons). */
+  famille_label?: string | null
   famille?: RefFamilleArticleRow
   /** Article lié pour regroupement (PROLAB) */
   article_lie?: { id: number; code: string; libelle: string } | null
   famille_packages?: RefFamillePackageRow[]
   parametres_essai?: RefParametreEssaiRow[]
   resultats?: RefResultatRow[]
+  qualification_tags?: RefQualificationTagRow[]
+  jalon_products?: RefArticleJalonProductRow[]
+  product_jalons?: RefArticleProductJalonRow[]
+  /** Nombre de produits rattachés (jalons, avec `with_products_count`). */
+  products_count?: number | null
+}
+
+/** Laravel ArticleResource renvoie parfois { data: article }. */
+function unwrapCatalogueArticle(payload: RefArticleRow | { data: RefArticleRow }): RefArticleRow {
+  if (payload && typeof payload === 'object' && 'data' in payload && payload.data && typeof payload.data === 'object') {
+    return payload.data
+  }
+  return payload as RefArticleRow
 }
 
 export interface RefFamilleArticleRow {
@@ -517,6 +763,22 @@ export interface RefFamilleArticleRow {
   ordre: number
   actif: boolean
   articles?: RefArticleRow[]
+}
+
+export type RefArticleCreateInput = Partial<RefArticleRow> & {
+  ref_famille_article_id: number
+  code: string
+  libelle: string
+  kind: 'jalon' | 'product'
+  qualification_tag_ids?: number[]
+  product_article_ids?: number[]
+  jalon_article_ids?: number[]
+}
+
+export type RefArticleUpdateInput = Partial<RefArticleRow> & {
+  qualification_tag_ids?: number[]
+  product_article_ids?: number[]
+  jalon_article_ids?: number[]
 }
 
 export const catalogueApi = {
@@ -538,14 +800,25 @@ export const catalogueApi = {
     const s = q.toString()
     return api<RefArticleRow[]>(`/v1/catalogue/familles/${familleId}/articles${s ? `?${s}` : ''}`)
   },
-  articles: (params?: { ref_famille_article_id?: number; with_inactif?: boolean; q?: string }) => {
+  articles: (params?: {
+    ref_famille_article_id?: number
+    with_inactif?: boolean
+    with_products_count?: boolean
+    q?: string
+    kind?: RefArticleKind
+    qualification_tag_code?: string
+  }) => {
     const q = new URLSearchParams()
     if (params?.ref_famille_article_id) q.set('ref_famille_article_id', String(params.ref_famille_article_id))
     if (params?.with_inactif) q.set('with_inactif', '1')
+    if (params?.with_products_count) q.set('with_products_count', '1')
     if (params?.q?.trim()) q.set('q', params.q.trim())
+    if (params?.kind) q.set('kind', params.kind)
+    if (params?.qualification_tag_code?.trim()) q.set('qualification_tag_code', params.qualification_tag_code.trim())
     const s = q.toString()
     return api<RefArticleRow[]>(`/v1/catalogue/articles${s ? `?${s}` : ''}`)
   },
+  qualificationTags: () => api<RefQualificationTagRow[]>('/v1/catalogue/qualification-tags'),
   packages: (params?: { ref_article_id?: number; ref_famille_package_id?: number; with_inactif?: boolean }) => {
     const q = new URLSearchParams()
     if (params?.ref_article_id) q.set('ref_article_id', String(params.ref_article_id))
@@ -554,12 +827,27 @@ export const catalogueApi = {
     const s = q.toString()
     return api<RefPackageRow[]>(`/v1/catalogue/packages${s ? `?${s}` : ''}`)
   },
-  article: (id: number) => api<RefArticleRow>(`/v1/catalogue/articles/${id}`),
-  createArticle: (body: Partial<RefArticleRow> & { ref_famille_article_id: number; code: string; libelle: string }) =>
-    api<RefArticleRow>('/v1/catalogue/articles', { method: 'POST', body: JSON.stringify(body) }),
-  updateArticle: (id: number, body: Partial<RefArticleRow>) =>
-    api<RefArticleRow>(`/v1/catalogue/articles/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  article: (id: number) =>
+    api<RefArticleRow | { data: RefArticleRow }>(`/v1/catalogue/articles/${id}`).then(unwrapCatalogueArticle),
+  createArticle: (body: RefArticleCreateInput) =>
+    api<RefArticleRow | { data: RefArticleRow }>('/v1/catalogue/articles', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }).then(unwrapCatalogueArticle),
+  updateArticle: (id: number, body: RefArticleUpdateInput) =>
+    api<RefArticleRow | { data: RefArticleRow }>(`/v1/catalogue/articles/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }).then(unwrapCatalogueArticle),
   deleteArticle: (id: number) => api<null>(`/v1/catalogue/articles/${id}`, { method: 'DELETE' }),
+  syncArticleLabVisibility: (
+    id: number,
+    body: { is_multi_site: boolean; lab_agency_ids: number[] },
+  ) =>
+    api<{ id: number; is_multi_site: boolean; visible_lab_agencies?: Pick<Agency, 'id' | 'name' | 'code'>[] }>(
+      `/v1/catalogue/articles/${id}/lab-visibility`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
 }
 
 export type DossierStatut = 'brouillon' | 'en_cours' | 'cloture' | 'archive'
@@ -640,7 +928,10 @@ export type BcLignePlanningAffectation = {
 export type BonCommandeLigne = {
   id: number
   libelle: string
+  ordre?: number
   quantite: string | number
+  /** Plafond issu du devis source (snapshot à la création du BC). */
+  quantite_devis?: string | number | null
   prix_unitaire_ht: string | number
   tva_rate: string | number
   montant_ht: string | number
@@ -672,6 +963,10 @@ export type BonCommande = {
   client?: { id: number; name: string }
   clientContact?: ClientContactRow
   dossier?: DossierRow
+  quote?: Pick<Quote, 'id' | 'number' | 'status'> & { meta?: EntityMetaPayload }
+  bons_livraison?: Array<Pick<BonLivraison, 'id' | 'numero' | 'statut' | 'date_livraison'>>
+  bons_livraison_count?: number
+  invoices_count?: number
 }
 
 export type BonLivraisonLigne = {
@@ -680,6 +975,10 @@ export type BonLivraisonLigne = {
   quantite_livree: string | number
   ref_article_id?: number | null
   bon_commande_ligne_id?: number | null
+  quantite_commandee?: string | number
+  quantite_deja_livree?: string | number
+  quantite_restante?: string | number
+  ordre?: number
 }
 
 export type BonLivraison = {
@@ -693,9 +992,15 @@ export type BonLivraison = {
   date_livraison: string
   notes?: string | null
   lignes?: BonLivraisonLigne[]
+  /** Structure devis (jalons / parcours) pour l’affichage groupé des lignes. */
+  devis_display_meta?: EntityMetaPayload | null
   client?: { id: number; name: string }
   clientContact?: ClientContactRow
   dossier?: DossierRow
+  bonCommande?: Pick<BonCommande, 'id' | 'numero'> & {
+    quote?: Pick<Quote, 'id' | 'number' | 'status'> & { meta?: EntityMetaPayload }
+  }
+  autres_bons_livraison?: Array<Pick<BonLivraison, 'id' | 'numero' | 'statut' | 'date_livraison'>>
 }
 
 export const dossiersApi = {
@@ -705,6 +1010,7 @@ export const dossiersApi = {
     site_id?: number
     date_debut_from?: string
     date_debut_to?: string
+    search?: string
   }) => {
     const q = new URLSearchParams()
     if (params?.client_id) q.set('client_id', String(params.client_id))
@@ -712,8 +1018,30 @@ export const dossiersApi = {
     if (params?.site_id) q.set('site_id', String(params.site_id))
     if (params?.date_debut_from) q.set('date_debut_from', params.date_debut_from)
     if (params?.date_debut_to) q.set('date_debut_to', params.date_debut_to)
+    if (params?.search) q.set('search', params.search)
     const s = q.toString()
     return api<DossierRow[]>(`/v1/dossiers${s ? `?${s}` : ''}`)
+  },
+  listPaginated: (params?: {
+    client_id?: number
+    statut?: DossierStatut
+    site_id?: number
+    date_debut_from?: string
+    date_debut_to?: string
+    search?: string
+    page?: number
+    per_page?: number
+  }) => {
+    const q = new URLSearchParams()
+    if (params?.client_id) q.set('client_id', String(params.client_id))
+    if (params?.statut) q.set('statut', params.statut)
+    if (params?.site_id) q.set('site_id', String(params.site_id))
+    if (params?.date_debut_from) q.set('date_debut_from', params.date_debut_from)
+    if (params?.date_debut_to) q.set('date_debut_to', params.date_debut_to)
+    if (params?.search) q.set('search', params.search)
+    q.set('page', String(params?.page ?? 1))
+    q.set('per_page', String(params?.per_page ?? 20))
+    return api<LaravelPaginator<DossierRow>>(`/v1/dossiers?${q.toString()}`)
   },
   get: (id: number) => api<DossierRow>(`/v1/dossiers/${id}`),
   create: (body: DossierCreateInput) => api<DossierRow>('/v1/dossiers', { method: 'POST', body: JSON.stringify(body) }),
@@ -728,16 +1056,18 @@ export const dossiersApi = {
 }
 
 export const bonsCommandeApi = {
-  list: (params?: { dossier_id?: number; client_id?: number; statut?: string }) => {
+  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string; planning?: boolean }) => {
     const q = new URLSearchParams()
     if (params?.dossier_id) q.set('dossier_id', String(params.dossier_id))
     if (params?.client_id) q.set('client_id', String(params.client_id))
     if (params?.statut) q.set('statut', params.statut)
+    if (params?.search) q.set('search', params.search)
+    if (params?.planning) q.set('planning', '1')
     const s = q.toString()
     return api<BonCommande[]>(`/v1/bons-commande${s ? `?${s}` : ''}`)
   },
   get: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}`),
-  update: (id: number, body: { notes?: string; date_livraison_prevue?: string; montant_ht?: number; montant_ttc?: number; contact_id?: number | null }) =>
+  update: (id: number, body: { notes?: string; date_livraison_prevue?: string; montant_ht?: number; montant_ttc?: number; contact_id?: number | null; statut?: string }) =>
     api<BonCommande>(`/v1/bons-commande/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api<null>(`/v1/bons-commande/${id}`, { method: 'DELETE' }),
   confirmer: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}/confirmer`, { method: 'POST' }),
@@ -745,7 +1075,14 @@ export const bonsCommandeApi = {
   updateLigne: (
     bcId: number,
     ligneId: number,
-    body: { date_debut_prevue?: string | null; date_fin_prevue?: string | null; technicien_id?: number | null; date_livraison?: string | null; notes_ligne?: string | null }
+    body: {
+      date_debut_prevue?: string | null
+      date_fin_prevue?: string | null
+      technicien_id?: number | null
+      date_livraison?: string | null
+      notes_ligne?: string | null
+      quantite?: number
+    },
   ) =>
     api<BonCommandeLigne>(`/v1/bons-commande/${bcId}/lignes/${ligneId}`, { method: 'PUT', body: JSON.stringify(body) }),
 }
@@ -766,8 +1103,11 @@ export type PlanningTerrainAffectationRow = BcLignePlanningAffectation & {
   }
 }
 
+import type { TechnicienOption } from '../lib/userRolePresentation'
+
 export const planningTerrainApi = {
-  techniciens: () => api<Array<{ id: number; name: string; email: string; role: string }>>(`/v1/planning-terrain/techniciens`),
+  techniciens: (context: 'terrain' | 'labo' | 'ingenieur' = 'terrain') =>
+    api<TechnicienOption[]>(`/v1/planning-terrain/techniciens?context=${context}`),
   list: (params: { from: string; to: string; user_id?: number }) => {
     const q = new URLSearchParams()
     q.set('from', params.from)
@@ -788,18 +1128,25 @@ export const planningTerrainApi = {
 }
 
 export const bonsLivraisonApi = {
-  list: (params?: { dossier_id?: number; client_id?: number; statut?: string }) => {
+  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string }) => {
     const q = new URLSearchParams()
     if (params?.dossier_id) q.set('dossier_id', String(params.dossier_id))
     if (params?.client_id) q.set('client_id', String(params.client_id))
     if (params?.statut) q.set('statut', params.statut)
+    if (params?.search) q.set('search', params.search)
     const s = q.toString()
     return api<BonLivraison[]>(`/v1/bons-livraison${s ? `?${s}` : ''}`)
   },
   get: (id: number) => api<BonLivraison>(`/v1/bons-livraison/${id}`),
   update: (
     id: number,
-    body: { notes?: string; date_livraison?: string; contact_id?: number | null; lignes?: { id: number; quantite_livree: number }[] },
+    body: {
+      notes?: string
+      date_livraison?: string
+      contact_id?: number | null
+      statut?: string
+      lignes?: { id: number; quantite_livree: number }[]
+    },
   ) => api<BonLivraison>(`/v1/bons-livraison/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   valider: (id: number) => api<BonLivraison>(`/v1/bons-livraison/${id}/valider`, { method: 'POST' }),
   delete: (id: number) => api<null>(`/v1/bons-livraison/${id}`, { method: 'DELETE' }),
@@ -914,8 +1261,8 @@ export const comptaV1Api = {
 }
 
 export const brandingApi = {
-  get: () => api<{ logo_url: string | null }>('/branding'),
-  async uploadLogo(file: File): Promise<{ logo_url: string | null; logo_public_path?: string }> {
+  get: () => api<{ logo_url: string | null; logo_is_custom?: boolean }>('/branding'),
+  async uploadLogo(file: File): Promise<{ logo_url: string | null; logo_is_custom?: boolean; logo_public_path?: string }> {
     const token = getToken()
     const fd = new FormData()
     fd.append('logo', file)
@@ -925,9 +1272,7 @@ export const brandingApi = {
       body: fd,
     })
     if (res.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
-      throw new Error('Unauthorized')
+      handleApiUnauthorized('/branding/logo', Boolean(token))
     }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -945,7 +1290,7 @@ export const brandingApi = {
     }
     return data as { logo_url: string | null; logo_public_path?: string }
   },
-  deleteLogo: () => api<{ logo_url: null }>('/branding/logo', { method: 'DELETE' }),
+  deleteLogo: () => api<{ logo_url: string | null; logo_is_custom?: boolean }>('/branding/logo', { method: 'DELETE' }),
 }
 
 export interface ReportPdfTemplateRow {
@@ -1000,11 +1345,25 @@ export const reportFormDefinitionsApi = {
 }
 
 export const sitesApi = {
-  list: (params?: { search?: string }) => {
+  list: (params?: { search?: string; client_id?: number }) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
+    if (params?.client_id) q.set('client_id', String(params.client_id))
     const s = q.toString()
     return api<Site[]>(`/sites${s ? `?${s}` : ''}`)
+  },
+  listPaginated: (params?: {
+    search?: string
+    client_id?: number
+    page?: number
+    per_page?: number
+  }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    if (params?.client_id) q.set('client_id', String(params.client_id))
+    q.set('page', String(params?.page ?? 1))
+    q.set('per_page', String(params?.per_page ?? 20))
+    return api<LaravelPaginator<Site>>(`/sites?${q.toString()}`)
   },
   get: (id: number) => api<Site>(`/sites/${id}`),
   create: (body: Partial<Site>) => api<Site>('/sites', { method: 'POST', body: JSON.stringify(body) }),
@@ -1023,6 +1382,50 @@ export interface CalibrationRow {
   provider?: string | null
   result: 'ok' | 'ok_with_reserve' | 'failed'
   notes?: string | null
+  maintenance_plan_id?: number | null
+}
+
+export type EquipmentMaintenancePlanKind = 'etalonnage' | 'maintenance' | 'verification'
+
+export interface EquipmentMaintenancePlanRow {
+  id: number
+  equipment_id: number
+  label: string
+  kind: EquipmentMaintenancePlanKind
+  interval_months: number
+  next_due_at: string
+  last_performed_at?: string | null
+  provider?: string | null
+  notes?: string | null
+  active: boolean
+  equipment?: { id: number; code: string; name: string }
+}
+
+export interface EquipmentMaintenanceDueEvent {
+  plan_id: number
+  equipment_id: number
+  date: string
+  label: string
+  kind: EquipmentMaintenancePlanKind
+  interval_months: number
+  equipment?: { id: number; code: string; name: string }
+}
+
+export interface MaterielAffectationRow {
+  id: number
+  equipment_id: number
+  dossier_id?: number | null
+  user_id?: number | null
+  ordre_mission_id?: number | null
+  date_debut: string
+  date_retour_prevue?: string | null
+  date_retour_effective?: string | null
+  etat_depart?: 'bon' | 'usage' | 'degrade'
+  etat_retour?: 'bon' | 'usage' | 'degrade' | null
+  observations?: string | null
+  user?: { id: number; name: string } | null
+  dossier?: { id: number; reference?: string } | null
+  equipment?: { id: number; code: string; name: string }
 }
 
 export interface EquipmentRow {
@@ -1043,6 +1446,9 @@ export interface EquipmentRow {
   agency?: { id: number; name: string } | null
   test_types?: Array<{ id: number; name: string }>
   calibrations?: CalibrationRow[]
+  maintenance_plans?: EquipmentMaintenancePlanRow[]
+  affectations?: MaterielAffectationRow[]
+  planning_slots?: PlanningEquipmentSlot[]
 }
 
 export const equipmentsApi = {
@@ -1121,6 +1527,111 @@ export const equipmentsApi = {
     }),
   deleteCalibration: (equipmentId: number, calibrationId: number) =>
     api(`/equipments/${equipmentId}/calibrations/${calibrationId}`, { method: 'DELETE' }),
+  listMaintenancePlans: (equipmentId: number) =>
+    api<EquipmentMaintenancePlanRow[]>(`/equipments/${equipmentId}/maintenance-plans`),
+  createMaintenancePlan: (
+    equipmentId: number,
+    body: {
+      label: string
+      kind?: EquipmentMaintenancePlanKind
+      interval_months: number
+      next_due_at: string
+      last_performed_at?: string | null
+      provider?: string | null
+      notes?: string | null
+      active?: boolean
+    },
+  ) =>
+    api<EquipmentMaintenancePlanRow>(`/equipments/${equipmentId}/maintenance-plans`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateMaintenancePlan: (
+    equipmentId: number,
+    planId: number,
+    body: Partial<{
+      label: string
+      kind: EquipmentMaintenancePlanKind
+      interval_months: number
+      next_due_at: string
+      last_performed_at: string | null
+      provider: string | null
+      notes: string | null
+      active: boolean
+    }>,
+  ) =>
+    api<EquipmentMaintenancePlanRow>(`/equipments/${equipmentId}/maintenance-plans/${planId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  deleteMaintenancePlan: (equipmentId: number, planId: number) =>
+    api(`/equipments/${equipmentId}/maintenance-plans/${planId}`, { method: 'DELETE' }),
+  recordMaintenancePlan: (
+    equipmentId: number,
+    planId: number,
+    body: {
+      performed_at: string
+      result: CalibrationRow['result']
+      provider?: string | null
+      notes?: string | null
+      next_due_at?: string | null
+    },
+  ) =>
+    api<{ plan: EquipmentMaintenancePlanRow; calibration: CalibrationRow }>(
+      `/equipments/${equipmentId}/maintenance-plans/${planId}/record`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  listAffectations: (equipmentId: number) =>
+    api<MaterielAffectationRow[]>(`/equipments/${equipmentId}/affectations`),
+  createAffectation: (
+    equipmentId: number,
+    body: {
+      user_id?: number | null
+      dossier_id?: number | null
+      date_debut: string
+      date_retour_prevue?: string | null
+      date_retour_effective?: string | null
+      observations?: string | null
+    },
+  ) =>
+    api<MaterielAffectationRow>(`/equipments/${equipmentId}/affectations`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateAffectation: (
+    equipmentId: number,
+    affectationId: number,
+    body: Partial<{
+      user_id: number | null
+      dossier_id: number | null
+      date_debut: string
+      date_retour_prevue: string | null
+      date_retour_effective: string | null
+      observations: string | null
+    }>,
+  ) =>
+    api<MaterielAffectationRow>(`/equipments/${equipmentId}/affectations/${affectationId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  deleteAffectation: (equipmentId: number, affectationId: number) =>
+    api(`/equipments/${equipmentId}/affectations/${affectationId}`, { method: 'DELETE' }),
+  maintenancePlansDue: (params: { from: string; to: string; equipment_id?: number }) => {
+    const q = new URLSearchParams({ from: params.from, to: params.to })
+    if (params.equipment_id != null) q.set('equipment_id', String(params.equipment_id))
+    return api<EquipmentMaintenanceDueEvent[]>(`/equipments-maintenance-plans/due?${q}`)
+  },
+}
+
+export const materielAffectationsApi = {
+  list: (params?: { from?: string; to?: string; equipment_id?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.from) q.set('from', params.from)
+    if (params?.to) q.set('to', params.to)
+    if (params?.equipment_id != null) q.set('equipment_id', String(params.equipment_id))
+    const s = q.toString()
+    return api<MaterielAffectationRow[]>(`/materiel/affectations${s ? `?${s}` : ''}`)
+  },
 }
 
 export type NonConformityRow = {
@@ -1274,6 +1785,208 @@ export type SampleWriteBody = {
   depth_bottom_m?: number | null
 }
 
+export type LabReceptionAttendu = {
+  id: number
+  libelle: string
+  quantite_attendue: number
+  quantite_en_transit: number
+  quantite_recue: number
+  quantite_manquante: number
+  reception_complete: boolean
+  article?: { id: number; code: string; libelle: string } | null
+  technicien?: { id: number; name: string } | null
+  bon_commande?: { id: number; numero: string; statut: string; date_commande?: string | null } | null
+  dossier?: { id: number; reference: string; titre: string } | null
+  chantier?: { id: number; name: string } | null
+  client?: { id: number; name: string } | null
+}
+
+export type LabReceptionAttendusResponse = {
+  data: LabReceptionAttendu[]
+  stats: {
+    produits: number
+    produits_en_attente: number
+    produits_complets: number
+    essais_attendus: number
+    essais_recus: number
+    essais_en_transit: number
+  }
+}
+
+export type ReceptionSample = {
+  id: number
+  fold_number?: string | null
+  transco_number?: string | null
+  reception_index?: number | null
+  reception_batch_total?: number | null
+  cancelled_at?: string | null
+  cancellation_reason?: string | null
+  status: string
+  sample_type?: string | null
+  dossier_id?: number | null
+  bon_commande_ligne_id?: number | null
+  product_id?: number | null
+  collected_at?: string | null
+  received_at?: string | null
+  condition_state?: string | null
+  storage_location?: string | null
+  photo_path?: string | null
+  weight_g?: number | null
+  quantity?: number | null
+  notes?: string | null
+  dossier?: { id: number; reference: string; titre: string } | null
+  product?: { id: number; code: string; libelle: string } | null
+  collected_by?: { id: number; name: string } | null
+  received_by?: { id: number; name: string } | null
+  cancelled_by?: { id: number; name: string } | null
+  bon_commande_ligne?: { id: number; libelle: string; bon_commande_id: number } | null
+}
+
+export type SampleReceptionCancellation = {
+  id: number
+  bon_commande_ligne_id: number
+  reception_index: number
+  reception_batch_total: number
+  reason?: string | null
+  created_at?: string | null
+  cancelled_by?: { id: number; name: string } | null
+}
+
+export type SampleLabelPayload = {
+  fold?: string | null
+  transco?: string | null
+  reception_index?: number | null
+  reception_batch_total?: number | null
+  label_ref?: string | null
+  received_at?: string | null
+  received_by?: string | null
+  from?: string | null
+  product?: string | null
+  product_code?: string | null
+  dossier?: string | null
+  dossier_titre?: string | null
+  bc?: string | null
+  devis?: string | null
+  sample_type?: string | null
+  condition_state?: string | null
+  storage_location?: string | null
+  weight_g?: number | null
+  quantity?: number | null
+}
+
+export type SampleLabelData = {
+  payload: SampleLabelPayload
+  qr_json: string
+  barcode: string | null
+}
+
+export type ReceiveFromLineBody = {
+  bon_commande_ligne_id: number
+  condition_state: 'bon' | 'endommage' | 'insuffisant'
+  storage_location?: string
+  collected_by?: number
+  sample_type?: string
+  origin_location?: string
+  depth_m?: number
+  weight_g?: number
+  quantity?: number
+  notes?: string
+  description?: string
+  reception_index?: number
+  reception_batch_total?: number
+}
+
+export type ReceiveSampleBody = {
+  condition_state: 'bon' | 'endommage' | 'insuffisant'
+  storage_location?: string
+  collected_by?: number
+  weight_g?: number
+  quantity?: number
+  notes?: string
+}
+
+export const labReceptionApi = {
+  attendus: (params?: { search?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    const s = q.toString()
+    return api<LabReceptionAttendusResponse>(`/v1/lab/reception/attendus${s ? `?${s}` : ''}`)
+  },
+  stats: () =>
+    api<{
+      produits_attendus: number
+      produits_en_attente: number
+      essais_attendus: number
+      essais_recus: number
+      en_transit: number
+      receptionne: number
+      en_essai: number
+      receptionnes_today: number
+    }>('/v1/lab/reception/stats'),
+}
+
+export const samplesReceptionApi = {
+  list: (params?: {
+    status?: string
+    fold?: string
+    per_page?: number
+    bon_commande_ligne_id?: number
+    include_cancelled?: boolean
+  }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.fold) q.set('fold', params.fold)
+    if (params?.per_page) q.set('per_page', String(params.per_page))
+    if (params?.bon_commande_ligne_id) q.set('bon_commande_ligne_id', String(params.bon_commande_ligne_id))
+    if (params?.include_cancelled) q.set('include_cancelled', '1')
+    const s = q.toString()
+    return api<LaravelPaginator<ReceptionSample>>(`/v1/samples${s ? `?${s}` : ''}`)
+  },
+  listCancellations: (bon_commande_ligne_id: number) =>
+    api<{ data: SampleReceptionCancellation[] }>(
+      `/v1/lab/reception/cancellations?bon_commande_ligne_id=${bon_commande_ligne_id}`,
+    ),
+  get: (id: number) => api<ReceptionSample>(`/v1/samples/${id}`),
+  search: (fold: string) => api<{ data: ReceptionSample[] }>(`/v1/samples/search?fold=${encodeURIComponent(fold)}`),
+  receiveFromLine: (body: ReceiveFromLineBody) =>
+    api<ReceptionSample>('/v1/lab/reception/receive-from-line', { method: 'POST', body: JSON.stringify(body) }),
+  receiveBatchFromLine: (body: {
+    bon_commande_ligne_id: number
+    batch_total: number
+    samples: Omit<ReceiveFromLineBody, 'bon_commande_ligne_id'>[]
+    cancelled_slots?: { reception_index: number; reason?: string }[]
+  }) =>
+    api<{ data: ReceptionSample[] }>('/v1/lab/reception/receive-batch-from-line', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  receive: (id: number, body: ReceiveSampleBody) =>
+    api<ReceptionSample>(`/v1/samples/${id}/receive`, { method: 'PATCH', body: JSON.stringify(body) }),
+  update: (id: number, body: Partial<ReceiveFromLineBody>) =>
+    api<ReceptionSample>(`/v1/samples/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api(`/v1/samples/${id}`, { method: 'DELETE' }),
+  cancel: (id: number, body?: { reason?: string }) =>
+    api<ReceptionSample>(`/v1/samples/${id}/cancel`, { method: 'PATCH', body: JSON.stringify(body ?? {}) }),
+  labelData: (id: number) => api<SampleLabelData>(`/v1/samples/${id}/label`),
+  photoUrl: (id: number) => `/api/v1/samples/${id}/photo`,
+  async uploadPhoto(id: number, file: File): Promise<{ photo_path: string; photo_url: string }> {
+    const token = getToken()
+    const fd = new FormData()
+    fd.append('photo', file)
+    const res = await fetch(`${API_BASE}/v1/samples/${id}/photo`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}`, Accept: 'application/json' } : { Accept: 'application/json' },
+      body: fd,
+    })
+    if (res.status === 401) {
+      handleApiUnauthorized(`/v1/samples/${id}/photo`, Boolean(token))
+    }
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error((data as { message?: string }).message || `Erreur ${res.status}`)
+    return data as { photo_path: string; photo_url: string }
+  },
+}
+
 export const samplesApi = {
   get: (id: number) => api<Sample>(`/samples/${id}`),
   create: (body: SampleWriteBody) => api<Sample>('/samples', { method: 'POST', body: JSON.stringify(body) }),
@@ -1301,7 +2014,13 @@ export const reportsApi = {
 }
 
 export const invoicesApi = {
-  list: (params?: { search?: string; status?: string | string[]; page?: number; client_id?: number }) => {
+  list: (params?: {
+    search?: string
+    status?: string | string[]
+    page?: number
+    client_id?: number
+    quick_filter?: '' | 'unpaid' | 'overdue' | 'relance'
+  }) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
     if (params?.status) {
@@ -1313,6 +2032,7 @@ export const invoicesApi = {
     }
     if (params?.page) q.set('page', String(params.page))
     if (params?.client_id) q.set('client_id', String(params.client_id))
+    if (params?.quick_filter) q.set('quick_filter', params.quick_filter)
     const s = q.toString()
     return api<LaravelPaginator<Invoice>>(`/invoices${s ? `?${s}` : ''}`)
   },
@@ -1334,6 +2054,14 @@ export const invoicesApi = {
     )
   },
   getPdfLink: (id: number) => api<{ url: string }>(`/invoices/${id}/pdf-link`),
+  fetchInvoicePdf: async (id: number) => {
+    const { url } = await invoicesApi.getPdfLink(id)
+    const res = await fetch(url)
+    if (!res.ok) {
+      throw new Error('Impossible de charger le PDF de la facture.')
+    }
+    return res.blob()
+  },
   openInvoicePdf: async (id: number) => {
     const { url } = await api<{ url: string }>(`/invoices/${id}/pdf-link`)
     window.open(url, '_blank', 'noopener,noreferrer')
@@ -1344,8 +2072,44 @@ export const invoicesApi = {
       method: 'POST',
       body: JSON.stringify({ order_ids: orderIds, client_id: clientId }),
     }),
+  eligibleBonsCommande: (params?: { search?: string; limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    if (params?.limit) q.set('limit', String(params.limit))
+    const s = q.toString()
+    return api<{
+      data: Array<{
+        id: number
+        numero: string
+        statut: string
+        date_commande: string
+        montant_ht: string | number
+        montant_ttc: string | number
+        client?: { id: number; name: string } | null
+        dossier?: { id: number; reference: string; titre: string } | null
+      }>
+    }>(`/invoices/eligible-bons-commande${s ? `?${s}` : ''}`)
+  },
+  fromBonsCommande: (bonCommandeIds: number[], clientId?: number) =>
+    api<Invoice>('/invoices/from-bons-commande', {
+      method: 'POST',
+      body: JSON.stringify({ bon_commande_ids: bonCommandeIds, client_id: clientId }),
+    }),
   update: (id: number, body: Partial<Invoice>) =>
     api<Invoice>(`/invoices/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  sendEmail: (
+    id: number,
+    body: { recipient_email?: string; recipient_name?: string; message?: string; pdf_template_id?: number },
+  ) =>
+    api<{ message?: string; invoice?: Invoice }>(`/invoices/${id}/send-email`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  sendReminder: (id: number, body?: { note?: string; next_reminder_date?: string }) =>
+    api<{ message?: string; invoice?: Invoice }>(`/invoices/${id}/send-reminder`, {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
+    }),
   delete: (id: number) => api(`/invoices/${id}`, { method: 'DELETE' }),
 }
 
@@ -1411,6 +2175,7 @@ export interface ActivityLogRow {
   subject_id?: number | null
   properties?: Record<string, unknown> | null
   ip_address?: string | null
+  user_agent?: string | null
   created_at: string
   user?: { id: number; name: string }
 }
@@ -1424,6 +2189,82 @@ export const activityLogsApi = {
     const s = q.toString()
     return api<ActivityLogRow[]>(`/activity-logs${s ? `?${s}` : ''}`)
   },
+}
+
+export type MonitoringActivityRow = ActivityLogRow & {
+  description?: string | null
+  user?: { id: number; name: string; email?: string }
+}
+
+export interface MonitoringErrorRow {
+  id: number
+  status_code: number
+  method: string
+  url: string
+  message?: string | null
+  exception_class?: string | null
+  ip_address?: string | null
+  user_agent?: string | null
+  created_at: string
+  user?: { id: number; name: string; email?: string } | null
+}
+
+export interface MonitoringSecurityRow {
+  id: number
+  event_type: string
+  email_attempted?: string | null
+  ip_address?: string | null
+  user_agent?: string | null
+  properties?: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface MonitoringSessionRow {
+  id: number
+  token_id: number
+  user_id: number
+  ip_address?: string | null
+  user_agent?: string | null
+  current_page?: string | null
+  last_seen_at: string
+  created_at: string
+  user?: { id: number; name: string; email?: string; role?: string } | null
+}
+
+export const monitoringApi = {
+  activity: (params?: { limit?: number; category?: string; search?: string; entity?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.limit) q.set('limit', String(params.limit))
+    if (params?.category) q.set('category', params.category)
+    if (params?.search) q.set('search', params.search)
+    if (params?.entity) q.set('entity', params.entity)
+    const s = q.toString()
+    return api<MonitoringActivityRow[]>(`/admin/monitoring/activity${s ? `?${s}` : ''}`)
+  },
+  errors: (params?: { limit?: number; status_group?: '4xx' | '5xx' | '404' }) => {
+    const q = new URLSearchParams()
+    if (params?.limit) q.set('limit', String(params.limit))
+    if (params?.status_group) q.set('status_group', params.status_group)
+    const s = q.toString()
+    return api<MonitoringErrorRow[]>(`/admin/monitoring/errors${s ? `?${s}` : ''}`)
+  },
+  security: (params?: { limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.limit) q.set('limit', String(params.limit))
+    const s = q.toString()
+    return api<MonitoringSecurityRow[]>(`/admin/monitoring/security${s ? `?${s}` : ''}`)
+  },
+  sessions: (params?: { stale_minutes?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.stale_minutes) q.set('stale_minutes', String(params.stale_minutes))
+    const s = q.toString()
+    return api<MonitoringSessionRow[]>(`/admin/monitoring/sessions${s ? `?${s}` : ''}`)
+  },
+  presence: (page: string) =>
+    api<{ last_seen_at: string }>('/user/presence', {
+      method: 'POST',
+      body: JSON.stringify({ page }),
+    }),
 }
 
 export interface StatsEssaisParType {
@@ -1456,6 +2297,7 @@ export interface StatsEssaisPayload {
 export const statsApi = {
   essais: () => api<StatsEssaisPayload>('/stats/essais'),
   dashboard: () => api<DashboardStatsPayload>('/stats/dashboard'),
+  kpi: () => api<KpiStatsPayload>('/stats/kpi'),
 }
 
 /** Métadonnées métier : indicateurs (valeurs suivies) et champs libres. */
@@ -1468,12 +2310,35 @@ export type EntityMetaPayload = {
   devis_jalons?: Array<{
     id?: string
     libelle: string
+    /** Quantité forfait jalon */
+    quantity?: number
+    /** PU HT forfait jalon */
+    prix_unitaire_ht?: number
     montant_ht?: number
+    /** Forfait au jalon (devis détaillé mixte) ; omit = détaillé */
+    mode?: string
+    tva_rate?: number
+    /** Unité affichée sur le PDF lorsque le jalon est forfait */
+    unite?: string
     ref_article_id?: number | null
     commercial_offering_id?: number | null
+    /** Clés row_key des lignes produit rattachées (catalogue S2G). */
+    product_line_keys?: string[]
+    /** Code article S2G (affichage). */
+    s2g_code?: string | null
+    /** IDs catalogue des produits rattachés (persistant après enregistrement). */
+    product_ref_article_ids?: number[]
   }>
   /** Tarif forfaitaire lorsqu’il n’y a pas de lignes article (optionnel) */
   tarif_global_hors_lignes_ht?: number
+  /** Désignation de la ligne forfaitaire globale (PDF) */
+  tarif_global_designation?: string
+  /** Quantité forfait document */
+  tarif_global_quantity?: number
+  /** PU HT forfait document */
+  tarif_global_prix_unitaire_ht?: number
+  /** Unité du montant forfaitaire global (PDF) */
+  tarif_global_unite?: string
   /** Un booléen par ligne (même ordre) : ne pas afficher le prix sur le PDF */
   ligne_masque_prix_pdf?: boolean[]
   /** Frais complémentaires (brouillon / PDF — le recalcul API n’intègre que port & déplacement) */
@@ -1493,6 +2358,8 @@ export type EntityMetaPayload = {
   delai_paiement?: string
   /** Conditions commerciales */
   conditions_commerciales?: string
+  /** Agence filiale client (numérotation documents par trigramme) */
+  filiale_agency_id?: number
 }
 
 export interface DashboardStatsPayload {
@@ -1534,6 +2401,80 @@ export interface DashboardStatsPayload {
   ca_par_mois: Array<{ mois: string; ca_ttc: number }>
 }
 
+export interface KpiDelayMetric {
+  avg: number | null
+  median: number | null
+  sample_size: number
+}
+
+export interface KpiStatsPayload {
+  devis_ouverts: {
+    count: number
+    montant_ttc: number
+    par_statut: Record<string, number>
+    liste: Array<{
+      id: number
+      number: string | null
+      status: string
+      quote_date: string | null
+      valid_until: string | null
+      amount_ttc: number
+      client_name: string | null | undefined
+    }>
+  }
+  equipes: {
+    terrain: { actifs: number; personnes: KpiTeamPerson[] }
+    labo: { actifs: number; personnes: KpiTeamPerson[] }
+    ingenieurs: { actifs: number; personnes: KpiTeamPerson[] }
+  }
+  volumes: {
+    dossiers: number
+    chantiers: number
+    bons_commande: number
+    bons_livraison: number
+    rapports_labo: number
+  }
+  delais_chaine: {
+    dossier_bc: KpiDelayMetric
+    devis_bc: KpiDelayMetric
+    bc_bl: KpiDelayMetric
+    bl_facture: KpiDelayMetric
+    facture_paiement: KpiDelayMetric
+    bc_rapport: KpiDelayMetric
+    devis_livraison_chantier: KpiDelayMetric
+  }
+  essais: {
+    duree_moyenne_jours: number | null
+    duree_mediane_jours: number | null
+    sample_size: number
+    depassant_2j: number
+    depassant_7j: number
+    en_cours_depasse_2j: number
+    en_cours_depasse_7j: number
+    alertes: Array<{
+      sample_id: number
+      reference: string | null
+      fold_number: string | null
+      transco_number: string | null
+      dossier_reference: string | null | undefined
+      status: string
+      jours: number
+      niveau: 'warning' | 'critical'
+      en_cours: boolean
+    }>
+  }
+}
+
+export interface KpiTeamPerson {
+  id: number
+  name: string
+  email: string
+  role: string
+  poste: string | null
+  poste_label: string
+  affectations_count?: number
+}
+
 export interface CommercialOffering {
   id: number
   code: string | null
@@ -1553,11 +2494,19 @@ export interface CommercialOffering {
 }
 
 export const commercialOfferingsApi = {
-  list: (params?: { search?: string; kind?: string; active_only?: boolean; per_page?: number; page?: number }) => {
+  list: (params?: {
+    search?: string
+    kind?: string
+    active_only?: boolean
+    track_stock?: boolean
+    per_page?: number
+    page?: number
+  }) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
     if (params?.kind) q.set('kind', params.kind)
     if (params?.active_only) q.set('active_only', '1')
+    if (params?.track_stock != null) q.set('track_stock', params.track_stock ? '1' : '0')
     if (params?.per_page) q.set('per_page', String(params.per_page))
     if (params?.page) q.set('page', String(params.page))
     const s = q.toString()
@@ -1581,6 +2530,7 @@ export interface QuoteLine {
   type_ligne?: string | null
   line_code?: string | null
   description: string
+  unite?: string | null
   quantity: number
   unit_price: number
   tva_rate?: number
@@ -1601,6 +2551,11 @@ export interface Quote {
   valid_until?: string
   amount_ht: number
   amount_ttc: number
+  currency_code?: string | null
+  exchange_rate?: number | null
+  exchange_rate_date?: string | null
+  amount_ht_base?: number | null
+  amount_ttc_base?: number | null
   tva_rate: number
   discount_percent?: number
   discount_amount?: number
@@ -1617,30 +2572,62 @@ export interface Quote {
   client?: Client
   client_contact?: ClientContactRow
   site?: Site
+  dossier?: Pick<DossierRow, 'id' | 'reference' | 'titre'>
   billing_address?: ClientAddress
   delivery_address?: ClientAddress
   quote_lines?: QuoteLine[]
+  bon_commande?: QuoteBonCommandeChain | null
+  bonCommande?: QuoteBonCommandeChain | null
+  bons_commande?: QuoteBonCommandeChain[]
+  bonsCommande?: QuoteBonCommandeChain[]
+}
+
+export type QuoteBonCommandeChain = {
+  id: number
+  numero: string
+  dossier_id?: number
+  bons_livraison_count?: number
+  invoices_count?: number
 }
 
 export const quotesApi = {
-  list: (params?: { search?: string; status?: string; page?: number }) => {
+  list: (params?: { search?: string; status?: string; page?: number; per_page?: number; eligible_bc?: boolean }) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
     if (params?.status) q.set('status', params.status)
     if (params?.page) q.set('page', String(params.page))
+    if (params?.per_page) q.set('per_page', String(params.per_page))
+    if (params?.eligible_bc) q.set('eligible_bc', '1')
     const s = q.toString()
     return api<LaravelPaginator<Quote>>(`/quotes${s ? `?${s}` : ''}`)
   },
+  /** Devis signés/acceptés avec dossier — pour « Créer depuis un devis » (plusieurs BC possibles). */
+  listEligibleForBc: (params?: { search?: string; per_page?: number }) =>
+    quotesApi.list({
+      eligible_bc: true,
+      per_page: params?.per_page ?? 100,
+      search: params?.search,
+    }),
   get: (id: number) => api<Quote>(`/quotes/${id}`),
   create: (body: QuoteCreateBody) => api<Quote>('/quotes', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: Partial<QuoteCreateBody> & { status?: string; meta?: EntityMetaPayload | null }) =>
     api<Quote>(`/quotes/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/quotes/${id}`, { method: 'DELETE' }),
+  sendEmail: (
+    id: number,
+    body: {
+      recipient_email: string
+      recipient_name: string
+      message?: string | null
+      pdf_template_id?: number
+    },
+  ) => api<{ message?: string }>(`/quotes/${id}/send-email`, { method: 'POST', body: JSON.stringify(body) }),
 }
 
 export interface QuoteCreateBody {
   client_id: number
   contact_id?: number | null
+  filiale_agency_id?: number
   site_id?: number
   dossier_id?: number | null
   meta?: EntityMetaPayload | null
@@ -1667,6 +2654,7 @@ export interface QuoteCreateBody {
     type_ligne?: string
     line_code?: string | null
     description: string
+    unite?: string | null
     quantity: number
     unit_price: number
     tva_rate?: number
@@ -1685,9 +2673,7 @@ export const pdfApi = {
       },
     })
     if (res.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
-      throw new Error('Unauthorized')
+      handleApiUnauthorized(`/pdf/examples/${slug}`, Boolean(token))
     }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -1701,7 +2687,12 @@ export const pdfApi = {
     a.click()
     URL.revokeObjectURL(url)
   },
-  generate: async (type: string, id: number, templateId?: number) => {
+  getPreviewLink: (type: string, id: number, templateId?: number) => {
+    const q = new URLSearchParams({ type, id: String(id) })
+    if (templateId != null) q.set('template_id', String(templateId))
+    return api<{ url: string }>(`/pdf/preview-link?${q.toString()}`)
+  },
+  fetchGenerate: async (type: string, id: number, templateId?: number) => {
     const token = getToken()
     const res = await fetch(`${API_BASE}/pdf/generate`, {
       method: 'POST',
@@ -1712,17 +2703,26 @@ export const pdfApi = {
       },
       body: JSON.stringify({ type, id, template_id: templateId }),
     })
+    if (res.status === 401) {
+      handleApiUnauthorized('/pdf/generate', Boolean(token))
+    }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       throw new Error(data.message || 'Erreur génération PDF')
     }
-    const blob = await res.blob()
+    return res.blob()
+  },
+  downloadBlob: (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `document-${type}-${id}.pdf`
+    a.download = filename
     a.click()
     URL.revokeObjectURL(url)
+  },
+  generate: async (type: string, id: number, templateId?: number) => {
+    const blob = await pdfApi.fetchGenerate(type, id, templateId)
+    pdfApi.downloadBlob(blob, `document-${type}-${id}.pdf`)
   },
 }
 
@@ -1775,14 +2775,23 @@ export interface User {
   name: string
   email: string
   phone?: string | null
+  poste?: string | null
+  expense_taux_km?: number | null
+  expense_plafond_repas?: number | null
+  expense_forfait_repas?: number | null
   role: string
   client_id?: number
   site_id?: number
+  agency_id?: number | null
+  agency?: Pick<Agency, 'id' | 'name' | 'code'> | null
   client?: Client
   site?: Site
   access_groups?: AccessGroupRow[]
   agencies?: AgencyRow[]
   effective_permissions?: string[]
+  /** Modules portail activés (rôles client / contact chantier). */
+  effective_portal_modules?: string[]
+  is_portal_user?: boolean
 }
 
 export interface RegisterBody {
@@ -1807,6 +2816,8 @@ export interface Client {
   /** Code tiers import PROLAB (ex. TI0002) */
   prolab_code?: string | null
   country?: string | null
+  /** ISO 4217 — devise des devis / factures client (défaut MAD). */
+  currency_code?: string | null
   address?: string
   city?: string | null
   postal_code?: string | null
@@ -1816,6 +2827,8 @@ export interface Client {
   siret?: string
   /** Maroc — Identifiant Commun de l’Entreprise */
   ice?: string | null
+  /** Régime TVA CA annuel : 25 % récupérable, 75 % reversée à l’État */
+  ca_annuel_tva_regime?: boolean
   rc?: string | null
   patente?: string | null
   if_number?: string | null
@@ -1835,14 +2848,21 @@ export interface Client {
   // GPS
   lat?: number | null
   lng?: number | null
+  created_at?: string
   sites?: Site[]
   addresses?: ClientAddress[]
   contacts?: ClientContactRow[]
+  /** Agences labo autorisées (vide = toutes). */
+  visible_lab_agencies?: Pick<Agency, 'id' | 'name' | 'code' | 'is_siege'>[]
+  /** Modules portail client activés (vide = défaut dossiers + interventions + rapports). */
+  portal_modules?: string[] | null
 }
 
 export interface Site {
   id: number
   client_id: number
+  agency_id?: number | null
+  agency?: AgencyRow | null
   name: string
   address?: string
   latitude?: number | string | null
@@ -2054,6 +3074,11 @@ export interface Invoice {
   due_date?: string
   amount_ht: number
   amount_ttc: number
+  currency_code?: string | null
+  exchange_rate?: number | null
+  exchange_rate_date?: string | null
+  amount_ht_base?: number | null
+  amount_ttc_base?: number | null
   tva_rate: number
   discount_percent?: number
   discount_amount?: number
@@ -2065,6 +3090,11 @@ export interface Invoice {
   delivery_address_id?: number
   pdf_template_id?: number
   status: string
+  notes?: string | null
+  last_reminder_sent_at?: string | null
+  reminder_count?: number
+  next_reminder_date?: string | null
+  reminder_notes?: string | null
   meta?: EntityMetaPayload | null
   client?: Client
   client_contact?: ClientContactRow
@@ -2178,25 +3208,74 @@ export interface OrdreMission {
   created_at?: string
   client?: { id: number; name: string } | null
   site?: { id: number; name: string } | null
+  dossier?: { id: number; reference: string; titre?: string | null; date_debut?: string | null; date_fin_prevue?: string | null } | null
   responsable?: { id: number; name: string } | null
-  bonCommande?: { id: number; numero: string } | null
+  bonCommande?: {
+    id: number
+    numero: string
+    quote_id?: number | null
+    quote?: { id: number; number: string } | null
+    dossier?: { id: number; reference: string; titre?: string | null } | null
+  } | null
+  /** Sérialisation Laravel (snake_case) */
+  bon_commande?: OrdreMission['bonCommande']
   lignes?: OrdreMissionLigne[]
 }
+
+/** Ligne de déplacement km — stockée dans expense_lines (note de frais / NDF). */
+export type FraisType = 'repas' | 'deplacement' | 'autres'
 
 export interface FraisDeplacement {
   id: number
   ordre_mission_id: number
+  expense_report_id: number
+  expense_report_number: string
+  ndf_statut: ExpenseReportStatut
+  type: FraisType
+  category?: string
   user_id: number
   date: string
   lieu_depart?: string | null
   lieu_arrivee?: string | null
-  distance_km: number
-  taux_km: number
+  distance_km?: number | null
+  taux_km?: number | null
   montant: number
-  type_transport: string
+  amount?: number
+  payment_method?: ExpensePaymentMethod | null
+  description?: string | null
+  type_transport?: string
   notes?: string | null
+  receipt_path?: string | null
+  receipt_filename?: string | null
+  is_validated?: boolean
+  /** Alias legacy — préférer ndf_statut */
   statut: 'draft' | 'valide' | 'rembourse'
   user?: { id: number; name: string } | null
+}
+
+export interface ArticleSectionProductAssignment {
+  id: number
+  ordre: number
+  product_article_id: number
+  product?: Pick<RefArticleRow, 'id' | 'code' | 'libelle' | 'unite' | 'prix_unitaire_ht' | 'kind' | 'actif'> | null
+}
+
+export type ArticleSectionProductsGrouped = {
+  technicien: ArticleSectionProductAssignment[]
+  ingenieur: ArticleSectionProductAssignment[]
+  labo: ArticleSectionProductAssignment[]
+}
+
+export const articleSectionProductsApi = {
+  list: (articleId: number) => api<ArticleSectionProductsGrouped>(`/articles/${articleId}/section-products`),
+  sync: (
+    articleId: number,
+    body: { section_type: 'technicien' | 'ingenieur' | 'labo'; product_article_ids: number[] },
+  ) =>
+    api<ArticleSectionProductsGrouped>(`/articles/${articleId}/section-products`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
 }
 
 export const articleActionsApi = {
@@ -2228,8 +3307,23 @@ export const ordresMissionApi = {
     api<void>(`/ordres-mission/${id}`, { method: 'DELETE' }),
   generateFromBC: (bcId: number) =>
     api<OrdreMission[]>(`/bons-commande/${bcId}/generate-ordres-mission`, { method: 'POST' }),
+  createLigne: (
+    omId: number,
+    body: {
+      libelle?: string
+      quantite?: number
+      ref_article_id?: number | null
+      article_action_id?: number | null
+      assigned_user_id?: number | null
+      date_prevue?: string | null
+      statut?: OrdreMissionLigne['statut']
+    },
+  ) =>
+    api<OrdreMissionLigne>(`/ordres-mission/${omId}/lignes`, { method: 'POST', body: JSON.stringify(body) }),
   updateLigne: (omId: number, ligneId: number, body: Partial<OrdreMissionLigne>) =>
     api<OrdreMissionLigne>(`/ordres-mission/${omId}/lignes/${ligneId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteLigne: (omId: number, ligneId: number) =>
+    api<void>(`/ordres-mission/${omId}/lignes/${ligneId}`, { method: 'DELETE' }),
   planning: (params?: { type?: string; from?: string; to?: string }) => {
     const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
     return api<OrdreMission[]>(`/ordres-mission/planning${s ? `?${s}` : ''}`)
@@ -2266,6 +3360,7 @@ export interface TaskMeasure {
   attachment_path?: string | null
   measure_config?: ActionMeasureConfig
   created_by?: number | null
+  created_at?: string | null
 }
 
 export interface TaskResult {
@@ -2283,9 +3378,10 @@ export interface TaskResult {
 
 export interface MissionTask {
   id: number
+  unique_number?: string
   ordre_mission_ligne_id: number
   assigned_user_id?: number | null
-  statut: 'todo' | 'in_progress' | 'done' | 'validated' | 'rejected'
+  statut: 'todo' | 'in_progress' | 'paused' | 'frozen' | 'done' | 'validated' | 'rejected'
   planned_date?: string | null
   due_date?: string | null
   started_at?: string | null
@@ -2304,26 +3400,137 @@ export interface MissionTask {
   result?: TaskResult | null
 }
 
+type MissionTaskApiRaw = Record<string, unknown>
+
+function asRecord(value: unknown): MissionTaskApiRaw | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as MissionTaskApiRaw)
+    : undefined
+}
+
+/** Laravel sérialise les relations en snake_case — normalise pour le front camelCase. */
+export function normalizeMissionTask(raw: MissionTaskApiRaw): MissionTask {
+  const ligneRaw = asRecord(raw.ordreMissionLigne ?? raw.ordre_mission_ligne)
+  let ordreMissionLigne: MissionTask['ordreMissionLigne']
+
+  if (ligneRaw) {
+    const omRaw = asRecord(ligneRaw.ordreMission ?? ligneRaw.ordre_mission)
+    const articleActionRaw = asRecord(ligneRaw.articleAction ?? ligneRaw.article_action)
+    const articleRaw = asRecord(ligneRaw.article)
+
+    ordreMissionLigne = {
+      ...(ligneRaw as unknown as OrdreMissionLigne),
+      ordreMission: omRaw
+        ? ({
+            ...(omRaw as unknown as OrdreMission),
+            client: asRecord(omRaw.client) as OrdreMission['client'],
+            site: asRecord(omRaw.site) as OrdreMission['site'],
+            dossier: asRecord(omRaw.dossier) as OrdreMission['dossier'],
+            bonCommande: (() => {
+              const bc = asRecord(omRaw.bonCommande ?? omRaw.bon_commande)
+              if (!bc) return undefined
+              return {
+                ...(bc as unknown as NonNullable<OrdreMission['bonCommande']>),
+                dossier: asRecord(bc.dossier) as OrdreMission['dossier'],
+              }
+            })(),
+          } as OrdreMission)
+        : undefined,
+      article: articleRaw as { id: number; code: string; libelle: string } | undefined,
+      articleAction: articleActionRaw
+        ? ({
+            ...(articleActionRaw as unknown as ArticleAction),
+            measure_configs: (articleActionRaw.measure_configs
+              ?? articleActionRaw.measureConfigs) as ActionMeasureConfig[] | undefined,
+          })
+        : undefined,
+    }
+  }
+
+  const measuresRaw = Array.isArray(raw.measures) ? raw.measures : []
+  const measures = measuresRaw.map((m) => {
+    const row = asRecord(m) ?? {}
+    const cfg = asRecord(row.measure_config ?? row.measureConfig)
+    return {
+      ...(row as unknown as TaskMeasure),
+      measure_config: cfg as ActionMeasureConfig | undefined,
+    }
+  })
+
+  const resultRaw = asRecord(raw.result)
+  const validatedBy = resultRaw
+    ? asRecord(resultRaw.validatedBy ?? resultRaw.validated_by)
+    : undefined
+
+  return {
+    ...(raw as unknown as MissionTask),
+    assignedUser: (asRecord(raw.assignedUser ?? raw.assigned_user) ?? undefined) as MissionTask['assignedUser'],
+    ordreMissionLigne,
+    measures,
+    result: resultRaw
+      ? ({
+          ...(resultRaw as unknown as TaskResult),
+          validatedBy: validatedBy as TaskResult['validatedBy'],
+        })
+      : raw.result === null
+        ? null
+        : undefined,
+  }
+}
+
+function normalizeMissionTasks(rows: MissionTaskApiRaw[]): MissionTask[] {
+  return rows.map(normalizeMissionTask)
+}
+
 export const missionTasksApi = {
-  list: (params?: { assigned_user_id?: number; statut?: string; type?: string; ordre_mission_id?: number; dossier_id?: number; date_from?: string; date_to?: string }) => {
+  list: async (params?: { assigned_user_id?: number; statut?: string; type?: string; ordre_mission_id?: number; dossier_id?: number; date_from?: string; date_to?: string }) => {
     const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
-    return api<MissionTask[]>(`/mission-tasks${s ? `?${s}` : ''}`)
+    const rows = await api<MissionTaskApiRaw[]>(`/mission-tasks${s ? `?${s}` : ''}`)
+    return normalizeMissionTasks(rows)
   },
-  laboBoard: (params?: { user_id?: number; statut?: string }) => {
+  laboBoard: async (params?: { user_id?: number; statut?: string }) => {
     const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
-    return api<MissionTask[]>(`/mission-tasks/labo${s ? `?${s}` : ''}`)
+    const rows = await api<MissionTaskApiRaw[]>(`/mission-tasks/labo${s ? `?${s}` : ''}`)
+    return normalizeMissionTasks(rows)
   },
-  terrainBoard: (params?: { user_id?: number; type?: string; statut?: string }) => {
+  terrainBoard: async (params?: { user_id?: number; type?: string; statut?: string; active_only?: boolean }) => {
     const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
-    return api<MissionTask[]>(`/mission-tasks/terrain${s ? `?${s}` : ''}`)
+    const rows = await api<MissionTaskApiRaw[]>(`/mission-tasks/terrain${s ? `?${s}` : ''}`)
+    return normalizeMissionTasks(rows)
   },
-  get: (id: number) => api<MissionTask>(`/mission-tasks/${id}`),
-  update: (id: number, body: Partial<MissionTask>) =>
-    api<MissionTask>(`/mission-tasks/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  submitMeasures: (id: number, measures: Array<{ measure_config_id: number; value?: string; value_numeric?: number; attachment_path?: string }>) =>
-    api<MissionTask>(`/mission-tasks/${id}/measures`, { method: 'POST', body: JSON.stringify({ measures }) }),
-  validate: (id: number, body: { is_conform: boolean; value_final?: number; conclusion?: string; observations?: string; rapport_path?: string }) =>
-    api<MissionTask>(`/mission-tasks/${id}/validate`, { method: 'POST', body: JSON.stringify(body) }),
+  terrainMeasuresBoard: async (params?: {
+    user_id?: number
+    type?: string
+    statut?: string
+    dossier_id?: number
+    date_from?: string
+    date_to?: string
+    search?: string
+  }) => {
+    const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString() : ''
+    const rows = await api<MissionTaskApiRaw[]>(`/mission-tasks/terrain/measures${s ? `?${s}` : ''}`)
+    return normalizeMissionTasks(rows)
+  },
+  terrainHistory: async (params?: {
+    user_id?: number
+    type?: string
+    statut?: string
+    dossier_id?: number
+    date_from?: string
+    date_to?: string
+    search?: string
+  }) => {
+    const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString() : ''
+    const rows = await api<MissionTaskApiRaw[]>(`/mission-tasks/terrain/history${s ? `?${s}` : ''}`)
+    return normalizeMissionTasks(rows)
+  },
+  get: async (id: number) => normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}`)),
+  update: async (id: number, body: Partial<MissionTask>) =>
+    normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}`, { method: 'PUT', body: JSON.stringify(body) })),
+  submitMeasures: async (id: number, measures: Array<{ measure_config_id: number; value?: string; value_numeric?: number; attachment_path?: string }>) =>
+    normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}/measures`, { method: 'POST', body: JSON.stringify({ measures }) })),
+  validate: async (id: number, body: { is_conform: boolean; value_final?: number; conclusion?: string; observations?: string; rapport_path?: string }) =>
+    normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}/validate`, { method: 'POST', body: JSON.stringify(body) })),
 }
 
 // ── Planning & Stock ───────────────────────────────────────────────────────
@@ -2345,12 +3552,14 @@ export interface PlanningEquipmentSlot {
   id: number
   equipment_id: number
   mission_task_id?: number | null
+  user_id?: number | null
   date_debut: string
   date_fin: string
   type_evenement: 'utilisation' | 'maintenance' | 'indispo' | 'autre'
   notes?: string | null
   equipment?: { id: number; name: string; code?: string }
   missionTask?: { id: number; statut: string }
+  user?: { id: number; name: string }
 }
 
 export interface StockPersonnel {
@@ -2375,11 +3584,26 @@ export interface StockEquipmentEntry {
   equipment?: { id: number; name: string; code?: string }
 }
 
+export type PlanningTerrainBcSlot = {
+  id: number
+  user_id: number
+  date_debut: string
+  date_fin: string
+  notes?: string | null
+  user?: { id: number; name: string }
+  bon_commande_ligne?: {
+    id: number
+    libelle: string
+    bon_commande?: { id: number; numero: string; dossier_id: number }
+  }
+}
+
 export interface PlanningOverview {
   humans: PlanningHuman[]
   equipments: PlanningEquipmentSlot[]
   stock_personnels: StockPersonnel[]
   stock_equipments: StockEquipmentEntry[]
+  terrain_bc?: PlanningTerrainBcSlot[]
 }
 
 export const planningApi = {
@@ -2436,6 +3660,20 @@ export const planningApi = {
 export const EXPENSE_CATEGORIES = ['Essence', 'Hotel', 'Voyage', 'Repas', 'Peage', 'Parking', 'Divers'] as const
 export type ExpenseCategory = typeof EXPENSE_CATEGORIES[number]
 
+export const EXPENSE_PAYMENT_METHODS = ['especes', 'cb', 'virement', 'cheque', 'autre'] as const
+export type ExpensePaymentMethod = typeof EXPENSE_PAYMENT_METHODS[number]
+
+export const EXPENSE_PAYMENT_METHOD_LABELS: Record<ExpensePaymentMethod, string> = {
+  especes: 'Espèces',
+  cb: 'Carte bancaire',
+  virement: 'Virement',
+  cheque: 'Chèque',
+  autre: 'Autre',
+}
+
+export const EXPENSE_TRANSPORT_TYPES = ['voiture', 'moto', 'velo', 'transports_commun', 'autre'] as const
+export type ExpenseTransportType = typeof EXPENSE_TRANSPORT_TYPES[number]
+
 export interface ExpenseLine {
   id: number
   expense_report_id: number
@@ -2443,17 +3681,45 @@ export interface ExpenseLine {
   user?: { id: number; name: string }
   category: ExpenseCategory
   amount: number
+  payment_method?: ExpensePaymentMethod | null
   date: string
   description?: string
-  receipt_path?: string
+  receipt_path?: string | null
+  receipt_filename?: string | null
+  lieu_depart?: string | null
+  lieu_arrivee?: string | null
+  distance_km?: number | null
+  taux_km?: number | null
+  type_transport?: ExpenseTransportType | null
+  is_validated?: boolean
   created_at: string
   updated_at: string
 }
 
+export function isExpenseDeplacementLine(line: Pick<ExpenseLine, 'category' | 'distance_km'>): boolean {
+  return line.category === 'Voyage' && line.distance_km != null
+}
+
+export type ExpenseReportStatut = 'brouillon' | 'soumis' | 'valide' | 'rembourse' | 'rejete'
+
+export const EXPENSE_STATUT_LABELS: Record<ExpenseReportStatut, string> = {
+  brouillon: 'Brouillon',
+  soumis: 'Soumis',
+  valide: 'Validé',
+  rembourse: 'Remboursé',
+  rejete: 'Rejeté',
+}
+
+export const EXPENSE_STATUT_OPTIONS: { value: ExpenseReportStatut; label: string }[] = (
+  Object.entries(EXPENSE_STATUT_LABELS) as [ExpenseReportStatut, string][]
+).map(([value, label]) => ({ value, label }))
+
 export interface ExpenseReport {
   id: number
   unique_number: string
-  ordre_mission_id: number
+  ordre_mission_id?: number | null
+  user_id?: number | null
+  user?: { id: number; name: string }
   ordre_mission?: {
     id: number
     unique_number?: string
@@ -2464,8 +3730,12 @@ export interface ExpenseReport {
     client?: { id: number; name: string }
     site?: { id: number; nom?: string; name?: string }
   }
-  statut: 'brouillon' | 'soumis' | 'valide' | 'rembourse' | 'rejete'
+  statut: ExpenseReportStatut
   notes?: string
+  private_notes?: string
+  advance_amount?: number | null
+  lines_count?: number
+  lines_validated_count?: number
   created_by?: number
   created_by_user?: { id: number; name: string }
   validated_by?: number
@@ -2480,20 +3750,31 @@ export interface ExpenseReport {
 export const expenseReportsApi = {
   eligibleOMs: () => api<OrdreMission[]>('/expense-reports/eligible-oms'),
 
-  list: (params?: { statut?: string; ordre_mission_id?: number }) => {
-    const s = params
-      ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
-      : ''
-    return api<{ data: ExpenseReport[]; total: number }>(`/expense-reports${s ? `?${s}` : ''}`)
+  list: (params?: { statut?: string; ordre_mission_id?: number; search?: string; page?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.statut) q.set('statut', params.statut)
+    if (params?.ordre_mission_id != null) q.set('ordre_mission_id', String(params.ordre_mission_id))
+    if (params?.search) q.set('search', params.search)
+    if (params?.page != null) q.set('page', String(params.page))
+    const s = q.toString()
+    return api<LaravelPaginator<ExpenseReport>>(`/expense-reports${s ? `?${s}` : ''}`)
   },
 
   get: (id: number) => api<ExpenseReport>(`/expense-reports/${id}`),
 
-  create: (body: { ordre_mission_id: number; notes?: string }) =>
+  create: (body: { ordre_mission_id?: number | null; user_id?: number | null; notes?: string }) =>
     api<ExpenseReport>('/expense-reports', { method: 'POST', body: JSON.stringify(body) }),
 
-  update: (id: number, body: Partial<Pick<ExpenseReport, 'statut' | 'notes'>>) =>
+  update: (id: number, body: Partial<Pick<ExpenseReport, 'statut' | 'notes' | 'private_notes' | 'advance_amount'>>) =>
     api<ExpenseReport>(`/expense-reports/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  sendEmail: (id: number, body: {
+    recipient_email: string
+    recipient_name?: string
+    message?: string
+    pdf_template_id?: number
+  }) =>
+    api<{ message: string }>(`/expense-reports/${id}/send-email`, { method: 'POST', body: JSON.stringify(body) }),
 
   delete: (id: number) => api<void>(`/expense-reports/${id}`, { method: 'DELETE' }),
 
@@ -2505,6 +3786,46 @@ export const expenseReportsApi = {
 
   deleteLine: (reportId: number, lineId: number) =>
     api<void>(`/expense-reports/${reportId}/lines/${lineId}`, { method: 'DELETE' }),
+
+  async uploadLineReceipt(reportId: number, lineId: number, file: File): Promise<ExpenseLine> {
+    const token = getToken()
+    const fd = new FormData()
+    fd.append('file', file)
+    const path = `/expense-reports/${reportId}/lines/${lineId}/receipt`
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}`, Accept: 'application/json' } : { Accept: 'application/json' },
+      body: fd,
+    })
+    if (res.status === 401) {
+      handleApiUnauthorized(path, Boolean(token))
+    }
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error((data as { message?: string }).message || `Erreur ${res.status}`)
+    return data as ExpenseLine
+  },
+
+  async downloadLineReceipt(reportId: number, lineId: number, filename: string): Promise<void> {
+    const token = getToken()
+    const path = `/expense-reports/${reportId}/lines/${lineId}/receipt`
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (res.status === 401) {
+      handleApiUnauthorized(path, Boolean(token))
+    }
+    if (!res.ok) throw new Error('Justificatif introuvable')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+
+  deleteLineReceipt: (reportId: number, lineId: number) =>
+    api<ExpenseLine>(`/expense-reports/${reportId}/lines/${lineId}/receipt`, { method: 'DELETE' }),
 }
 
 // ─── Lab Reports ────────────────────────────────────────────────────────────
@@ -2547,6 +3868,7 @@ export type LabReport = {
   sections?: LabReportSection[]
   technician?: { id: number; name: string }
   validator?: { id: number; name: string }
+  dossier?: { id: number; reference: string; titre?: string | null }
   created_at: string
 }
 
@@ -2588,7 +3910,10 @@ export type Agency = {
 }
 
 export const agencesApi = {
-  list: () => api<Agency[]>('/agences'),
+  list: async () => {
+    const res = await api<LaravelPaginator<Agency> | Agency[]>('/agences?per_page=200')
+    return Array.isArray(res) ? res : res.data
+  },
   get: (id: number) => api<Agency>(`/agences/${id}`),
   create: (body: Partial<Agency>) => api<Agency>('/agences', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: Partial<Agency>) => api<Agency>(`/agences/${id}`, { method: 'PUT', body: JSON.stringify(body) }),

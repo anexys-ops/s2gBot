@@ -38,6 +38,17 @@ class BonLivraison extends Model
         ];
     }
 
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        $array = parent::toArray();
+        if ($this->date_livraison !== null) {
+            $array['date_livraison'] = $this->date_livraison->format('Y-m-d');
+        }
+
+        return $array;
+    }
+
     public function bonCommande(): BelongsTo
     {
         return $this->belongsTo(BonCommande::class, 'bon_commande_id');

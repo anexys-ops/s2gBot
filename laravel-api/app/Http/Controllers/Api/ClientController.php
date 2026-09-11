@@ -4,11 +4,25 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Support\AgencyAccess;
+use App\Support\ClientListEnrichment;
+use App\Services\DocumentActivityLogger;
+use App\Support\ClientPortalAccess;
+use App\Support\ClientPortalCatalog;
+use App\Support\CurrencyCode;
+use Illuminate\Validation\Rule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ClientController extends Controller
 {
+    private const CLIENT_AUDIT_FIELDS = [
+        'name', 'email', 'phone', 'whatsapp', 'siret', 'ice', 'ca_annuel_tva_regime', 'rc', 'city', 'address',
+        'commercial_id', 'portal_modules', 'currency_code',
+    ];
+
+    public function __construct(private DocumentActivityLogger $documentActivity) {}
+
     private const REFERENT_RELATIONS = [
         'commercial:id,name,email',
         'responsableTechnique:id,name,email',
@@ -26,6 +40,8 @@ class ClientController extends Controller
 
         if ($user->isClient() || $user->isSiteContact()) {
             $query->where('id', $user->client_id);
+        } else {
+            AgencyAccess::applyClientScope($query, $user);
         }
 
         if ($search = trim((string) $request->query('search', ''))) {
@@ -51,7 +67,22 @@ class ClientController extends Controller
             $query->whereNotNull('lat')->whereNotNull('lng');
         }
 
-        $clients = $query->orderBy('name')->get();
+        $this->applyViewFilter($query, $request->query('view'));
+
+        $query->orderBy('name');
+
+        if ($request->has('page') || $request->has('per_page')) {
+            $perPage = (int) $request->query('per_page', 20);
+            $perPage = min(100, max(1, $perPage));
+
+            $paginator = $query->paginate($perPage);
+            ClientListEnrichment::enrich($paginator->getCollection());
+
+            return response()->json($paginator);
+        }
+
+        $clients = $query->get();
+        ClientListEnrichment::enrich($clients);
 
         return response()->json($clients);
     }
@@ -64,6 +95,7 @@ class ClientController extends Controller
 
         $validated = $request->validate($this->rules());
         $client    = Client::create($validated);
+        $this->documentActivity->clientCreated($request->user(), $client);
 
         return response()->json($client->load(['sites', ...self::REFERENT_RELATIONS]), 201);
     }
@@ -74,10 +106,14 @@ class ClientController extends Controller
         if (($user->isClient() || $user->isSiteContact()) && $client->id !== $user->client_id) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
+        if ($user->isInternal() && ! AgencyAccess::userMayAccessClient($user, $client)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
 
         return response()->json($client->load([
             'sites.agency',
             'agencies',
+            'visibleLabAgencies:id,name,code,is_siege',
             'addresses',
             'contacts',
             ...self::REFERENT_RELATIONS,
@@ -91,9 +127,12 @@ class ClientController extends Controller
         }
 
         $validated = $request->validate($this->rules(sometimes: true));
+        $before = $client->only(self::CLIENT_AUDIT_FIELDS);
         $client->update($validated);
+        $fresh = $client->fresh();
+        $this->documentActivity->clientUpdated($request->user(), $fresh, $before);
 
-        return response()->json($client->load(['sites', ...self::REFERENT_RELATIONS]));
+        return response()->json($fresh->load(['sites', ...self::REFERENT_RELATIONS]));
     }
 
     public function destroy(Request $request, Client $client): JsonResponse
@@ -102,14 +141,98 @@ class ClientController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
+        $this->documentActivity->clientDeleted($request->user(), $client);
         $client->delete();
 
         return response()->json(null, 204);
     }
 
+    /**
+     * Agences labo autorisées à voir ce client (vide = toutes les agences).
+     */
+    public function syncLabAgencies(Request $request, Client $client): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $validated = $request->validate([
+            'lab_agency_ids' => 'nullable|array',
+            'lab_agency_ids.*' => 'integer|exists:agencies,id',
+        ]);
+
+        $ids = array_map('intval', $validated['lab_agency_ids'] ?? []);
+        $allowed = \App\Models\Agency::query()
+            ->whereNull('client_id')
+            ->whereIn('id', $ids)
+            ->pluck('id')
+            ->all();
+
+        $client->visibleLabAgencies()->sync($allowed);
+
+        return response()->json($client->fresh()->load('visibleLabAgencies:id,name,code,is_siege'));
+    }
+
+    /**
+     * Catalogue des modules portail client (libellés pour l’admin).
+     */
+    public function portalCatalog(): JsonResponse
+    {
+        return response()->json([
+            'modules' => collect(ClientPortalCatalog::labels())
+                ->map(fn (string $label, string $key) => ['key' => $key, 'label' => $label])
+                ->values(),
+            'defaults' => ClientPortalCatalog::defaults(),
+        ]);
+    }
+
+    /**
+     * Modules portail activés pour un client (checkboxes admin).
+     */
+    public function syncPortalModules(Request $request, Client $client): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $validated = $request->validate([
+            'portal_modules' => 'required|array',
+            'portal_modules.*' => 'string|in:'.implode(',', ClientPortalCatalog::keys()),
+        ]);
+
+        $client = ClientPortalAccess::syncClientModules($client, $validated['portal_modules']);
+
+        return response()->json([
+            'portal_modules' => ClientPortalCatalog::normalize($client->portal_modules),
+        ]);
+    }
+
     // ----------------------------------------------------------------
     // Helpers
     // ----------------------------------------------------------------
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<Client>  $query
+     */
+    private function applyViewFilter($query, mixed $view): void
+    {
+        $view = is_string($view) ? trim($view) : '';
+
+        match ($view) {
+            'with_siret' => $query->whereNotNull('siret')->where('siret', '!=', ''),
+            'with_ice' => $query->whereNotNull('ice')->where('ice', '!=', ''),
+            'missing_email' => $query->where(function ($q) {
+                $q->whereNull('email')->orWhere('email', '=', '');
+            }),
+            'missing_phone' => $query->where(function ($q) {
+                $q->whereNull('phone')->orWhere('phone', '=', '');
+            }),
+            'missing_ice' => $query->where(function ($q) {
+                $q->whereNull('ice')->orWhere('ice', '=', '');
+            }),
+            default => null,
+        };
+    }
 
     private function rules(bool $sometimes = false): array
     {
@@ -121,11 +244,13 @@ class ClientController extends Controller
             'city'                        => 'nullable|string|max:128',
             'postal_code'                 => 'nullable|string|max:16',
             'country'                     => 'nullable|string|max:4',
+            'currency_code'               => ['nullable', 'string', 'size:3', Rule::in(array_keys(CurrencyCode::labels()))],
             'email'                       => 'nullable|email',
             'phone'                       => 'nullable|string|max:50',
             'whatsapp'                    => 'nullable|string|max:50',
             'siret'                       => 'nullable|string|max:20',
             'ice'                         => 'nullable|string|max:32',
+            'ca_annuel_tva_regime'        => 'nullable|boolean',
             'rc'                          => 'nullable|string|max:80',
             'patente'                     => 'nullable|string|max:64',
             'if_number'                   => 'nullable|string|max:32',

@@ -29,8 +29,13 @@ type Props = {
   addLine: () => void
   updateLine: (index: number, field: keyof QuoteLineDraft, value: string | number | null | boolean) => void
   removeLine: (index: number) => void
-  onOpenCommercialCatalog: (lineIndex: number) => void
-  onOpenProlabCatalog: (lineIndex: number) => void
+  onOpenCommercialCatalog?: (lineIndex: number) => void
+  onOpenProlabCatalog?: (lineIndex: number) => void
+  onOpenS2gCatalog?: () => void
+  onAddArticlesToJalon?: (jalonId: string) => void
+  onRemoveJalon: (jalonId: string) => void
+  onAddFromCommercialCatalog?: () => void
+  onAddFromProlabCatalog?: () => void
   totals: DocumentTotalsResult
   metaFraisTtc: number
   isCreate: boolean
@@ -42,6 +47,8 @@ type Props = {
   /** Externally controlled step override (e.g. jump to 6 after creation) */
   wizardStep?: number | null
   onWizardStepChange?: (step: number) => void
+  /** Non-draft quotes: browse wizard without editing */
+  readOnly?: boolean
 }
 
 function isStepValid(step: number, form: QuoteFormState): boolean {
@@ -53,11 +60,9 @@ function isStepValid(step: number, form: QuoteFormState): boolean {
     case 3:
       return true
     case 4: {
-      const hasForfait =
-        form.meta?.mode_devis === 'forfait' &&
-        (form.meta?.tarif_global_hors_lignes_ht ?? 0) > 0
       const hasLines = form.lines.length > 0
-      return hasForfait || hasLines
+      const hasJalons = (form.meta?.devis_jalons ?? []).length > 0
+      return hasLines || hasJalons
     }
     case 5:
       return true
@@ -75,11 +80,11 @@ export default function QuoteWizard({
   dossiers,
   addresses,
   quoteTemplates,
-  addLine,
   updateLine,
   removeLine,
-  onOpenCommercialCatalog,
-  onOpenProlabCatalog,
+  onOpenS2gCatalog,
+  onAddArticlesToJalon,
+  onRemoveJalon,
   totals,
   metaFraisTtc,
   isCreate,
@@ -89,6 +94,7 @@ export default function QuoteWizard({
   createdQuote,
   wizardStep,
   onWizardStepChange,
+  readOnly = false,
 }: Props) {
   const [internalStep, setInternalStep] = useState(isCreate ? 1 : 4)
 
@@ -110,58 +116,88 @@ export default function QuoteWizard({
     if (step > 1) setStep((s) => s - 1)
   }
 
+  const canGoToStep = (target: number) => {
+    if (target < 1 || target > 5) return false
+    if (readOnly || !isCreate) return true
+    if (target <= step) return true
+    for (let s = 1; s < target; s++) {
+      if (!isStepValid(s, form)) return false
+    }
+    return true
+  }
+
+  const goToStep = (target: number) => {
+    if (canGoToStep(target)) setStep(target)
+  }
+
   // Step 6 — shown after successful creation
   if (step === 6 && createdQuote) {
-    const contactEmail =
+    const selectedContact =
       form.contact_id != null
-        ? clientContacts.find((c) => c.id === form.contact_id)?.email ?? undefined
+        ? clientContacts.find((c) => c.id === form.contact_id)
         : undefined
+    const contactEmail = selectedContact?.email?.trim() || undefined
+    const contactName = selectedContact
+      ? [selectedContact.prenom, selectedContact.nom].filter(Boolean).join(' ').trim() || undefined
+      : undefined
     return (
       <WizardStep6Send
         quoteId={createdQuote.id}
         quoteNumber={createdQuote.number}
         contactEmail={contactEmail}
+        contactName={contactName}
         onDone={onCancel}
       />
     )
   }
 
   return (
-    <>
-      <WizardStepperBar current={step} />
+    <div className="qw-shell">
+      <WizardStepperBar current={step} onStepClick={goToStep} canGoToStep={canGoToStep} />
 
+      <div className="qw-shell__body">
       {step === 1 && (
-        <WizardStep1Context
-          form={form}
-          setForm={setForm}
-          clients={clients}
-          allSites={allSites}
-          dossiers={dossiers}
-        />
+        <fieldset disabled={readOnly} className="qw-step-fieldset">
+          <WizardStep1Context
+            form={form}
+            setForm={setForm}
+            clients={clients}
+            allSites={allSites}
+            dossiers={dossiers}
+          />
+        </fieldset>
       )}
 
-      {step === 2 && <WizardStep2Dates form={form} setForm={setForm} />}
+      {step === 2 && (
+        <fieldset disabled={readOnly} className="qw-step-fieldset">
+          <WizardStep2Dates form={form} setForm={setForm} />
+        </fieldset>
+      )}
 
       {step === 3 && (
-        <WizardStep3Infos
-          form={form}
-          setForm={setForm}
-          clientContacts={clientContacts}
-          addresses={addresses}
-          quoteTemplates={quoteTemplates}
-        />
+        <fieldset disabled={readOnly} className="qw-step-fieldset">
+          <WizardStep3Infos
+            form={form}
+            setForm={setForm}
+            clientContacts={clientContacts}
+            addresses={addresses}
+            quoteTemplates={quoteTemplates}
+          />
+        </fieldset>
       )}
 
       {step === 4 && (
-        <WizardStep4Lines
-          form={form}
-          setForm={setForm}
-          addLine={addLine}
-          updateLine={updateLine}
-          removeLine={removeLine}
-          onOpenCommercialCatalog={onOpenCommercialCatalog}
-          onOpenProlabCatalog={onOpenProlabCatalog}
-        />
+        <fieldset disabled={readOnly} className="qw-step-fieldset">
+          <WizardStep4Lines
+            form={form}
+            setForm={setForm}
+            updateLine={updateLine}
+            removeLine={removeLine}
+            onOpenS2gCatalog={onOpenS2gCatalog ?? (() => {})}
+            onAddArticlesToJalon={onAddArticlesToJalon}
+            onRemoveJalon={onRemoveJalon}
+          />
+        </fieldset>
       )}
 
       {step === 5 && (
@@ -170,41 +206,38 @@ export default function QuoteWizard({
           setForm={setForm}
           totals={totals}
           metaFraisTtc={metaFraisTtc}
-          isSubmitting={isSubmitting}
-          submitLabel={submitLabel}
-          onCancel={onCancel}
+          readOnly={readOnly}
         />
       )}
 
-      {/* Navigation — not shown on step 5 (has its own submit buttons) */}
-      {step !== 5 && (
-        <div className="qw-nav" style={{ padding: '0 2rem 2rem' }}>
-          <button
-            type="button"
-            className="qw-nav__back"
-            onClick={step === 1 ? onCancel : goBack}
-          >
-            {step === 1 ? 'Annuler' : '← Retour'}
-          </button>
-          <button
-            type="button"
-            className="qw-nav__next"
-            onClick={goNext}
-            disabled={!canGoNext}
-          >
-            Suivant →
-          </button>
-        </div>
-      )}
+      </div>
 
-      {/* Back button on step 5 */}
-      {step === 5 && (
-        <div style={{ padding: '0 2rem 1rem' }}>
-          <button type="button" className="qw-nav__back" onClick={goBack}>
-            ← Retour
-          </button>
+      <div className="qw-nav qw-nav--dock">
+        <button
+          type="button"
+          className="qw-nav__back"
+          onClick={step === 1 ? onCancel : goBack}
+        >
+          {step === 1 ? (readOnly ? 'Retour à la liste' : 'Annuler') : '← Retour'}
+        </button>
+        <div className="qw-nav__actions">
+          {step < 5 && (
+            <button
+              type="button"
+              className="qw-nav__next"
+              onClick={goNext}
+              disabled={!canGoNext}
+            >
+              Suivant →
+            </button>
+          )}
+          {step === 5 && !readOnly && (
+            <button type="submit" className="qw-nav__submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Enregistrement…' : submitLabel}
+            </button>
+          )}
         </div>
-      )}
-    </>
+      </div>
+    </div>
   )
 }

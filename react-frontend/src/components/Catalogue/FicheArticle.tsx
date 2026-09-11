@@ -24,7 +24,7 @@ export default function FicheArticle({ article, section = 'all', showBackLink = 
     <div className="fiche-article">
       {showOverview && <div className="fiche-article__summary card">
         <h2 className="fiche-article__summary-title">Caractéristiques</h2>
-        {article.tags && article.tags.length > 0 && (
+        {article.tags && article.tags.length > 0 && article.kind !== 'jalon' && article.kind !== 'product' && (
           <div className="fiche-article__tags">
             {article.tags.map((t, i) => (
               <span key={i} className="catalogue-prolab-tag catalogue-prolab-tag--a">
@@ -34,6 +34,36 @@ export default function FicheArticle({ article, section = 'all', showBackLink = 
           </div>
         )}
         <dl className="module-fiche-grid fiche-article__dl">
+          <div>
+            <dt>Type catalogue</dt>
+            <dd>
+              {article.kind === 'jalon'
+                ? 'Jalon (regroupement S2G)'
+                : article.kind === 'product'
+                  ? 'Produit / descriptif S2G'
+                  : 'Legacy PROLAB'}
+            </dd>
+          </div>
+          {article.famille_label?.trim() ? (
+            <div>
+              <dt>Famille S2G</dt>
+              <dd>{article.famille_label}</dd>
+            </div>
+          ) : null}
+          {article.qualification_tags && article.qualification_tags.length > 0 ? (
+            <div className="fiche-article__tags-row">
+              <dt>Qualifications</dt>
+              <dd>
+                <div className="fiche-article__tags">
+                  {article.qualification_tags.map((tag) => (
+                    <span key={tag.id} className="catalogue-prolab-tag catalogue-prolab-tag--b" title={tag.label}>
+                      {tag.display_label}
+                    </span>
+                  ))}
+                </div>
+              </dd>
+            </div>
+          ) : null}
           <div>
             <dt>Code article</dt>
             <dd>
@@ -207,6 +237,17 @@ export default function FicheArticle({ article, section = 'all', showBackLink = 
               </tbody>
             </table>
           </div>
+        </section>
+      )}
+
+      {showTables && fpkgs.length === 0 && params.length === 0 && resultats.length === 0 && (
+        <section className="fiche-article__section card">
+          <h2 className="fiche-article__h2">Tables</h2>
+          <p className="fiche-article__tables-empty text-muted">
+            Aucune donnée tabulaire pour cet article : pas de forfaits &amp; packages, de paramètres d&apos;essai ni de
+            résultats attendus. D&apos;autres articles du catalogue peuvent en comporter selon leur famille et leur
+            configuration laboratoire.
+          </p>
         </section>
       )}
 

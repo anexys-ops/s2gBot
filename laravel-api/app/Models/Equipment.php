@@ -50,6 +50,21 @@ class Equipment extends Model
         return $this->hasMany(Calibration::class)->orderByDesc('calibration_date');
     }
 
+    public function maintenancePlans(): HasMany
+    {
+        return $this->hasMany(EquipmentMaintenancePlan::class)->orderBy('next_due_at');
+    }
+
+    public function affectations(): HasMany
+    {
+        return $this->hasMany(MaterielAffectation::class)->orderByDesc('date_debut');
+    }
+
+    public function planningSlots(): HasMany
+    {
+        return $this->hasMany(PlanningEquipment::class)->orderByDesc('date_debut');
+    }
+
     public function testTypes(): BelongsToMany
     {
         return $this->belongsToMany(TestType::class, 'equipment_test_type')->withTimestamps();

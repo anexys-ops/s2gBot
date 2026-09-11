@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Agency;
 use App\Models\Site;
 use App\Support\AgencyAccess;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -29,14 +30,25 @@ class SiteController extends Controller
             });
         }
 
-        $sites = $query->orderBy('name')->get();
+        if ($clientId = $request->query('client_id')) {
+            $query->where('client_id', (int) $clientId);
+        }
 
-        return response()->json($sites);
+        $query->orderBy('name');
+
+        if ($request->has('page') || $request->has('per_page')) {
+            $perPage = (int) $request->query('per_page', 20);
+            $perPage = min(100, max(1, $perPage));
+
+            return response()->json($query->paginate($perPage));
+        }
+
+        return response()->json($query->get());
     }
 
     public function store(Request $request): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $request->user()->isLab()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -87,7 +99,7 @@ class SiteController extends Controller
 
     public function update(Request $request, Site $site): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $request->user()->isLab()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -121,11 +133,17 @@ class SiteController extends Controller
 
     public function destroy(Request $request, Site $site): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $request->user()->isLab()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $site->delete();
+        try {
+            $site->delete();
+        } catch (QueryException) {
+            return response()->json([
+                'message' => 'Impossible de supprimer ce chantier : des dossiers ou missions y sont encore rattachés.',
+            ], 422);
+        }
 
         return response()->json(null, 204);
     }

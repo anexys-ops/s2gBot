@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StockEquipment extends Model
 {
+    protected $table = 'stock_equipments';
+
     protected $fillable = [
         'equipment_id',
         'date_debut',

@@ -66,6 +66,14 @@ services:
       # pour surpasser tout /var/www/html/.env résiduel dans l'image Docker.
       APP_VERSION: ${APP_VERSION:-}
       GIT_COMMIT_SHORT: ${GIT_COMMIT_SHORT:-}
+      MAIL_MAILER: ${MAIL_MAILER:-log}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_ENCRYPTION: ${MAIL_ENCRYPTION:-tls}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Lab BTP}
     volumes:
       - laravel_storage:/var/www/html/storage
       - laravel_bootstrap_cache:/var/www/html/bootstrap/cache

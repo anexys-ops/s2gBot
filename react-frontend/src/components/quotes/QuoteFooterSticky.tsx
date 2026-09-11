@@ -24,9 +24,17 @@ export default function QuoteFooterSticky({ totals, metaFraisTtc, isSubmitting, 
           <strong>{formatMoney(totals.lines_ht_after_discount)}</strong>
         </div>
         <div className="quote-editor-sticky-footer__row">
-          <span>TVA (prorata lignes + port + déplacement)</span>
+          <span>
+            {totals.ca_annuel_tva_regime ? 'TVA État (75 %)' : 'TVA (prorata lignes + port + déplacement)'}
+          </span>
           <strong>{formatMoney(totals.amount_tva)}</strong>
         </div>
+        {totals.ca_annuel_tva_regime && totals.tva_recuperable != null ? (
+          <div className="quote-editor-sticky-footer__row" style={{ fontSize: '0.8rem' }}>
+            <span>TVA récupérable (25 %)</span>
+            <span>{formatMoney(totals.tva_recuperable)}</span>
+          </div>
+        ) : null}
         <div className="quote-editor-sticky-footer__row quote-editor-sticky-footer__row--ttc">
           <span>Total TTC (enregistrement, aligné API)</span>
           <strong>{formatMoney(totals.amount_ttc)}</strong>

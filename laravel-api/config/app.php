@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Facade;
 
 return [
-    'name' => env('APP_NAME', 'Lab BTP API'),
+    'name' => env('APP_NAME', 'Lab BTP'),
     /**
      * Ne pas stocker la version applicative ici : avec `php artisan config:cache`, la valeur
      * serait figée au moment du cache. Voir {@see \App\Http\Controllers\Api\VersionController}

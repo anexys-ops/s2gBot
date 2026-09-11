@@ -7,6 +7,10 @@ namespace App\Services;
  */
 class CommercialDocumentTotalsService
 {
+    public const CA_ANNUEL_TVA_RECUPERABLE_RATIO = 0.25;
+
+    public const CA_ANNUEL_TVA_ETAT_RATIO = 0.75;
+
     public static function lineHt(float $quantity, float $unitPrice, float $lineDiscountPercent): float
     {
         $base = round($quantity * $unitPrice, 2);
@@ -16,8 +20,47 @@ class CommercialDocumentTotalsService
     }
 
     /**
+     * @return array{tva_nominale: float, tva_recuperable: float, tva_etat: float, amount_tva: float}
+     */
+    public static function applyCaAnnuelTvaRegime(float $nominalTva): array
+    {
+        $tvaNominale = round(max(0, $nominalTva), 2);
+        $tvaRecuperable = round($tvaNominale * self::CA_ANNUEL_TVA_RECUPERABLE_RATIO, 2);
+        $tvaEtat = round($tvaNominale * self::CA_ANNUEL_TVA_ETAT_RATIO, 2);
+
+        return [
+            'tva_nominale' => $tvaNominale,
+            'tva_recuperable' => $tvaRecuperable,
+            'tva_etat' => $tvaEtat,
+            'amount_tva' => $tvaEtat,
+        ];
+    }
+
+    public static function ttcFromHt(float $ht, float $nominalTvaRate, bool $caAnnuelTvaRegime = false): float
+    {
+        $safeHt = max(0, round($ht, 2));
+        $rate = max(0, min(100, $nominalTvaRate));
+        $nominalTva = round($safeHt * ($rate / 100), 2);
+        if (! $caAnnuelTvaRegime) {
+            return round($safeHt + $nominalTva, 2);
+        }
+
+        return round($safeHt + self::applyCaAnnuelTvaRegime($nominalTva)['amount_tva'], 2);
+    }
+
+    /**
      * @param  array<int, array{ht: float, tva_rate: float}>  $lines
-     * @return array{amount_ht: float, amount_ttc: float, lines_ht_subtotal: float, lines_ht_after_discount: float, amount_tva: float}
+     * @return array{
+     *     amount_ht: float,
+     *     amount_ttc: float,
+     *     lines_ht_subtotal: float,
+     *     lines_ht_after_discount: float,
+     *     amount_tva: float,
+     *     tva_nominale: float,
+     *     tva_recuperable: float,
+     *     tva_etat: float,
+     *     ca_annuel_tva_regime: bool
+     * }
      */
     public static function computeTotals(
         array $lines,
@@ -27,6 +70,7 @@ class CommercialDocumentTotalsService
         float $shippingTvaRate,
         float $travelFeeHt = 0,
         float $travelFeeTvaRate = 20,
+        bool $caAnnuelTvaRegime = false,
     ): array {
         $linesHt = 0.0;
         $linesTva = 0.0;
@@ -52,7 +96,21 @@ class CommercialDocumentTotalsService
         $travelTva = round($travelHt * ($trRate / 100), 2);
 
         $totalHt = round($afterDiscount + $shippingAmountHt + $travelHt, 2);
-        $totalTva = round($scaledTva + $shipTva + $travelTva, 2);
+        $totalTvaNominal = round($scaledTva + $shipTva + $travelTva, 2);
+
+        if ($caAnnuelTvaRegime) {
+            $split = self::applyCaAnnuelTvaRegime($totalTvaNominal);
+            $totalTva = $split['amount_tva'];
+            $tvaNominale = $split['tva_nominale'];
+            $tvaRecuperable = $split['tva_recuperable'];
+            $tvaEtat = $split['tva_etat'];
+        } else {
+            $totalTva = $totalTvaNominal;
+            $tvaNominale = $totalTvaNominal;
+            $tvaRecuperable = 0.0;
+            $tvaEtat = $totalTvaNominal;
+        }
+
         $totalTtc = round($totalHt + $totalTva, 2);
 
         return [
@@ -61,6 +119,10 @@ class CommercialDocumentTotalsService
             'amount_ht' => $totalHt,
             'amount_tva' => $totalTva,
             'amount_ttc' => $totalTtc,
+            'tva_nominale' => $tvaNominale,
+            'tva_recuperable' => $tvaRecuperable,
+            'tva_etat' => $tvaEtat,
+            'ca_annuel_tva_regime' => $caAnnuelTvaRegime,
         ];
     }
 }

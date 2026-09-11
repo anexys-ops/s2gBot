@@ -45,6 +45,11 @@ class Invoice extends Model
         'due_date',
         'amount_ht',
         'amount_ttc',
+        'currency_code',
+        'exchange_rate',
+        'exchange_rate_date',
+        'amount_ht_base',
+        'amount_ttc_base',
         'tva_rate',
         'discount_percent',
         'discount_amount',
@@ -58,6 +63,9 @@ class Invoice extends Model
         'status',
         'last_reminder_sent_at',
         'reminder_count',
+        'next_reminder_date',
+        'reminder_notes',
+        'notes',
         'meta',
     ];
 
@@ -68,10 +76,15 @@ class Invoice extends Model
             'order_date' => 'date',
             'site_delivery_date' => 'date',
             'due_date' => 'date',
+            'next_reminder_date' => 'date',
             'last_reminder_sent_at' => 'datetime',
             'reminder_count' => 'integer',
             'amount_ht' => 'decimal:2',
             'amount_ttc' => 'decimal:2',
+            'exchange_rate' => 'decimal:6',
+            'exchange_rate_date' => 'date',
+            'amount_ht_base' => 'decimal:2',
+            'amount_ttc_base' => 'decimal:2',
             'tva_rate' => 'decimal:2',
             'discount_percent' => 'decimal:2',
             'discount_amount' => 'decimal:2',
@@ -116,6 +129,11 @@ class Invoice extends Model
     public function orders(): BelongsToMany
     {
         return $this->belongsToMany(Order::class, 'invoice_orders')->withTimestamps();
+    }
+
+    public function bonsCommande(): BelongsToMany
+    {
+        return $this->belongsToMany(BonCommande::class, 'invoice_bon_commande')->withTimestamps();
     }
 
     public function invoiceLines(): HasMany

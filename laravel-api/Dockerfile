@@ -20,7 +20,13 @@ COPY . .
 
 # Avant composer : package:discover (post-autoload-dump) exige bootstrap/cache présent et inscriptible
 RUN mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache/data storage/logs bootstrap/cache \
-    && composer install --no-dev --no-interaction --prefer-dist \
+    && (for attempt in 1 2 3 4 5; do \
+          composer install --no-dev --no-interaction --prefer-dist && exit 0; \
+          echo "composer install attempt ${attempt}/5 failed (transient network?), retry in 15s..."; \
+          sleep 15; \
+        done; \
+        echo "prefer-dist exhausted, trying prefer-source..."; \
+        composer install --no-dev --no-interaction --prefer-source) \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod +x docker-entrypoint.sh
 

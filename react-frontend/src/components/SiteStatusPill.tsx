@@ -1,13 +1,15 @@
-import { presentationSiteStatus } from '../lib/siteStatusPresentation'
+import StatusBadge, { siteStatutBadgeProps, type StatusBadgeSize } from './ds/StatusBadge'
 
-export default function SiteStatusPill({ status }: { status?: string | null }) {
-  const p = presentationSiteStatus(status)
+type Props = {
+  status?: string | null
+  size?: StatusBadgeSize
+}
+
+export default function SiteStatusPill({ status, size = 'sm' }: Props) {
+  const props = siteStatutBadgeProps(status)
   return (
-    <span className={`status-pill status-pill--${p.tone}`}>
-      <span className="status-pill__emoji" aria-hidden>
-        {p.emoji}
-      </span>
-      {p.label}
-    </span>
+    <StatusBadge variant={props.variant} size={size} title={props.label}>
+      {props.label}
+    </StatusBadge>
   )
 }

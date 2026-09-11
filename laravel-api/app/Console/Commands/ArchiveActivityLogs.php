@@ -29,6 +29,7 @@ class ArchiveActivityLogs extends Command
                         'original_id' => $log->id,
                         'user_id' => $log->user_id,
                         'action' => $log->action,
+                        'description' => $log->description ?? null,
                         'subject_type' => $log->subject_type,
                         'subject_id' => $log->subject_id,
                         'properties' => $log->properties !== null ? json_encode($log->properties) : null,

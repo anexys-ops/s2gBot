@@ -20,6 +20,10 @@ export type HubIconId =
   | 'template'
   | 'handshake'
   | 'lab'
+  | 'clock'
+  | 'truck'
+  | 'wallet'
+  | 'chart'
 
 type Props = { id: HubIconId; className?: string; title?: string }
 
@@ -171,6 +175,37 @@ export function OutlineIcon({ id, className, title }: Props) {
           <>
             <path d="M9 3h6l2 8v8a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-8l2-8z" {...stroke} />
             <path d="M7 15h10" {...stroke} />
+          </>
+        )
+      case 'clock':
+        return (
+          <>
+            <circle cx="12" cy="12" r="9" {...stroke} />
+            <path d="M12 7v5l3 2" {...stroke} />
+          </>
+        )
+      case 'truck':
+        return (
+          <>
+            <path d="M3 17h1.5a2.5 2.5 0 0 0 5 0H15a2.5 2.5 0 0 0 5 0H21V11l-3-4H9v10H3z" {...stroke} />
+            <path d="M9 11V7h7l3 4" {...stroke} />
+            <circle cx="7.5" cy="17" r="1.5" {...stroke} />
+            <circle cx="17.5" cy="17" r="1.5" {...stroke} />
+          </>
+        )
+      case 'wallet':
+        return (
+          <>
+            <path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" {...stroke} />
+            <path d="M16 13h4" {...stroke} />
+            <circle cx="18" cy="13" r="1" fill="currentColor" stroke="none" />
+          </>
+        )
+      case 'chart':
+        return (
+          <>
+            <path d="M4 19V5M4 19h16" {...stroke} />
+            <path d="M8 15V11M12 15V8M16 15v-3" {...stroke} />
           </>
         )
       default: {

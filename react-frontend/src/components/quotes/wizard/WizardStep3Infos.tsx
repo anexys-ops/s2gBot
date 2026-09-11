@@ -15,7 +15,7 @@ export default function WizardStep3Infos({
   setForm,
   clientContacts,
   addresses,
-  quoteTemplates,
+  quoteTemplates: _quoteTemplates,
 }: Props) {
   const set = <K extends keyof QuoteFormState>(field: K, value: QuoteFormState[K]) =>
     setForm((f) => ({ ...f, [field]: value }))
@@ -39,23 +39,6 @@ export default function WizardStep3Infos({
               <option key={c.id} value={c.id}>
                 {c.prenom} {c.nom}
                 {c.poste ? ` — ${c.poste}` : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label>Modèle PDF</label>
-          <select
-            value={form.pdf_template_id ?? ''}
-            onChange={(e) =>
-              set('pdf_template_id', e.target.value ? Number(e.target.value) : undefined)
-            }
-          >
-            <option value="">Par défaut</option>
-            {quoteTemplates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
               </option>
             ))}
           </select>

@@ -15,22 +15,30 @@ class Sequence extends Model
      * Génère le prochain numéro unique pour un type donné.
      * Utilise un lock pessimiste pour garantir l'unicité sous concurrence.
      *
-     * @param string $type  'OM' | 'NDF' | 'MAT' | 'TSK'
+     * @param string $type  'OM' | 'NDF' | 'MAT' | 'TSK' | 'FOLD' | 'TRANSCO'
      * @return string       ex: 'OM-10000001'
      */
     public static function next(string $type): string
     {
-        return DB::transaction(function () use ($type) {
+        return strtoupper($type).'-'.static::nextNumeric($type);
+    }
+
+    /**
+     * Numéro séquentiel sans préfixe — usage code-barres transco.
+     */
+    public static function nextNumeric(string $type): string
+    {
+        return (string) DB::transaction(function () use ($type) {
             $seq = static::where('type', $type)->lockForUpdate()->first();
 
-            if (!$seq) {
+            if (! $seq) {
                 $seq = static::create(['type' => $type, 'last_value' => 10000000]);
             }
 
             $seq->last_value += 1;
             $seq->save();
 
-            return strtoupper($type) . '-' . $seq->last_value;
+            return $seq->last_value;
         });
     }
 }

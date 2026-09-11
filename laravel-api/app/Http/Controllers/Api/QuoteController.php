@@ -10,13 +10,22 @@ use App\Models\Catalogue\Package;
 use App\Models\DevisTache;
 use App\Models\DocumentStatusHistory;
 use App\Models\Dossier;
+use App\Models\MailLog;
 use App\Models\Quote;
 use App\Models\QuoteLine;
 use App\Models\Site;
+use App\Models\User;
 use App\Models\DocumentSequence;
 use App\Services\CommercialDocumentTotalsService;
+use App\Services\CommercialPdfPreGenerationService;
+use App\Services\DocumentActivityLogger;
+use App\Services\DocumentCurrencyService;
+use App\Services\QuotePricingService;
+use App\Models\Client;
 use App\Services\DocumentSequenceService;
+use App\Support\ClientFilialeResolver;
 use App\Services\DocumentStatusService;
+use App\Support\ActivityChangeTracker;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
 use Illuminate\Http\JsonResponse;
@@ -26,8 +35,17 @@ use Illuminate\Validation\Rule;
 
 class QuoteController extends Controller
 {
+    private const QUOTE_AUDIT_FIELDS = [
+        'number', 'client_id', 'site_id', 'dossier_id', 'contact_id', 'quote_date',
+        'valid_until', 'status', 'notes', 'tva_rate', 'discount_percent', 'discount_amount',
+        'amount_ht', 'amount_ttc',
+    ];
+
     public function __construct(
-        private readonly DocumentSequenceService $documentSequences
+        private readonly DocumentSequenceService $documentSequences,
+        private readonly DocumentActivityLogger $documentActivity,
+        private readonly DocumentCurrencyService $documentCurrency,
+        private readonly CommercialPdfPreGenerationService $pdfPreGeneration,
     ) {}
 
     private const QUOTE_LINE_BASE = [
@@ -35,6 +53,7 @@ class QuoteController extends Controller
         'lines.*.ref_article_id' => 'nullable|exists:ref_articles,id',
         'lines.*.ref_package_id' => 'nullable|exists:ref_packages,id',
         'lines.*.description' => 'required|string|max:500',
+        'lines.*.unite' => 'nullable|string|max:64',
         'lines.*.quantity' => 'required|integer|min:1',
         'lines.*.unit_price' => 'required|numeric|min:0',
         'lines.*.tva_rate' => 'nullable|numeric|min:0|max:100',
@@ -68,6 +87,10 @@ class QuoteController extends Controller
             'billingAddress',
             'deliveryAddress',
             'pdfTemplate',
+            'bonsCommande' => function ($q) {
+                $q->select('id', 'numero', 'quote_id', 'dossier_id')
+                    ->withCount(['bonsLivraison', 'invoices']);
+            },
         ]);
 
         if (! $user->isLab()) {
@@ -75,11 +98,14 @@ class QuoteController extends Controller
         }
 
         if ($search = trim((string) $request->query('search', ''))) {
-            $query->where(function ($q) use ($search) {
-                $q->where('number', 'like', '%'.$search.'%')
-                    ->orWhere('notes', 'like', '%'.$search.'%')
-                    ->orWhereHas('client', function ($cq) use ($search) {
-                        $cq->where('name', 'like', '%'.$search.'%');
+            $like = '%'.$search.'%';
+            $query->where(function ($q) use ($like) {
+                $q->where('number', 'like', $like)
+                    ->orWhere('notes', 'like', $like)
+                    ->orWhereHas('client', fn ($cq) => $cq->where('name', 'like', $like))
+                    ->orWhereHas('dossier', function ($dq) use ($like) {
+                        $dq->where('reference', 'like', $like)
+                            ->orWhere('titre', 'like', $like);
                     });
             });
         }
@@ -88,7 +114,15 @@ class QuoteController extends Controller
             $query->where('status', $status);
         }
 
-        $quotes = $query->orderByDesc('quote_date')->paginate(15);
+        if ($request->boolean('eligible_bc')) {
+            $query
+                ->whereNotNull('dossier_id')
+                ->whereIn('status', [Quote::STATUS_SIGNED, Quote::STATUS_ACCEPTED]);
+        }
+
+        $perPage = min(max((int) $request->query('per_page', 15), 1), 100);
+
+        $quotes = $query->orderByDesc('quote_date')->paginate($perPage);
 
         return response()->json($quotes);
     }
@@ -120,14 +154,20 @@ class QuoteController extends Controller
             'travel_fee_ht' => 'nullable|numeric|min:0',
             'travel_fee_tva_rate' => 'nullable|numeric|min:0|max:100',
             'apply_site_travel' => 'nullable|boolean',
+            'filiale_agency_id' => 'nullable|integer|exists:agencies,id',
             'meta' => 'nullable|array',
         ], [
             'lines' => 'required|array|min:0',
         ], self::QUOTE_LINE_BASE, self::TACHES_RULES));
 
+        $dossierId = $this->resolveDossierIdForChantier(
+            (int) $validated['client_id'],
+            isset($validated['site_id']) ? (int) $validated['site_id'] : null,
+            isset($validated['dossier_id']) ? (int) $validated['dossier_id'] : null,
+        );
         $this->assertDossierForClient(
             (int) $validated['client_id'],
-            isset($validated['dossier_id']) ? (int) $validated['dossier_id'] : null,
+            $dossierId,
             isset($validated['site_id']) ? (int) $validated['site_id'] : null,
         );
         ClientContactDocument::assertBelongsToClient(
@@ -136,7 +176,16 @@ class QuoteController extends Controller
         );
         $this->assertLinesNoDualRef($validated['lines']);
 
-        $number = $this->documentSequences->next(DocumentSequence::TYPE_DEVIS);
+        $cid = (int) $validated['client_id'];
+        $siteId = isset($validated['site_id']) ? (int) $validated['site_id'] : null;
+        $filialeAgencyId = ClientFilialeResolver::resolveAgencyId(
+            $request->user(),
+            $cid,
+            $siteId,
+            isset($validated['filiale_agency_id']) ? (int) $validated['filiale_agency_id'] : null,
+        );
+        $filialeCode = ClientFilialeResolver::codeForAgencyId($filialeAgencyId, $cid);
+        $number = $this->documentSequences->next(DocumentSequence::TYPE_DEVIS, $filialeCode);
         $defaultTva = $validated['tva_rate'] ?? 20;
 
         $travelHt = (float) ($validated['travel_fee_ht'] ?? 0);
@@ -147,17 +196,8 @@ class QuoteController extends Controller
             }
         }
 
-        $cid = (int) $validated['client_id'];
-        $agencyId = null;
-        if (! empty($validated['site_id'])) {
-            $site = Site::query()->find((int) $validated['site_id']);
-            if ($site && (int) $site->client_id === $cid) {
-                $agencyId = $site->agency_id;
-            }
-        }
-        if (! $agencyId) {
-            $agencyId = Agency::query()->where('client_id', $cid)->where('is_headquarters', true)->value('id');
-        }
+        $agencyId = self::resolveLabAgencyIdForQuote($request->user(), $validated['site_id'] ?? null, $cid);
+        $meta = ClientFilialeResolver::mergeFilialeMeta($validated['meta'] ?? null, $filialeAgencyId);
 
         $quote = Quote::create([
             'number' => $number,
@@ -165,7 +205,7 @@ class QuoteController extends Controller
             'contact_id' => $validated['contact_id'] ?? null,
             'agency_id' => $agencyId,
             'site_id' => $validated['site_id'] ?? null,
-            'dossier_id' => $validated['dossier_id'] ?? null,
+            'dossier_id' => $dossierId,
             'quote_date' => $validated['quote_date'],
             'order_date' => $validated['order_date'] ?? null,
             'site_delivery_date' => $validated['site_delivery_date'] ?? null,
@@ -184,8 +224,11 @@ class QuoteController extends Controller
             'pdf_template_id' => $validated['pdf_template_id'] ?? null,
             'status' => Quote::STATUS_DRAFT,
             'notes' => $validated['notes'] ?? null,
-            'meta' => $validated['meta'] ?? null,
+            'meta' => $meta,
         ]);
+
+        $client = Client::query()->findOrFail($cid);
+        $this->documentCurrency->applyQuoteCurrencyOnCreate($quote, $client);
 
         $this->syncQuoteLines($quote, $validated['lines'], (float) $defaultTva);
         $this->recalculateQuoteTotals($quote);
@@ -193,7 +236,11 @@ class QuoteController extends Controller
             $this->syncDevisTaches($quote, $validated['taches'] ?? []);
         }
 
-        return response()->json($this->loadQuoteForResponse($quote->fresh()), 201);
+        $fresh = $quote->fresh();
+        $this->documentActivity->quoteCreated($request->user(), $fresh);
+        $this->pdfPreGeneration->warmQuote($fresh);
+
+        return response()->json($this->loadQuoteForResponse($fresh), 201);
     }
 
     public function show(Request $request, Quote $quote): JsonResponse
@@ -213,6 +260,8 @@ class QuoteController extends Controller
         }
 
         $oldStatus = $quote->status;
+        $before = $quote->only(self::QUOTE_AUDIT_FIELDS);
+        $tasks = [];
         $statusRule = Rule::in(Quote::statuses());
 
         if ($quote->status !== Quote::STATUS_DRAFT) {
@@ -230,8 +279,12 @@ class QuoteController extends Controller
             );
             $quote->save();
             $this->recordQuoteStatusChange($quote, $oldStatus, $request);
+            $fresh = $quote->fresh();
+            $tasks[] = 'statut/notes';
+            $this->documentActivity->quoteUpdated($request->user(), $fresh, $before, $tasks);
+            $this->pdfPreGeneration->warmQuote($fresh);
 
-            return response()->json($this->loadQuoteForResponse($quote->fresh()));
+            return response()->json($this->loadQuoteForResponse($fresh));
         }
 
         $validated = $request->validate(array_merge([
@@ -256,12 +309,25 @@ class QuoteController extends Controller
             'travel_fee_ht' => 'nullable|numeric|min:0',
             'travel_fee_tva_rate' => 'nullable|numeric|min:0|max:100',
             'apply_site_travel' => 'nullable|boolean',
+            'filiale_agency_id' => 'nullable|integer|exists:agencies,id',
             'meta' => 'nullable|array',
         ], [
             'lines' => 'sometimes|array|min:0',
         ], self::QUOTE_LINE_BASE, self::TACHES_RULES));
 
-        $fill = collect($validated)->except(['lines', 'apply_site_travel', 'taches'])->toArray();
+        $fill = collect($validated)->except(['lines', 'apply_site_travel', 'taches', 'filiale_agency_id'])->toArray();
+        if (array_key_exists('filiale_agency_id', $validated)) {
+            $filialeAgencyId = ClientFilialeResolver::resolveAgencyId(
+                $request->user(),
+                (int) $quote->client_id,
+                isset($validated['site_id']) ? (int) $validated['site_id'] : ($quote->site_id ? (int) $quote->site_id : null),
+                (int) $validated['filiale_agency_id'],
+            );
+            $fill['meta'] = ClientFilialeResolver::mergeFilialeMeta(
+                is_array($fill['meta'] ?? null) ? $fill['meta'] : (is_array($quote->meta) ? $quote->meta : []),
+                $filialeAgencyId,
+            );
+        }
         if (! empty($validated['apply_site_travel']) && ($validated['site_id'] ?? $quote->site_id)) {
             $sid = $validated['site_id'] ?? $quote->site_id;
             $site = Site::find($sid);
@@ -271,15 +337,19 @@ class QuoteController extends Controller
         }
         $quote->fill($fill);
 
+        if (! $quote->dossier_id && $quote->site_id) {
+            $resolvedDossierId = Dossier::resolveUniqueIdForClientSite(
+                (int) $quote->client_id,
+                (int) $quote->site_id,
+            );
+            if ($resolvedDossierId) {
+                $quote->dossier_id = $resolvedDossierId;
+            }
+        }
+
         if (array_key_exists('site_id', $fill) || array_key_exists('client_id', $fill)) {
             $cid = (int) $quote->client_id;
-            $agencyId = null;
-            if ($quote->site_id) {
-                $agencyId = Site::query()->whereKey($quote->site_id)->value('agency_id');
-            }
-            if (! $agencyId) {
-                $agencyId = Agency::query()->where('client_id', $cid)->where('is_headquarters', true)->value('id');
-            }
+            $agencyId = self::resolveLabAgencyIdForQuote($request->user(), $quote->site_id, $cid);
             if ($agencyId) {
                 $quote->agency_id = $agencyId;
             }
@@ -295,22 +365,33 @@ class QuoteController extends Controller
             (int) $quote->client_id,
         );
 
+        $lineChanges = [];
         if (isset($validated['lines'])) {
+            $linesBefore = $this->snapshotQuoteLines($quote);
             $this->assertLinesNoDualRef($validated['lines']);
             $defaultTva = $validated['tva_rate'] ?? $quote->tva_rate;
             $quote->quoteLines()->delete();
             $this->syncQuoteLines($quote, $validated['lines'], (float) $defaultTva);
+            $tasks[] = 'lignes devis';
+            $lineChanges = ActivityChangeTracker::diffDocumentLines(
+                $linesBefore,
+                $this->snapshotQuoteLines($quote->fresh()),
+            );
         }
 
         if (array_key_exists('taches', $validated)) {
             $this->syncDevisTaches($quote, $validated['taches'] ?? []);
+            $tasks[] = 'tâches devis';
         }
 
         $quote->save();
         $this->recalculateQuoteTotals($quote);
         $this->recordQuoteStatusChange($quote->fresh(), $oldStatus, $request);
+        $fresh = $quote->fresh();
+        $this->documentActivity->quoteUpdated($request->user(), $fresh, $before, $tasks, $lineChanges);
+        $this->pdfPreGeneration->warmQuote($fresh);
 
-        return response()->json($this->loadQuoteForResponse($quote->fresh()));
+        return response()->json($this->loadQuoteForResponse($fresh));
     }
 
     public function destroy(Request $request, Quote $quote): JsonResponse
@@ -319,6 +400,7 @@ class QuoteController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
+        $this->documentActivity->quoteDeleted($request->user(), $quote);
         $quote->delete();
 
         return response()->json(null, 204);
@@ -334,31 +416,109 @@ class QuoteController extends Controller
         }
 
         $validated = $request->validate([
-            'recipient_email' => 'required|email',
-            'recipient_name'  => 'required|string|max:100',
+            'recipient_email' => 'nullable|email',
+            'recipient_name'  => 'nullable|string|max:100',
             'message'         => 'nullable|string|max:2000',
+            'pdf_template_id' => 'nullable|integer|exists:document_pdf_templates,id',
         ]);
 
+        $recipientEmail = trim((string) ($validated['recipient_email'] ?? ''));
+        $recipientName = trim((string) ($validated['recipient_name'] ?? ''));
+
+        if ($recipientEmail === '' && $quote->clientContact?->email) {
+            $recipientEmail = trim((string) $quote->clientContact->email);
+        }
+        if ($recipientName === '' && $quote->clientContact) {
+            $recipientName = trim(
+                ($quote->clientContact->prenom ?? '') . ' ' . ($quote->clientContact->nom ?? '')
+            );
+        }
+        if ($recipientEmail === '' && $quote->client?->email) {
+            $recipientEmail = trim((string) $quote->client->email);
+        }
+        if ($recipientName === '' && $quote->client?->name) {
+            $recipientName = trim((string) $quote->client->name);
+        }
+
+        if ($recipientEmail === '' || $recipientName === '') {
+            return response()->json([
+                'message' => 'Destinataire incomplet : email et nom du contact (ou du client) requis.',
+            ], 422);
+        }
+
+        $mailer = (string) config('mail.default', 'log');
+        if (in_array($mailer, ['log', 'array'], true)) {
+            return response()->json([
+                'message' => 'Envoi email impossible : le serveur SMTP n\'est pas configuré (MAIL_MAILER=smtp et identifiants SMTP dans .env.docker).',
+            ], 503);
+        }
+
+        $subject = "Devis {$quote->number} — " . \App\Support\AppDisplayName::resolve();
+
         try {
-            Mail::to($validated['recipient_email'])
+            Mail::to($recipientEmail)
                 ->send(new QuoteEmailMailable(
                     $quote,
-                    $validated['recipient_name'],
+                    $recipientName,
                     $validated['message'] ?? null,
+                    $user->name,
+                    isset($validated['pdf_template_id']) ? (int) $validated['pdf_template_id'] : null,
                 ));
 
-            // Marquer comme envoyé si le devis est encore au statut brouillon
-            if ($quote->status === Quote::STATUS_DRAFT) {
+            MailLog::create([
+                'to' => $recipientEmail,
+                'subject' => $subject,
+                'template_name' => 'quote_send',
+                'status' => 'sent',
+                'user_id' => $user->id,
+                'sent_at' => now(),
+            ]);
+
+            // Marquer comme envoyé si ce n'est pas déjà le cas
+            if ($quote->status !== Quote::STATUS_SENT) {
                 $quote->update(['status' => Quote::STATUS_SENT]);
             }
 
+            $this->documentActivity->quoteEmailed($user, $quote->fresh(), $recipientEmail);
+
             return response()->json([
-                'message' => 'Devis envoyé avec succès à ' . $validated['recipient_email'],
+                'message' => 'Devis envoyé avec succès à ' . $recipientEmail,
                 'quote'   => $this->loadQuoteForResponse($quote->fresh()),
             ]);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Erreur d\'envoi : ' . $e->getMessage()], 500);
+        } catch (\Throwable $e) {
+            MailLog::create([
+                'to' => $recipientEmail,
+                'subject' => $subject,
+                'template_name' => 'quote_send',
+                'status' => 'failed',
+                'error_message' => $e->getMessage(),
+                'user_id' => $user->id,
+                'sent_at' => now(),
+            ]);
+
+            return response()->json(['message' => 'Erreur d\'envoi : ' . $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function snapshotQuoteLines(Quote $quote): array
+    {
+        return $quote->quoteLines()
+            ->orderBy('id')
+            ->get(['description', 'quantity', 'unit_price', 'unite', 'total', 'tva_rate', 'discount_percent'])
+            ->map(fn (QuoteLine $line) => [
+                'description' => $line->description,
+                'quantity' => $line->quantity,
+                'unit_price' => $line->unit_price,
+                'unite' => $line->unite,
+                'total' => $line->total,
+                'tva_rate' => $line->tva_rate,
+                'discount_percent' => $line->discount_percent,
+            ])
+            ->values()
+            ->all();
     }
 
     private function loadQuoteForResponse(Quote $quote): Quote
@@ -398,6 +558,18 @@ class QuoteController extends Controller
             $request->user(),
             DocumentStatusHistory::SOURCE_API,
         );
+    }
+
+    private function resolveDossierIdForChantier(int $clientId, ?int $siteId, ?int $dossierId): ?int
+    {
+        if ($dossierId !== null) {
+            return $dossierId;
+        }
+        if ($siteId === null) {
+            return null;
+        }
+
+        return Dossier::resolveUniqueIdForClientSite($clientId, $siteId);
     }
 
     private function assertDossierForClient(int $clientId, ?int $dossierId, ?int $siteId): void
@@ -445,6 +617,7 @@ class QuoteController extends Controller
             $refPackageId = ! empty($line['ref_package_id']) ? (int) $line['ref_package_id'] : null;
             $description = (string) $line['description'];
             $unit = (float) $line['unit_price'];
+            $unite = isset($line['unite']) ? trim((string) $line['unite']) : '';
 
             if ($refPackageId) {
                 $p = Package::query()->find($refPackageId);
@@ -469,10 +642,17 @@ class QuoteController extends Controller
                     if ($unit <= 0) {
                         $unit = (float) $a->prix_unitaire_ht;
                     }
+                    if ($unite === '' && filled($a->unite)) {
+                        $unite = trim((string) $a->unite);
+                    }
                     if (! isset($line['tva_rate']) && $a->tva_rate !== null) {
                         $tva = (float) $a->tva_rate;
                     }
                 }
+            }
+
+            if ($unite === '') {
+                $unite = 'U';
             }
 
             $ht = CommercialDocumentTotalsService::lineHt(
@@ -492,6 +672,7 @@ class QuoteController extends Controller
                 'type_ligne' => $typeLigne,
                 'line_code' => isset($line['line_code']) ? (string) $line['line_code'] : null,
                 'description' => $description,
+                'unite' => $unite,
                 'quantity' => (int) $line['quantity'],
                 'unit_price' => $unit,
                 'tva_rate' => $tva,
@@ -503,14 +684,9 @@ class QuoteController extends Controller
 
     private function recalculateQuoteTotals(Quote $quote): void
     {
-        $quote->load('quoteLines');
-        $lines = [];
-        foreach ($quote->quoteLines as $ql) {
-            $lines[] = [
-                'ht' => (float) $ql->total,
-                'tva_rate' => (float) $ql->tva_rate,
-            ];
-        }
+        $quote->load(['quoteLines', 'client']);
+        $lines = QuotePricingService::totalsLines($quote);
+        $caAnnuelTvaRegime = $quote->client?->usesCaAnnuelTvaRegime() ?? false;
 
         $totals = CommercialDocumentTotalsService::computeTotals(
             $lines,
@@ -520,11 +696,48 @@ class QuoteController extends Controller
             (float) $quote->shipping_tva_rate,
             (float) $quote->travel_fee_ht,
             (float) $quote->travel_fee_tva_rate,
+            $caAnnuelTvaRegime,
         );
 
-        $quote->update([
-            'amount_ht' => $totals['amount_ht'],
-            'amount_ttc' => $totals['amount_ttc'],
-        ]);
+        $refreshRate = $quote->status === Quote::STATUS_DRAFT;
+        $this->documentCurrency->syncQuoteTotals(
+            $quote,
+            (float) $totals['amount_ht'],
+            (float) $totals['amount_ttc'],
+            $refreshRate,
+        );
+    }
+
+    /**
+     * Agence labo S2G portée par le devis (pas l'agence filiale du client BTP).
+     */
+    private static function resolveLabAgencyIdForQuote(User $user, ?int $siteId, int $clientId): ?int
+    {
+        if ($user->isInternal() && $user->agency_id) {
+            return (int) $user->agency_id;
+        }
+
+        if ($siteId) {
+            $site = Site::query()->find($siteId);
+            if ($site && (int) $site->client_id === $clientId && $site->agency_id) {
+                $agency = Agency::query()->find($site->agency_id);
+                if ($agency && $agency->client_id === null) {
+                    return (int) $agency->id;
+                }
+            }
+        }
+
+        if ($user->isClient() || $user->isSiteContact()) {
+            if ($siteId) {
+                $site = Site::query()->find($siteId);
+                if ($site && (int) $site->client_id === $clientId) {
+                    return $site->agency_id ? (int) $site->agency_id : null;
+                }
+            }
+
+            return Agency::query()->where('client_id', $clientId)->where('is_headquarters', true)->value('id');
+        }
+
+        return Agency::query()->whereNull('client_id')->where('is_siege', true)->value('id');
     }
 }

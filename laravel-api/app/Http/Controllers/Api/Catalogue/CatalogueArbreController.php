@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Catalogue;
 
 use App\Http\Controllers\Controller;
+use App\Models\Catalogue\Article;
 use App\Models\Catalogue\FamilleArticle;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,12 +16,23 @@ class CatalogueArbreController extends Controller
         if (! $request->boolean('with_inactif')) {
             $q->actif();
         }
+        if (Article::hasS2gCatalogue() && ! $request->boolean('with_legacy')) {
+            $q->whereHas('articles', function ($a) use ($request): void {
+                if (! $request->boolean('with_inactif')) {
+                    $a->actif();
+                }
+                $a->catalogueS2g();
+            });
+        }
 
         $familles = $q->ordonne()
             ->with([
                 'articles' => function ($a) use ($request) {
                     if (! $request->boolean('with_inactif')) {
                         $a->actif();
+                    }
+                    if (! $request->boolean('with_legacy')) {
+                        $a->forCatalogueListing();
                     }
                     $a->ordonne()
                         ->with([

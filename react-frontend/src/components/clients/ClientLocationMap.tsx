@@ -194,27 +194,47 @@ function geocodeCacheKey(c: Client): string | null {
   return null
 }
 
+/** Coordonnées GPS enregistrées sur la fiche client (prioritaires sur le géocodage). */
+function parseClientGps(c: Client): { lat: number; lng: number } | null {
+  const lat = c.lat != null ? Number(c.lat) : NaN
+  const lng = c.lng != null ? Number(c.lng) : NaN
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
+  return { lat, lng }
+}
+
 type Props = { client: Client }
 
 export default function ClientLocationMap({ client }: Props) {
   useFixLeafletIcons()
+  const storedGps = useMemo(() => parseClientGps(client), [client.lat, client.lng])
   const cacheKey = useMemo(() => geocodeCacheKey(client), [client])
 
   const { data: hit, isLoading, isError } = useQuery({
     queryKey: ['nominatim-client', client.id, cacheKey],
     queryFn: () => geocodeClientAddress(client),
-    enabled: !!cacheKey && cacheKey.length >= 2,
+    enabled: !storedGps && !!cacheKey && cacheKey.length >= 2,
     staleTime: 60 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
   })
 
-  const center: [number, number] = hit ? [hit.lat, hit.lon] : DEFAULT_CENTER
-  const zoom = hit ? 15 : DEFAULT_ZOOM
+  const markerPosition: [number, number] | null = storedGps
+    ? [storedGps.lat, storedGps.lng]
+    : hit
+      ? [hit.lat, hit.lon]
+      : null
+
+  const center: [number, number] = markerPosition ?? DEFAULT_CENTER
+  const zoom = markerPosition ? 15 : DEFAULT_ZOOM
   const lines = formatAddressLines(client)
-  const mapsQuery = buildDedupedFreeform(client) ?? cacheKey ?? ''
+  const mapsQuery = storedGps
+    ? `${storedGps.lat},${storedGps.lng}`
+    : buildDedupedFreeform(client) ?? cacheKey ?? ''
   const mapsHref = mapsQuery
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`
     : undefined
+
+  const hasLocationInput = !!storedGps || !!cacheKey
 
   return (
     <div className="card client-location-map-card">
@@ -222,34 +242,51 @@ export default function ClientLocationMap({ client }: Props) {
       {lines.length > 0 && (
         <p className="client-location-map-card__address">{lines[0]}</p>
       )}
-      {!cacheKey && (
+      {!hasLocationInput && (
         <p className="client-location-map-card__hint">
-          Renseignez l’adresse, le code postal ou la ville sur la <strong>Fiche</strong> du client pour afficher la carte.
+          Renseignez l’adresse, le code postal, la ville ou les coordonnées GPS sur la <strong>Fiche</strong> du client
+          pour afficher la carte.
         </p>
       )}
-      {cacheKey && isLoading && <p className="client-location-map-card__hint">Recherche de la position…</p>}
-      {cacheKey && !isLoading && isError && (
+      {storedGps && (
+        <p className="client-location-map-card__hint">
+          Position GPS enregistrée ({storedGps.lat.toFixed(5)}, {storedGps.lng.toFixed(5)}).
+        </p>
+      )}
+      {!storedGps && cacheKey && isLoading && (
+        <p className="client-location-map-card__hint">Recherche de la position à partir de l’adresse…</p>
+      )}
+      {!storedGps && cacheKey && !isLoading && isError && (
         <p className="client-location-map-card__hint">Impossible de géolocaliser cette adresse pour le moment.</p>
       )}
-      {cacheKey && !isLoading && !hit && !isError && (
+      {!storedGps && cacheKey && !isLoading && !hit && !isError && (
         <p className="client-location-map-card__hint">
           Adresse introuvable dans OpenStreetMap (orthographe du quartier / rue, ou données locales incomplètes). La carte
-          affiche le Maroc ; utilisez le lien ci-dessous pour une recherche dans Google Maps.
+          affiche le Maroc ; renseignez latitude / longitude sur la fiche ou utilisez le lien ci-dessous.
         </p>
       )}
       <div className="client-location-map-wrap">
         <MapContainer center={center} zoom={zoom} className="client-location-map-leaflet" scrollWheelZoom={false}>
           <MapViewSync center={center} zoom={zoom} />
           <TileLayer attribution={OSM_ATTR} url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          {hit && (
-            <Marker position={[hit.lat, hit.lon]}>
+          {markerPosition && (
+            <Marker key={`${markerPosition[0]}-${markerPosition[1]}`} position={markerPosition}>
               <Popup>
                 <strong>{client.name}</strong>
-                {hit.display_name && (
+                {storedGps ? (
                   <>
                     <br />
-                    <span style={{ fontSize: '0.85rem' }}>{hit.display_name}</span>
+                    <span style={{ fontSize: '0.85rem' }}>
+                      GPS : {storedGps.lat.toFixed(5)}, {storedGps.lng.toFixed(5)}
+                    </span>
                   </>
+                ) : (
+                  hit?.display_name && (
+                    <>
+                      <br />
+                      <span style={{ fontSize: '0.85rem' }}>{hit.display_name}</span>
+                    </>
+                  )
                 )}
               </Popup>
             </Marker>

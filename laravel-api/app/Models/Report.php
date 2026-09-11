@@ -51,7 +51,7 @@ class Report extends Model
 
     public function pdfTemplate(): BelongsTo
     {
-        return $this->belongsTo(ReportPdfTemplate::class, 'pdf_template_id');
+        return $this->belongsTo(DocumentPdfTemplate::class, 'pdf_template_id');
     }
 
     public function signedByUser(): BelongsTo

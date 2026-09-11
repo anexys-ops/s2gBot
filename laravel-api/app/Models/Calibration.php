@@ -16,6 +16,7 @@ class Calibration extends Model
 
     protected $fillable = [
         'equipment_id',
+        'maintenance_plan_id',
         'calibration_date',
         'next_due_date',
         'certificate_path',
@@ -35,6 +36,11 @@ class Calibration extends Model
     public function equipment(): BelongsTo
     {
         return $this->belongsTo(Equipment::class);
+    }
+
+    public function maintenancePlan(): BelongsTo
+    {
+        return $this->belongsTo(EquipmentMaintenancePlan::class, 'maintenance_plan_id');
     }
 
     public function attachments(): MorphMany

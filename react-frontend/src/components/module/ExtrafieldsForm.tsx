@@ -24,11 +24,13 @@ export default function ExtrafieldsForm({
   entityId,
   canEdit,
   title = 'Champs personnalisés (extrafields)',
+  className = 'card extrafields-form',
 }: {
   entityType: ExtrafieldEntityType
   entityId: number
   canEdit: boolean
   title?: string
+  className?: string
 }) {
   const queryClient = useQueryClient()
   const { data, isLoading, error } = useQuery({
@@ -79,8 +81,10 @@ export default function ExtrafieldsForm({
   if (error) return <p className="error">{(error as Error).message}</p>
   if (defsSorted.length === 0) {
     return (
-      <div className="card" style={{ marginTop: '1rem' }}>
-        <h3 style={{ marginTop: 0 }}>{title}</h3>
+      <div className={className}>
+        <h3 className="ds-form-section__title" style={{ marginTop: 0 }}>
+          {title}
+        </h3>
         <p style={{ margin: 0, color: 'var(--color-muted, #64748b)' }}>
           Aucun champ personnalisé défini pour ce module. Configurez-les dans le back office → Configuration.
         </p>
@@ -152,8 +156,10 @@ export default function ExtrafieldsForm({
   }
 
   return (
-    <div className="card extrafields-form" style={{ marginTop: '1rem' }}>
-      <h3 style={{ marginTop: 0 }}>{title}</h3>
+    <div className={className}>
+      <h3 className="ds-form-section__title" style={{ marginTop: 0 }}>
+        {title}
+      </h3>
       <div className="extrafields-form__grid">
         {defsSorted.map((def) => (
           <div key={def.id} className="form-group" style={{ marginBottom: 0 }}>

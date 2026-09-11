@@ -19,6 +19,7 @@ class BonCommandeLigne extends Model
         'libelle',
         'ordre',
         'quantite',
+        'quantite_devis',
         'prix_unitaire_ht',
         'tva_rate',
         'montant_ht',
@@ -36,6 +37,19 @@ class BonCommandeLigne extends Model
             'date_fin_prevue' => 'date',
             'date_livraison' => 'date',
         ];
+    }
+
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        $array = parent::toArray();
+        foreach (['date_debut_prevue', 'date_fin_prevue', 'date_livraison'] as $attr) {
+            if ($this->{$attr} !== null) {
+                $array[$attr] = $this->{$attr}->format('Y-m-d');
+            }
+        }
+
+        return $array;
     }
 
     public function bonCommande(): BelongsTo
@@ -56,5 +70,10 @@ class BonCommandeLigne extends Model
     public function planningAffectations(): HasMany
     {
         return $this->hasMany(BcLignePlanningAffectation::class, 'bon_commande_ligne_id');
+    }
+
+    public function samples(): HasMany
+    {
+        return $this->hasMany(Sample::class, 'bon_commande_ligne_id');
     }
 }

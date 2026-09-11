@@ -4,16 +4,27 @@ namespace App\Models\Catalogue;
 
 use App\Models\ArticleAction;
 use App\Models\ArticleEquipmentRequirement;
+use App\Models\ArticleSectionProduct;
+use App\Models\JalonProduct;
+use App\Models\QualificationTag;
+use App\Support\MoneyFormat;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Article extends Model
 {
     use SoftDeletes;
+
+    public const KIND_JALON = 'jalon';
+
+    public const KIND_PRODUCT = 'product';
+
+    public const KIND_LEGACY = 'legacy';
 
     protected $table = 'ref_articles';
 
@@ -36,6 +47,9 @@ class Article extends Model
         'duree_estimee',
         'normes',
         'actif',
+        'is_multi_site',
+        'kind',
+        'famille_label',
         // v1.2.0 — déclencheurs workflow & ressources
         'triggers_odm_terrain',
         'triggers_odm_labo',
@@ -58,6 +72,7 @@ class Article extends Model
             'tva_rate'                 => 'decimal:2',
             'duree_estimee'            => 'integer',
             'actif'                    => 'boolean',
+            'is_multi_site'            => 'boolean',
             'tags'                     => 'array',
             // v1.2.0 — déclencheurs & ressources
             'triggers_odm_terrain'     => 'boolean',
@@ -72,7 +87,7 @@ class Article extends Model
     protected function prixUnitaireHtFormate(): Attribute
     {
         return Attribute::get(function (): string {
-            return number_format((float) $this->prix_unitaire_ht, 2, ',', ' ').' € HT';
+            return MoneyFormat::formatHt($this->prix_unitaire_ht);
         });
     }
 
@@ -123,9 +138,39 @@ class Article extends Model
         return $this->hasMany(ArticleEquipmentRequirement::class, 'ref_article_id');
     }
 
+    public function sectionProducts(): HasMany
+    {
+        return $this->hasMany(ArticleSectionProduct::class, 'ref_article_id')->orderBy('ordre');
+    }
+
     public function scopeOrdonne(Builder $query): Builder
     {
         return $query->orderBy('code');
+    }
+
+    /** Articles du nouveau catalogue S2G (hors legacy PROLAB / géo). */
+    public function scopeCatalogueS2g(Builder $query): Builder
+    {
+        return $query->whereIn('kind', [self::KIND_JALON, self::KIND_PRODUCT]);
+    }
+
+    /** True une fois le jeu S2G importé (au moins un jalon ou produit). */
+    public static function hasS2gCatalogue(): bool
+    {
+        return static::query()->catalogueS2g()->exists();
+    }
+
+    /**
+     * Filtre liste catalogue : S2G uniquement si importé, sinon legacy visible
+     * (évite une liste vide avant `catalogue:import-s2g`).
+     */
+    public function scopeForCatalogueListing(Builder $query, bool $withLegacy = false): Builder
+    {
+        if ($withLegacy || ! static::hasS2gCatalogue()) {
+            return $query;
+        }
+
+        return $query->catalogueS2g();
     }
 
     // ── Compositions (v1.2.0) ────────────────────────────────────────────────
@@ -138,5 +183,56 @@ class Article extends Model
     public function composedIn(): HasMany
     {
         return $this->hasMany(ArticleComposition::class, 'child_article_id');
+    }
+
+    public function qualificationTags(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            QualificationTag::class,
+            'qualification_tag_jalon',
+            'jalon_article_id',
+            'qualification_tag_id'
+        );
+    }
+
+    public function jalonProductLinks(): HasMany
+    {
+        return $this->hasMany(JalonProduct::class, 'jalon_article_id')->orderBy('ordre');
+    }
+
+    public function jalonProducts(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            self::class,
+            'jalon_products',
+            'jalon_article_id',
+            'product_article_id'
+        )->withPivot(['ordre', 'tache_code', 'tache_label'])->orderByPivot('ordre');
+    }
+
+    public function productJalonLinks(): HasMany
+    {
+        return $this->hasMany(JalonProduct::class, 'product_article_id')->orderBy('ordre');
+    }
+
+    /** Agences labo autorisées (si is_multi_site = false). */
+    public function visibleLabAgencies(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            \App\Models\Agency::class,
+            'article_lab_agency',
+            'article_id',
+            'agency_id'
+        )->withTimestamps();
+    }
+
+    public function isJalon(): bool
+    {
+        return $this->kind === self::KIND_JALON;
+    }
+
+    public function isProduct(): bool
+    {
+        return $this->kind === self::KIND_PRODUCT;
     }
 }

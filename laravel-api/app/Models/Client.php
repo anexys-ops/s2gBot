@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
@@ -33,12 +34,14 @@ class Client extends Model
         'address',
         'city',
         'country',
+        'currency_code',
         'postal_code',
         'email',
         'phone',
         'whatsapp',
         'siret',
         'ice',
+        'ca_annuel_tva_regime',
         'rc',
         'patente',
         'if_number',
@@ -46,6 +49,7 @@ class Client extends Model
         'cnss_employer',
         'capital_social',
         'meta',
+        'portal_modules',
         // Référents S2G
         'commercial_id',
         'responsable_technique_id',
@@ -59,11 +63,18 @@ class Client extends Model
     protected function casts(): array
     {
         return [
-            'meta'           => 'array',
+            'meta'            => 'array',
+            'portal_modules'  => 'array',
             'capital_social' => 'decimal:2',
+            'ca_annuel_tva_regime' => 'boolean',
             'lat'            => 'float',
             'lng'            => 'float',
         ];
+    }
+
+    public function usesCaAnnuelTvaRegime(): bool
+    {
+        return (bool) $this->ca_annuel_tva_regime;
     }
 
     // ----------------------------------------------------------------
@@ -112,6 +123,12 @@ class Client extends Model
     public function agencies(): HasMany
     {
         return $this->hasMany(Agency::class);
+    }
+
+    /** Agences labo S2G autorisées à voir ce client (vide = toutes). */
+    public function visibleLabAgencies(): BelongsToMany
+    {
+        return $this->belongsToMany(Agency::class, 'client_lab_agency')->withTimestamps();
     }
 
     public function headquartersAgency(): ?Agency

@@ -16,6 +16,10 @@
     </style>
 </head>
 <body>
+@php extract(\App\Support\AppBranding::commercialLayoutViewVars($layoutConfig ?? [])); @endphp
+@php
+    $currencyLabel = $currencyLabel ?? 'DH';
+@endphp
     <div class="header">
         @include('pdf.partials.branding-header', ['layoutConfig' => $layoutConfig ?? [], 'brandingLogoDataUri' => $brandingLogoDataUri ?? null])
         <h1>Facture n° {{ $invoice->number }}</h1>
@@ -30,7 +34,9 @@
         <p class="meta">Échéance : {{ $invoice->due_date->format('d/m/Y') }}</p>
         @endif
         <p class="meta">Statut : {{ $invoice->status }}</p>
+        @if($showClientName)
         <p class="meta">Client : {{ $invoice->client->name }}</p>
+        @endif
         @if($invoice->billingAddress ?? null)
         <p class="meta">Facturation : {{ $invoice->billingAddress->labelFormatted() }}</p>
         @elseif($invoice->client->address)<p class="meta">{{ $invoice->client->address }}</p>@endif
@@ -43,24 +49,43 @@
     <table>
         <thead>
             <tr>
+                @if($showDesignation || $showArticleCode)
                 <th>Désignation</th>
+                @endif
+                @if($showQuantity)
                 <th>Qté</th>
+                @endif
+                @if($showPuPtCols)
                 <th>Prix unitaire HT</th>
                 <th class="text-right">Total HT</th>
+                @endif
             </tr>
         </thead>
         <tbody>
             @foreach($invoice->invoiceLines as $line)
+            @php
+                $lineParts = [];
+                if ($showArticleCode && !empty($line->line_code)) { $lineParts[] = $line->line_code; }
+                if ($showDesignation && !empty($line->description)) { $lineParts[] = $line->description; }
+                $lineLabel = $lineParts !== [] ? implode(' — ', $lineParts) : '—';
+            @endphp
             <tr>
-                <td>{{ $line->description }}</td>
+                @if($showDesignation || $showArticleCode)
+                <td>{{ $lineLabel }}</td>
+                @endif
+                @if($showQuantity)
                 <td>{{ $line->quantity }}</td>
+                @endif
+                @if($showPuPtCols)
                 <td>{{ number_format($line->unit_price, 2, ',', ' ') }} {{ $currencyLabel }}</td>
                 <td class="text-right">{{ number_format($line->total, 2, ',', ' ') }} {{ $currencyLabel }}</td>
+                @endif
             </tr>
             @endforeach
         </tbody>
     </table>
 
+    @if($showTotalHt || $showTotalTva || $showTotalTtc)
     <div class="totals">
         @if((float)($invoice->discount_percent ?? 0) > 0 || (float)($invoice->discount_amount ?? 0) > 0)
         <p>Remise : {{ number_format((float)($invoice->discount_percent ?? 0), 2, ',', ' ') }} % @if((float)($invoice->discount_amount ?? 0) > 0) — {{ number_format($invoice->discount_amount, 2, ',', ' ') }} {{ $currencyLabel }} HT @endif</p>
@@ -68,10 +93,17 @@
         @if((float)($invoice->shipping_amount_ht ?? 0) > 0)
         <p>Port / livraison HT : {{ number_format($invoice->shipping_amount_ht, 2, ',', ' ') }} {{ $currencyLabel }}</p>
         @endif
+        @if($showTotalHt)
         <p>Total HT : {{ number_format($invoice->amount_ht, 2, ',', ' ') }} {{ $currencyLabel }}</p>
+        @endif
+        @if($showTotalTva)
         <p>TVA (global {{ $invoice->tva_rate }} %) : {{ number_format($invoice->amount_ttc - $invoice->amount_ht, 2, ',', ' ') }} {{ $currencyLabel }}</p>
+        @endif
+        @if($showTotalTtc)
         <p><strong>Total TTC : {{ number_format($invoice->amount_ttc, 2, ',', ' ') }} {{ $currencyLabel }}</strong></p>
+        @endif
     </div>
+    @endif
 
     <p style="margin-top: 30px; font-size: 10px; color: #666;">Document généré par la plateforme Lab BTP.</p>
 </body>

@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\Site;
 use App\Services\DocumentSequenceService;
+use App\Support\ClientFilialeResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -69,7 +71,12 @@ class Dossier extends Model
 
     public function newReference(): string
     {
-        return app(DocumentSequenceService::class)->next(DocumentSequence::TYPE_DOSSIER);
+        $site = $this->site_id ? Site::query()->find($this->site_id) : null;
+
+        return app(DocumentSequenceService::class)->next(
+            DocumentSequence::TYPE_DOSSIER,
+            ClientFilialeResolver::codeForSite($site),
+        );
     }
 
     public function client(): BelongsTo
@@ -125,5 +132,18 @@ class Dossier extends Model
     public function scopeOrdonne(Builder $query): Builder
     {
         return $query->orderByDesc('date_debut')->orderBy('reference');
+    }
+
+    /**
+     * When a single dossier exists for this client + chantier, return its id (auto-link devis).
+     */
+    public static function resolveUniqueIdForClientSite(int $clientId, int $siteId): ?int
+    {
+        $ids = static::query()
+            ->where('client_id', $clientId)
+            ->where('site_id', $siteId)
+            ->pluck('id');
+
+        return $ids->count() === 1 ? (int) $ids->first() : null;
     }
 }

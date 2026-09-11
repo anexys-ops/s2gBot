@@ -1,8 +1,8 @@
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
 import DossiersListPage from './pages/dossiers/DossiersListPage'
 import DossierFichePage from './pages/dossiers/DossierFichePage'
 import DossierInfosTab from './pages/dossiers/tabs/DossierInfosTab'
-import DossierPlaceholderTab from './pages/dossiers/tabs/DossierPlaceholderTab'
+import DossierEssaisTab from './pages/dossiers/tabs/DossierEssaisTab'
 import DossierBcBlTab from './pages/dossiers/tabs/DossierBcBlTab'
 import DossierDevisTab from './pages/dossiers/tabs/DossierDevisTab'
 import DossierDocumentsTab from './pages/dossiers/tabs/DossierDocumentsTab'
@@ -13,12 +13,14 @@ import DossierNewPage from './pages/dossiers/DossierNewPage'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Orders from './pages/Orders'
 import OrderDetail from './pages/OrderDetail'
 import OrderNew from './pages/OrderNew'
 import Invoices from './pages/Invoices'
+import InvoiceEditorPage from './pages/invoices/InvoiceEditorPage'
 import Clients from './pages/Clients'
 import Sites from './pages/Sites'
 import Devis from './pages/Devis'
@@ -38,7 +40,7 @@ import CrmHub from './pages/hub/CrmHub'
 import CrmDocuments from './pages/CrmDocuments'
 import TerrainHub from './pages/hub/TerrainHub'
 import LaboHub from './pages/hub/LaboHub'
-import TerrainMesuresPage from './pages/TerrainMesuresPage'
+import TerrainMesuresPage from './pages/terrain/TerrainMesuresPage'
 import TerrainChantiersCartePage from './pages/TerrainChantiersCartePage'
 import LaboEssaisPage from './pages/LaboEssaisPage'
 import LaboTasksPage from './pages/labo/LaboTasksPage'
@@ -54,18 +56,19 @@ import ClientCommerceTab from './pages/clients/ClientCommerceTab'
 import ClientDocumentsTab from './pages/clients/ClientDocumentsTab'
 import ClientContactsPage from './pages/clients/ClientContactsPage'
 import ClientExtrafieldsTab from './pages/clients/ClientExtrafieldsTab'
+import ClientAgenciesRoute from './pages/clients/ClientAgenciesRoute'
 import ClientsMapPage from './pages/clients/ClientsMapPage'
 import SiteLayout from './pages/sites/SiteLayout'
 import SiteFicheTab from './pages/sites/SiteFicheTab'
 import SiteMissionsTab from './pages/sites/SiteMissionsTab'
 import SiteMapTab from './pages/sites/SiteMapTab'
-import ReportPdfTemplates from './pages/ReportPdfTemplates'
 import DocumentPdfTemplates from './pages/DocumentPdfTemplates'
+import DocumentPdfTemplateDetail from './pages/DocumentPdfTemplateDetail'
 import ModuleConfigurationPage from './pages/back-office/ModuleConfigurationPage'
 import ReportComptaPage from './pages/reports/ReportComptaPage'
 import ReportVentesPage from './pages/reports/ReportVentesPage'
 import ReportDelaiTraitementPage from './pages/reports/ReportDelaiTraitementPage'
-import ReportDelaiChantierPage from './pages/reports/ReportDelaiChantierPage'
+import ReportKpiPage from './pages/reports/ReportKpiPage'
 import QuoteEditorPage from './pages/QuoteEditorPage'
 import CommercialCatalogPage from './pages/CommercialCatalogPage'
 import SettingsLayout from './pages/settings/SettingsLayout'
@@ -74,6 +77,7 @@ import SettingsSecurityPage from './pages/settings/SettingsSecurityPage'
 import SettingsUsersPage from './pages/settings/SettingsUsersPage'
 import SettingsGroupsPage from './pages/settings/SettingsGroupsPage'
 import SettingsBrandingPage from './pages/settings/SettingsBrandingPage'
+import SettingsLogsPage from './pages/settings/SettingsLogsPage'
 import BonsCommandeListPage from './pages/commercial/BonsCommandeListPage'
 import BonCommandeFichePage from './pages/commercial/BonCommandeFichePage'
 import BonsLivraisonListPage from './pages/commercial/BonsLivraisonListPage'
@@ -82,7 +86,6 @@ import ComptaFondationPage from './pages/commercial/ComptaFondationPage'
 import OrdresMissionPage from './pages/commercial/OrdresMissionPage'
 import OrdreMissionFichePage from './pages/commercial/OrdreMissionFichePage'
 import OrdreMissionPlanningPage from './pages/commercial/OrdreMissionPlanningPage'
-import MaterielHub from './pages/hub/MaterielHub'
 import MaterielModuleLayout from './pages/materiel/MaterielModuleLayout'
 import MaterielPlanningPage from './pages/materiel/MaterielPlanningPage'
 import MaterielStocksPage from './pages/materiel/MaterielStocksPage'
@@ -92,15 +95,20 @@ import {
 } from './pages/back-office/BackOfficeMaterielRedirects'
 import PlanningTechniciensPage from './pages/terrain/PlanningTechniciensPage'
 import AgencesPage from './pages/config/AgencesPage'
-import OdmIngenieurPage from './pages/ingenierie/OdmIngenieurPage'
-import TachesIngenieurPage from './pages/ingenierie/TachesIngenieurPage'
 import PlanningIngenieurPage from './pages/ingenierie/PlanningIngenieurPage'
-import LaboOdmPage from './pages/labo/LaboOdmPage'
 import LaboReceptionPage from './pages/labo/LaboReceptionPage'
 import PlanningLaboPage from './pages/labo/PlanningLaboPage'
 import TranscoFoldPage from './pages/labo/TranscoFoldPage'
 import LabReportsListPage from './pages/labo/LabReportsListPage'
 import LabReportViewPage from './pages/labo/LabReportViewPage'
+import NotFoundPage from './pages/NotFoundPage'
+import PortalLayout from './components/PortalLayout'
+import PortalHomePage from './pages/portal/PortalHomePage'
+import PortalInterventionsPage from './pages/portal/PortalInterventionsPage'
+import PortalRapportsPage from './pages/portal/PortalRapportsPage'
+import PortalRapportViewPage from './pages/portal/PortalRapportViewPage'
+import { hasPortalModule, isPortalUser, type PortalModuleKey } from './lib/portalAccess'
+import { canAccessStaffPath, staffHomePath } from './lib/staffAccess'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -109,16 +117,116 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function StaffRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <div className="container">Chargement...</div>
+  if (isPortalUser(user)) return <Navigate to="/portal" replace />
+  return <>{children}</>
+}
+
+function PortalRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <div className="container">Chargement...</div>
+  if (!isPortalUser(user)) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
+function PortalModuleRoute({ module, children }: { module: PortalModuleKey; children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <div className="container">Chargement...</div>
+  if (!hasPortalModule(user, module)) return <Navigate to="/portal" replace />
+  return <>{children}</>
+}
+
+function StaffPathGuard({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  const location = useLocation()
+  if (loading) return <div className="container">Chargement...</div>
+  if (!canAccessStaffPath(user, location.pathname)) {
+    return <Navigate to={staffHomePath(user)} replace />
+  }
+  return <>{children}</>
+}
+
+/** Ancienne URL /devis/:id → éditeur */
+function QuoteIdRedirect() {
+  const { quoteId } = useParams<{ quoteId: string }>()
+  if (!quoteId || quoteId === 'nouveau') return <Navigate to="/devis/nouveau" replace />
+  return <Navigate to={`/devis/${quoteId}/editer`} replace />
+}
+
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/login/reinitialiser" element={<ResetPasswordPage />} />
       <Route path="/register" element={<Register />} />
+      <Route
+        path="/portal"
+        element={
+          <PrivateRoute>
+            <PortalRoute>
+              <PortalLayout />
+            </PortalRoute>
+          </PrivateRoute>
+        }
+      >
+        <Route index element={<PortalHomePage />} />
+        <Route
+          path="dossiers"
+          element={
+            <PortalModuleRoute module="dossiers">
+              <DossiersListPage mode="portal" />
+            </PortalModuleRoute>
+          }
+        />
+        <Route
+          path="dossiers/:id"
+          element={
+            <PortalModuleRoute module="dossiers">
+              <DossierFichePage />
+            </PortalModuleRoute>
+          }
+        >
+          <Route index element={<Navigate to="infos" replace />} />
+          <Route path="infos" element={<DossierInfosTab />} />
+          <Route path="documents" element={<DossierDocumentsTab />} />
+        </Route>
+        <Route
+          path="interventions"
+          element={
+            <PortalModuleRoute module="interventions">
+              <PortalInterventionsPage />
+            </PortalModuleRoute>
+          }
+        />
+        <Route
+          path="rapports"
+          element={
+            <PortalModuleRoute module="rapports">
+              <PortalRapportsPage />
+            </PortalModuleRoute>
+          }
+        />
+        <Route
+          path="rapports/:reportId"
+          element={
+            <PortalModuleRoute module="rapports">
+              <PortalRapportViewPage />
+            </PortalModuleRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/portal" replace />} />
+      </Route>
       <Route
         path="/"
         element={
           <PrivateRoute>
-            <Layout />
+            <StaffRoute>
+              <StaffPathGuard>
+                <Layout />
+              </StaffPathGuard>
+            </StaffRoute>
           </PrivateRoute>
         }
       >
@@ -128,7 +236,9 @@ function AppRoutes() {
           <Route path="compta" element={<ReportComptaPage />} />
           <Route path="ventes" element={<ReportVentesPage />} />
           <Route path="delai-traitement" element={<ReportDelaiTraitementPage />} />
-          <Route path="delai-chantier" element={<ReportDelaiChantierPage />} />
+          <Route path="kpi" element={<ReportKpiPage />} />
+          <Route path="delai-chantier" element={<Navigate to="/rapports/kpi" replace />} />
+          <Route path="delais" element={<Navigate to="/rapports/kpi" replace />} />
         </Route>
         <Route path="crm" element={<CrmHub />} />
         <Route path="crm/documents" element={<CrmDocuments />} />
@@ -144,25 +254,24 @@ function AppRoutes() {
         <Route path="catalogue/services" element={<CommercialCatalogPage />} />
         <Route path="catalogue/articles/:id" element={<ArticleFichePage />} />
         <Route path="dossiers/new" element={<DossierNewPage />} />
+        <Route path="dossiers/:id/editer" element={<DossierNewPage />} />
         <Route path="dossiers" element={<DossiersListPage />} />
         <Route path="dossiers/:id" element={<DossierFichePage />}>
           <Route index element={<Navigate to="infos" replace />} />
           <Route path="infos" element={<DossierInfosTab />} />
           <Route path="devis" element={<DossierDevisTab />} />
           <Route path="bc-bl" element={<DossierBcBlTab />} />
-          <Route
-            path="essais"
-            element={<DossierPlaceholderTab label="Essais" description="Lien vers commandes d’essai et résultats." />}
-          />
+          <Route path="essais" element={<DossierEssaisTab />} />
           <Route path="documents" element={<DossierDocumentsTab />} />
           <Route path="extrafields" element={<DossierExtrafieldsTab />} />
         </Route>
         <Route path="terrain" element={<TerrainHub />} />
+        <Route path="terrain/carte" element={<Navigate to="/terrain/chantiers" replace />} />
         <Route path="terrain/mesures" element={<TerrainMesuresPage />} />
         <Route path="terrain/chantiers" element={<TerrainChantiersCartePage />} />
         <Route path="terrain/planning" element={<PlanningTechniciensPage />} />
         <Route path="materiel" element={<MaterielModuleLayout />}>
-          <Route index element={<MaterielHub />} />
+          <Route index element={<Navigate to="equipements" replace />} />
           <Route path="equipements" element={<EquipmentsPage />} />
           <Route path="equipements/:id" element={<EquipmentDetailPage />} />
           <Route path="planning" element={<MaterielPlanningPage />} />
@@ -175,11 +284,11 @@ function AppRoutes() {
         <Route path="labo/rapports" element={<LabReportsListPage />} />
         <Route path="labo/rapports/:reportId" element={<LabReportViewPage />} />
         <Route path="labo/reception" element={<LaboReceptionPage />} />
-        <Route path="labo/odm" element={<LaboOdmPage />} />
+        <Route path="labo/odm" element={<Navigate to="/ordres-mission?context=labo&type=labo" replace />} />
         <Route path="labo/planning" element={<PlanningLaboPage />} />
         <Route path="labo/transco" element={<TranscoFoldPage />} />
-        <Route path="ingenierie/odm" element={<OdmIngenieurPage />} />
-        <Route path="ingenierie/taches" element={<TachesIngenieurPage />} />
+        <Route path="ingenierie/odm" element={<Navigate to="/ordres-mission?context=ingenierie&type=ingenieur" replace />} />
+        <Route path="ingenierie/taches" element={<TerrainTasksPage entryContext="ingenieur" />} />
         <Route path="ingenierie/planning" element={<PlanningIngenieurPage />} />
         <Route path="terrain/taches" element={<TerrainTasksPage />} />
         <Route path="notes-de-frais" element={<ExpenseReportsPage />} />
@@ -191,10 +300,15 @@ function AppRoutes() {
         <Route path="orders/:id" element={<OrderDetail />} />
         <Route path="catalog" element={<Navigate to="/catalogue" replace />} />
         <Route path="graphiques-essais" element={<GraphiquesEssais />} />
+        <Route path="factures" element={<Invoices />} />
         <Route path="invoices" element={<Invoices />} />
+        <Route path="factures/:invoiceId/editer" element={<InvoiceEditorPage />} />
+        <Route path="invoices/:invoiceId/editer" element={<InvoiceEditorPage />} />
         <Route path="devis/nouveau" element={<QuoteEditorPage />} />
         <Route path="devis/:quoteId/editer" element={<QuoteEditorPage />} />
+        <Route path="devis/:quoteId" element={<QuoteIdRedirect />} />
         <Route path="devis" element={<Devis />} />
+        <Route path="back-office/utilisateurs" element={<Navigate to="/settings/utilisateurs" replace />} />
         <Route path="back-office" element={<Outlet />}>
           <Route path="equipements" element={<BackOfficeEquipementsListRedirect />} />
           <Route path="equipements/:id" element={<BackOfficeEquipementDetailRedirect />} />
@@ -210,8 +324,9 @@ function AppRoutes() {
             <Route path="journal-audit" element={<ActivityLogPage />} />
             <Route path="non-conformites" element={<NonConformitiesPage />} />
             <Route path="non-conformites/:id" element={<NonConformityDetailPage />} />
-            <Route path="modeles-rapports-pdf" element={<ReportPdfTemplates />} />
+            <Route path="modeles-rapports-pdf" element={<Navigate to="/back-office/modeles-documents-pdf" replace />} />
             <Route path="modeles-documents-pdf" element={<DocumentPdfTemplates />} />
+            <Route path="modeles-documents-pdf/:id" element={<DocumentPdfTemplateDetail />} />
             <Route path="configuration" element={<ModuleConfigurationPage />} />
             <Route path="pdf" element={<PdfModule />} />
             <Route path="mails" element={<Mails />} />
@@ -225,6 +340,7 @@ function AppRoutes() {
           <Route path="fiche" element={<ClientFicheTab />} />
           <Route path="commerce" element={<ClientCommerceTab />} />
           <Route path="documents" element={<ClientDocumentsTab />} />
+          <Route path="agences" element={<ClientAgenciesRoute />} />
           <Route path="extrafields" element={<ClientExtrafieldsTab />} />
         </Route>
         <Route path="clients/:clientId/commercial" element={<LegacyClientCommercialRedirect />} />
@@ -238,14 +354,15 @@ function AppRoutes() {
         <Route path="settings" element={<SettingsLayout />}>
           <Route index element={<Navigate to="compte" replace />} />
           <Route path="compte" element={<SettingsAccountPage />} />
+          <Route path="journaux" element={<SettingsLogsPage />} />
           <Route path="securite" element={<SettingsSecurityPage />} />
           <Route path="utilisateurs" element={<SettingsUsersPage />} />
           <Route path="groupes" element={<SettingsGroupsPage />} />
           <Route path="charte" element={<SettingsBrandingPage />} />
         </Route>
         <Route path="config/agences" element={<AgencesPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

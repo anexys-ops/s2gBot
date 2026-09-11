@@ -41,6 +41,10 @@ class User extends Authenticatable
         'name',
         'email',
         'phone',
+        'poste',
+        'expense_taux_km',
+        'expense_plafond_repas',
+        'expense_forfait_repas',
         'password',
         'role',
         'client_id',
@@ -56,8 +60,11 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'email_verified_at'     => 'datetime',
+            'password'              => 'hashed',
+            'expense_taux_km'       => 'float',
+            'expense_plafond_repas' => 'float',
+            'expense_forfait_repas' => 'float',
         ];
     }
 
@@ -100,24 +107,7 @@ class User extends Authenticatable
             return true;
         }
 
-        $groups = $this->relationLoaded('accessGroups')
-            ? $this->accessGroups
-            : $this->accessGroups()->get();
-
-        foreach ($groups as $group) {
-            $perms = $group->permissions ?? [];
-            if (! is_array($perms)) {
-                continue;
-            }
-            if (in_array(PermissionCatalog::ALL_MARKER, $perms, true)) {
-                return true;
-            }
-            if (in_array($permission, $perms, true)) {
-                return true;
-            }
-        }
-
-        return false;
+        return in_array($permission, $this->effectivePermissionKeys(), true);
     }
 
     /**
@@ -132,7 +122,7 @@ class User extends Authenticatable
         }
 
         $this->loadMissing('accessGroups');
-        $out = [];
+        $raw = [];
         foreach ($this->accessGroups as $group) {
             $perms = $group->permissions ?? [];
             if (! is_array($perms)) {
@@ -143,12 +133,12 @@ class User extends Authenticatable
             }
             foreach ($perms as $p) {
                 if (is_string($p)) {
-                    $out[$p] = true;
+                    $raw[] = $p;
                 }
             }
         }
 
-        return array_keys($out);
+        return PermissionCatalog::expandEffective($raw);
     }
 
     public function isLabAdmin(): bool
@@ -164,6 +154,11 @@ class User extends Authenticatable
     public function isLab(): bool
     {
         return in_array($this->role, [self::ROLE_LAB_ADMIN, self::ROLE_LAB_TECHNICIAN], true);
+    }
+
+    public function posteLabel(): string
+    {
+        return \App\Support\UserPresentation::posteLabel($this->poste, $this->role);
     }
 
     public function isClient(): bool

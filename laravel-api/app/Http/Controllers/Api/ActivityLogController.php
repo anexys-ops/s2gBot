@@ -135,6 +135,7 @@ class ActivityLogController extends Controller
                 'subject_id' => $row->subject_id !== null ? (int) $row->subject_id : null,
                 'properties' => $props,
                 'ip_address' => $row->ip_address,
+                'user_agent' => $row->user_agent ?? null,
                 'created_at' => $row->created_at,
             ];
         })->values();

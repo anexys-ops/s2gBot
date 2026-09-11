@@ -7,6 +7,7 @@ import {
   filterDevisParcoursRemoveJalon,
 } from '../../lib/devisParcours'
 import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import { resolveUniqueDossierForChantier } from '../../lib/resolveDossierForChantier'
 import { lineHt, type DocumentTotalsResult } from '../../lib/quoteTotals'
 
 export type QuoteLineDraft = {
@@ -16,12 +17,16 @@ export type QuoteLineDraft = {
   ref_article_id?: number | null
   ref_package_id?: number | null
   description: string
+  /** Unité de quantité (code catalogue devis) */
+  unite?: string
   quantity: number
   unit_price: number
   tva_rate: number
   discount_percent: number
   /** Produit lié à un forfait / package catalogue (sélection ultérieure côté API) */
   part_of_package?: boolean
+  /** Ligne produit rattachée à un jalon S2G (id meta devis_jalons). */
+  parent_jalon_id?: string | null
 }
 
 export type ContextMode = 'client' | 'chantier' | 'dossier'
@@ -30,6 +35,7 @@ export type QuoteFormState = {
   contextMode: ContextMode
   client_id: number
   contact_id?: number | null
+  filiale_agency_id?: number
   site_id?: number
   dossier_id?: number
   quote_date: string
@@ -98,7 +104,7 @@ export default function QuoteFormFields({
   sitesForClient,
   dossiers,
   addresses,
-  quoteTemplates,
+  quoteTemplates: _quoteTemplates,
   addLine,
   updateLine,
   removeLine,
@@ -164,7 +170,7 @@ export default function QuoteFormFields({
       contextMode: 'chantier',
       site_id: s.id,
       client_id: s.client_id,
-      dossier_id: undefined,
+      dossier_id: resolveUniqueDossierForChantier(dossiers, s.client_id, s.id),
       contact_id: undefined,
     }))
   }
@@ -407,7 +413,17 @@ export default function QuoteFormFields({
               Chantier
               <select
                 value={form.site_id ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, site_id: e.target.value ? Number(e.target.value) : undefined }))}
+                onChange={(e) => {
+                  const siteId = e.target.value ? Number(e.target.value) : undefined
+                  setForm((f) => ({
+                    ...f,
+                    site_id: siteId,
+                    dossier_id:
+                      siteId && f.client_id
+                        ? resolveUniqueDossierForChantier(dossiers, f.client_id, siteId)
+                        : undefined,
+                  }))
+                }}
               >
                 <option value="">—</option>
                 {sitesForClient.map((s) => (
@@ -486,26 +502,6 @@ export default function QuoteFormFields({
                 </button>
               )}
             </div>
-          </label>
-          <label>
-            Modèle PDF
-            <select
-              value={form.pdf_template_id ?? ''}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  pdf_template_id: e.target.value ? Number(e.target.value) : undefined,
-                }))
-              }
-            >
-              <option value="">Défaut</option>
-              {quoteTemplates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                  {t.is_default ? ' (défaut)' : ''}
-                </option>
-              ))}
-            </select>
           </label>
         </div>
       </div>
@@ -682,9 +678,17 @@ export default function QuoteFormFields({
                         <input
                           type="number"
                           min={1}
+                          step={1}
                           className="quote-lines-table__num"
                           value={line.quantity}
-                          onChange={(e) => updateLine(index, 'quantity', Number(e.target.value))}
+                          onChange={(e) => {
+                            const raw = e.target.value
+                            if (raw === '') {
+                              updateLine(index, 'quantity', 0)
+                              return
+                            }
+                            updateLine(index, 'quantity', Math.max(0, Math.round(Number(raw))))
+                          }}
                         />
                       </td>
                       <td>
@@ -713,10 +717,21 @@ export default function QuoteFormFields({
                           type="number"
                           min={0}
                           max={100}
-                          step={0.01}
+                          step={1}
                           className="quote-lines-table__num"
                           value={line.tva_rate ?? form.tva_rate ?? 20}
-                          onChange={(e) => updateLine(index, 'tva_rate', Number(e.target.value))}
+                          onChange={(e) => {
+                            const raw = e.target.value
+                            if (raw === '') {
+                              updateLine(index, 'tva_rate', 0)
+                              return
+                            }
+                            updateLine(
+                              index,
+                              'tva_rate',
+                              Math.min(100, Math.max(0, Math.round(Number(raw)))),
+                            )
+                          }}
                         />
                       </td>
                       <td className="quote-lines-table__total">
@@ -1146,8 +1161,14 @@ export default function QuoteFormFields({
               <strong>Total HT (aperçu) :</strong> {formatMoney(totals.amount_ht)}
             </li>
             <li>
-              <strong>Total TVA (aperçu) :</strong> {formatMoney(totals.amount_tva)}
+              <strong>{totals.ca_annuel_tva_regime ? 'TVA État (75 %)' : 'Total TVA (aperçu)'} :</strong>{' '}
+              {formatMoney(totals.amount_tva)}
             </li>
+            {totals.ca_annuel_tva_regime && totals.tva_recuperable != null ? (
+              <li>
+                <strong>TVA récupérable (25 %) :</strong> {formatMoney(totals.tva_recuperable)}
+              </li>
+            ) : null}
             <li>
               <strong>Total TTC (aperçu) :</strong> {formatMoney(totals.amount_ttc)}
             </li>

@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AccessGroupController;
 use App\Http\Controllers\Api\ActionMeasureConfigController;
 use App\Http\Controllers\Api\ExpenseReportController;
 use App\Http\Controllers\Api\ArticleActionController;
+use App\Http\Controllers\Api\ArticleSectionProductController;
 use App\Http\Controllers\Api\MissionTaskController;
 use App\Http\Controllers\Api\OrdreMissionController;
 use App\Http\Controllers\Api\PlanningController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\Api\Catalogue\ArticleController;
 use App\Http\Controllers\Api\Catalogue\CatalogueArbreController;
 use App\Http\Controllers\Api\Catalogue\FamilleArticleController;
 use App\Http\Controllers\Api\Catalogue\PackageController;
+use App\Http\Controllers\Api\Catalogue\QualificationTagController;
 use App\Http\Controllers\Api\Catalogue\TacheController;
 use App\Http\Controllers\Api\ClientAddressController;
 use App\Http\Controllers\Api\ClientCommercialController;
@@ -31,10 +33,14 @@ use App\Http\Controllers\Api\CommercialDocumentLinkController;
 use App\Http\Controllers\Api\CommercialOfferingController;
 use App\Http\Controllers\Api\CorrectiveActionController;
 use App\Http\Controllers\Api\DocumentPdfTemplateController;
+use App\Http\Controllers\Api\DocumentStatusDefinitionController;
 use App\Http\Controllers\Api\DocumentStatusHistoryController;
 use App\Http\Controllers\Api\DossierController;
 use App\Http\Controllers\Api\EquipmentController;
+use App\Http\Controllers\Api\EquipmentMaintenancePlanController;
+use App\Http\Controllers\Api\MaterielAffectationController;
 use App\Http\Controllers\Api\ExamplePdfController;
+use App\Http\Controllers\Api\FxRateController;
 use App\Http\Controllers\Api\ExtrafieldDefinitionController;
 use App\Http\Controllers\Api\ExtrafieldValueController;
 use App\Http\Controllers\Api\InvoiceController;
@@ -53,9 +59,11 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReportFormDefinitionController;
 use App\Http\Controllers\Api\ReportPdfTemplateController;
 use App\Http\Controllers\Api\SampleController;
+use App\Http\Controllers\Api\LabReceptionController;
 use App\Http\Controllers\Api\SampleReceptionController;
 use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\StatsController;
+use App\Http\Controllers\Api\SystemMonitoringController;
 use App\Http\Controllers\Api\TestResultController;
 use App\Http\Controllers\Api\TestTypeController;
 use App\Http\Controllers\Api\UserManagementController;
@@ -71,6 +79,8 @@ use App\Http\Controllers\Api\Workflow\WorkflowDefinitionController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::get('/register/clients', [AuthController::class, 'registerClientList']);
 Route::get('/register/sites', [AuthController::class, 'registerSiteList']);
@@ -95,7 +105,10 @@ Route::middleware('auth:sanctum')->group(function () {
             ->whereNumber('article');
         Route::delete('catalogue/articles/{article}', [ArticleController::class, 'destroy'])
             ->whereNumber('article');
+        Route::put('catalogue/articles/{article}/lab-visibility', [ArticleController::class, 'syncLabVisibility'])
+            ->whereNumber('article');
         Route::get('catalogue/arbre', CatalogueArbreController::class);
+        Route::get('catalogue/qualification-tags', [QualificationTagController::class, 'index']);
         Route::get('catalogue/taches', [TacheController::class, 'index']);
 
         Route::get('dossiers', [DossierController::class, 'index']);
@@ -176,13 +189,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('user/api-tokens/{tokenId}', [AccountController::class, 'revokeApiToken'])->whereNumber('tokenId');
     Route::get('permissions/catalog', [AccountController::class, 'permissionCatalog']);
 
+    Route::post('user/presence', [SystemMonitoringController::class, 'updatePresence']);
+
     Route::prefix('admin')->group(function () {
         Route::get('activity-logs', [ActivityLogController::class, 'indexAll']);
+        Route::get('monitoring/activity', [SystemMonitoringController::class, 'activityLogs']);
+        Route::get('monitoring/errors', [SystemMonitoringController::class, 'errorLogs']);
+        Route::get('monitoring/security', [SystemMonitoringController::class, 'securityLogs']);
+        Route::get('monitoring/sessions', [SystemMonitoringController::class, 'activeSessions']);
         Route::apiResource('users', UserManagementController::class);
         Route::apiResource('access-groups', AccessGroupController::class);
     });
 
+    Route::get('clients/portal/catalog', [ClientController::class, 'portalCatalog']);
     Route::apiResource('clients', ClientController::class);
+    Route::put('clients/{client}/lab-agencies', [ClientController::class, 'syncLabAgencies']);
+    Route::put('clients/{client}/portal-modules', [ClientController::class, 'syncPortalModules']);
     Route::get('clients/{client}/agencies', [AgencyController::class, 'index']);
     Route::post('clients/{client}/agencies', [AgencyController::class, 'store']);
     Route::get('agencies/{agency}', [AgencyController::class, 'show']);
@@ -218,7 +240,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('lithology-layers/{lithology_layer}', [LithologyLayerController::class, 'update']);
     Route::delete('lithology-layers/{lithology_layer}', [LithologyLayerController::class, 'destroy']);
     Route::apiResource('test-types', TestTypeController::class);
+    Route::get('equipments-maintenance-plans/due', [EquipmentMaintenancePlanController::class, 'dueInRange']);
+    Route::get('materiel/affectations', [MaterielAffectationController::class, 'indexAll']);
     Route::apiResource('equipments', EquipmentController::class);
+    Route::get('equipments/{equipment}/maintenance-plans', [EquipmentMaintenancePlanController::class, 'index']);
+    Route::post('equipments/{equipment}/maintenance-plans', [EquipmentMaintenancePlanController::class, 'store']);
+    Route::put('equipments/{equipment}/maintenance-plans/{plan}', [EquipmentMaintenancePlanController::class, 'update']);
+    Route::patch('equipments/{equipment}/maintenance-plans/{plan}', [EquipmentMaintenancePlanController::class, 'update']);
+    Route::delete('equipments/{equipment}/maintenance-plans/{plan}', [EquipmentMaintenancePlanController::class, 'destroy']);
+    Route::post('equipments/{equipment}/maintenance-plans/{plan}/record', [EquipmentMaintenancePlanController::class, 'record']);
+    Route::get('equipments/{equipment}/affectations', [MaterielAffectationController::class, 'index']);
+    Route::post('equipments/{equipment}/affectations', [MaterielAffectationController::class, 'store']);
+    Route::put('equipments/{equipment}/affectations/{affectation}', [MaterielAffectationController::class, 'update']);
+    Route::patch('equipments/{equipment}/affectations/{affectation}', [MaterielAffectationController::class, 'update']);
+    Route::delete('equipments/{equipment}/affectations/{affectation}', [MaterielAffectationController::class, 'destroy']);
     Route::get('equipments/{equipment}/calibrations', [CalibrationController::class, 'index']);
     Route::post('equipments/{equipment}/calibrations', [CalibrationController::class, 'store']);
     Route::get('equipments/{equipment}/calibrations/{calibration}', [CalibrationController::class, 'show']);
@@ -252,13 +287,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('report-pdf-templates/{report_pdf_template}', [ReportPdfTemplateController::class, 'update']);
     Route::get('report-form-definitions', [ReportFormDefinitionController::class, 'index']);
     Route::post('invoices/from-orders', [InvoiceController::class, 'fromOrders']);
+    Route::get('invoices/eligible-bons-commande', [InvoiceController::class, 'eligibleBonsCommande']);
+    Route::post('invoices/from-bons-commande', [InvoiceController::class, 'fromBonsCommande']);
     Route::get('invoices/unpaid', [InvoiceController::class, 'unpaid']);
     Route::get('invoices/{invoice}/pdf-link', [InvoiceController::class, 'pdfLink']);
+    Route::post('invoices/{invoice}/send-email', [InvoiceController::class, 'sendEmail']);
+    Route::post('invoices/{invoice}/send-reminder', [InvoiceController::class, 'sendReminder']);
     Route::apiResource('invoices', InvoiceController::class);
     Route::apiResource('quotes', QuoteController::class);
     Route::post('quotes/{id}/send-email', [QuoteController::class, 'sendEmail'])->whereNumber('id');
     Route::apiResource('commercial-offerings', CommercialOfferingController::class);
     Route::get('pdf/templates', [PdfController::class, 'templates']);
+    Route::get('pdf/preview-link', [PdfController::class, 'previewLink']);
     Route::post('pdf/generate', [PdfController::class, 'generate']);
     Route::get('pdf/examples/{slug}', [ExamplePdfController::class, 'download']);
     Route::get('mail/templates', [MailController::class, 'templates']);
@@ -275,6 +315,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('activity-logs', [ActivityLogController::class, 'index']);
     Route::get('stats/essais', [StatsController::class, 'essais']);
     Route::get('stats/dashboard', [StatsController::class, 'dashboard']);
+    Route::get('stats/kpi', [StatsController::class, 'kpi']);
     Route::get('accounting/exports', [AccountingExportController::class, 'export']);
 
     Route::get('attachments', [AttachmentController::class, 'index']);
@@ -286,8 +327,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('commercial-links', [CommercialDocumentLinkController::class, 'store']);
     Route::delete('commercial-links/{commercial_document_link}', [CommercialDocumentLinkController::class, 'destroy']);
 
+    Route::get('document-pdf-templates/options', [DocumentPdfTemplateController::class, 'options']);
     Route::get('document-pdf-templates', [DocumentPdfTemplateController::class, 'index']);
+    Route::post('document-pdf-templates', [DocumentPdfTemplateController::class, 'store']);
+    Route::get('document-pdf-templates/{document_pdf_template}', [DocumentPdfTemplateController::class, 'show']);
     Route::put('document-pdf-templates/{document_pdf_template}', [DocumentPdfTemplateController::class, 'update']);
+    Route::delete('document-pdf-templates/{document_pdf_template}', [DocumentPdfTemplateController::class, 'destroy']);
+
+    Route::get('document-status-definitions/document-types', [DocumentStatusDefinitionController::class, 'documentTypes']);
+    Route::get('document-status-definitions', [DocumentStatusDefinitionController::class, 'index']);
+    Route::post('document-status-definitions', [DocumentStatusDefinitionController::class, 'store']);
+    Route::put('document-status-definitions/{document_status_definition}', [DocumentStatusDefinitionController::class, 'update']);
+    Route::delete('document-status-definitions/{document_status_definition}', [DocumentStatusDefinitionController::class, 'destroy']);
 
     Route::get('extrafield-definitions', [ExtrafieldDefinitionController::class, 'index']);
     Route::post('extrafield-definitions', [ExtrafieldDefinitionController::class, 'store']);
@@ -299,6 +350,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('module-settings/{module_key}', [ModuleSettingController::class, 'show']);
     Route::put('module-settings/{module_key}', [ModuleSettingController::class, 'update']);
 
+    Route::get('currencies', [FxRateController::class, 'catalog']);
+    Route::get('fx-rates', [FxRateController::class, 'show']);
+    Route::get('fx-rates/settings', [FxRateController::class, 'settings']);
+    Route::get('fx-rates/status', [FxRateController::class, 'status']);
+    Route::post('fx-rates/refresh', [FxRateController::class, 'refresh']);
+
     // ── Actions par article & matériel requis ────────────────────────────────
     Route::get('articles/{article}/actions', [ArticleActionController::class, 'index']);
     Route::post('articles/{article}/actions', [ArticleActionController::class, 'store']);
@@ -307,6 +364,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('articles/{article}/equipment-requirements', [ArticleActionController::class, 'equipmentIndex']);
     Route::post('articles/{article}/equipment-requirements', [ArticleActionController::class, 'equipmentStore']);
     Route::delete('articles/{article}/equipment-requirements/{requirement}', [ArticleActionController::class, 'equipmentDestroy']);
+    Route::get('articles/{article}/section-products', [ArticleSectionProductController::class, 'index']);
+    Route::put('articles/{article}/section-products', [ArticleSectionProductController::class, 'sync']);
 
     // ── Configuration des mesures par action ─────────────────────────────────
     Route::get('articles/{article}/actions/{action}/measures', [ActionMeasureConfigController::class, 'index']);
@@ -316,6 +375,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── Tâches de mission ────────────────────────────────────────────────────
     Route::get('mission-tasks/labo', [MissionTaskController::class, 'laboBoard']);
+    Route::get('mission-tasks/terrain/history', [MissionTaskController::class, 'terrainHistory']);
+    Route::get('mission-tasks/terrain/measures', [MissionTaskController::class, 'terrainMeasuresBoard']);
     Route::get('mission-tasks/terrain', [MissionTaskController::class, 'terrainBoard']);
     Route::get('mission-tasks', [MissionTaskController::class, 'index']);
     Route::get('mission-tasks/{task}', [MissionTaskController::class, 'show']);
@@ -344,7 +405,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('ordres-mission/{ordre_mission}', [OrdreMissionController::class, 'show']);
     Route::put('ordres-mission/{ordre_mission}', [OrdreMissionController::class, 'update']);
     Route::delete('ordres-mission/{ordre_mission}', [OrdreMissionController::class, 'destroy']);
+    Route::post('ordres-mission/{ordre_mission}/lignes', [OrdreMissionController::class, 'storeLigne']);
     Route::put('ordres-mission/{ordre_mission}/lignes/{ligne}', [OrdreMissionController::class, 'updateLigne']);
+    Route::delete('ordres-mission/{ordre_mission}/lignes/{ligne}', [OrdreMissionController::class, 'destroyLigne']);
     Route::get('ordres-mission/{ordre_mission}/frais', [OrdreMissionController::class, 'fraisIndex']);
     Route::post('ordres-mission/{ordre_mission}/frais', [OrdreMissionController::class, 'fraisStore']);
     Route::put('ordres-mission/{ordre_mission}/frais/{frais}', [OrdreMissionController::class, 'fraisUpdate']);
@@ -357,10 +420,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('expense-reports', [ExpenseReportController::class, 'store']);
     Route::get('expense-reports/{expenseReport}', [ExpenseReportController::class, 'show']);
     Route::put('expense-reports/{expenseReport}', [ExpenseReportController::class, 'update']);
+    Route::post('expense-reports/{expenseReport}/send-email', [ExpenseReportController::class, 'sendEmail']);
     Route::delete('expense-reports/{expenseReport}', [ExpenseReportController::class, 'destroy']);
     Route::post('expense-reports/{expenseReport}/lines', [ExpenseReportController::class, 'storeLine']);
     Route::put('expense-reports/{expenseReport}/lines/{line}', [ExpenseReportController::class, 'updateLine']);
     Route::delete('expense-reports/{expenseReport}/lines/{line}', [ExpenseReportController::class, 'destroyLine']);
+    Route::post('expense-reports/{expenseReport}/lines/{line}/receipt', [ExpenseReportController::class, 'uploadLineReceipt']);
+    Route::get('expense-reports/{expenseReport}/lines/{line}/receipt', [ExpenseReportController::class, 'downloadLineReceipt']);
+    Route::delete('expense-reports/{expenseReport}/lines/{line}/receipt', [ExpenseReportController::class, 'deleteLineReceipt']);
 
     // App mobile laboratoire / terrain — dossiers (mesures + photos)
     Route::prefix('mobile/dossiers')->group(function () {
@@ -379,13 +446,29 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     // ── v1.2.0 — Menu RÉCEPTION (échantillons FOLD) ──────────────────────────
     Route::prefix('v1')->group(function () {
+        Route::get('lab/reception/attendus', [LabReceptionController::class, 'attendus']);
+        Route::get('lab/reception/stats',    [LabReceptionController::class, 'stats']);
+        Route::post('lab/reception/receive-from-line', [SampleReceptionController::class, 'receiveFromLine'])
+            ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur');
+        Route::post('lab/reception/receive-batch-from-line', [SampleReceptionController::class, 'receiveBatchFromLine'])
+            ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur');
+        Route::get('lab/reception/cancellations', [SampleReceptionController::class, 'lineCancellations'])
+            ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur,lab_admin');
         Route::get('samples',                 [SampleReceptionController::class, 'index']);
         Route::get('samples/stats',           [SampleReceptionController::class, 'stats']);
         Route::get('samples/search',          [SampleReceptionController::class, 'searchByFold']);
         Route::get('samples/{sample}',        [SampleReceptionController::class, 'show'])->whereNumber('sample');
+        Route::get('samples/{sample}/label',  [SampleReceptionController::class, 'labelData'])->whereNumber('sample');
+        Route::get('samples/{sample}/photo',  [SampleReceptionController::class, 'downloadPhoto'])->whereNumber('sample');
         Route::post('samples',                [SampleReceptionController::class, 'store'])
             ->middleware('role:lab_technician,receptionnaire,laborantin,ingenieur');
+        Route::post('samples/{sample}/photo', [SampleReceptionController::class, 'uploadPhoto'])
+            ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur')->whereNumber('sample');
         Route::put('samples/{sample}',        [SampleReceptionController::class, 'update'])->whereNumber('sample');
+        Route::delete('samples/{sample}',     [SampleReceptionController::class, 'destroy'])
+            ->middleware('role:responsable,receptionnaire')->whereNumber('sample');
+        Route::patch('samples/{sample}/cancel', [SampleReceptionController::class, 'cancel'])
+            ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur')->whereNumber('sample');
         Route::patch('samples/{sample}/receive',     [SampleReceptionController::class, 'receive'])
             ->middleware('role:receptionnaire,responsable,laborantin')->whereNumber('sample');
         Route::patch('samples/{sample}/start-test',  [SampleReceptionController::class, 'startTest'])
@@ -442,4 +525,8 @@ Route::middleware('signed')->group(function () {
         ->name('invoice.pdf.signed');
     Route::get('reports/{report}/pdf', [ReportController::class, 'signedPdf'])
         ->name('report.pdf.signed');
+    Route::get('pdf/preview/{type}/{id}/{template_id}', [PdfController::class, 'signedGenerate'])
+        ->where('template_id', '[0-9]+')
+        ->whereNumber('id')
+        ->name('commercial.pdf.signed');
 });

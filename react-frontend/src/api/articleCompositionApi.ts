@@ -3,9 +3,9 @@ import { api } from './client'
 export interface ArticleCompositionChild {
   id: number
   code: string
-  designation: string
-  prix_unitaire: number
-  unite: string
+  libelle: string
+  prix_unitaire_ht: number | string | null
+  unite: string | null
 }
 
 export interface ArticleComposition {

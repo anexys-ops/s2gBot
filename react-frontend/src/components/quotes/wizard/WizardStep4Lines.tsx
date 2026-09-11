@@ -1,267 +1,925 @@
-import { useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
+import ConfirmDialog from '../../ConfirmDialog'
 import type { QuoteFormState, QuoteLineDraft } from '../QuoteFormFields'
-import { lineHt } from '../../../lib/quoteTotals'
+import UniteSelect from '../UniteSelect'
+import { lineHt, isJalonForfait, lineLockedByForfaitJalon, quoteFormPricingLines } from '../../../lib/quoteTotals'
+import {
+  clearedForfaitJalonPricing,
+  DEFAULT_FORFAIT_DESIGNATION,
+  forfaitDocumentQuantity,
+  forfaitDocumentTotalHt,
+  forfaitDocumentUnitPrice,
+  forfaitJalonQuantity,
+  forfaitJalonTotalHt,
+  forfaitJalonUnitPrice,
+  withSyncedForfaitDocumentMontant,
+  withSyncedForfaitJalonMontant,
+} from '../../../lib/quoteForfaitJalon'
 import { formatMoney } from '../../../lib/appLocale'
+import {
+  getEffectiveDevisParcours,
+  lineKeyForRow,
+  reorderJalonProductKeys,
+  type DevisParcoursItem,
+} from '../../../lib/devisParcours'
+import { DEFAULT_FORFAIT_UNITE, DEFAULT_QUOTE_UNITE } from '../../../lib/quoteUnites'
 
 type Props = {
   form: QuoteFormState
   setForm: React.Dispatch<React.SetStateAction<QuoteFormState>>
-  addLine: () => void
   updateLine: (index: number, field: keyof QuoteLineDraft, value: string | number | null | boolean) => void
   removeLine: (index: number) => void
-  onOpenCommercialCatalog: (lineIndex: number) => void
-  onOpenProlabCatalog: (lineIndex: number) => void
+  onOpenS2gCatalog: () => void
+  onAddArticlesToJalon?: (jalonId: string) => void
+  onRemoveJalon: (jalonId: string) => void
+}
+
+function lineOrigin(l: QuoteLineDraft): string {
+  if (l.parent_jalon_id) return 'S2G'
+  if (l.ref_article_id) return 'S2G'
+  if (l.commercial_offering_id) return 'Offre'
+  if (l.ref_package_id) return 'Forfait'
+  return 'Libre'
+}
+
+function lineOriginTone(l: QuoteLineDraft): string {
+  if (l.parent_jalon_id || l.ref_article_id) return 'status-pill--emerald'
+  if (l.commercial_offering_id) return 'status-pill--coral'
+  if (l.ref_package_id) return 'status-pill--amber'
+  return 'status-pill--slate'
+}
+
+type DisplayBlock =
+  | { type: 'jalon'; jalonId: string; jalonIndex: number }
+  | { type: 'line'; lineIndex: number }
+
+function buildDisplayBlocks(
+  form: QuoteFormState,
+  jalons: NonNullable<QuoteFormState['meta']['devis_jalons']>,
+): DisplayBlock[] {
+  const parcours: DevisParcoursItem[] = getEffectiveDevisParcours(form.lines, form.meta)
+  const jalonById = new Map(jalons.map((j, i) => [j.id ?? `j-idx-${i}`, { j, i }]))
+  const lineIndexByKey = new Map(form.lines.map((l, i) => [lineKeyForRow(l, i), i]))
+  const childKeys = new Set(
+    jalons.flatMap((j) => j.product_line_keys ?? []),
+  )
+
+  const blocks: DisplayBlock[] = []
+  const seenJalons = new Set<string>()
+  const seenLines = new Set<number>()
+
+  for (const item of parcours) {
+    if (item.kind === 'jalon') {
+      const entry = jalonById.get(item.id)
+      if (!entry || seenJalons.has(item.id)) continue
+      seenJalons.add(item.id)
+      blocks.push({ type: 'jalon', jalonId: item.id, jalonIndex: entry.i })
+    } else {
+      const idx = lineIndexByKey.get(item.id)
+      if (idx == null || seenLines.has(idx)) continue
+      if (childKeys.has(item.id)) continue
+      seenLines.add(idx)
+      blocks.push({ type: 'line', lineIndex: idx })
+    }
+  }
+
+  for (const [jalonId, { i }] of jalonById) {
+    if (!seenJalons.has(jalonId)) {
+      seenJalons.add(jalonId)
+      blocks.push({ type: 'jalon', jalonId, jalonIndex: i })
+    }
+  }
+
+  form.lines.forEach((l, i) => {
+    if (seenLines.has(i)) return
+    const key = lineKeyForRow(l, i)
+    if (childKeys.has(key)) return
+    seenLines.add(i)
+    blocks.push({ type: 'line', lineIndex: i })
+  })
+
+  return blocks
+}
+
+function LineRow({
+  line,
+  lineIndex,
+  moneyLocked,
+  lockTitle,
+  uniteLocked,
+  form,
+  updateLine,
+  onDelete,
+  nested,
+  draggable,
+  dragOver,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+}: {
+  line: QuoteLineDraft
+  lineIndex: number
+  moneyLocked: boolean
+  lockTitle?: string
+  uniteLocked?: boolean
+  form: QuoteFormState
+  updateLine: Props['updateLine']
+  onDelete: () => void
+  nested?: boolean
+  draggable?: boolean
+  dragOver?: boolean
+  onDragStart?: () => void
+  onDragOver?: (e: React.DragEvent) => void
+  onDrop?: () => void
+  onDragEnd?: () => void
+}) {
+  const qty = moneyLocked ? 1 : line.quantity
+  const ht = lineHt(qty, line.unit_price, line.discount_percent ?? 0)
+  return (
+    <tr
+      className={[
+        nested ? 'qw-s2g-line-row qw-s2g-line-row--nested' : 'qw-s2g-line-row',
+        dragOver ? 'qw-s2g-line-row--drag-over' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      onDragOver={draggable ? onDragOver : undefined}
+      onDrop={draggable ? onDrop : undefined}
+    >
+      <td>
+        <div className="qw-s2g-line-row__origin">
+          {draggable ? (
+            <button
+              type="button"
+              className="qw-drag-handle"
+              draggable
+              title="Glisser pour réordonner"
+              aria-label="Glisser pour réordonner"
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = 'move'
+                onDragStart?.()
+              }}
+              onDragEnd={onDragEnd}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+                <path
+                  fill="currentColor"
+                  d="M9 5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm6-11a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"
+                />
+              </svg>
+            </button>
+          ) : null}
+          <span className={`status-pill ${lineOriginTone(line)}`} style={{ fontSize: '0.72rem' }}>
+            {lineOrigin(line)}
+          </span>
+        </div>
+      </td>
+      <td>
+        <input
+          className="quote-lines-table__desc"
+          type="text"
+          value={line.description}
+          onChange={(e) => updateLine(lineIndex, 'description', e.target.value)}
+          placeholder="Désignation…"
+        />
+      </td>
+      <td>
+        <UniteSelect
+          value={line.unite || DEFAULT_QUOTE_UNITE}
+          disabled={uniteLocked}
+          title={
+            uniteLocked
+              ? 'En forfait, l’unité se choisit sur le jalon'
+              : undefined
+          }
+          onChange={(code) => updateLine(lineIndex, 'unite', code)}
+        />
+      </td>
+      <td>
+        <input
+          className="quote-lines-table__num"
+          type="number"
+          min={1}
+          step={1}
+          value={qty}
+          disabled={moneyLocked}
+          title={lockTitle}
+          onChange={(e) => {
+            if (moneyLocked) return
+            const raw = e.target.value
+            if (raw === '') {
+              updateLine(lineIndex, 'quantity', 0)
+              return
+            }
+            updateLine(lineIndex, 'quantity', Math.max(0, Math.round(Number(raw))))
+          }}
+        />
+      </td>
+      <td>
+        <input
+          className="quote-lines-table__num"
+          type="number"
+          min={0}
+          step={0.01}
+          value={line.unit_price}
+          disabled={moneyLocked}
+          title={lockTitle}
+          onChange={(e) => {
+            if (moneyLocked) return
+            updateLine(lineIndex, 'unit_price', Number(e.target.value))
+          }}
+        />
+      </td>
+      <td>
+        <input
+          className="quote-lines-table__num"
+          type="number"
+          min={0}
+          max={100}
+          step={0.01}
+          value={line.discount_percent ?? 0}
+          disabled={moneyLocked}
+          title={lockTitle}
+          onChange={(e) => {
+            if (moneyLocked) return
+            updateLine(lineIndex, 'discount_percent', Number(e.target.value))
+          }}
+        />
+      </td>
+      <td>
+        <input
+          className="quote-lines-table__num"
+          type="number"
+          min={0}
+          max={100}
+          step={1}
+          value={line.tva_rate ?? form.tva_rate ?? 20}
+          disabled={moneyLocked}
+          title={lockTitle}
+          onChange={(e) => {
+            if (moneyLocked) return
+            const raw = e.target.value
+            if (raw === '') {
+              updateLine(lineIndex, 'tva_rate', 0)
+              return
+            }
+            updateLine(lineIndex, 'tva_rate', Math.min(100, Math.max(0, Math.round(Number(raw)))))
+          }}
+        />
+      </td>
+      <td className="quote-lines-table__total" title={lockTitle}>
+        {moneyLocked ? '—' : formatMoney(ht)}
+      </td>
+      <td className="data-table__actions">
+        <div className="data-table__actions-inner">
+          <button
+            type="button"
+            className="ds-icon-btn ds-icon-btn--danger"
+            title="Supprimer la ligne"
+            aria-label={`Supprimer la ligne ${lineIndex + 1}`}
+            onClick={onDelete}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M5 6h14v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6zM10 11v6M14 11v6"
+              />
+            </svg>
+          </button>
+        </div>
+      </td>
+    </tr>
+  )
 }
 
 export default function WizardStep4Lines({
   form,
   setForm,
-  addLine,
   updateLine,
   removeLine,
-  onOpenCommercialCatalog,
-  onOpenProlabCatalog,
+  onOpenS2gCatalog,
+  onAddArticlesToJalon,
+  onRemoveJalon,
 }: Props) {
   const isForfait = form.meta?.mode_devis === 'forfait'
-  const [localForfait, setLocalForfait] = useState<string>(
-    String(form.meta?.tarif_global_hors_lignes_ht ?? ''),
+  const [deleteIndex, setDeleteIndex] = useState<number | null>(null)
+  const [deleteJalonId, setDeleteJalonId] = useState<string | null>(null)
+  const [dragState, setDragState] = useState<{ jalonId: string; fromIndex: number } | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+
+  const jalons = form.meta?.devis_jalons ?? []
+
+  const forfaitQty = forfaitDocumentQuantity(form.meta)
+  const forfaitPu = forfaitDocumentUnitPrice(form.meta)
+  const forfaitHt = forfaitDocumentTotalHt(form.meta)
+  const forfaitTva = Math.min(100, Math.max(0, Number(form.tva_rate ?? 20)))
+  const forfaitTvaAmount = Math.round(forfaitHt * (forfaitTva / 100) * 100) / 100
+  const forfaitTtc = Math.round((forfaitHt + forfaitTvaAmount) * 100) / 100
+
+  const linesTotalHt = useMemo(
+    () =>
+      quoteFormPricingLines(
+        form.lines,
+        jalons,
+        form.tva_rate ?? 20,
+        isForfait,
+        forfaitHt,
+      ).reduce((sum, line) => sum + lineHt(line.quantity, line.unit_price, line.discount_percent ?? 0), 0),
+    [form.lines, jalons, form.tva_rate, isForfait, forfaitHt],
   )
 
-  const toggleForfait = (enabled: boolean) => {
-    setForm((f) => ({
-      ...f,
-      meta: {
-        ...f.meta,
-        mode_devis: enabled ? 'forfait' : undefined,
-        tarif_global_hors_lignes_ht: enabled
-          ? (f.meta?.tarif_global_hors_lignes_ht ?? 0)
-          : undefined,
-      },
-    }))
+  const displayBlocks = useMemo(() => buildDisplayBlocks(form, jalons), [form, jalons])
+
+  const hasContent = form.lines.length > 0 || jalons.length > 0
+
+  const lineMoneyLock = (line: QuoteLineDraft, index: number) => {
+    if (isForfait) {
+      return {
+        locked: true,
+        title: 'En mode forfait, le montant HT global se saisit en haut de page',
+      }
+    }
+    if (lineLockedByForfaitJalon(line, index, jalons)) {
+      return {
+        locked: true,
+        title: 'En forfait jalon, le montant est saisi sur le jalon',
+      }
+    }
+    return { locked: false, title: undefined as string | undefined }
   }
 
-  const addJalon = () => {
-    setForm((f) => {
-      const newJalon = {
-        id: `j-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        libelle: '',
-        montant_ht: undefined,
-        ref_article_id: null,
-        commercial_offering_id: null,
+  const initJalonForfaitPricing = (
+    jalon: NonNullable<QuoteFormState['meta']['devis_jalons']>[number],
+    jalonId: string,
+    lines: QuoteLineDraft[],
+    defaultTva: number,
+  ) => {
+    const childKeys = new Set(jalon.product_line_keys ?? [])
+    const childSum = lines.reduce((sum, line, i) => {
+      const key = lineKeyForRow(line, i)
+      if (line.parent_jalon_id === jalonId || childKeys.has(key)) {
+        return sum + lineHt(line.quantity, line.unit_price, line.discount_percent ?? 0)
       }
+      return sum
+    }, 0)
+    const existingPu = forfaitJalonUnitPrice(jalon)
+    const pu = existingPu > 0 ? existingPu : childSum
+    return withSyncedForfaitJalonMontant({
+      ...jalon,
+      quantity: forfaitJalonQuantity(jalon),
+      prix_unitaire_ht: pu,
+      tva_rate: jalon.tva_rate ?? defaultTva,
+      unite: (jalon.unite ?? '').trim() || DEFAULT_FORFAIT_UNITE,
+    })
+  }
+
+  const toggleForfait = (enabled: boolean) => {
+    setForm((f) => {
+      const nextLines = enabled
+        ? f.lines.map((l) => (l.quantity === 1 ? l : { ...l, quantity: 1 }))
+        : f.lines
+      const meta = { ...f.meta }
+      if (enabled) {
+        meta.mode_devis = 'forfait'
+        const existing = Number(f.meta?.tarif_global_hors_lignes_ht)
+        const linesHt = nextLines.reduce(
+          (sum, line) => sum + lineHt(line.quantity, line.unit_price, line.discount_percent ?? 0),
+          0,
+        )
+        const ht =
+          Number.isFinite(existing) && existing > 0 ? existing : Math.round(linesHt * 100) / 100
+        const qty = forfaitDocumentQuantity(f.meta)
+        meta.tarif_global_designation =
+          (f.meta?.tarif_global_designation ?? '').trim() || DEFAULT_FORFAIT_DESIGNATION
+        meta.tarif_global_quantity = qty
+        meta.tarif_global_prix_unitaire_ht =
+          qty > 0 ? Math.round((ht / qty) * 100) / 100 : ht
+        meta.tarif_global_hors_lignes_ht = ht
+        meta.tarif_global_unite = (f.meta?.tarif_global_unite ?? '').trim() || DEFAULT_FORFAIT_UNITE
+        meta.devis_jalons = (meta.devis_jalons ?? []).map((j) => clearedForfaitJalonPricing(j))
+        delete meta.ligne_masque_prix_pdf
+      } else {
+        delete meta.mode_devis
+        delete meta.tarif_global_hors_lignes_ht
+        delete meta.tarif_global_designation
+        delete meta.tarif_global_quantity
+        delete meta.tarif_global_prix_unitaire_ht
+        delete meta.tarif_global_unite
+      }
+      return { ...f, lines: nextLines, meta }
+    })
+  }
+
+  const applyForfaitDocumentMeta = (
+    patch: Partial<NonNullable<QuoteFormState['meta']>>,
+  ) => {
+    setForm((f) => {
+      const merged = withSyncedForfaitDocumentMontant({
+        ...f.meta,
+        mode_devis: 'forfait',
+        ...patch,
+      })
       return {
         ...f,
+        lines: f.lines.map((l) => ({ ...l, unit_price: 0, discount_percent: 0 })),
         meta: {
-          ...f.meta,
-          devis_jalons: [...(f.meta?.devis_jalons ?? []), newJalon],
+          ...merged,
+          tarif_global_unite: (merged.tarif_global_unite ?? '').trim() || DEFAULT_FORFAIT_UNITE,
+          devis_jalons: (f.meta.devis_jalons ?? []).map((j) => clearedForfaitJalonPricing(j)),
         },
       }
     })
   }
 
-  const updateJalon = (index: number, field: 'libelle' | 'montant_ht', value: string) => {
+  const setForfaitTva = (raw: string) => {
+    setForm((f) => ({
+      ...f,
+      tva_rate: raw === '' ? 0 : Math.min(100, Math.max(0, Math.round(Number(raw)))),
+    }))
+  }
+
+  const toggleJalonForfait = (jalonId: string, enabled: boolean) => {
     setForm((f) => {
-      const list = [...(f.meta?.devis_jalons ?? [])]
-      if (!list[index]) return f
-      list[index] = {
-        ...list[index],
-        [field]: field === 'montant_ht' ? (value === '' ? undefined : Number(value)) : value,
+      const list = [...(f.meta.devis_jalons ?? [])]
+      const idx = list.findIndex((j) => j.id === jalonId)
+      if (idx < 0) return f
+      const jalon = { ...list[idx] }
+      if (enabled) {
+        list[idx] = { ...initJalonForfaitPricing(jalon, jalonId, f.lines, f.tva_rate ?? 20), mode: 'forfait' }
+      } else {
+        delete jalon.mode
+        list[idx] = jalon
       }
       return { ...f, meta: { ...f.meta, devis_jalons: list } }
     })
   }
 
-  const removeJalon = (index: number) => {
+  const updateJalonLibelle = (jalonId: string, libelle: string) => {
     setForm((f) => {
-      const list = (f.meta?.devis_jalons ?? []).filter((_, i) => i !== index)
+      const list = [...(f.meta.devis_jalons ?? [])]
+      const idx = list.findIndex((j) => j.id === jalonId)
+      if (idx < 0) return f
+      list[idx] = { ...list[idx], libelle }
       return { ...f, meta: { ...f.meta, devis_jalons: list } }
     })
   }
 
-  const jalons = form.meta?.devis_jalons ?? []
+  const updateJalonForfait = (
+    jalonId: string,
+    field: 'quantity' | 'prix_unitaire_ht' | 'tva_rate' | 'unite',
+    raw: string,
+  ) => {
+    setForm((f) => {
+      const list = [...(f.meta.devis_jalons ?? [])]
+      const idx = list.findIndex((j) => j.id === jalonId)
+      if (idx < 0) return f
+      const base = {
+        ...list[idx],
+        ...(field !== 'unite' || list[idx].mode === 'forfait' || f.meta?.mode_devis === 'forfait'
+          ? { mode: 'forfait' as const }
+          : {}),
+      }
+      let jalon = base
+      if (field === 'quantity') {
+        jalon = { ...base, quantity: raw === '' ? 1 : Math.max(1, Math.round(Number(raw))) }
+      } else if (field === 'prix_unitaire_ht') {
+        jalon = { ...base, prix_unitaire_ht: raw === '' ? 0 : Math.max(0, Number(raw)) }
+      } else if (field === 'tva_rate') {
+        jalon = { ...base, tva_rate: raw === '' ? 0 : Math.min(100, Math.max(0, Math.round(Number(raw)))) }
+      } else {
+        jalon = { ...base, unite: raw || DEFAULT_FORFAIT_UNITE }
+      }
+      list[idx] = withSyncedForfaitJalonMontant(jalon)
+      return { ...f, meta: { ...f.meta, devis_jalons: list } }
+    })
+  }
+
+  const lineIndexByKey = useMemo(
+    () => new Map(form.lines.map((l, i) => [lineKeyForRow(l, i), i])),
+    [form.lines],
+  )
+
+  const childLinesForJalon = (productKeys: string[]) => {
+    return productKeys
+      .map((key) => lineIndexByKey.get(key))
+      .filter((i): i is number => i != null)
+      .map((i) => ({ line: form.lines[i], index: i }))
+  }
+
+  const reorderJalonProducts = (jalonId: string, fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return
+    setForm((f) => ({
+      ...f,
+      meta: reorderJalonProductKeys(f.meta, jalonId, fromIndex, toIndex, f.lines),
+    }))
+  }
+
+  const deleteTarget = deleteIndex != null ? form.lines[deleteIndex] : null
+  const deleteJalonTarget = deleteJalonId
+    ? jalons.find((j) => j.id === deleteJalonId)
+    : null
 
   return (
-    <div className="qw-body">
+    <div className="qw-body qw-lines-step">
       <p className="qw-section-title">Lignes du devis</p>
-      <p className="qw-section-sub">Ajoutez les articles et jalons.</p>
+      <p className="qw-section-sub">
+        Ajoutez des jalons depuis le catalogue S2G en suivant le parcours{' '}
+        <strong>Qualification → Jalon → Articles</strong>. En mode détaillé, chaque jalon peut être tarifé au forfait
+        ou à la ligne.
+      </p>
 
-      {/* Mode toggle */}
-      <div className="qw-mode-btns" style={{ marginBottom: '1rem' }}>
-        <button
-          type="button"
-          className={`qw-mode-btn${!isForfait ? ' qw-mode-btn--active' : ''}`}
-          onClick={() => toggleForfait(false)}
-        >
-          Détaillé
-        </button>
-        <button
-          type="button"
-          className={`qw-mode-btn${isForfait ? ' qw-mode-btn--active' : ''}`}
-          onClick={() => toggleForfait(true)}
-        >
-          Forfait
-        </button>
+      <div className="qw-lines-step__mode">
+        <span className="qw-lines-step__mode-label">Mode</span>
+        <div className="qw-mode-btns">
+          <button
+            type="button"
+            className={`qw-mode-btn${!isForfait ? ' qw-mode-btn--active' : ''}`}
+            onClick={() => toggleForfait(false)}
+          >
+            Détaillé
+          </button>
+          <button
+            type="button"
+            className={`qw-mode-btn${isForfait ? ' qw-mode-btn--active' : ''}`}
+            onClick={() => toggleForfait(true)}
+          >
+            Forfait
+          </button>
+        </div>
       </div>
 
-      {isForfait && (
+      {isForfait ? (
         <div className="qw-forfait-box">
-          <label>
-            Montant forfaitaire HT :
-            <input
-              type="number"
-              className="qw-forfait-input"
-              min={0}
-              step={0.01}
-              value={localForfait}
-              onChange={(e) => {
-                setLocalForfait(e.target.value)
-                setForm((f) => ({
-                  ...f,
-                  meta: {
-                    ...f.meta,
-                    tarif_global_hors_lignes_ht: e.target.value === '' ? undefined : Number(e.target.value),
-                  },
-                }))
-              }}
-              placeholder="0.00"
-            />
-          </label>
-          <p style={{ fontSize: '.8rem', color: '#92400e', marginTop: '.5rem' }}>
-            En mode forfait, les lignes servent de descriptif (prix masqués sur le PDF).
+          <p className="qw-forfait-box__title">Montant forfaitaire</p>
+          <p className="qw-forfait-box__hint">
+            Saisissez la désignation, l’unité, la quantité et le PU HT. Le total HT, la TVA et le TTC se
+            calculent automatiquement. Les prix des articles sous les jalons restent masqués.
           </p>
+          <div className="qw-forfait-box__fields">
+            <label className="qw-forfait-box__field qw-forfait-box__field--wide">
+              <span>Désignation</span>
+              <input
+                className="qw-forfait-input qw-forfait-input--wide"
+                type="text"
+                value={form.meta?.tarif_global_designation ?? DEFAULT_FORFAIT_DESIGNATION}
+                onChange={(e) =>
+                  applyForfaitDocumentMeta({ tarif_global_designation: e.target.value })
+                }
+                placeholder="Prestation forfaitaire…"
+              />
+            </label>
+            <label className="qw-forfait-box__field">
+              <span>Unité</span>
+              <UniteSelect
+                className="qw-forfait-input"
+                value={form.meta?.tarif_global_unite || DEFAULT_FORFAIT_UNITE}
+                onChange={(code) => applyForfaitDocumentMeta({ tarif_global_unite: code })}
+              />
+            </label>
+            <label className="qw-forfait-box__field">
+              <span>Qté</span>
+              <input
+                className="qw-forfait-input"
+                type="number"
+                min={1}
+                step={1}
+                value={forfaitQty}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  applyForfaitDocumentMeta({
+                    tarif_global_quantity:
+                      raw === '' ? 1 : Math.max(1, Math.round(Number(raw))),
+                  })
+                }}
+              />
+            </label>
+            <label className="qw-forfait-box__field">
+              <span>PU HT</span>
+              <input
+                className="qw-forfait-input"
+                type="number"
+                min={0}
+                step={0.01}
+                value={forfaitPu}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  applyForfaitDocumentMeta({
+                    tarif_global_prix_unitaire_ht: raw === '' ? 0 : Math.max(0, Number(raw)),
+                  })
+                }}
+              />
+            </label>
+            <div className="qw-forfait-box__field qw-forfait-box__field--readonly">
+              <span>Total HT</span>
+              <strong>{formatMoney(forfaitHt)}</strong>
+            </div>
+            <label className="qw-forfait-box__field">
+              <span>TVA %</span>
+              <input
+                className="qw-forfait-input"
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={forfaitTva}
+                onChange={(e) => setForfaitTva(e.target.value)}
+              />
+            </label>
+            <div className="qw-forfait-box__field qw-forfait-box__field--readonly">
+              <span>TVA</span>
+              <strong>{formatMoney(forfaitTvaAmount)}</strong>
+            </div>
+            <div className="qw-forfait-box__field qw-forfait-box__field--readonly">
+              <span>Total TTC</span>
+              <strong>{formatMoney(forfaitTtc)}</strong>
+            </div>
+          </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Lines table */}
-      {form.lines.length > 0 && (
-        <div style={{ overflowX: 'auto' }}>
-          <table className="qw-lines-table">
+      <div className="quote-lines-toolbar qw-lines-step__toolbar">
+        <div>
+          <h4 className="qw-lines-step__toolbar-title">Catalogue S2G</h4>
+          {form.lines.length > 0 ? (
+            <p className="qw-lines-step__summary">
+              {form.lines.length} ligne{form.lines.length !== 1 ? 's' : ''}
+              {jalons.length > 0 ? ` · ${jalons.length} jalon${jalons.length !== 1 ? 's' : ''}` : ''}
+              {isForfait ? ' · Forfait global' : ''} · Total HT{' '}
+              <strong>{formatMoney(linesTotalHt)}</strong>
+            </p>
+          ) : jalons.length > 0 ? (
+            <p className="qw-lines-step__summary">
+              {jalons.length} jalon{jalons.length !== 1 ? 's' : ''}
+              {isForfait ? ' · Forfait global' : ''}
+              {isForfait ? (
+                <>
+                  {' '}
+                  · Total HT <strong>{formatMoney(linesTotalHt)}</strong>
+                </>
+              ) : null}
+            </p>
+          ) : isForfait ? (
+            <p className="qw-lines-step__summary">
+              Forfait global · Total HT <strong>{formatMoney(linesTotalHt)}</strong>
+            </p>
+          ) : null}
+        </div>
+        <div className="quote-lines-toolbar__btns">
+          <button type="button" className="btn btn-primary btn-sm" onClick={onOpenS2gCatalog}>
+            + Catalogue S2G
+          </button>
+        </div>
+      </div>
+
+      {!hasContent ? (
+        <div className="qw-lines-step__empty card">
+          <p className="qw-lines-step__empty-title">Aucun élément pour l’instant</p>
+          <p className="text-muted" style={{ margin: '0 0 1rem', fontSize: '0.9rem' }}>
+            Ajoutez un jalon avec les articles souhaités via le parcours Qualification → Jalon → Articles.
+          </p>
+          <button type="button" className="btn btn-primary btn-sm" onClick={onOpenS2gCatalog}>
+            Catalogue S2G
+          </button>
+        </div>
+      ) : (
+        <div className="quote-lines-table-wrap qw-lines-step__table-wrap">
+          <table className="quote-lines-table data-table data-table--compact qw-s2g-lines-table">
             <thead>
               <tr>
-                <th style={{ width: '38%' }}>Désignation</th>
-                <th style={{ width: '7%' }}>Qté</th>
-                {!isForfait && (
-                  <>
-                    <th style={{ width: '10%' }}>PU HT</th>
-                    <th style={{ width: '8%' }}>TVA %</th>
-                    <th style={{ width: '8%' }}>Remise %</th>
-                    <th style={{ width: '10%' }}>S-total HT</th>
-                  </>
-                )}
-                <th style={{ width: '7%' }}>Cat.</th>
-                <th style={{ width: '4%' }}></th>
+                <th>Origine</th>
+                <th>Désignation</th>
+                <th>Unité</th>
+                <th>Qté</th>
+                <th>PU HT</th>
+                <th>Rem. %</th>
+                <th>TVA %</th>
+                <th>Total HT</th>
+                <th className="data-table__actions">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {form.lines.map((line, i) => {
-                const ht = lineHt(line.quantity, line.unit_price, line.discount_percent ?? 0)
+              {displayBlocks.map((block) => {
+                if (block.type === 'line') {
+                  const line = form.lines[block.lineIndex]
+                  if (!line) return null
+                  const lock = lineMoneyLock(line, block.lineIndex)
+                  return (
+                    <LineRow
+                      key={line.row_key ?? `line-${block.lineIndex}`}
+                      line={line}
+                      lineIndex={block.lineIndex}
+                      moneyLocked={lock.locked}
+                      lockTitle={lock.title}
+                      uniteLocked={isForfait || lock.locked}
+                      form={form}
+                      updateLine={updateLine}
+                      onDelete={() => setDeleteIndex(block.lineIndex)}
+                    />
+                  )
+                }
+
+                const jalon = jalons[block.jalonIndex]
+                if (!jalon) return null
+                const productKeys = jalon.product_line_keys ?? []
+                const children = childLinesForJalon(productKeys)
+                const jalonForfait = isJalonForfait(jalon)
+                const jalonQty = forfaitJalonQuantity(jalon)
+                const jalonPu = forfaitJalonUnitPrice(jalon)
+                const jalonHt = forfaitJalonTotalHt(jalon)
+                const jalonTva = Math.min(
+                  100,
+                  Math.max(0, Number(jalon.tva_rate ?? form.tva_rate ?? 20)),
+                )
+                const jalonTvaAmount = Math.round(jalonHt * (jalonTva / 100) * 100) / 100
+                const jalonTtc = Math.round((jalonHt + jalonTvaAmount) * 100) / 100
+                /** Document forfait = montant global only; per-jalon pricing stays in mode détaillé. */
+                const showJalonPricing = !isForfait && jalonForfait
+
                 return (
-                  <tr key={line.row_key ?? i}>
-                    <td>
-                      <input
-                        className="qw-lines-input"
-                        type="text"
-                        value={line.description}
-                        onChange={(e) => updateLine(i, 'description', e.target.value)}
-                        placeholder="Description…"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="qw-lines-input"
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        value={line.quantity}
-                        onChange={(e) => updateLine(i, 'quantity', Number(e.target.value))}
-                        style={{ width: '70px' }}
-                      />
-                    </td>
-                    {!isForfait && (
-                      <>
-                        <td>
+                  <Fragment key={`jalon-block-${block.jalonId}`}>
+                    <tr key={`jalon-${block.jalonId}`} className="qw-s2g-jalon-row">
+                      <td>
+                        <span className="status-pill status-pill--emerald" style={{ fontSize: '0.72rem' }}>
+                          Jalon
+                        </span>
+                      </td>
+                      <td>
+                        <div className="qw-s2g-jalon-row__designation">
                           <input
-                            className="qw-lines-input"
-                            type="number"
-                            min={0}
-                            step={0.01}
-                            value={line.unit_price}
-                            onChange={(e) => updateLine(i, 'unit_price', Number(e.target.value))}
-                            style={{ width: '90px' }}
+                            className="quote-lines-table__desc qw-s2g-jalon-row__title-input"
+                            type="text"
+                            value={jalon.libelle}
+                            onChange={(e) => updateJalonLibelle(block.jalonId, e.target.value)}
+                            placeholder="Nom du jalon…"
+                            aria-label="Nom du jalon"
                           />
-                        </td>
-                        <td>
-                          <input
-                            className="qw-lines-input"
-                            type="number"
-                            min={0}
-                            max={100}
-                            step={0.01}
-                            value={line.tva_rate}
-                            onChange={(e) => updateLine(i, 'tva_rate', Number(e.target.value))}
-                            style={{ width: '65px' }}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            className="qw-lines-input"
-                            type="number"
-                            min={0}
-                            max={100}
-                            step={0.01}
-                            value={line.discount_percent ?? 0}
-                            onChange={(e) =>
-                              updateLine(i, 'discount_percent', Number(e.target.value))
+                          {jalon.s2g_code ? (
+                            <span className="text-muted qw-s2g-jalon-row__code">{jalon.s2g_code}</span>
+                          ) : null}
+                          {!isForfait ? (
+                            <div className="qw-mode-btns qw-s2g-jalon-row__mode">
+                              <button
+                                type="button"
+                                className={`qw-mode-btn${!jalonForfait ? ' qw-mode-btn--active' : ''}`}
+                                onClick={() => toggleJalonForfait(block.jalonId, false)}
+                              >
+                                Détaillé
+                              </button>
+                              <button
+                                type="button"
+                                className={`qw-mode-btn${jalonForfait ? ' qw-mode-btn--active' : ''}`}
+                                onClick={() => toggleJalonForfait(block.jalonId, true)}
+                              >
+                                Forfait
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                        {children.length === 0 && jalon.ref_article_id ? (
+                          <p className="qw-s2g-jalon-row__empty text-muted">
+                            Aucun produit configuré dans Actions &amp; matériel pour ce jalon.
+                          </p>
+                        ) : null}
+                      </td>
+                      {showJalonPricing ? (
+                        <>
+                          <td>
+                            <UniteSelect
+                              className="qw-forfait-input"
+                              value={jalon.unite || DEFAULT_FORFAIT_UNITE}
+                              onChange={(code) => updateJalonForfait(block.jalonId, 'unite', code)}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className="quote-lines-table__num qw-forfait-input"
+                              type="number"
+                              min={1}
+                              step={1}
+                              value={jalonQty}
+                              onChange={(e) => updateJalonForfait(block.jalonId, 'quantity', e.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className="quote-lines-table__num qw-forfait-input"
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              value={jalonPu}
+                              onChange={(e) => updateJalonForfait(block.jalonId, 'prix_unitaire_ht', e.target.value)}
+                            />
+                          </td>
+                          <td className="text-muted">—</td>
+                          <td>
+                            {!isForfait ? (
+                              <input
+                                className="quote-lines-table__num qw-forfait-input"
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={1}
+                                value={jalonTva}
+                                onChange={(e) => updateJalonForfait(block.jalonId, 'tva_rate', e.target.value)}
+                              />
+                            ) : (
+                              <span className="text-muted">{jalonTva} %</span>
+                            )}
+                          </td>
+                          <td>
+                            <strong>{formatMoney(jalonHt)}</strong>
+                            {!isForfait ? (
+                              <span className="qw-s2g-jalon-row__forfait-ttc">
+                                {' '}
+                                · TTC {formatMoney(jalonTtc)}
+                              </span>
+                            ) : null}
+                          </td>
+                        </>
+                      ) : (
+                        <td colSpan={6} />
+                      )}
+                      <td className="data-table__actions">
+                        <div className="qw-s2g-jalon-row__actions">
+                          {onAddArticlesToJalon && jalon.ref_article_id ? (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              title="Ajouter des articles à ce jalon"
+                              onClick={() => onAddArticlesToJalon(block.jalonId)}
+                            >
+                              + Articles
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="ds-icon-btn ds-icon-btn--danger"
+                            title="Retirer le jalon"
+                            aria-label="Retirer le jalon"
+                            onClick={() => setDeleteJalonId(block.jalonId)}
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+                              <path
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.75"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M5 6h14v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6zM10 11v6M14 11v6"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {children.map(({ line, index }, childIdx) => {
+                      const lock = lineMoneyLock(line, index)
+                      const canDrag = children.length > 1
+                      return (
+                        <LineRow
+                          key={line.row_key ?? `child-${index}`}
+                          line={line}
+                          lineIndex={index}
+                          moneyLocked={lock.locked}
+                          lockTitle={lock.title}
+                          uniteLocked={isForfait || lock.locked}
+                          form={form}
+                          updateLine={updateLine}
+                          onDelete={() => setDeleteIndex(index)}
+                          nested
+                          draggable={canDrag}
+                          dragOver={
+                            dragState?.jalonId === block.jalonId && dragOverIndex === childIdx
+                          }
+                          onDragStart={() =>
+                            setDragState({ jalonId: block.jalonId, fromIndex: childIdx })
+                          }
+                          onDragOver={(e) => {
+                            e.preventDefault()
+                            if (dragState?.jalonId === block.jalonId) {
+                              setDragOverIndex(childIdx)
                             }
-                            style={{ width: '65px' }}
-                          />
-                        </td>
-                        <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                          {formatMoney(ht)}
-                        </td>
-                      </>
-                    )}
-                    <td>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button
-                          type="button"
-                          title="Catalogue commercial"
-                          style={{
-                            border: 'none',
-                            background: 'none',
-                            cursor: 'pointer',
-                            fontSize: '.9rem',
                           }}
-                          onClick={() => onOpenCommercialCatalog(i)}
-                        >
-                          🔍
-                        </button>
-                        <button
-                          type="button"
-                          title="Catalogue PROLAB"
-                          style={{
-                            border: 'none',
-                            background: 'none',
-                            cursor: 'pointer',
-                            fontSize: '.9rem',
+                          onDrop={() => {
+                            if (dragState?.jalonId === block.jalonId) {
+                              reorderJalonProducts(block.jalonId, dragState.fromIndex, childIdx)
+                            }
+                            setDragState(null)
+                            setDragOverIndex(null)
                           }}
-                          onClick={() => onOpenProlabCatalog(i)}
-                        >
-                          🧪
-                        </button>
-                      </div>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444' }}
-                        onClick={() => removeLine(i)}
-                        title="Supprimer"
-                      >
-                        ×
-                      </button>
-                    </td>
-                  </tr>
+                          onDragEnd={() => {
+                            setDragState(null)
+                            setDragOverIndex(null)
+                          }}
+                        />
+                      )
+                    })}
+                  </Fragment>
                 )
               })}
             </tbody>
@@ -269,55 +927,42 @@ export default function WizardStep4Lines({
         </div>
       )}
 
-      {/* Jalons */}
-      {jalons.length > 0 && (
-        <div style={{ marginTop: '1rem' }}>
-          <p style={{ fontWeight: 600, color: '#374151', marginBottom: '.5rem' }}>Jalons</p>
-          {jalons.map((j, i) => (
-            <div key={j.id ?? i} className="qw-jalon-row">
-              <input
-                value={j.libelle}
-                onChange={(e) => updateJalon(i, 'libelle', e.target.value)}
-                placeholder="Libellé du jalon…"
-              />
-              <input
-                type="number"
-                min={0}
-                step={0.01}
-                value={j.montant_ht ?? ''}
-                onChange={(e) => updateJalon(i, 'montant_ht', e.target.value)}
-                placeholder="Montant HT (opt.)"
-                style={{
-                  width: '130px',
-                  border: '1px solid #bbf7d0',
-                  borderRadius: '6px',
-                  padding: '.25rem .5rem',
-                  background: 'transparent',
-                  fontSize: '.88rem',
-                  color: '#166534',
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => removeJalon(i)}
-                style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444' }}
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      {deleteIndex != null && deleteTarget ? (
+        <ConfirmDialog
+          title="Supprimer la ligne"
+          message={
+            <>
+              Retirer la ligne{' '}
+              <strong>{deleteTarget.description.trim() || `#${deleteIndex + 1}`}</strong> du devis ?
+            </>
+          }
+          confirmLabel="Supprimer"
+          variant="danger"
+          onConfirm={() => {
+            removeLine(deleteIndex)
+            setDeleteIndex(null)
+          }}
+          onCancel={() => setDeleteIndex(null)}
+        />
+      ) : null}
 
-      {/* Add buttons */}
-      <div style={{ display: 'flex', gap: '.5rem', marginTop: '.75rem' }}>
-        <button type="button" className="qw-add-line-btn" onClick={addLine}>
-          + Ligne article
-        </button>
-        <button type="button" className="qw-add-line-btn" onClick={addJalon}>
-          + Jalon
-        </button>
-      </div>
+      {deleteJalonId && deleteJalonTarget ? (
+        <ConfirmDialog
+          title="Retirer le jalon"
+          message={
+            <>
+              Retirer le jalon <strong>{deleteJalonTarget.libelle}</strong> et ses produits associés ?
+            </>
+          }
+          confirmLabel="Retirer"
+          variant="danger"
+          onConfirm={() => {
+            onRemoveJalon(deleteJalonId)
+            setDeleteJalonId(null)
+          }}
+          onCancel={() => setDeleteJalonId(null)}
+        />
+      ) : null}
     </div>
   )
 }

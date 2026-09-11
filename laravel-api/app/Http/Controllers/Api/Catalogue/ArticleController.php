@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Api\Catalogue;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Catalogue\ArticleResource;
+use App\Models\Agency;
 use App\Models\Catalogue\Article;
+use App\Services\Catalogue\ArticleS2gRelationService;
+use App\Support\AgencyAccess;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,14 +17,32 @@ class ArticleController extends Controller
 {
     use AuthorizesRequests;
 
+    public function __construct(
+        private readonly ArticleS2gRelationService $s2gRelations,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
-        $q = Article::query()->with(['famille', 'articleLie:id,code,libelle']);
+        $q = Article::query()->with([
+            'famille',
+            'articleLie:id,code,libelle',
+            'qualificationTags' => fn ($t) => $t->orderBy('groupe')->orderBy('code'),
+        ]);
         if (! $request->boolean('with_inactif')) {
             $q->actif();
         }
         if ($request->filled('ref_famille_article_id')) {
             $q->where('ref_famille_article_id', (int) $request->query('ref_famille_article_id'));
+        }
+        if ($kind = trim((string) $request->query('kind', ''))) {
+            $q->where('kind', $kind);
+        }
+        if ($tagCode = trim((string) $request->query('qualification_tag_code', ''))) {
+            $q->where('kind', Article::KIND_JALON)
+                ->whereHas('qualificationTags', fn ($b) => $b->where('code', $tagCode));
+        }
+        if (! $request->boolean('with_legacy')) {
+            $q->forCatalogueListing();
         }
         if ($search = trim((string) $request->query('q', ''))) {
             $q->where(function ($b) use ($search) {
@@ -32,18 +53,89 @@ class ArticleController extends Controller
             });
         }
 
-        return response()->json($q->ordonne()->get());
+        AgencyAccess::applyArticleScope($q, $request->user());
+
+        $withProductsCount = $request->boolean('with_products_count');
+        if ($withProductsCount && $kind === Article::KIND_JALON) {
+            $q->withCount('jalonProductLinks as products_count');
+        }
+
+        return response()->json(
+            $q->ordonne()->get()->map(fn (Article $article) => [
+                'id' => $article->id,
+                'ref_famille_article_id' => $article->ref_famille_article_id,
+                'ref_article_lie_id' => $article->ref_article_lie_id,
+                'code' => $article->code,
+                'code_interne' => $article->code_interne,
+                'sku' => $article->sku,
+                'libelle' => $article->libelle,
+                'description' => $article->description,
+                'description_commerciale' => $article->description_commerciale,
+                'description_technique' => $article->description_technique,
+                'tags' => $article->isJalon() || $article->isProduct() ? null : $article->tags,
+                'unite' => $article->unite,
+                'hfsql_unite' => $article->hfsql_unite,
+                'prix_unitaire_ht' => $article->prix_unitaire_ht,
+                'prix_revient_ht' => $article->prix_revient_ht,
+                'prix_unitaire_ht_formate' => $article->prix_unitaire_ht_formate,
+                'tva_rate' => $article->tva_rate,
+                'duree_estimee' => $article->duree_estimee,
+                'normes' => $article->normes,
+                'actif' => $article->actif,
+                'kind' => $article->kind ?? Article::KIND_LEGACY,
+                'famille_label' => $article->famille_label,
+                'famille' => $article->famille,
+                'article_lie' => $article->articleLie ? [
+                    'id' => $article->articleLie->id,
+                    'code' => $article->articleLie->code,
+                    'libelle' => $article->articleLie->libelle,
+                ] : null,
+                'qualification_tags' => $article->isJalon()
+                    ? $article->qualificationTags->map(fn ($tag) => [
+                        'id' => $tag->id,
+                        'code' => $tag->code,
+                        'label' => $tag->label,
+                        'display_label' => $tag->displayLabel(),
+                        'groupe' => $tag->groupe,
+                    ])->values()
+                    : [],
+                'products_count' => $withProductsCount && $article->isJalon()
+                    ? (int) ($article->products_count ?? 0)
+                    : null,
+            ])
+        );
     }
 
-    public function show(Article $article): JsonResponse
+    public function show(Request $request, Article $article): JsonResponse
     {
-        $article->load([
+        if (! AgencyAccess::userMayAccessArticle($request->user(), $article)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $loads = [
             'famille',
             'articleLie:id,code,libelle',
             'parametresEssai' => fn ($p) => $p->ordonne(),
             'resultats' => fn ($r) => $r->orderBy('code'),
             'famillePackages' => fn ($f) => $f->ordonne()->with(['packages' => fn ($x) => $x->ordonne()]),
-        ]);
+        ];
+
+        if ($article->isJalon()) {
+            $loads['qualificationTags'] = fn ($t) => $t->orderBy('groupe')->orderBy('code');
+            $loads['jalonProductLinks'] = fn ($jp) => $jp->with([
+                'product:id,code,libelle,unite,prix_unitaire_ht,tva_rate,kind,actif',
+            ]);
+        }
+
+        if ($article->isProduct()) {
+            $loads['productJalonLinks'] = fn ($jp) => $jp->with([
+                'jalon:id,code,libelle,famille_label,kind,actif',
+            ]);
+        }
+
+        $loads['visibleLabAgencies'] = fn ($q) => $q->select('agencies.id', 'agencies.name', 'agencies.code');
+
+        $article->load($loads);
 
         return (new ArticleResource($article))->response();
     }
@@ -53,9 +145,23 @@ class ArticleController extends Controller
         $this->authorize('create', Article::class);
 
         $data = $request->validate($this->rules());
-        $article = Article::create($data);
+        $article = $this->s2gRelations->createArticleWithRelations($data);
 
-        return (new ArticleResource($article->load('famille')))->response()->setStatusCode(201);
+        $loads = ['famille'];
+        if ($article->isJalon()) {
+            $loads['qualificationTags'] = fn ($t) => $t->orderBy('groupe')->orderBy('code');
+            $loads['jalonProductLinks'] = fn ($jp) => $jp->with([
+                'product:id,code,libelle,unite,prix_unitaire_ht,tva_rate,kind,actif',
+            ]);
+        }
+
+        if ($article->isProduct()) {
+            $loads['productJalonLinks'] = fn ($jp) => $jp->with([
+                'jalon:id,code,libelle,famille_label,kind,actif',
+            ]);
+        }
+
+        return (new ArticleResource($article->load($loads)))->response()->setStatusCode(201);
     }
 
     public function update(Request $request, Article $article): JsonResponse
@@ -63,14 +169,57 @@ class ArticleController extends Controller
         $this->authorize('update', $article);
 
         $data = $request->validate($this->rules($article->id, true));
+        $qualificationTagIds = array_key_exists('qualification_tag_ids', $data)
+            ? array_values(array_map('intval', $data['qualification_tag_ids'] ?? []))
+            : null;
+        $productArticleIds = array_key_exists('product_article_ids', $data)
+            ? array_values(array_map('intval', $data['product_article_ids'] ?? []))
+            : null;
+        $jalonArticleIds = array_key_exists('jalon_article_ids', $data)
+            ? array_values(array_map('intval', $data['jalon_article_ids'] ?? []))
+            : null;
+
+        unset($data['qualification_tag_ids'], $data['product_article_ids'], $data['jalon_article_ids']);
+
         $article->update($data);
+        $article->refresh();
+
+        if ($article->isJalon()) {
+            if ($qualificationTagIds !== null || $productArticleIds !== null) {
+                $this->s2gRelations->syncJalon(
+                    $article,
+                    $qualificationTagIds ?? $article->qualificationTags()->pluck('qualification_tags.id')->all(),
+                    $productArticleIds ?? $article->jalonProductLinks()->pluck('product_article_id')->all(),
+                );
+            }
+        }
+
+        if ($article->isProduct() && $jalonArticleIds !== null) {
+            $this->s2gRelations->syncProductJalons($article, $jalonArticleIds);
+        }
+
         $fresh = $article->fresh();
-        $fresh->load([
+        $loads = [
             'famille',
             'parametresEssai' => fn ($p) => $p->ordonne(),
             'resultats' => fn ($r) => $r->orderBy('code'),
             'famillePackages' => fn ($f) => $f->ordonne()->with(['packages' => fn ($x) => $x->ordonne()]),
-        ]);
+        ];
+
+        if ($fresh->isJalon()) {
+            $loads['qualificationTags'] = fn ($t) => $t->orderBy('groupe')->orderBy('code');
+            $loads['jalonProductLinks'] = fn ($jp) => $jp->with([
+                'product:id,code,libelle,unite,prix_unitaire_ht,tva_rate,kind,actif',
+            ]);
+        }
+
+        if ($fresh->isProduct()) {
+            $loads['productJalonLinks'] = fn ($jp) => $jp->with([
+                'jalon:id,code,libelle,famille_label,kind,actif',
+            ]);
+        }
+
+        $fresh->load($loads);
 
         return (new ArticleResource($fresh))->response();
     }
@@ -81,6 +230,34 @@ class ArticleController extends Controller
         $article->delete();
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * Visibilité agences labo : multi-site ou agences spécifiques.
+     */
+    public function syncLabVisibility(Request $request, Article $article): JsonResponse
+    {
+        $this->authorize('update', $article);
+
+        $validated = $request->validate([
+            'is_multi_site' => 'required|boolean',
+            'lab_agency_ids' => 'nullable|array',
+            'lab_agency_ids.*' => 'integer|exists:agencies,id',
+        ]);
+
+        $article->update(['is_multi_site' => (bool) $validated['is_multi_site']]);
+
+        $ids = array_map('intval', $validated['lab_agency_ids'] ?? []);
+        $allowed = Agency::query()
+            ->whereNull('client_id')
+            ->whereIn('id', $ids)
+            ->pluck('id')
+            ->all();
+        $article->visibleLabAgencies()->sync($validated['is_multi_site'] ? [] : $allowed);
+
+        return response()->json($article->fresh()->load([
+            'visibleLabAgencies:id,name,code,is_siege',
+        ]));
     }
 
     /**
@@ -101,7 +278,7 @@ class ArticleController extends Controller
             ? 'sometimes|integer|exists:ref_famille_articles,id'
             : 'required|integer|exists:ref_famille_articles,id';
 
-        $libelle = $partial ? 'sometimes|string|max:255' : 'required|string|max:255';
+        $libelle = $partial ? 'sometimes|string' : 'required|string';
 
         $lie = ['nullable', 'integer', 'exists:ref_articles,id'];
         if ($ignoreId !== null) {
@@ -111,6 +288,10 @@ class ArticleController extends Controller
                 Rule::exists('ref_articles', 'id')->whereNot('id', $ignoreId),
             ];
         }
+
+        $kindRule = $partial
+            ? ['sometimes', Rule::in([Article::KIND_JALON, Article::KIND_PRODUCT, Article::KIND_LEGACY])]
+            : ['required', Rule::in([Article::KIND_JALON, Article::KIND_PRODUCT])];
 
         return [
             'ref_famille_article_id' => $famille,
@@ -132,6 +313,15 @@ class ArticleController extends Controller
             'duree_estimee' => 'nullable|integer|min:0',
             'normes' => 'nullable|string',
             'actif' => 'boolean',
+            'is_multi_site' => 'sometimes|boolean',
+            'kind' => $kindRule,
+            'famille_label' => 'nullable|string|max:255',
+            'qualification_tag_ids' => 'nullable|array',
+            'qualification_tag_ids.*' => 'integer|exists:qualification_tags,id',
+            'product_article_ids' => 'nullable|array',
+            'product_article_ids.*' => 'integer|exists:ref_articles,id',
+            'jalon_article_ids' => 'nullable|array',
+            'jalon_article_ids.*' => 'integer|exists:ref_articles,id',
         ];
     }
 }

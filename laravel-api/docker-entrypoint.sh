@@ -42,6 +42,7 @@ if [ -n "$DB_HOST" ] && [ "$DB_CONNECTION" != "sqlite" ]; then
 fi
 
 php artisan migrate --force --no-interaction
+php artisan catalogue:import-s2g --if-empty --force --no-interaction 2>/dev/null || true
 php artisan storage:link --force 2>/dev/null || true
 
 if [ "${RUN_SEED:-0}" = "1" ]; then

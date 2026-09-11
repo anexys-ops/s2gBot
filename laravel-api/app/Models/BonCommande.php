@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BonCommande extends Model
@@ -80,5 +83,26 @@ class BonCommande extends Model
     public function bonsLivraison(): HasMany
     {
         return $this->hasMany(BonLivraison::class, 'bon_commande_id');
+    }
+
+    public function invoices(): BelongsToMany
+    {
+        return $this->belongsToMany(Invoice::class, 'invoice_bon_commande')->withTimestamps();
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
+    }
+
+    /** BC planifiables sur le terrain (brouillon inclus, hors annulés). */
+    public function scopePlanifiable(Builder $query): Builder
+    {
+        return $query->whereIn('statut', [
+            self::STATUT_BROUILLON,
+            self::STATUT_CONFIRME,
+            self::STATUT_EN_COURS,
+            self::STATUT_LIVRE,
+        ]);
     }
 }

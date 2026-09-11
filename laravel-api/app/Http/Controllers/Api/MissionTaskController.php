@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\MissionTask;
+use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
 use App\Models\TaskMeasure;
 use App\Models\TaskResult;
@@ -13,6 +14,17 @@ use Illuminate\Support\Facades\DB;
 
 class MissionTaskController extends Controller
 {
+    private function optionalQueryString(Request $request, string $key): ?string
+    {
+        if (! $request->filled($key)) {
+            return null;
+        }
+
+        $value = trim($request->string($key)->toString());
+
+        return $value !== '' ? $value : null;
+    }
+
     /**
      * GET /mission-tasks
      * Paramètres : assigned_user_id, statut, type (labo|technicien|ingenieur),
@@ -35,10 +47,10 @@ class MissionTaskController extends Controller
         if ($uid = $request->integer('assigned_user_id')) {
             $q->where('assigned_user_id', $uid);
         }
-        if ($statut = $request->string('statut')) {
+        if ($statut = $this->optionalQueryString($request, 'statut')) {
             $q->where('statut', $statut);
         }
-        if ($type = $request->string('type')) {
+        if ($type = $this->optionalQueryString($request, 'type')) {
             $q->whereHas('ordreMissionLigne.ordreMission', fn ($sq) => $sq->where('type', $type));
         }
         if ($omId = $request->integer('ordre_mission_id')) {
@@ -47,10 +59,10 @@ class MissionTaskController extends Controller
         if ($dossierId = $request->integer('dossier_id')) {
             $q->whereHas('ordreMissionLigne.ordreMission', fn ($sq) => $sq->where('dossier_id', $dossierId));
         }
-        if ($from = $request->string('date_from')) {
+        if ($from = $this->optionalQueryString($request, 'date_from')) {
             $q->where(fn ($sq) => $sq->whereDate('planned_date', '>=', $from)->orWhereDate('due_date', '>=', $from));
         }
-        if ($to = $request->string('date_to')) {
+        if ($to = $this->optionalQueryString($request, 'date_to')) {
             $q->where(fn ($sq) => $sq->whereDate('planned_date', '<=', $to)->orWhereDate('due_date', '<=', $to));
         }
 
@@ -81,7 +93,7 @@ class MissionTaskController extends Controller
 
         $data = $request->validate([
             'assigned_user_id' => 'nullable|exists:users,id',
-            'statut'           => 'in:todo,in_progress,done,validated,rejected',
+            'statut'           => 'in:'.implode(',', MissionTask::statuts()),
             'planned_date'     => 'nullable|date',
             'due_date'         => 'nullable|date',
             'notes'            => 'nullable|string',
@@ -175,6 +187,8 @@ class MissionTaskController extends Controller
      */
     public function laboBoard(Request $request): JsonResponse
     {
+        OrdreMissionLigne::syncMissingMissionTasks(['labo']);
+
         $q = MissionTask::query()
             ->whereHas('ordreMissionLigne.ordreMission', fn ($sq) => $sq->where('type', 'labo'))
             ->with([
@@ -192,7 +206,7 @@ class MissionTaskController extends Controller
         if ($uid = $request->integer('user_id')) {
             $q->where('assigned_user_id', $uid);
         }
-        if ($statut = $request->string('statut')) {
+        if ($statut = $this->optionalQueryString($request, 'statut')) {
             $q->where('statut', $statut);
         }
 
@@ -204,17 +218,21 @@ class MissionTaskController extends Controller
      */
     public function terrainBoard(Request $request): JsonResponse
     {
+        OrdreMissionLigne::syncMissingMissionTasks(['technicien', 'ingenieur']);
+
         $q = MissionTask::query()
             ->whereHas('ordreMissionLigne.ordreMission', function ($sq) {
                 $sq->whereIn('type', ['technicien', 'ingenieur']);
             })
             ->with([
                 'assignedUser:id,name',
-                'ordreMissionLigne.ordreMission:id,numero,type,statut,client_id,site_id',
-                'ordreMissionLigne.ordreMission.client:id,name',
-                'ordreMissionLigne.ordreMission.site:id,name',
-                'ordreMissionLigne.article:id,code,libelle',
-                'ordreMissionLigne.articleAction:id,type,libelle,duree_heures',
+                'ordreMissionLigne',
+                'ordreMissionLigne.ordreMission.client',
+                'ordreMissionLigne.ordreMission.site',
+                'ordreMissionLigne.ordreMission.dossier',
+                'ordreMissionLigne.ordreMission.bonCommande:id,numero,dossier_id',
+                'ordreMissionLigne.ordreMission.bonCommande.dossier:id,reference,titre',
+                'ordreMissionLigne.article',
                 'ordreMissionLigne.articleAction.measureConfigs',
                 'measures.measureConfig',
                 'result',
@@ -223,13 +241,174 @@ class MissionTaskController extends Controller
         if ($uid = $request->integer('user_id')) {
             $q->where('assigned_user_id', $uid);
         }
-        if ($type = $request->string('type')) {
+        if ($type = $this->optionalQueryString($request, 'type')) {
             $q->whereHas('ordreMissionLigne.ordreMission', fn ($sq) => $sq->where('type', $type));
         }
-        if ($statut = $request->string('statut')) {
+        if ($statut = $this->optionalQueryString($request, 'statut')) {
             $q->where('statut', $statut);
+        }
+        if ($request->boolean('active_only')) {
+            $q->whereHas('ordreMissionLigne.ordreMission', fn ($sq) => $sq->whereIn('statut', [
+                OrdreMission::STATUT_PLANIFIE,
+                OrdreMission::STATUT_EN_COURS,
+            ]))->whereNotIn('statut', [
+                MissionTask::STATUT_DONE,
+                MissionTask::STATUT_VALIDATED,
+                MissionTask::STATUT_REJECTED,
+            ]);
         }
 
         return response()->json($q->orderBy('planned_date')->get());
+    }
+
+    /**
+     * GET /mission-tasks/terrain/measures — tâches terrain avec formulaires de mesure
+     *
+     * Paramètres : user_id, type, statut, dossier_id, date_from, date_to, search
+     */
+    public function terrainMeasuresBoard(Request $request): JsonResponse
+    {
+        OrdreMissionLigne::syncMissingMissionTasks(['technicien', 'ingenieur']);
+
+        $q = MissionTask::query()
+            ->whereHas('ordreMissionLigne.ordreMission', function ($sq) {
+                $sq->whereIn('type', ['technicien', 'ingenieur']);
+            })
+            ->whereHas('ordreMissionLigne.articleAction.measureConfigs')
+            ->with([
+                'assignedUser:id,name',
+                'ordreMissionLigne:id,ordre_mission_id,libelle,ref_article_id,article_action_id,statut',
+                'ordreMissionLigne.ordreMission:id,numero,type,statut,client_id,site_id,dossier_id',
+                'ordreMissionLigne.ordreMission.client:id,name',
+                'ordreMissionLigne.ordreMission.site:id,name',
+                'ordreMissionLigne.ordreMission.dossier:id,reference,titre,date_debut,date_fin_prevue',
+                'ordreMissionLigne.article:id,code,libelle',
+                'ordreMissionLigne.articleAction:id,type,libelle,duree_heures',
+                'ordreMissionLigne.articleAction.measureConfigs',
+                'measures.measureConfig',
+                'measures.createdBy:id,name',
+                'result',
+            ]);
+
+        if ($uid = $request->integer('user_id')) {
+            $q->where('assigned_user_id', $uid);
+        }
+        if ($type = $this->optionalQueryString($request, 'type')) {
+            $q->whereHas('ordreMissionLigne.ordreMission', fn ($sq) => $sq->where('type', $type));
+        }
+        if ($statut = $this->optionalQueryString($request, 'statut')) {
+            $q->where('statut', $statut);
+        }
+        if ($dossierId = $request->integer('dossier_id')) {
+            $q->whereHas('ordreMissionLigne.ordreMission', fn ($sq) => $sq->where('dossier_id', $dossierId));
+        }
+        if ($from = $this->optionalQueryString($request, 'date_from')) {
+            $q->where(fn ($sq) => $sq->whereDate('planned_date', '>=', $from)->orWhereDate('due_date', '>=', $from));
+        }
+        if ($to = $this->optionalQueryString($request, 'date_to')) {
+            $q->where(fn ($sq) => $sq->whereDate('planned_date', '<=', $to)->orWhereDate('due_date', '<=', $to));
+        }
+        if ($search = $this->optionalQueryString($request, 'search')) {
+            $term = '%'.addcslashes($search, '%_\\').'%';
+            $q->where(function ($sq) use ($term) {
+                $sq->where('unique_number', 'like', $term)
+                    ->orWhereHas('ordreMissionLigne.ordreMission', fn ($om) => $om->where('numero', 'like', $term))
+                    ->orWhereHas('ordreMissionLigne.ordreMission.dossier', fn ($d) => $d->where('reference', 'like', $term)->orWhere('titre', 'like', $term))
+                    ->orWhereHas('ordreMissionLigne.ordreMission.client', fn ($c) => $c->where('name', 'like', $term))
+                    ->orWhereHas('ordreMissionLigne.article', fn ($a) => $a->where('code', 'like', $term)->orWhere('libelle', 'like', $term))
+                    ->orWhereHas('ordreMissionLigne.articleAction', fn ($a) => $a->where('libelle', 'like', $term));
+            });
+        }
+
+        return response()->json($q->orderBy('planned_date')->get());
+    }
+
+    /**
+     * GET /mission-tasks/terrain/history — vue synthétique des tâches terrain
+     *
+     * Paramètres : user_id, type, statut, dossier_id, date_from, date_to (sur date de fin),
+     *              search (article, action, TSK, OdM, dossier), completed_only (1 = terminées uniquement)
+     */
+    public function terrainHistory(Request $request): JsonResponse
+    {
+        OrdreMissionLigne::syncMissingMissionTasks(['technicien', 'ingenieur']);
+
+        $q = MissionTask::query()
+            ->whereHas('ordreMissionLigne.ordreMission', function ($sq) {
+                $sq->whereIn('type', ['technicien', 'ingenieur']);
+            })
+            ->with([
+                'assignedUser:id,name',
+                'validatedBy:id,name',
+                'ordreMissionLigne',
+                'ordreMissionLigne.ordreMission.client',
+                'ordreMissionLigne.ordreMission.site',
+                'ordreMissionLigne.ordreMission.dossier',
+                'ordreMissionLigne.ordreMission.bonCommande:id,numero,dossier_id',
+                'ordreMissionLigne.ordreMission.bonCommande.dossier:id,reference,titre',
+                'ordreMissionLigne.article',
+                'ordreMissionLigne.articleAction.measureConfigs',
+                'measures.measureConfig',
+                'measures.createdBy:id,name',
+                'result.validatedBy:id,name',
+            ]);
+
+        if ($uid = $request->integer('user_id')) {
+            $q->where('assigned_user_id', $uid);
+        }
+        if ($type = $this->optionalQueryString($request, 'type')) {
+            $q->whereHas('ordreMissionLigne.ordreMission', fn ($sq) => $sq->where('type', $type));
+        }
+        if ($statut = $this->optionalQueryString($request, 'statut')) {
+            $q->where('statut', $statut);
+        } elseif ($request->boolean('completed_only')) {
+            $q->whereIn('statut', [
+                MissionTask::STATUT_DONE,
+                MissionTask::STATUT_VALIDATED,
+                MissionTask::STATUT_REJECTED,
+            ]);
+        }
+        if ($dossierId = $request->integer('dossier_id')) {
+            $q->whereHas('ordreMissionLigne.ordreMission', fn ($sq) => $sq->where('dossier_id', $dossierId));
+        }
+        if ($from = $this->optionalQueryString($request, 'date_from')) {
+            $q->where(function ($sq) use ($from) {
+                $sq->whereDate('completed_at', '>=', $from)
+                    ->orWhere(function ($sq2) use ($from) {
+                        $sq2->whereNull('completed_at')->whereDate('validated_at', '>=', $from);
+                    })
+                    ->orWhere(function ($sq2) use ($from) {
+                        $sq2->whereNull('completed_at')->whereNull('validated_at')->whereDate('planned_date', '>=', $from);
+                    });
+            });
+        }
+        if ($to = $this->optionalQueryString($request, 'date_to')) {
+            $q->where(function ($sq) use ($to) {
+                $sq->whereDate('completed_at', '<=', $to)
+                    ->orWhere(function ($sq2) use ($to) {
+                        $sq2->whereNull('completed_at')->whereDate('validated_at', '<=', $to);
+                    })
+                    ->orWhere(function ($sq2) use ($to) {
+                        $sq2->whereNull('completed_at')->whereNull('validated_at')->whereDate('planned_date', '<=', $to);
+                    });
+            });
+        }
+        if ($search = $this->optionalQueryString($request, 'search')) {
+            $term = '%' . addcslashes($search, '%_\\') . '%';
+            $q->where(function ($sq) use ($term) {
+                $sq->where('unique_number', 'like', $term)
+                    ->orWhereHas('ordreMissionLigne.ordreMission', fn ($om) => $om->where('numero', 'like', $term))
+                    ->orWhereHas('ordreMissionLigne.ordreMission.dossier', fn ($d) => $d->where('reference', 'like', $term)->orWhere('titre', 'like', $term))
+                    ->orWhereHas('ordreMissionLigne.article', fn ($a) => $a->where('code', 'like', $term)->orWhere('libelle', 'like', $term))
+                    ->orWhereHas('ordreMissionLigne.articleAction', fn ($a) => $a->where('libelle', 'like', $term));
+            });
+        }
+
+        return response()->json(
+            $q->orderByDesc('completed_at')
+                ->orderByDesc('validated_at')
+                ->orderByDesc('planned_date')
+                ->get()
+        );
     }
 }

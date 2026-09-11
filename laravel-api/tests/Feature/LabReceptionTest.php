@@ -1,0 +1,347 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\ArticleAction;
+use App\Models\BonCommande;
+use App\Models\BonCommandeLigne;
+use App\Models\Catalogue\Article;
+use App\Models\Catalogue\FamilleArticle;
+use App\Models\Agency;
+use App\Models\Client;
+use App\Models\Dossier;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Sample;
+use App\Models\Site;
+use App\Models\TestType;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class LabReceptionTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_attendus_lists_all_bc_lines_with_technician_including_report(): void
+    {
+        [$labLine, $reportLine, $bc] = $this->seedBcWithLabAndReportLines();
+
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+
+        $res = $this->actingAs($lab, 'sanctum')->getJson('/api/v1/lab/reception/attendus');
+        $res->assertOk();
+        $res->assertJsonPath('stats.produits', 2);
+        $res->assertJsonCount(2, 'data');
+
+        $ids = collect($res->json('data'))->pluck('id')->all();
+        $this->assertContains($labLine->id, $ids);
+        $this->assertContains($reportLine->id, $ids);
+
+        $labRow = collect($res->json('data'))->firstWhere('id', $labLine->id);
+        $this->assertSame(3, $labRow['quantite_attendue']);
+        $this->assertSame($bc->numero, $labRow['bon_commande']['numero']);
+        $this->assertSame('Chantier Réception', $labRow['chantier']['name']);
+    }
+
+    public function test_attendus_includes_free_text_line_without_catalogue_article(): void
+    {
+        [, , $bc, , $technicien] = $this->seedBcWithLabAndReportLines();
+
+        $freeTextLine = BonCommandeLigne::query()->create([
+            'bon_commande_id' => $bc->id,
+            'ref_article_id' => null,
+            'libelle' => 'Ligne texte libre chantier',
+            'quantite' => 2,
+            'prix_unitaire_ht' => 50,
+            'tva_rate' => 20,
+            'montant_ht' => 100,
+            'technicien_id' => $technicien->id,
+        ]);
+
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $res = $this->actingAs($lab, 'sanctum')->getJson('/api/v1/lab/reception/attendus');
+        $res->assertOk();
+        $res->assertJsonPath('stats.produits', 3);
+
+        $row = collect($res->json('data'))->firstWhere('id', $freeTextLine->id);
+        $this->assertNotNull($row);
+        $this->assertSame('Ligne texte libre chantier', $row['libelle']);
+        $this->assertNull($row['article']);
+    }
+
+    public function test_attendus_excludes_brouillon_bc_and_lines_without_technician(): void
+    {
+        [$labLine] = $this->seedBcWithLabAndReportLines(statut: BonCommande::STATUT_BROUILLON);
+        $labLine->update(['technicien_id' => null]);
+
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $this->actingAs($lab, 'sanctum')->getJson('/api/v1/lab/reception/attendus')
+            ->assertOk()
+            ->assertJsonPath('stats.produits', 0);
+    }
+
+    public function test_attendus_tracks_sample_counts_per_bc_line(): void
+    {
+        [$labLine, , , $client] = $this->seedBcWithLabAndReportLines();
+        $orderItemId = $this->legacyOrderItemId($client);
+
+        Sample::query()->create([
+            'order_item_id' => $orderItemId,
+            'reference' => 'SMP-REC-TRANSIT',
+            'bon_commande_ligne_id' => $labLine->id,
+            'dossier_id' => $labLine->bonCommande->dossier_id,
+            'product_id' => $labLine->ref_article_id,
+            'sample_type' => 'sol',
+            'status' => Sample::STATUS_EN_TRANSIT,
+        ]);
+        Sample::query()->create([
+            'order_item_id' => $orderItemId,
+            'reference' => 'SMP-REC-RECEIVED',
+            'bon_commande_ligne_id' => $labLine->id,
+            'dossier_id' => $labLine->bonCommande->dossier_id,
+            'product_id' => $labLine->ref_article_id,
+            'sample_type' => 'sol',
+            'status' => Sample::STATUS_RECEPTIONNE,
+            'received_at' => now(),
+        ]);
+
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $res = $this->actingAs($lab, 'sanctum')->getJson('/api/v1/lab/reception/attendus');
+        $res->assertOk();
+        $row = collect($res->json('data'))->firstWhere('id', $labLine->id);
+        $this->assertNotNull($row);
+        $this->assertSame(1, $row['quantite_en_transit']);
+        $this->assertSame(1, $row['quantite_recue']);
+        $this->assertSame(1, $row['quantite_manquante']);
+        $this->assertFalse($row['reception_complete']);
+    }
+
+    public function test_receive_from_line_creates_sample_with_transco_and_label(): void
+    {
+        [$labLine, , , $client, $technicien] = $this->seedBcWithLabAndReportLines();
+        $this->legacyOrderItemId($client);
+        $receptionnaire = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+
+        $res = $this->actingAs($receptionnaire, 'sanctum')->postJson('/api/v1/lab/reception/receive-from-line', [
+            'bon_commande_ligne_id' => $labLine->id,
+            'condition_state' => 'bon',
+            'storage_location' => 'Salle A / Étagère 1',
+            'collected_by' => $technicien->id,
+            'sample_type' => 'sol',
+            'quantity' => 1,
+        ]);
+
+        $res->assertCreated();
+        $res->assertJsonPath('status', Sample::STATUS_RECEPTIONNE);
+        $this->assertNotEmpty($res->json('fold_number'));
+        $this->assertNotEmpty($res->json('transco_number'));
+        $this->assertNotNull($res->json('received_at'));
+        $sampleId = (int) $res->json('id');
+        $this->assertDatabaseHas('samples', [
+            'id' => $sampleId,
+            'received_by' => $receptionnaire->id,
+            'status' => Sample::STATUS_RECEPTIONNE,
+        ]);
+        $res->assertJsonPath('received_by.id', $receptionnaire->id);
+        $label = $this->actingAs($receptionnaire, 'sanctum')->getJson("/api/v1/samples/{$sampleId}/label");
+        $label->assertOk();
+        $label->assertJsonPath('barcode', $res->json('fold_number'));
+        $qr = json_decode((string) $label->json('qr_json'), true);
+        $this->assertIsArray($qr);
+        $this->assertSame($res->json('fold_number'), $qr['fold']);
+        $this->assertSame($technicien->name, $qr['technicien']);
+        $this->assertNotEmpty($qr['date']);
+        $this->assertSame(1, $qr['prelevements']);
+    }
+
+    public function test_receive_batch_from_line_creates_multiple_samples(): void
+    {
+        [$labLine, , , $client, $technicien] = $this->seedBcWithLabAndReportLines();
+        $this->legacyOrderItemId($client);
+        $receptionnaire = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+
+        $res = $this->actingAs($receptionnaire, 'sanctum')->postJson('/api/v1/lab/reception/receive-batch-from-line', [
+            'bon_commande_ligne_id' => $labLine->id,
+            'batch_total' => 4,
+            'samples' => [
+                ['reception_index' => 1, 'condition_state' => 'bon', 'collected_by' => $technicien->id, 'sample_type' => 'sol'],
+                ['reception_index' => 2, 'condition_state' => 'bon', 'collected_by' => $technicien->id, 'sample_type' => 'sol'],
+                ['reception_index' => 4, 'condition_state' => 'bon', 'collected_by' => $technicien->id, 'sample_type' => 'sol'],
+            ],
+            'cancelled_slots' => [
+                ['reception_index' => 3, 'reason' => 'Échantillon non remis'],
+            ],
+        ]);
+
+        $res->assertCreated();
+        $res->assertJsonCount(3, 'data');
+        $res->assertJsonPath('data.0.reception_index', 1);
+        $res->assertJsonPath('data.0.reception_batch_total', 4);
+        $res->assertJsonPath('data.1.reception_index', 2);
+        $res->assertJsonPath('data.2.reception_index', 4);
+        $this->assertDatabaseHas('sample_reception_cancellations', [
+            'bon_commande_ligne_id' => $labLine->id,
+            'reception_index' => 3,
+            'reception_batch_total' => 4,
+        ]);
+
+        $sampleId = (int) $res->json('data.0.id');
+        $label = $this->actingAs($receptionnaire, 'sanctum')->getJson("/api/v1/samples/{$sampleId}/label");
+        $label->assertOk();
+        $label->assertJsonPath('payload.label_ref', '1/4');
+    }
+
+    public function test_cancel_sample_marks_annule_and_keeps_history(): void
+    {
+        [$labLine, , , $client, $technicien] = $this->seedBcWithLabAndReportLines();
+        $this->legacyOrderItemId($client);
+        $receptionnaire = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+
+        $create = $this->actingAs($receptionnaire, 'sanctum')->postJson('/api/v1/lab/reception/receive-from-line', [
+            'bon_commande_ligne_id' => $labLine->id,
+            'condition_state' => 'bon',
+            'collected_by' => $technicien->id,
+            'reception_index' => 1,
+            'reception_batch_total' => 1,
+        ]);
+        $create->assertCreated();
+        $sampleId = (int) $create->json('id');
+
+        $cancel = $this->actingAs($receptionnaire, 'sanctum')->patchJson("/api/v1/samples/{$sampleId}/cancel", [
+            'reason' => 'Erreur saisie',
+        ]);
+        $cancel->assertOk();
+        $cancel->assertJsonPath('status', Sample::STATUS_ANNULE);
+        $this->assertDatabaseHas('samples', [
+            'id' => $sampleId,
+            'status' => Sample::STATUS_ANNULE,
+            'cancellation_reason' => 'Erreur saisie',
+        ]);
+
+        $list = $this->actingAs($receptionnaire, 'sanctum')->getJson("/api/v1/samples?bon_commande_ligne_id={$labLine->id}&include_cancelled=1");
+        $list->assertOk();
+        $this->assertSame(1, collect($list->json('data'))->where('id', $sampleId)->count());
+    }
+
+    private function legacyOrderItemId(Client $client): int
+    {
+        $agency = Agency::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Siège réception',
+            'is_headquarters' => true,
+        ]);
+        $testType = TestType::query()->create([
+            'name' => 'Essai réception',
+            'unit_price' => '10.00',
+        ]);
+        $order = Order::query()->create([
+            'reference' => 'ORD-REC-'.uniqid(),
+            'client_id' => $client->id,
+            'agency_id' => $agency->id,
+            'status' => Order::STATUS_IN_PROGRESS,
+            'order_date' => now()->toDateString(),
+        ]);
+
+        return (int) OrderItem::query()->create([
+            'order_id' => $order->id,
+            'test_type_id' => $testType->id,
+            'quantity' => 1,
+        ])->id;
+    }
+
+    /**
+     * @return array{0: BonCommandeLigne, 1: BonCommandeLigne, 2: BonCommande, 3: Client, 4: User}
+     */
+    private function seedBcWithLabAndReportLines(string $statut = BonCommande::STATUT_CONFIRME): array
+    {
+        $client = Client::query()->create(['name' => 'Réception Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Chantier Réception']);
+        $technicien = User::factory()->create(['role' => User::ROLE_LAB_TECHNICIAN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-REC-001',
+            'titre' => 'Dossier réception',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $technicien->id,
+        ]);
+
+        $famille = FamilleArticle::query()->create([
+            'code' => 'F-REC',
+            'libelle' => 'Essais réception',
+            'type_ressource' => 'labo',
+            'actif' => true,
+        ]);
+
+        $labArticle = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
+            'code' => 'ESSAI-SOL-REC',
+            'libelle' => 'Essai sol réception',
+            'prix_unitaire_ht' => 100,
+            'tva_rate' => 20,
+            'actif' => true,
+            'triggers_odm_labo' => true,
+        ]);
+        ArticleAction::query()->create([
+            'ref_article_id' => $labArticle->id,
+            'type' => ArticleAction::TYPE_LABO,
+            'libelle' => 'Analyse sol',
+            'ordre' => 1,
+        ]);
+
+        $reportArticle = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
+            'code' => 'RAPPORT-GEO',
+            'libelle' => 'Rapport géotechnique',
+            'prix_unitaire_ht' => 500,
+            'tva_rate' => 20,
+            'actif' => true,
+            'triggers_odm_ingenieur' => true,
+            'triggers_odm_labo' => false,
+        ]);
+        ArticleAction::query()->create([
+            'ref_article_id' => $reportArticle->id,
+            'type' => ArticleAction::TYPE_INGENIEUR,
+            'libelle' => 'Rédaction rapport',
+            'ordre' => 1,
+        ]);
+
+        $bc = BonCommande::query()->create([
+            'numero' => 'BC-REC-001',
+            'dossier_id' => $dossier->id,
+            'client_id' => $client->id,
+            'statut' => $statut,
+            'date_commande' => '2026-03-01',
+            'montant_ht' => 800,
+            'montant_ttc' => 960,
+            'tva_rate' => 20,
+            'created_by' => $technicien->id,
+        ]);
+
+        $labLine = BonCommandeLigne::query()->create([
+            'bon_commande_id' => $bc->id,
+            'ref_article_id' => $labArticle->id,
+            'libelle' => 'Essai sol réception',
+            'quantite' => 3,
+            'prix_unitaire_ht' => 100,
+            'tva_rate' => 20,
+            'montant_ht' => 300,
+            'technicien_id' => $technicien->id,
+        ]);
+
+        $reportLine = BonCommandeLigne::query()->create([
+            'bon_commande_id' => $bc->id,
+            'ref_article_id' => $reportArticle->id,
+            'libelle' => 'Rapport géotechnique',
+            'quantite' => 1,
+            'prix_unitaire_ht' => 500,
+            'tva_rate' => 20,
+            'montant_ht' => 500,
+            'technicien_id' => $technicien->id,
+        ]);
+
+        return [$labLine, $reportLine, $bc, $client, $technicien];
+    }
+}

@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\BcLignePlanningAffectation;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
+use App\Services\BonLivraisonDeliveryService;
+use App\Services\CommercialDocumentTotalsService;
 use App\Services\CommercialDocumentWorkflowService;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
@@ -14,13 +17,15 @@ use Illuminate\Http\Request;
 class BonCommandeController extends Controller
 {
     public function __construct(
-        private readonly CommercialDocumentWorkflowService $workflow
+        private readonly CommercialDocumentWorkflowService $workflow,
+        private readonly BonLivraisonDeliveryService $delivery,
     ) {}
 
     public function index(Request $request): JsonResponse
     {
         $q = BonCommande::query()
-            ->with(['dossier', 'client', 'clientContact', 'lignes'])
+            ->with(['dossier', 'client', 'clientContact', 'lignes', 'quote'])
+            ->withCount(['bonsLivraison', 'invoices'])
             ->orderByDesc('date_commande')
             ->orderByDesc('id');
         if ($request->filled('dossier_id')) {
@@ -31,6 +36,21 @@ class BonCommandeController extends Controller
         }
         if ($request->filled('statut')) {
             $q->where('statut', (string) $request->query('statut'));
+        }
+        if ($request->boolean('planning')) {
+            $q->planifiable();
+        }
+        if ($search = trim((string) $request->query('search', ''))) {
+            $like = '%'.$search.'%';
+            $q->where(function ($sub) use ($like) {
+                $sub->where('numero', 'like', $like)
+                    ->orWhereHas('client', fn ($cq) => $cq->where('name', 'like', $like))
+                    ->orWhereHas('dossier', function ($dq) use ($like) {
+                        $dq->where('reference', 'like', $like)
+                            ->orWhere('titre', 'like', $like);
+                    })
+                    ->orWhereHas('quote', fn ($qq) => $qq->where('number', 'like', $like));
+            });
         }
         if ($request->user()->isLab()) {
             return response()->json($q->get());
@@ -50,6 +70,7 @@ class BonCommandeController extends Controller
         }
         $bonCommande->load([
             'lignes.planningAffectations.user',
+            'lignes.technicien',
             'dossier',
             'client',
             'clientContact',
@@ -75,6 +96,7 @@ class BonCommandeController extends Controller
             'montant_ht' => 'sometimes|numeric|min:0',
             'montant_ttc' => 'sometimes|numeric|min:0',
             'contact_id' => 'sometimes|nullable|exists:client_contacts,id',
+            'statut' => 'sometimes|string|in:brouillon,confirme,en_cours,livre,annule',
         ]);
         if ($data !== []) {
             $bonCommande->update($data);
@@ -122,12 +144,20 @@ class BonCommandeController extends Controller
             return response()->json(['message' => 'Ligne introuvable pour ce bon de commande.'], 404);
         }
 
+        if ($bonCommande->statut === BonCommande::STATUT_ANNULE) {
+            return response()->json(['message' => 'Impossible de modifier un bon de commande annulé.'], 422);
+        }
+
         $data = $request->validate([
             'date_debut_prevue' => 'sometimes|nullable|date',
             'date_fin_prevue' => 'sometimes|nullable|date',
+            'technicien_id' => 'sometimes|nullable|integer|exists:users,id',
+            'date_livraison' => 'sometimes|nullable|date',
+            'notes_ligne' => 'sometimes|nullable|string|max:500',
+            'quantite' => 'sometimes|numeric|min:0',
         ]);
         if ($data === []) {
-            $ligne->load('planningAffectations.user');
+            $ligne->load(['planningAffectations.user', 'technicien']);
 
             return response()->json($ligne);
         }
@@ -137,6 +167,50 @@ class BonCommandeController extends Controller
         if (array_key_exists('date_fin_prevue', $data)) {
             $ligne->date_fin_prevue = $data['date_fin_prevue'];
         }
+        if (array_key_exists('technicien_id', $data)) {
+            $ligne->technicien_id = $data['technicien_id'];
+        }
+        if (array_key_exists('date_livraison', $data)) {
+            $ligne->date_livraison = $data['date_livraison'];
+        }
+        if (array_key_exists('notes_ligne', $data)) {
+            $ligne->notes_ligne = $data['notes_ligne'];
+        }
+        if ($ligne->date_debut_prevue) {
+            if (! $ligne->date_fin_prevue) {
+                $ligne->date_fin_prevue = $ligne->date_debut_prevue;
+            }
+            if (! $ligne->date_livraison) {
+                $ligne->date_livraison = $ligne->date_debut_prevue;
+            }
+        }
+        $qtyChanged = false;
+        if (array_key_exists('quantite', $data)) {
+            $qty = round((float) $data['quantite'], 3);
+            $dejaLivree = $this->delivery->deliveredQtyForBcLigne((int) $ligne->id);
+            if ($qty + 1e-9 < $dejaLivree) {
+                $minLabel = $this->formatQtyLabel($dejaLivree);
+
+                return response()->json([
+                    'message' => "La quantité ne peut pas être inférieure à la quantité déjà livrée ({$minLabel}).",
+                ], 422);
+            }
+            $maxDevis = $ligne->quantite_devis !== null ? (float) $ligne->quantite_devis : null;
+            if ($maxDevis !== null && $qty > $maxDevis + 1e-9) {
+                $maxLabel = $this->formatQtyLabel($maxDevis);
+
+                return response()->json([
+                    'message' => "La quantité ne peut pas dépasser celle du devis ({$maxLabel}).",
+                ], 422);
+            }
+            $ligne->quantite = $qty;
+            $ligne->montant_ht = CommercialDocumentTotalsService::lineHt(
+                $qty,
+                (float) $ligne->prix_unitaire_ht,
+                0,
+            );
+            $qtyChanged = true;
+        }
         if ($ligne->date_debut_prevue && $ligne->date_fin_prevue
             && $ligne->date_debut_prevue->format('Y-m-d') > $ligne->date_fin_prevue->format('Y-m-d')
         ) {
@@ -144,9 +218,64 @@ class BonCommandeController extends Controller
         }
 
         $ligne->save();
-        $ligne->load('planningAffectations.user');
+        if ($qtyChanged) {
+            $this->recalculateBonCommandeTotals($bonCommande);
+        }
+        $this->syncTerrainPlanningAffectation($ligne, (int) $request->user()->id);
+        $ligne->load(['planningAffectations.user', 'technicien']);
 
         return response()->json($ligne);
+    }
+
+    private function recalculateBonCommandeTotals(BonCommande $bonCommande): void
+    {
+        $bonCommande->load(['lignes', 'client']);
+        $rows = [];
+        foreach ($bonCommande->lignes as $l) {
+            $rows[] = [
+                'ht' => (float) $l->montant_ht,
+                'tva_rate' => (float) $l->tva_rate,
+            ];
+        }
+        $caAnnuelTvaRegime = $bonCommande->client?->usesCaAnnuelTvaRegime() ?? false;
+        $totals = CommercialDocumentTotalsService::computeTotals($rows, 0, 0, 0, 0, 0, 20, $caAnnuelTvaRegime);
+        $bonCommande->update([
+            'montant_ht' => $totals['amount_ht'],
+            'montant_ttc' => $totals['amount_ttc'],
+        ]);
+    }
+
+    private function formatQtyLabel(float $qty): string
+    {
+        if (abs($qty - round($qty)) < 1e-9) {
+            return (string) (int) round($qty);
+        }
+
+        return rtrim(rtrim(number_format($qty, 3, '.', ''), '0'), '.');
+    }
+
+    private function syncTerrainPlanningAffectation(BonCommandeLigne $ligne, int $actorId): void
+    {
+        $ligne->refresh();
+
+        if (! $ligne->technicien_id || ! $ligne->date_debut_prevue) {
+            return;
+        }
+
+        $dateFin = $ligne->date_fin_prevue ?? $ligne->date_debut_prevue;
+
+        BcLignePlanningAffectation::query()->updateOrCreate(
+            [
+                'bon_commande_ligne_id' => $ligne->id,
+                'user_id' => $ligne->technicien_id,
+            ],
+            [
+                'date_debut' => $ligne->date_debut_prevue->format('Y-m-d'),
+                'date_fin' => $dateFin->format('Y-m-d'),
+                'notes' => $ligne->notes_ligne,
+                'created_by' => $actorId,
+            ]
+        );
     }
 
     public function confirmer(Request $request, BonCommande $bonCommande): JsonResponse

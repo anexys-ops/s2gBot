@@ -12,11 +12,27 @@ class MissionTask extends Model
 {
     use SoftDeletes;
 
-    const STATUT_TODO       = 'todo';
+    const STATUT_TODO        = 'todo';
     const STATUT_IN_PROGRESS = 'in_progress';
-    const STATUT_DONE       = 'done';
-    const STATUT_VALIDATED  = 'validated';
-    const STATUT_REJECTED   = 'rejected';
+    const STATUT_PAUSED      = 'paused';
+    const STATUT_FROZEN      = 'frozen';
+    const STATUT_DONE        = 'done';
+    const STATUT_VALIDATED   = 'validated';
+    const STATUT_REJECTED    = 'rejected';
+
+    /** @return list<string> */
+    public static function statuts(): array
+    {
+        return [
+            self::STATUT_TODO,
+            self::STATUT_IN_PROGRESS,
+            self::STATUT_PAUSED,
+            self::STATUT_FROZEN,
+            self::STATUT_DONE,
+            self::STATUT_VALIDATED,
+            self::STATUT_REJECTED,
+        ];
+    }
 
     protected $fillable = [
         'unique_number',

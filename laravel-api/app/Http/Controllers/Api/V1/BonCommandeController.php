@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BcLignePlanningAffectation;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
+use App\Models\Quote;
 use App\Services\BonLivraisonDeliveryService;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\CommercialDocumentWorkflowService;
@@ -71,7 +72,7 @@ class BonCommandeController extends Controller
         $bonCommande->load([
             'lignes.planningAffectations.user',
             'lignes.technicien',
-            'dossier',
+            'dossier.centreGroup',
             'client',
             'clientContact',
             'quote',
@@ -275,6 +276,67 @@ class BonCommandeController extends Controller
                 'created_by' => $actorId,
             ]
         );
+    }
+
+    public function syncPrixDevis(Request $request, BonCommande $bonCommande): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if (! AgencyAccess::userMayAccessBonCommande($request->user(), $bonCommande)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if ($bonCommande->statut === BonCommande::STATUT_ANNULE) {
+            return response()->json(['message' => 'Impossible de modifier un bon de commande annulé.'], 422);
+        }
+        if (! $bonCommande->quote_id) {
+            return response()->json(['message' => 'Ce bon de commande n\'est pas lié à un devis.'], 422);
+        }
+
+        $quote = Quote::with('quoteLines')->find($bonCommande->quote_id);
+        if (! $quote) {
+            return response()->json(['message' => 'Devis introuvable.'], 422);
+        }
+
+        $bonCommande->load('lignes');
+        $quoteLines = $quote->quoteLines->sortBy('order')->values();
+        $bcLignes = $bonCommande->lignes->sortBy('ordre')->values();
+
+        $updated = 0;
+        foreach ($bcLignes as $idx => $ligne) {
+            $ql = $quoteLines[$idx] ?? null;
+            if (! $ql) {
+                continue;
+            }
+            $prix = round((float) $ql->unit_price, 4);
+            if ($prix <= 0) {
+                continue;
+            }
+            $ligne->prix_unitaire_ht = $prix;
+            $ligne->montant_ht = CommercialDocumentTotalsService::lineHt(
+                (float) $ligne->quantite,
+                $prix,
+                0,
+            );
+            $ligne->save();
+            $updated++;
+        }
+
+        if ($updated > 0) {
+            $this->recalculateBonCommandeTotals($bonCommande);
+        }
+
+        $bonCommande->refresh()->load([
+            'lignes.planningAffectations.user',
+            'lignes.technicien',
+            'dossier',
+            'client',
+            'clientContact',
+            'quote',
+            'bonsLivraison.lignes',
+        ]);
+
+        return response()->json($bonCommande);
     }
 
     public function confirmer(Request $request, BonCommande $bonCommande): JsonResponse

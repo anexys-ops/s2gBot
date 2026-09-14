@@ -790,12 +790,28 @@ export default function QuoteEditorPage() {
       ? `Consulter le devis ${quote?.number ?? ''}`
       : `Modifier le devis ${quote?.number ?? ''}`
 
+  const selectedDossier = form.dossier_id ? dossiers.find((d) => d.id === form.dossier_id) : undefined
+
   const pageSubtitle = isReadOnly ? (
     <span className="bc-fiche__subtitle">
       {quote ? (
         <StatusBadge variant={quoteStatutBadgeProps(quote.status).variant} size="sm">
           {quoteStatutBadgeProps(quote.status).label}
         </StatusBadge>
+      ) : null}
+      {selectedDossier?.centre_group ? (
+        <span
+          style={{
+            background: 'var(--color-accent-soft, #e8f4fd)',
+            color: 'var(--color-accent, #0a6bbf)',
+            borderRadius: '0.3rem',
+            padding: '0.1rem 0.5rem',
+            fontSize: '0.8rem',
+            fontWeight: 600,
+          }}
+        >
+          {selectedDossier.centre_group.name}
+        </span>
       ) : null}
       <span className="text-muted">
         Consultation seule — repassez en <strong>brouillon</strong> pour modifier les lignes et le tarif.

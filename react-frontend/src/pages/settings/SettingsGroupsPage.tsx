@@ -116,37 +116,69 @@ export default function SettingsGroupsPage() {
             <thead>
               <tr>
                 <th>Nom</th>
-                <th>Slug</th>
                 <th>Membres</th>
+                <th>Droits accordés</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {groups.map((g) => (
-                <tr key={g.id}>
-                  <td>{g.name}</td>
-                  <td>
-                    <code>{g.slug}</code>
-                  </td>
-                  <td>{g.users_count ?? '—'}</td>
-                  <td>
-                    <div className="crud-actions">
-                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEdit(g)}>
-                        Droits
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm btn-danger-outline"
-                        onClick={() => {
-                          if (window.confirm(`Supprimer le groupe « ${g.name} » ?`)) deleteMut.mutate(g.id)
-                        }}
-                      >
-                        Supprimer
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {groups.map((g) => {
+                const labels = cat?.permissions ?? {}
+                const gPerms = g.permissions ?? []
+                return (
+                  <tr key={g.id}>
+                    <td>
+                      <strong>{g.name}</strong>
+                      {g.description ? (
+                        <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>{g.description}</div>
+                      ) : null}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>{g.users_count ?? '—'}</td>
+                    <td>
+                      {gPerms.length === 0 ? (
+                        <span className="text-muted" style={{ fontSize: '0.82rem' }}>
+                          Aucun droit
+                        </span>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                          {gPerms.map((p) => (
+                            <span
+                              key={p}
+                              style={{
+                                fontSize: '0.75rem',
+                                padding: '0.1rem 0.45rem',
+                                borderRadius: 99,
+                                background: 'var(--color-primary-alpha, rgba(59,130,246,0.1))',
+                                color: 'var(--color-primary, #3b82f6)',
+                                whiteSpace: 'nowrap',
+                              }}
+                              title={labels[p] ?? p}
+                            >
+                              {labels[p] ?? p}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <div className="crud-actions">
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEdit(g)}>
+                          Modifier
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm btn-danger-outline"
+                          onClick={() => {
+                            if (window.confirm(`Supprimer le groupe « ${g.name} » ?`)) deleteMut.mutate(g.id)
+                          }}
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -179,35 +211,66 @@ export default function SettingsGroupsPage() {
               <input value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
             <div className="form-group">
-              <label>Droits — modules visibles et fonctions</label>
+              <label>Droits accordés aux membres du groupe</label>
               <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '0.65rem' }}>
-                Cochez les <strong>modules</strong> visibles dans le menu, puis les fonctions fines (lecture/écriture).
-                Les utilisateurs du groupe héritent de ces droits.
+                Cochez les <strong>modules</strong> visibles dans le menu (section « Modules visibles »), puis
+                les fonctions fines selon le rôle souhaité. Les droits cochés sont hérités par tous les membres.
               </p>
               <div
                 className="permissions-editor"
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '0.85rem',
-                  maxHeight: 360,
+                  gap: '1rem',
+                  maxHeight: 400,
                   overflow: 'auto',
-                  padding: '0.65rem',
+                  padding: '0.75rem',
                   border: '1px solid var(--color-border, #e2e8f0)',
                   borderRadius: 8,
                 }}
               >
                 {permSections.map((section) => (
                   <section key={section.title}>
-                    <h4 style={{ margin: '0 0 0.45rem', fontSize: '0.88rem' }}>{section.title}</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    <h4
+                      style={{
+                        margin: '0 0 0.5rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        color: 'var(--color-muted)',
+                      }}
+                    >
+                      {section.title}
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       {section.entries.map(([key, label]) => (
-                        <label key={key} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                          <input type="checkbox" checked={perms.includes(key)} onChange={() => togglePerm(key)} />
+                        <label
+                          key={key}
+                          style={{
+                            display: 'flex',
+                            gap: '0.6rem',
+                            alignItems: 'flex-start',
+                            cursor: 'pointer',
+                            padding: '0.35rem 0.5rem',
+                            borderRadius: 6,
+                            background: perms.includes(key)
+                              ? 'var(--color-primary-alpha, rgba(59,130,246,0.07))'
+                              : 'transparent',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={perms.includes(key)}
+                            onChange={() => togglePerm(key)}
+                            style={{ marginTop: 3, flexShrink: 0 }}
+                          />
                           <span>
-                            <strong>{key}</strong>
+                            <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{label}</span>
                             <br />
-                            <span style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>{label}</span>
+                            <code style={{ fontSize: '0.75rem', color: 'var(--color-muted)', opacity: 0.7 }}>
+                              {key}
+                            </code>
                           </span>
                         </label>
                       ))}

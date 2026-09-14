@@ -15,7 +15,7 @@ class DossierController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $q = Dossier::query()->with(['client', 'site', 'createur', 'mission']);
+        $q = Dossier::query()->with(['client', 'site', 'createur', 'mission', 'centreGroup']);
         AgencyAccess::applyDossierScope($q, $request->user());
 
         if ($request->filled('client_id')) {
@@ -67,6 +67,7 @@ class DossierController extends Controller
             'site',
             'createur',
             'mission',
+            'centreGroup',
             'contacts',
             'missions',
             'quotes' => fn ($q) => $q->orderByDesc('quote_date')->orderByDesc('id'),
@@ -99,7 +100,7 @@ class DossierController extends Controller
             $this->syncContacts($dossier, $contactRows, replaceAll: true);
         }
 
-        return response()->json($dossier->load(['client', 'site', 'createur', 'mission', 'contacts']), 201);
+        return response()->json($dossier->load(['client', 'site', 'createur', 'mission', 'centreGroup', 'contacts']), 201);
     }
 
     public function update(Request $request, Dossier $dossier): JsonResponse
@@ -139,6 +140,7 @@ class DossierController extends Controller
                 'site',
                 'createur',
                 'mission',
+                'centreGroup',
                 'contacts',
                 'missions',
                 'quotes',
@@ -234,6 +236,8 @@ class DossierController extends Controller
             'client_id' => $partial ? 'sometimes|integer|exists:clients,id' : 'required|integer|exists:clients,id',
             'site_id' => $partial ? 'sometimes|integer|exists:sites,id' : 'required|integer|exists:sites,id',
             'mission_id' => 'nullable|integer|exists:missions,id',
+            'lab_centre_group_id' => 'nullable|integer|exists:lab_centre_groups,id',
+            'lien_dossier_id' => 'nullable|integer|exists:dossiers,id',
             'statut' => $partial ? ['sometimes', 'string', $statutRule] : ['required', 'string', $statutRule],
             'date_debut' => $partial ? 'sometimes|date' : 'required|date',
             'date_fin_prevue' => 'nullable|date',

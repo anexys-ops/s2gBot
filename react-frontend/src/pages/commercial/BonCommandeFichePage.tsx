@@ -368,6 +368,18 @@ export default function BonCommandeFichePage() {
   const hasBonLivraison = (bc.bons_livraison?.length ?? 0) > 0
   const canEditQuantites = lab && forfaitLignes.length > 0 && bc.statut !== 'annule'
 
+  const mutSyncPrix = useMutation({
+    mutationFn: () => bonsCommandeApi.syncPrixDevis(bcId),
+    onSuccess: () => {
+      setPlanningToast({ message: 'Prix synchronisés depuis le devis.', variant: 'success' })
+      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+    },
+    onError: (err) => {
+      setPlanningToast({ message: toastErrorMessage(err, 'Échec de la synchronisation des prix.'), variant: 'error' })
+    },
+  })
+
   function saveQuantites() {
     setPlanningToast(null)
     mutQuantites.reset()
@@ -376,14 +388,27 @@ export default function BonCommandeFichePage() {
 
   const saveQuantitesButton =
     canEditQuantites ? (
-      <button
-        type="button"
-        className="btn btn-primary btn-sm"
-        onClick={saveQuantites}
-        disabled={mutQuantites.isPending || !qtyDirty}
-      >
-        {mutQuantites.isPending ? 'Enregistrement…' : 'Enregistrer les lignes'}
-      </button>
+      <div className="bc-fiche__qty-actions">
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={saveQuantites}
+          disabled={mutQuantites.isPending || !qtyDirty}
+        >
+          {mutQuantites.isPending ? 'Enregistrement…' : 'Enregistrer les lignes'}
+        </button>
+        {bc.quote_id ? (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => mutSyncPrix.mutate()}
+            disabled={mutSyncPrix.isPending}
+            title="Importer les prix unitaires HT depuis le devis lié"
+          >
+            {mutSyncPrix.isPending ? 'Synchronisation…' : 'Sync prix du devis'}
+          </button>
+        ) : null}
+      </div>
     ) : null
 
   return (
@@ -416,6 +441,20 @@ export default function BonCommandeFichePage() {
               Dossier #{bc.dossier_id}
             </Link>
           )}
+          {bc.dossier?.centre_group ? (
+            <span
+              style={{
+                background: 'var(--color-accent-soft, #e8f4fd)',
+                color: 'var(--color-accent, #0a6bbf)',
+                borderRadius: '0.3rem',
+                padding: '0.1rem 0.5rem',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+              }}
+            >
+              {bc.dossier.centre_group.name}
+            </span>
+          ) : null}
         </span>
       }
       actions={

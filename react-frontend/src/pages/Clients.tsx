@@ -53,7 +53,9 @@ const VIEW_LABELS: Record<ViewFilter, string> = {
 
 export default function Clients() {
   const { user } = useAuth()
-  const isAdmin = user?.role === 'lab_admin'
+  const isAdmin =
+    user?.role === 'lab_admin' ||
+    (user?.effective_permissions ?? []).includes('clients.write')
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const queryClient = useQueryClient()
   const location = useLocation()

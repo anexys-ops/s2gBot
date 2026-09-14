@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   clientsApi,
   dossiersApi,
+  labCentreGroupsApi,
   missionsApi,
   sitesApi,
   type Client,
@@ -45,6 +46,8 @@ export default function DossierNewPage() {
   const [clientId, setClientId] = useState<number | ''>('')
   const [siteId, setSiteId] = useState<number | ''>('')
   const [missionId, setMissionId] = useState<number | ''>('')
+  const [centreGroupId, setCentreGroupId] = useState<number | ''>('')
+  const [lienDossierId, setLienDossierId] = useState<number | ''>('')
   const [titre, setTitre] = useState('')
   const [statut, setStatut] = useState<DossierStatut>('brouillon')
   const [dateDebut, setDateDebut] = useState(() => todayLocalDateInput())
@@ -69,6 +72,8 @@ export default function DossierNewPage() {
     setClientId(existing.client_id)
     setSiteId(existing.site_id)
     setMissionId(existing.mission_id ?? '')
+    setCentreGroupId(existing.lab_centre_group_id ?? '')
+    setLienDossierId(existing.lien_dossier_id ?? '')
     setTitre(existing.titre ?? '')
     setStatut(existing.statut)
     setDateDebut(dateInputFromApi(existing.date_debut) || todayLocalDateInput())
@@ -103,6 +108,21 @@ export default function DossierNewPage() {
   })
 
   const missions = normalizeList<Mission>(missionsData)
+
+  const { data: centreGroupsData } = useQuery({
+    queryKey: ['lab-centre-groups'],
+    queryFn: () => labCentreGroupsApi.list(),
+    enabled: isLab,
+    staleTime: 300_000,
+  })
+  const centreGroups = centreGroupsData ?? []
+
+  const { data: dossiersParSiteData, isLoading: dossiersParSiteLoading } = useQuery({
+    queryKey: ['dossiers-site', siteId],
+    queryFn: () => dossiersApi.listBySite(siteId as number),
+    enabled: isLab && siteId !== '',
+  })
+  const dossiersParSite = (dossiersParSiteData ?? []).filter((d) => d.id !== dossierId)
 
   const saveMut = useMutation({
     mutationFn: (body: DossierCreateInput) =>
@@ -222,6 +242,8 @@ export default function DossierNewPage() {
               notes: notes.trim() || null,
               date_fin_prevue: dateFin || null,
               mission_id: missionId === '' ? null : missionId,
+              lab_centre_group_id: centreGroupId === '' ? null : centreGroupId,
+              lien_dossier_id: lienDossierId === '' ? null : lienDossierId,
             }
             saveMut.mutate(body)
           }}
@@ -286,6 +308,44 @@ export default function DossierNewPage() {
                   </p>
                 ) : null}
               </div>
+              <div className="dossier-new-form__col-6 form-group">
+                <label htmlFor="dossier-lien">Dossier lié / parent (optionnel)</label>
+                <select
+                  id="dossier-lien"
+                  value={lienDossierId === '' ? '' : String(lienDossierId)}
+                  onChange={(e) => setLienDossierId(e.target.value === '' ? '' : Number(e.target.value))}
+                  disabled={siteId === '' || dossiersParSiteLoading}
+                >
+                  <option value="">— Aucun —</option>
+                  {dossiersParSite.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.reference} — {d.titre}
+                    </option>
+                  ))}
+                </select>
+                {siteId !== '' && dossiersParSiteLoading ? (
+                  <p className="text-muted" style={{ fontSize: '0.82rem', marginTop: '0.35rem' }}>
+                    Chargement des dossiers du chantier…
+                  </p>
+                ) : null}
+              </div>
+              {centreGroups.length > 0 ? (
+                <div className="dossier-new-form__col-6 form-group">
+                  <label htmlFor="dossier-centre">Centre</label>
+                  <select
+                    id="dossier-centre"
+                    value={centreGroupId === '' ? '' : String(centreGroupId)}
+                    onChange={(e) => setCentreGroupId(e.target.value === '' ? '' : Number(e.target.value))}
+                  >
+                    <option value="">— Non défini —</option>
+                    {centreGroups.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.code} — {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
             </div>
           </section>
 

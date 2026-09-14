@@ -43,6 +43,8 @@ class Dossier extends Model
         'client_id',
         'site_id',
         'mission_id',
+        'lab_centre_group_id',
+        'lien_dossier_id',
         'statut',
         'date_debut',
         'date_fin_prevue',
@@ -92,6 +94,16 @@ class Dossier extends Model
     public function mission(): BelongsTo
     {
         return $this->belongsTo(Mission::class);
+    }
+
+    public function centreGroup(): BelongsTo
+    {
+        return $this->belongsTo(LabCentreGroup::class, 'lab_centre_group_id');
+    }
+
+    public function lienDossier(): BelongsTo
+    {
+        return $this->belongsTo(Dossier::class, 'lien_dossier_id');
     }
 
     public function createur(): BelongsTo

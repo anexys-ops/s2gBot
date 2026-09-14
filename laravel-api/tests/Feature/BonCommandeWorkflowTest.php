@@ -219,7 +219,7 @@ class BonCommandeWorkflowTest extends TestCase
         $this->assertEquals(100.0, (float) $ligne->montant_ht);
     }
 
-    public function test_update_bc_ligne_quantity_rejects_above_devis(): void
+    public function test_update_bc_ligne_quantity_allows_above_devis(): void
     {
         $client = Client::query()->create(['name' => 'BC Qty Max Co']);
         $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site Qty Max']);
@@ -256,11 +256,12 @@ class BonCommandeWorkflowTest extends TestCase
         $bcId = (int) $bc['id'];
         $ligneId = (int) $bc['lignes'][0]['id'];
 
+        // Le plafond devis a été supprimé — la quantité peut dépasser celle du devis
         $r = $this->actingAs($lab, 'sanctum')->putJson("/api/v1/bons-commande/{$bcId}/lignes/{$ligneId}", [
             'quantite' => 5,
         ]);
-        $r->assertStatus(422);
-        $r->assertJsonFragment(['message' => 'La quantité ne peut pas dépasser celle du devis (2).']);
+        $r->assertStatus(200);
+        $r->assertJsonPath('lignes.0.quantite', 5);
     }
 
     public function test_update_bc_ligne_quantity_rejects_below_delivered(): void

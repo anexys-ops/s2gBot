@@ -176,6 +176,18 @@ export default function BonCommandeFichePage() {
     [bc?.lignes, devisDisplayMeta],
   )
 
+  const mutSyncPrix = useMutation({
+    mutationFn: () => bonsCommandeApi.syncPrixDevis(bcId),
+    onSuccess: () => {
+      setPlanningToast({ message: 'Prix synchronisés depuis le devis.', variant: 'success' })
+      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+    },
+    onError: (err) => {
+      setPlanningToast({ message: toastErrorMessage(err, 'Échec de la synchronisation des prix.'), variant: 'error' })
+    },
+  })
+
   const mutQuantites = useMutation({
     mutationFn: async (edits: { qty: Record<number, string>; prix: Record<number, string> }) => {
       if (!forfaitLignes.length) return
@@ -367,18 +379,6 @@ export default function BonCommandeFichePage() {
   const canGenerateOm = lab && isAdmin && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
   const hasBonLivraison = (bc.bons_livraison?.length ?? 0) > 0
   const canEditQuantites = lab && forfaitLignes.length > 0 && bc.statut !== 'annule'
-
-  const mutSyncPrix = useMutation({
-    mutationFn: () => bonsCommandeApi.syncPrixDevis(bcId),
-    onSuccess: () => {
-      setPlanningToast({ message: 'Prix synchronisés depuis le devis.', variant: 'success' })
-      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
-      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
-    },
-    onError: (err) => {
-      setPlanningToast({ message: toastErrorMessage(err, 'Échec de la synchronisation des prix.'), variant: 'error' })
-    },
-  })
 
   function saveQuantites() {
     setPlanningToast(null)

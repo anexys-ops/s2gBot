@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { Outlet, useLocation, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { dossiersApi, type DossierRow } from '../../api/client'
+import { dossiersApi, pdfApi, type DossierRow } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import StatusBadge, { dossierStatutBadgeProps } from '../../components/ds/StatusBadge'
 
@@ -17,6 +18,7 @@ export default function DossierFichePage() {
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
   const isPortal = location.pathname.startsWith('/portal/dossiers')
+  const [pdfLoading, setPdfLoading] = useState(false)
   const dossierId = Number(id)
   const listPath = isPortal ? '/portal/dossiers' : '/dossiers'
   const homePath = isPortal ? '/portal' : '/'
@@ -105,7 +107,17 @@ export default function DossierFichePage() {
         <button
           type="button"
           className="btn btn--outline btn--sm"
-          onClick={() => window.print()}
+          disabled={pdfLoading}
+          onClick={async () => {
+            setPdfLoading(true)
+            try {
+              await pdfApi.generate('dossier', dossierId)
+            } catch (e) {
+              alert((e as Error).message ?? 'Erreur PDF')
+            } finally {
+              setPdfLoading(false)
+            }
+          }}
           style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -113,7 +125,7 @@ export default function DossierFichePage() {
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
             <rect x="6" y="14" width="12" height="8" />
           </svg>
-          Imprimer
+          {pdfLoading ? 'Génération…' : 'Télécharger PDF'}
         </button>
       }
       tabs={visibleTabs.map((t) => ({ to: `${base}/${t.to}`, label: t.label, end: true }))}

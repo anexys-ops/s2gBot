@@ -10,8 +10,10 @@ use App\Models\ExpenseReport;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Quote;
+use App\Models\Dossier;
 use App\Services\BonCommandePdfGenerator;
 use App\Services\BonLivraisonPdfGenerator;
+use App\Services\DossierPdfGenerator;
 use App\Services\ExpenseReportPdfGenerator;
 use App\Services\QuotePdfGenerator;
 use App\Services\ReportService;
@@ -35,6 +37,7 @@ class PdfController extends Controller
         'purchase_order',
         'delivery_note',
         'expense_report',
+        'dossier',
     ];
 
     public function __construct(
@@ -43,6 +46,7 @@ class PdfController extends Controller
         private BonCommandePdfGenerator $bonCommandePdfGenerator,
         private BonLivraisonPdfGenerator $bonLivraisonPdfGenerator,
         private ExpenseReportPdfGenerator $expenseReportPdfGenerator,
+        private DossierPdfGenerator $dossierPdfGenerator,
     ) {}
 
     public function templates(Request $request): JsonResponse
@@ -158,6 +162,7 @@ class PdfController extends Controller
             'purchase_order' => $this->streamPurchaseOrderPdf($id, $templateId, $inline),
             'delivery_note' => $this->streamDeliveryNotePdf($id, $templateId, $inline),
             'expense_report' => $this->streamExpenseReportPdf($id, $templateId, $inline),
+            'dossier' => $this->streamDossierPdf($id, $inline),
             default => response()->json(['message' => 'Type PDF non pris en charge'], 422),
         };
     }
@@ -321,6 +326,26 @@ class PdfController extends Controller
         );
     }
 
+
+    private function streamDossierPdf(int $id, bool $inline = false): Response|StreamedResponse|JsonResponse
+    {
+        $dossier = Dossier::find($id);
+        if (! $dossier) {
+            return response()->json(['message' => 'Dossier introuvable'], 404);
+        }
+        [$pdfBytes, $filename] = $this->dossierPdfGenerator->generate($dossier);
+
+        if ($inline) {
+            return $this->inlinePdfResponse($pdfBytes, $filename);
+        }
+
+        return response()->streamDownload(
+            fn () => print($pdfBytes),
+            $this->sanitizeFilename($filename),
+            ['Content-Type' => 'application/pdf']
+        );
+    }
+
     private function documentTypeLabel(string $type): string
     {
         return match ($type) {
@@ -330,6 +355,7 @@ class PdfController extends Controller
             'purchase_order' => 'Bon de commande',
             'delivery_note' => 'Bon de livraison',
             'expense_report' => 'Note de frais',
+            'dossier' => 'Fiche dossier',
             default => $type,
         };
     }

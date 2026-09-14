@@ -185,7 +185,7 @@ export default function SettingsGroupsPage() {
       )}
 
       {modal && (
-        <Modal title={modal === 'create' ? 'Nouveau groupe' : `Groupe : ${name}`} onClose={() => setModal(null)}>
+        <Modal title={modal === 'create' ? 'Nouveau groupe' : `Groupe : ${name}`} onClose={() => setModal(null)} size="xl">
           <form
             onSubmit={(e) => {
               e.preventDefault()
@@ -193,96 +193,117 @@ export default function SettingsGroupsPage() {
               else updateMut.mutate()
             }}
           >
-            <div className="form-group">
-              <label>Nom</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
-            <div className="form-group">
-              <label>Slug technique (optionnel, a-z et tirets)</label>
-              <input
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                placeholder="auto si vide"
-                pattern="[a-z0-9\-]*"
-              />
-            </div>
-            <div className="form-group">
-              <label>Description</label>
-              <input value={description} onChange={(e) => setDescription(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label>Droits accordés aux membres du groupe</label>
-              <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '0.65rem' }}>
-                Cochez les <strong>modules</strong> visibles dans le menu (section « Modules visibles »), puis
-                les fonctions fines selon le rôle souhaité. Les droits cochés sont hérités par tous les membres.
-              </p>
-              <div
-                className="permissions-editor"
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem',
-                  maxHeight: 400,
-                  overflow: 'auto',
-                  padding: '0.75rem',
-                  border: '1px solid var(--color-border, #e2e8f0)',
-                  borderRadius: 8,
-                }}
-              >
-                {permSections.map((section) => (
-                  <section key={section.title}>
-                    <h4
-                      style={{
-                        margin: '0 0 0.5rem',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.04em',
-                        color: 'var(--color-muted)',
-                      }}
-                    >
-                      {section.title}
-                    </h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {section.entries.map(([key, label]) => (
-                        <label
-                          key={key}
-                          style={{
-                            display: 'flex',
-                            gap: '0.6rem',
-                            alignItems: 'flex-start',
-                            cursor: 'pointer',
-                            padding: '0.35rem 0.5rem',
-                            borderRadius: 6,
-                            background: perms.includes(key)
-                              ? 'var(--color-primary-alpha, rgba(59,130,246,0.07))'
-                              : 'transparent',
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={perms.includes(key)}
-                            onChange={() => togglePerm(key)}
-                            style={{ marginTop: 3, flexShrink: 0 }}
-                          />
-                          <span>
-                            <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{label}</span>
-                            <br />
-                            <code style={{ fontSize: '0.75rem', color: 'var(--color-muted)', opacity: 0.7 }}>
-                              {key}
-                            </code>
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </section>
-                ))}
+            <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '1.5rem', alignItems: 'start' }}>
+              {/* Colonne gauche — informations groupe */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>Nom</label>
+                  <input value={name} onChange={(e) => setName(e.target.value)} required />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>Slug technique</label>
+                  <input
+                    value={slug}
+                    onChange={(e) => setSlug(e.target.value)}
+                    placeholder="auto si vide (a-z, tirets)"
+                    pattern="[a-z0-9\-]*"
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>Description</label>
+                  <input value={description} onChange={(e) => setDescription(e.target.value)} />
+                </div>
+                <div style={{ marginTop: '0.25rem' }}>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: 0, lineHeight: 1.5 }}>
+                    Cochez les <strong>modules</strong> visibles dans le menu, puis les fonctions fines selon le rôle.
+                    Les droits cochés sont hérités par tous les membres du groupe.
+                  </p>
+                  {perms.length > 0 ? (
+                    <p style={{ fontSize: '0.8rem', margin: '0.5rem 0 0', color: 'var(--color-primary, #3b82f6)', fontWeight: 600 }}>
+                      {perms.length} droit{perms.length > 1 ? 's' : ''} accordé{perms.length > 1 ? 's' : ''}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Colonne droite — éditeur de droits */}
+              <div>
+                <p style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)', margin: '0 0 0.6rem' }}>
+                  Droits accordés aux membres
+                </p>
+                <div
+                  className="permissions-editor"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1.2rem',
+                    maxHeight: 480,
+                    overflowY: 'auto',
+                    padding: '0.75rem 0.85rem',
+                    border: '1px solid var(--color-border, #e2e8f0)',
+                    borderRadius: 8,
+                    background: 'var(--color-surface-subtle, #fafafa)',
+                  }}
+                >
+                  {permSections.map((section) => (
+                    <section key={section.title}>
+                      <h4
+                        style={{
+                          margin: '0 0 0.45rem',
+                          fontSize: '0.73rem',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.06em',
+                          color: 'var(--color-muted)',
+                          borderBottom: '1px solid var(--color-border, #e2e8f0)',
+                          paddingBottom: '0.25rem',
+                        }}
+                      >
+                        {section.title}
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        {section.entries.map(([key, label]) => {
+                          const checked = perms.includes(key)
+                          return (
+                            <label
+                              key={key}
+                              style={{
+                                display: 'flex',
+                                gap: '0.55rem',
+                                alignItems: 'center',
+                                cursor: 'pointer',
+                                padding: '0.3rem 0.5rem',
+                                borderRadius: 5,
+                                background: checked
+                                  ? 'var(--color-primary-alpha, rgba(59,130,246,0.08))'
+                                  : 'transparent',
+                                border: checked
+                                  ? '1px solid rgba(59,130,246,0.2)'
+                                  : '1px solid transparent',
+                                transition: 'background 0.1s',
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => togglePerm(key)}
+                                style={{ flexShrink: 0, accentColor: 'var(--color-primary, #3b82f6)' }}
+                              />
+                              <span style={{ fontSize: '0.875rem', fontWeight: checked ? 600 : 400 }}>{label}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </section>
+                  ))}
+                </div>
               </div>
             </div>
+
             {(createMut.isError || updateMut.isError) && (
-              <p className="error">{((createMut.error || updateMut.error) as Error).message}</p>
+              <p className="error" style={{ marginTop: '0.75rem' }}>{((createMut.error || updateMut.error) as Error).message}</p>
             )}
-            <div className="crud-actions">
+            <div className="crud-actions" style={{ marginTop: '1rem' }}>
               <button type="submit" className="btn btn-primary" disabled={createMut.isPending || updateMut.isPending}>
                 Enregistrer
               </button>

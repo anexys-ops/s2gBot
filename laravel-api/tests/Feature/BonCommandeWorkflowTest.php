@@ -261,7 +261,7 @@ class BonCommandeWorkflowTest extends TestCase
             'quantite' => 5,
         ]);
         $r->assertStatus(200);
-        $r->assertJsonPath('lignes.0.quantite', 5);
+        $r->assertJsonPath('quantite', 5);
     }
 
     public function test_update_bc_ligne_quantity_rejects_below_delivered(): void

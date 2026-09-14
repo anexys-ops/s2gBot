@@ -329,23 +329,33 @@ export default function DossierNewPage() {
                   </p>
                 ) : null}
               </div>
-              {centreGroups.length > 0 ? (
-                <div className="dossier-new-form__col-6 form-group">
-                  <label htmlFor="dossier-centre">Centre</label>
-                  <select
-                    id="dossier-centre"
-                    value={centreGroupId === '' ? '' : String(centreGroupId)}
-                    onChange={(e) => setCentreGroupId(e.target.value === '' ? '' : Number(e.target.value))}
-                  >
-                    <option value="">— Non défini —</option>
-                    {centreGroups.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.code} — {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : null}
+              <div className="dossier-new-form__col-6 form-group">
+                <label htmlFor="dossier-centre">Centre</label>
+                <select
+                  id="dossier-centre"
+                  value={centreGroupId === '' ? '' : String(centreGroupId)}
+                  onChange={(e) => setCentreGroupId(e.target.value === '' ? '' : Number(e.target.value))}
+                  disabled={centreGroups.length === 0}
+                >
+                  <option value="">— Non défini —</option>
+                  {centreGroups.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code} — {c.name}
+                    </option>
+                  ))}
+                </select>
+                {centreGroups.length === 0 ? (
+                  <p className="text-muted" style={{ fontSize: '0.82rem', marginTop: '0.35rem' }}>
+                    Aucun centre configuré.
+                    {user?.role === 'lab_admin' ? (
+                      <>
+                        {' '}
+                        <Link to="/config/centres">Créer un centre</Link>
+                      </>
+                    ) : null}
+                  </p>
+                ) : null}
+              </div>
             </div>
           </section>
 

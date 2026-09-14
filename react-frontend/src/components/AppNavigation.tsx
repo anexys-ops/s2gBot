@@ -73,6 +73,7 @@ function isCatalogueActive(pathname: string): boolean {
 
 function isConfigurationActive(pathname: string): boolean {
   if (pathname.startsWith('/config/agences')) return true
+  if (pathname.startsWith('/config/centres')) return true
   if (pathname.startsWith('/settings/utilisateurs')) return true
   if (pathname.startsWith('/settings/groupes')) return true
   if (pathname.startsWith('/back-office/modeles-documents-pdf')) return true
@@ -212,7 +213,10 @@ export default function AppNavigation() {
         module: 'configuration',
         items: filterItems([
           ...(canManageAppConfig(user) || user?.role === 'lab_admin'
-            ? [{ to: '/config/agences', label: 'Agences', module: 'configuration' as StaffModuleKey }]
+            ? [
+                { to: '/config/agences', label: 'Agences', module: 'configuration' as StaffModuleKey },
+                { to: '/config/centres', label: 'Centres', module: 'configuration' as StaffModuleKey },
+              ]
             : []),
           ...(canManageUsers(user)
             ? [{ to: '/settings/utilisateurs', label: 'Utilisateurs', module: 'configuration' as StaffModuleKey }]

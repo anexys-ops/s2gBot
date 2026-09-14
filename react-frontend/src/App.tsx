@@ -95,6 +95,7 @@ import {
 } from './pages/back-office/BackOfficeMaterielRedirects'
 import PlanningTechniciensPage from './pages/terrain/PlanningTechniciensPage'
 import AgencesPage from './pages/config/AgencesPage'
+import SettingsCentresPage from './pages/settings/SettingsCentresPage'
 import PlanningIngenieurPage from './pages/ingenierie/PlanningIngenieurPage'
 import LaboReceptionPage from './pages/labo/LaboReceptionPage'
 import PlanningLaboPage from './pages/labo/PlanningLaboPage'
@@ -361,6 +362,7 @@ function AppRoutes() {
           <Route path="charte" element={<SettingsBrandingPage />} />
         </Route>
         <Route path="config/agences" element={<AgencesPage />} />
+        <Route path="config/centres" element={<SettingsCentresPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

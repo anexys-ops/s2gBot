@@ -322,7 +322,7 @@ class QuoteController extends Controller
         if (array_key_exists('filiale_agency_id', $validated)) {
             $filialeAgencyId = ClientFilialeResolver::resolveAgencyId(
                 $request->user(),
-                (int) $quote->client_id,
+                (int) ($validated['client_id'] ?? $quote->client_id),
                 isset($validated['site_id']) ? (int) $validated['site_id'] : ($quote->site_id ? (int) $quote->site_id : null),
                 (int) $validated['filiale_agency_id'],
             );

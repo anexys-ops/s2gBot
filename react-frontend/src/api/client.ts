@@ -1063,8 +1063,16 @@ export const dossiersApi = {
     api<{ id: number; reference: string; titre: string; statut: string }[]>(`/v1/sites/${siteId}/dossiers`),
 }
 
+export type LabCentreGroup = { id: number; code: string; name: string; sort_order: number; active: boolean }
+
 export const labCentreGroupsApi = {
-  list: () => api<{ id: number; code: string; name: string; sort_order: number; active: boolean }[]>('/v1/lab-centre-groups'),
+  list: () => api<LabCentreGroup[]>('/v1/lab-centre-groups'),
+  listAll: () => api<LabCentreGroup[]>('/v1/lab-centre-groups?all=1'),
+  create: (body: { code: string; name: string; sort_order?: number; active?: boolean }) =>
+    api<LabCentreGroup>('/v1/lab-centre-groups', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: number, body: Partial<{ code: string; name: string; sort_order: number; active: boolean }>) =>
+    api<LabCentreGroup>(`/v1/lab-centre-groups/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api<void>(`/v1/lab-centre-groups/${id}`, { method: 'DELETE' }),
 }
 
 export const bonsCommandeApi = {

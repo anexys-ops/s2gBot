@@ -75,4 +75,58 @@ class ClientFilialeDocumentNumberTest extends TestCase
         $this->assertMatchesRegularExpression('/^DEV-\d{4}-\d{4}\/PAR$/', $number);
         $this->assertSame($filiale->id, (int) $response->json('meta.filiale_agency_id'));
     }
+
+    public function test_updating_quote_client_and_filiale_together_is_not_rejected_as_stale(): void
+    {
+        $admin = User::factory()->create([
+            'role' => User::ROLE_LAB_ADMIN,
+            'client_id' => null,
+            'site_id' => null,
+        ]);
+
+        $clientA = Client::query()->create(['name' => 'Client A']);
+        $filialeA = Agency::query()
+            ->where('client_id', $clientA->id)->where('is_headquarters', true)->first();
+        $siteA = Site::query()->create([
+            'client_id' => $clientA->id,
+            'agency_id' => $filialeA->id,
+            'name' => 'Chantier A',
+            'status' => 'not_started',
+        ]);
+
+        $clientB = Client::query()->create(['name' => 'Client B']);
+        $filialeB = Agency::query()
+            ->where('client_id', $clientB->id)->where('is_headquarters', true)->first();
+        $siteB = Site::query()->create([
+            'client_id' => $clientB->id,
+            'agency_id' => $filialeB->id,
+            'name' => 'Chantier B',
+            'status' => 'not_started',
+        ]);
+
+        $createResponse = $this->actingAs($admin, 'sanctum')->postJson('/api/quotes', [
+            'client_id' => $clientA->id,
+            'site_id' => $siteA->id,
+            'filiale_agency_id' => $filialeA->id,
+            'quote_date' => now()->toDateString(),
+            'lines' => [
+                ['description' => 'Essai', 'quantity' => 1, 'unit_price' => 100],
+            ],
+        ]);
+        $createResponse->assertCreated();
+        $quoteId = $createResponse->json('id');
+
+        // Reassigning the (draft) quote to a different client + its own filiale, in the same
+        // request, used to be rejected because the filiale was checked against the quote's
+        // pre-update client_id instead of the client_id being set by this very request.
+        $updateResponse = $this->actingAs($admin, 'sanctum')->putJson("/api/quotes/{$quoteId}", [
+            'client_id' => $clientB->id,
+            'site_id' => $siteB->id,
+            'filiale_agency_id' => $filialeB->id,
+        ]);
+
+        $updateResponse->assertOk();
+        $this->assertSame($clientB->id, (int) $updateResponse->json('client_id'));
+        $this->assertSame($filialeB->id, (int) $updateResponse->json('meta.filiale_agency_id'));
+    }
 }

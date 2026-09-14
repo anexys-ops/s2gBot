@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\DocumentStatusDefinitionController;
 use App\Http\Controllers\Api\DocumentStatusHistoryController;
 use App\Http\Controllers\Api\DossierController;
 use App\Http\Controllers\Api\EquipmentController;
+use App\Http\Controllers\Api\LabCentreGroupController;
 use App\Http\Controllers\Api\EquipmentMaintenancePlanController;
 use App\Http\Controllers\Api\MaterielAffectationController;
 use App\Http\Controllers\Api\ExamplePdfController;
@@ -113,7 +114,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('dossiers', [DossierController::class, 'index']);
         Route::post('dossiers', [DossierController::class, 'store']);
-        Route::get('lab-centre-groups', fn () => response()->json(\App\Models\LabCentreGroup::query()->where('active', true)->orderBy('sort_order')->orderBy('name')->get()));
+        Route::get('lab-centre-groups', [LabCentreGroupController::class, 'index']);
+        Route::post('lab-centre-groups', [LabCentreGroupController::class, 'store']);
+        Route::put('lab-centre-groups/{labCentreGroup}', [LabCentreGroupController::class, 'update'])
+            ->whereNumber('labCentreGroup');
+        Route::delete('lab-centre-groups/{labCentreGroup}', [LabCentreGroupController::class, 'destroy'])
+            ->whereNumber('labCentreGroup');
         Route::get('sites/{site}/dossiers', fn (\Illuminate\Http\Request $req, \App\Models\Site $site) => response()->json(
             \App\Models\Dossier::query()
                 ->where('site_id', $site->id)

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Dossier;
 use App\Models\Site;
 use App\Support\AgencyAccess;
+use App\Support\PermissionCatalog;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -79,7 +80,8 @@ class DossierController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        $u = $request->user();
+        if (! $u->isLab() && ! $u->hasCapability(PermissionCatalog::ORDERS_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -105,7 +107,8 @@ class DossierController extends Controller
 
     public function update(Request $request, Dossier $dossier): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        $u = $request->user();
+        if (! $u->isLab() && ! $u->hasCapability(PermissionCatalog::ORDERS_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -151,7 +154,8 @@ class DossierController extends Controller
 
     public function destroy(Request $request, Dossier $dossier): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        $u = $request->user();
+        if (! $u->isLab() && ! $u->hasCapability(PermissionCatalog::ORDERS_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
         $dossier->delete();
@@ -199,7 +203,8 @@ class DossierController extends Controller
 
     public function addContact(Request $request, Dossier $dossier): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        $u = $request->user();
+        if (! $u->isLab() && ! $u->hasCapability(PermissionCatalog::ORDERS_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
         if (! AgencyAccess::userMayAccessDossier($request->user(), $dossier)) {

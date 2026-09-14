@@ -16,6 +16,7 @@ use App\Support\ActivityChangeTracker;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
 use App\Support\ClientFilialeResolver;
+use App\Support\PermissionCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\DocumentActivityLogger;
@@ -181,7 +182,8 @@ class InvoiceController extends Controller
 
     public function fromOrders(Request $request): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        $u = $request->user();
+        if (! $u->isLab() && ! $u->hasCapability(PermissionCatalog::COMMERCIAL_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -205,7 +207,8 @@ class InvoiceController extends Controller
 
     public function eligibleBonsCommande(Request $request): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        $u = $request->user();
+        if (! $u->isLab() && ! $u->hasCapability(PermissionCatalog::COMMERCIAL_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -237,7 +240,8 @@ class InvoiceController extends Controller
 
     public function fromBonsCommande(Request $request): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        $u = $request->user();
+        if (! $u->isLab() && ! $u->hasCapability(PermissionCatalog::COMMERCIAL_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -261,7 +265,8 @@ class InvoiceController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        $u = $request->user();
+        if (! $u->isLabAdmin() && ! $u->hasCapability(PermissionCatalog::COMMERCIAL_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -403,7 +408,8 @@ class InvoiceController extends Controller
 
     public function update(Request $request, Invoice $invoice): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        $u = $request->user();
+        if (! $u->isLabAdmin() && ! $u->hasCapability(PermissionCatalog::COMMERCIAL_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 

@@ -110,6 +110,62 @@ class BonCommandeWorkflowTest extends TestCase
         $this->assertNotNull(Quote::query()->find($q->id)->meta);
     }
 
+    public function test_bc_from_forfait_jalon_quote_carries_jalon_price(): void
+    {
+        $client = Client::query()->create(['name' => 'BC Forfait Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site F']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0002',
+            'titre' => 'D forfait',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-FORFAIT',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 1200,
+            'amount_ttc' => 1440,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+            'meta' => [
+                'devis_jalons' => [
+                    [
+                        'id' => 'j1',
+                        'libelle' => 'Etude de formulation de béton',
+                        'mode' => 'forfait',
+                        'montant_ht' => 1200,
+                        'product_ref_article_ids' => [],
+                    ],
+                ],
+            ],
+        ]);
+        // Les lignes d'un jalon forfait sont enregistrées à prix 0 — le prix réel vit
+        // dans meta.devis_jalons.*.montant_ht (voir QuotePricingService::totalsLines).
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai de résistance à la compression',
+            'quantity' => 6,
+            'unit_price' => 0,
+            'tva_rate' => 20,
+            'total' => 0,
+        ]);
+
+        $r = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc");
+        $r->assertCreated();
+        $r->assertJsonPath('lignes.0.libelle', 'Essai de résistance à la compression');
+        $r->assertJsonPath('lignes.0.prix_unitaire_ht', 0);
+        $r->assertJsonPath('lignes.1.libelle', 'Prestation forfaitaire — Etude de formulation de béton');
+        $r->assertJsonPath('lignes.1.prix_unitaire_ht', 1200);
+        $r->assertJsonPath('lignes.1.montant_ht', 1200);
+    }
+
     public function test_update_bc_ligne_persists_planning_extra_fields(): void
     {
         $client = Client::query()->create(['name' => 'BC Ligne Co']);

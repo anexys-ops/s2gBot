@@ -1171,6 +1171,7 @@ export const bonsLivraisonApi = {
       date_livraison?: string
       contact_id?: number | null
       statut?: string
+      lab_centre_group_id?: number | null
       lignes?: { id: number; quantite_livree: number }[]
     },
   ) => api<BonLivraison>(`/v1/bons-livraison/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
@@ -2597,6 +2598,8 @@ export interface Quote {
   status: string
   notes?: string
   meta?: EntityMetaPayload | null
+  lab_centre_group_id?: number | null
+  centre_group?: { id: number; code: string; name: string } | null
   client?: Client
   client_contact?: ClientContactRow
   site?: Site

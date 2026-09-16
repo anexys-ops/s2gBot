@@ -51,6 +51,7 @@ class Quote extends Model
         'agency_id',
         'site_id',
         'dossier_id',
+        'lab_centre_group_id',
         'quote_date',
         'order_date',
         'site_delivery_date',
@@ -124,6 +125,11 @@ class Quote extends Model
     public function dossier(): BelongsTo
     {
         return $this->belongsTo(Dossier::class, 'dossier_id');
+    }
+
+    public function centreGroup(): BelongsTo
+    {
+        return $this->belongsTo(LabCentreGroup::class, 'lab_centre_group_id');
     }
 
     public function billingAddress(): BelongsTo

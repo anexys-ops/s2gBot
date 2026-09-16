@@ -30,6 +30,7 @@ class BonCommande extends Model
         'numero',
         'quote_id',
         'dossier_id',
+        'lab_centre_group_id',
         'client_id',
         'contact_id',
         'statut',
@@ -53,6 +54,11 @@ class BonCommande extends Model
     public function dossier(): BelongsTo
     {
         return $this->belongsTo(Dossier::class);
+    }
+
+    public function centreGroup(): BelongsTo
+    {
+        return $this->belongsTo(LabCentreGroup::class, 'lab_centre_group_id');
     }
 
     public function client(): BelongsTo

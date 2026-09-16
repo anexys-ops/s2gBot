@@ -73,6 +73,7 @@ class BonCommandeController extends Controller
             'lignes.planningAffectations.user',
             'lignes.technicien',
             'dossier.centreGroup',
+            'centreGroup',
             'client',
             'clientContact',
             'quote',
@@ -98,6 +99,7 @@ class BonCommandeController extends Controller
             'montant_ttc' => 'sometimes|numeric|min:0',
             'contact_id' => 'sometimes|nullable|exists:client_contacts,id',
             'statut' => 'sometimes|string|in:brouillon,confirme,en_cours,livre,annule',
+            'lab_centre_group_id' => 'sometimes|nullable|integer|exists:lab_centre_groups,id',
         ]);
         if ($data !== []) {
             $bonCommande->update($data);
@@ -107,7 +109,8 @@ class BonCommandeController extends Controller
 
         return response()->json($bonCommande->fresh()->load([
             'lignes.planningAffectations.user',
-            'dossier',
+            'dossier.centreGroup',
+            'centreGroup',
             'client',
             'clientContact',
         ]));

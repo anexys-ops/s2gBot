@@ -117,6 +117,7 @@ export function buildQuoteApiBody(form: QuoteFormState): QuoteCreateBody {
     filiale_agency_id: optionalPositiveId(form.filiale_agency_id),
     site_id: optionalPositiveId(form.site_id),
     dossier_id: dossierId ?? null,
+    lab_centre_group_id: optionalPositiveId(form.lab_centre_group_id) ?? null,
     quote_date: form.quote_date,
     order_date: form.order_date?.trim() || undefined,
     site_delivery_date: form.site_delivery_date?.trim() || undefined,

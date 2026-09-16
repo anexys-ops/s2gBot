@@ -38,6 +38,7 @@ export type QuoteFormState = {
   filiale_agency_id?: number
   site_id?: number
   dossier_id?: number
+  lab_centre_group_id?: number
   quote_date: string
   order_date?: string
   site_delivery_date?: string

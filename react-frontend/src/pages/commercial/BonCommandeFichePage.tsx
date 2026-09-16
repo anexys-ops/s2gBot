@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import EntityAttachmentsPanel from '../../components/attachments/EntityAttachmentsPanel'
 import ClientContactPicker from '../../components/clients/ClientContactPicker'
+import CentreGroupField from '../../components/centres/CentreGroupField'
 import {
   buildBcLigneDisplayRows,
   filterForfaitBcLigneIds,
@@ -109,6 +110,7 @@ export default function BonCommandeFichePage() {
 
   const [notes, setNotes] = useState('')
   const [contactId, setContactId] = useState<number | null>(null)
+  const [centreGroupId, setCentreGroupId] = useState<number | undefined>(undefined)
   const [qtyEdits, setQtyEdits] = useState<Record<number, string>>({})
   const [prixEdits, setPrixEdits] = useState<Record<number, string>>({})
   const [confirmAction, setConfirmAction] = useState<'confirmer' | 'bl' | null>(null)
@@ -125,6 +127,7 @@ export default function BonCommandeFichePage() {
     if (!bc) return
     setNotes(typeof bc.notes === 'string' ? bc.notes : '')
     setContactId(bc.contact_id ?? null)
+    setCentreGroupId(bc.lab_centre_group_id ?? undefined)
   }, [bc?.id])
 
   const serverLignesKey = useMemo(
@@ -156,7 +159,12 @@ export default function BonCommandeFichePage() {
   }, [bc?.id, serverLignesKey])
 
   const mutUpdate = useMutation({
-    mutationFn: () => bonsCommandeApi.update(bcId, { notes: notes || undefined, contact_id: contactId }),
+    mutationFn: () =>
+      bonsCommandeApi.update(bcId, {
+        notes: notes || undefined,
+        contact_id: contactId,
+        lab_centre_group_id: centreGroupId ?? null,
+      }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
     },
@@ -441,7 +449,7 @@ export default function BonCommandeFichePage() {
               Dossier #{bc.dossier_id}
             </Link>
           )}
-          {bc.dossier?.centre_group ? (
+          {bc.centre_group ?? bc.dossier?.centre_group ? (
             <span
               style={{
                 background: 'var(--color-accent-soft, #e8f4fd)',
@@ -452,7 +460,7 @@ export default function BonCommandeFichePage() {
                 fontWeight: 600,
               }}
             >
-              {bc.dossier.centre_group.name}
+              {(bc.centre_group ?? bc.dossier?.centre_group)?.name}
             </span>
           ) : null}
         </span>
@@ -805,6 +813,27 @@ export default function BonCommandeFichePage() {
                 {mutUpdate.isError ? (
                   <p className="error">{(mutUpdate.error as Error).message}</p>
                 ) : null}
+              </section>
+            ) : null}
+
+            {lab ? (
+              <section className="card bc-fiche__aside-panel">
+                <h2 className="ds-form-section__title">Centre</h2>
+                <CentreGroupField
+                  id="bc-centre-field"
+                  value={centreGroupId}
+                  onChange={(id) => setCentreGroupId(id)}
+                />
+                <div className="bc-fiche__aside-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => mutUpdate.mutate()}
+                    disabled={mutUpdate.isPending}
+                  >
+                    {mutUpdate.isPending ? 'Enregistrement…' : 'Enregistrer le centre'}
+                  </button>
+                </div>
               </section>
             ) : null}
 

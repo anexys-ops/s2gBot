@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   clientsApi,
   dossiersApi,
-  labCentreGroupsApi,
   missionsApi,
   sitesApi,
   type Client,
@@ -17,6 +16,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import ClientSelectField from '../../components/clients/ClientSelectField'
 import SiteSelectField from '../../components/sites/SiteSelectField'
+import CentreGroupField from '../../components/centres/CentreGroupField'
 import { dateInputFromApi, todayLocalDateInput } from '../../lib/appLocale'
 
 const STATUTS: { v: DossierStatut; l: string }[] = [
@@ -108,14 +108,6 @@ export default function DossierNewPage() {
   })
 
   const missions = normalizeList<Mission>(missionsData)
-
-  const { data: centreGroupsData } = useQuery({
-    queryKey: ['lab-centre-groups'],
-    queryFn: () => labCentreGroupsApi.list(),
-    enabled: isLab,
-    staleTime: 300_000,
-  })
-  const centreGroups = centreGroupsData ?? []
 
   const { data: dossiersParSiteData, isLoading: dossiersParSiteLoading } = useQuery({
     queryKey: ['dossiers-site', siteId],
@@ -329,32 +321,12 @@ export default function DossierNewPage() {
                   </p>
                 ) : null}
               </div>
-              <div className="dossier-new-form__col-6 form-group">
-                <label htmlFor="dossier-centre">Centre</label>
-                <select
+              <div className="dossier-new-form__col-6">
+                <CentreGroupField
                   id="dossier-centre"
-                  value={centreGroupId === '' ? '' : String(centreGroupId)}
-                  onChange={(e) => setCentreGroupId(e.target.value === '' ? '' : Number(e.target.value))}
-                  disabled={centreGroups.length === 0}
-                >
-                  <option value="">— Non défini —</option>
-                  {centreGroups.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.code} — {c.name}
-                    </option>
-                  ))}
-                </select>
-                {centreGroups.length === 0 ? (
-                  <p className="text-muted" style={{ fontSize: '0.82rem', marginTop: '0.35rem' }}>
-                    Aucun centre configuré.
-                    {user?.role === 'lab_admin' ? (
-                      <>
-                        {' '}
-                        <Link to="/config/centres">Créer un centre</Link>
-                      </>
-                    ) : null}
-                  </p>
-                ) : null}
+                  value={centreGroupId === '' ? undefined : centreGroupId}
+                  onChange={(id) => setCentreGroupId(id ?? '')}
+                />
               </div>
             </div>
           </section>

@@ -956,6 +956,8 @@ export type BonCommande = {
   numero: string
   quote_id: number | null
   dossier_id: number
+  lab_centre_group_id?: number | null
+  centre_group?: LabCentreGroup | null
   client_id: number
   contact_id?: number | null
   statut: string
@@ -1087,7 +1089,7 @@ export const bonsCommandeApi = {
     return api<BonCommande[]>(`/v1/bons-commande${s ? `?${s}` : ''}`)
   },
   get: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}`),
-  update: (id: number, body: { notes?: string; date_livraison_prevue?: string; montant_ht?: number; montant_ttc?: number; contact_id?: number | null; statut?: string }) =>
+  update: (id: number, body: { notes?: string; date_livraison_prevue?: string; montant_ht?: number; montant_ttc?: number; contact_id?: number | null; statut?: string; lab_centre_group_id?: number | null }) =>
     api<BonCommande>(`/v1/bons-commande/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api<null>(`/v1/bons-commande/${id}`, { method: 'DELETE' }),
   syncPrixDevis: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}/sync-prix-devis`, { method: 'POST' }),
@@ -2567,6 +2569,8 @@ export interface Quote {
   contact_id?: number | null
   site_id?: number
   dossier_id?: number | null
+  lab_centre_group_id?: number | null
+  centre_group?: LabCentreGroup | null
   quote_date: string
   order_date?: string
   site_delivery_date?: string
@@ -2652,6 +2656,7 @@ export interface QuoteCreateBody {
   filiale_agency_id?: number
   site_id?: number
   dossier_id?: number | null
+  lab_centre_group_id?: number | null
   meta?: EntityMetaPayload | null
   quote_date: string
   order_date?: string

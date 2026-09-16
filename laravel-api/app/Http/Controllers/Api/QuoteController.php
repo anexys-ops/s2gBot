@@ -157,6 +157,7 @@ class QuoteController extends Controller
             'travel_fee_tva_rate' => 'nullable|numeric|min:0|max:100',
             'apply_site_travel' => 'nullable|boolean',
             'filiale_agency_id' => 'nullable|integer|exists:agencies,id',
+            'lab_centre_group_id' => 'nullable|integer|exists:lab_centre_groups,id',
             'meta' => 'nullable|array',
         ], [
             'lines' => 'required|array|min:0',
@@ -201,6 +202,12 @@ class QuoteController extends Controller
         $agencyId = self::resolveLabAgencyIdForQuote($request->user(), $validated['site_id'] ?? null, $cid);
         $meta = ClientFilialeResolver::mergeFilialeMeta($validated['meta'] ?? null, $filialeAgencyId);
 
+        $centreGroupId = isset($validated['lab_centre_group_id']) ? (int) $validated['lab_centre_group_id'] : null;
+        if ($centreGroupId === null && $dossierId) {
+            $centreGroupId = Dossier::query()->whereKey($dossierId)->value('lab_centre_group_id');
+            $centreGroupId = $centreGroupId ? (int) $centreGroupId : null;
+        }
+
         $quote = Quote::create([
             'number' => $number,
             'client_id' => $validated['client_id'],
@@ -208,6 +215,7 @@ class QuoteController extends Controller
             'agency_id' => $agencyId,
             'site_id' => $validated['site_id'] ?? null,
             'dossier_id' => $dossierId,
+            'lab_centre_group_id' => $centreGroupId,
             'quote_date' => $validated['quote_date'],
             'order_date' => $validated['order_date'] ?? null,
             'site_delivery_date' => $validated['site_delivery_date'] ?? null,
@@ -274,6 +282,7 @@ class QuoteController extends Controller
                 'pdf_template_id' => 'nullable|exists:document_pdf_templates,id',
                 'meta' => 'nullable|array',
                 'contact_id' => 'nullable|exists:client_contacts,id',
+                'lab_centre_group_id' => 'nullable|integer|exists:lab_centre_groups,id',
             ]);
             $quote->fill($validated);
             ClientContactDocument::assertBelongsToClient(
@@ -313,6 +322,7 @@ class QuoteController extends Controller
             'travel_fee_tva_rate' => 'nullable|numeric|min:0|max:100',
             'apply_site_travel' => 'nullable|boolean',
             'filiale_agency_id' => 'nullable|integer|exists:agencies,id',
+            'lab_centre_group_id' => 'nullable|integer|exists:lab_centre_groups,id',
             'meta' => 'nullable|array',
         ], [
             'lines' => 'sometimes|array|min:0',
@@ -527,7 +537,7 @@ class QuoteController extends Controller
     private function loadQuoteForResponse(Quote $quote): Quote
     {
         return $quote->load([
-            'client', 'clientContact', 'agency', 'site', 'dossier',
+            'client', 'clientContact', 'agency', 'site', 'dossier', 'centreGroup',
             'quoteLines.commercialOffering',
             'quoteLines.refArticle',
             'quoteLines.refPackage',

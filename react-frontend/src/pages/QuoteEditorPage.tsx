@@ -76,6 +76,7 @@ function emptyForm(): QuoteFormState {
     filiale_agency_id: undefined,
     site_id: undefined,
     dossier_id: undefined,
+    lab_centre_group_id: undefined,
     quote_date: todayLocalDateInput(),
     order_date: '',
     site_delivery_date: '',
@@ -203,6 +204,7 @@ export default function QuoteEditorPage() {
             dossier_id: d.id,
             client_id: d.client_id,
             site_id: d.site_id,
+            lab_centre_group_id: d.lab_centre_group_id ?? undefined,
             contextMode: 'dossier',
           }))
         })()
@@ -266,6 +268,7 @@ export default function QuoteEditorPage() {
         typeof meta.filiale_agency_id === 'number' ? meta.filiale_agency_id : undefined,
       site_id: quote.site_id,
       dossier_id: quote.dossier_id ?? undefined,
+      lab_centre_group_id: quote.lab_centre_group_id ?? undefined,
       quote_date: dateInputFromApi(quote.quote_date) || todayLocalDateInput(),
       order_date: dateInputFromApi(quote.order_date),
       site_delivery_date: dateInputFromApi(quote.site_delivery_date),
@@ -791,6 +794,7 @@ export default function QuoteEditorPage() {
       : `Modifier le devis ${quote?.number ?? ''}`
 
   const selectedDossier = form.dossier_id ? dossiers.find((d) => d.id === form.dossier_id) : undefined
+  const displayCentreGroup = quote?.centre_group ?? selectedDossier?.centre_group
 
   const pageSubtitle = isReadOnly ? (
     <span className="bc-fiche__subtitle">
@@ -799,7 +803,7 @@ export default function QuoteEditorPage() {
           {quoteStatutBadgeProps(quote.status).label}
         </StatusBadge>
       ) : null}
-      {selectedDossier?.centre_group ? (
+      {displayCentreGroup ? (
         <span
           style={{
             background: 'var(--color-accent-soft, #e8f4fd)',
@@ -810,7 +814,7 @@ export default function QuoteEditorPage() {
             fontWeight: 600,
           }}
         >
-          {selectedDossier.centre_group.name}
+          {displayCentreGroup.name}
         </span>
       ) : null}
       <span className="text-muted">

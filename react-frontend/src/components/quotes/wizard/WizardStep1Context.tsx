@@ -3,6 +3,7 @@ import type { QuoteFormState, ContextMode } from '../QuoteFormFields'
 import type { Site, DossierRow } from '../../../api/client'
 import { useAuth } from '../../../contexts/AuthContext'
 import ClientFilialeAgencyField from '../../agencies/ClientFilialeAgencyField'
+import CentreGroupField from '../../centres/CentreGroupField'
 import { resolveUniqueDossierForChantier } from '../../../lib/resolveDossierForChantier'
 
 type Props = {
@@ -72,6 +73,10 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
     () => allSites.find((s) => s.id === form.site_id) ?? null,
     [allSites, form.site_id],
   )
+
+  /** Centre par défaut du dossier auto-lié (chantier avec un seul dossier) — reste modifiable ensuite. */
+  const centreForDossierId = (dossierId: number | undefined): number | undefined =>
+    dossierId != null ? (dossiers.find((d) => d.id === dossierId)?.lab_centre_group_id ?? undefined) : undefined
 
   return (
     <div className="qw-body">
@@ -172,11 +177,16 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
                     type="button"
                     className={`qw-tile${form.site_id === s.id ? ' qw-tile--selected' : ''}`}
                     onClick={() =>
-                      setForm((f) => ({
-                        ...f,
-                        site_id: s.id,
-                        dossier_id: resolveUniqueDossierForChantier(dossiers, s.client_id, s.id),
-                      }))
+                      setForm((f) => {
+                        const dossier_id = resolveUniqueDossierForChantier(dossiers, s.client_id, s.id)
+
+                        return {
+                          ...f,
+                          site_id: s.id,
+                          dossier_id,
+                          lab_centre_group_id: centreForDossierId(dossier_id) ?? f.lab_centre_group_id,
+                        }
+                      })
                     }
                   >
                     <div className="qw-tile__name">{s.name}</div>
@@ -199,13 +209,18 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
                 type="button"
                 className={`qw-tile${form.site_id === s.id ? ' qw-tile--selected' : ''}`}
                 onClick={() =>
-                  setForm((f) => ({
-                    ...f,
-                    site_id: s.id,
-                    client_id: s.client_id,
-                    dossier_id: resolveUniqueDossierForChantier(dossiers, s.client_id, s.id),
-                    contextMode: 'chantier',
-                  }))
+                  setForm((f) => {
+                    const dossier_id = resolveUniqueDossierForChantier(dossiers, s.client_id, s.id)
+
+                    return {
+                      ...f,
+                      site_id: s.id,
+                      client_id: s.client_id,
+                      dossier_id,
+                      lab_centre_group_id: centreForDossierId(dossier_id) ?? f.lab_centre_group_id,
+                      contextMode: 'chantier',
+                    }
+                  })
                 }
               >
                 <div className="qw-tile__name">{s.name}</div>
@@ -242,6 +257,17 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
         </div>
       )}
 
+      {form.client_id > 0 && (
+        <div style={{ marginTop: '1rem' }}>
+          <CentreGroupField
+            id="quote-centre-field"
+            value={form.lab_centre_group_id}
+            onChange={(centreGroupId) => setForm((f) => ({ ...f, lab_centre_group_id: centreGroupId }))}
+            hint="Repris du dossier lié par défaut — modifiable si besoin."
+          />
+        </div>
+      )}
+
       {mode === 'dossier' && (
         <div className="qw-tiles qw-tiles--scroll">
           {filteredDossiers.map((d) => {
@@ -257,6 +283,7 @@ export default function WizardStep1Context({ form, setForm, clients, allSites, d
                     dossier_id: d.id,
                     client_id: d.client_id,
                     site_id: d.site_id,
+                    lab_centre_group_id: d.lab_centre_group_id ?? undefined,
                     contextMode: 'dossier',
                   }))
                 }

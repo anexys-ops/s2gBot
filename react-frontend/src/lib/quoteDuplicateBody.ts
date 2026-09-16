@@ -24,6 +24,7 @@ export function buildQuoteDuplicateBody(quote: Quote): QuoteCreateBody {
     contact_id: quote.contact_id ?? undefined,
     site_id: quote.site_id,
     dossier_id: quote.dossier_id ?? undefined,
+    lab_centre_group_id: quote.lab_centre_group_id ?? undefined,
     quote_date: todayLocalDateInput(),
     order_date: quote.order_date?.slice(0, 10),
     site_delivery_date: quote.site_delivery_date?.slice(0, 10),

@@ -74,6 +74,10 @@ export default function DossierInfosTab() {
                   : '—'}
               </dd>
             </div>
+            <div className="dossier-infos-grid__col-6">
+              <dt>Centre</dt>
+              <dd>{dossier.centre_group ? `${dossier.centre_group.code} — ${dossier.centre_group.name}` : '—'}</dd>
+            </div>
           </dl>
         </section>
 

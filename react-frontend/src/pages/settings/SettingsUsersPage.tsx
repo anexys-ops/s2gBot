@@ -377,17 +377,18 @@ export default function SettingsUsersPage() {
               else updateMut.mutate()
             }}
           >
-            <div className="user-admin-form__header">
-              <div className="user-admin-form__avatar" aria-hidden>
-                {(form.name.trim()[0] ?? '?').toUpperCase()}
+            <div className="user-admin-form__sticky-top">
+              <div className="user-admin-form__header">
+                <div className="user-admin-form__avatar" aria-hidden>
+                  {(form.name.trim()[0] ?? '?').toUpperCase()}
+                </div>
+                <div>
+                  <p className="user-admin-form__preview-name">{form.name.trim() || 'Nouvel utilisateur'}</p>
+                  <UserRoleBadge role={form.role} />
+                </div>
               </div>
-              <div>
-                <p className="user-admin-form__preview-name">{form.name.trim() || 'Nouvel utilisateur'}</p>
-                <UserRoleBadge role={form.role} />
-              </div>
+              <UserFormTabs tab={formTab} onTab={setFormTab} />
             </div>
-
-            <UserFormTabs tab={formTab} onTab={setFormTab} />
 
             {formTab === 'identite' && (
               <section className="ds-form-section user-admin-form__section">

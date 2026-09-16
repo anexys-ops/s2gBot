@@ -4,6 +4,7 @@ import { accessGroupsApi, permissionsCatalogApi, type AccessGroupRow } from '../
 import Modal from '../../components/Modal'
 import { useAuth } from '../../contexts/AuthContext'
 import { canManageGroups } from '../../lib/settingsAccess'
+import { ListTablePanelHeader } from '../../components/ListTablePanel'
 
 export default function SettingsGroupsPage() {
   const { user } = useAuth()
@@ -111,96 +112,94 @@ export default function SettingsGroupsPage() {
       {isLoading ? (
         <p>Chargement…</p>
       ) : (
-        <div className="card">
-          <table>
-            <thead>
-              <tr>
-                <th>Nom</th>
-                <th>Membres</th>
-                <th>Droits accordés</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groups.map((g) => {
-                const labels = cat?.permissions ?? {}
-                const gPerms = g.permissions ?? []
-                return (
-                  <tr key={g.id}>
-                    <td>
-                      <strong>{g.name}</strong>
-                      {g.description ? (
-                        <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>{g.description}</div>
-                      ) : null}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>{g.users_count ?? '—'}</td>
-                    <td>
-                      {gPerms.length === 0 ? (
-                        <span className="text-muted" style={{ fontSize: '0.82rem' }}>
-                          Aucun droit
-                        </span>
-                      ) : (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
-                          {gPerms.map((p) => (
-                            <span
-                              key={p}
-                              style={{
-                                fontSize: '0.75rem',
-                                padding: '0.1rem 0.45rem',
-                                borderRadius: 99,
-                                background: 'var(--color-primary-alpha, rgba(59,130,246,0.1))',
-                                color: 'var(--color-primary, #3b82f6)',
-                                whiteSpace: 'nowrap',
-                              }}
-                              title={labels[p] ?? p}
-                            >
-                              {labels[p] ?? p}
-                            </span>
-                          ))}
+        <div className="card dossier-tab-panel dossier-tab-panel--table">
+          <ListTablePanelHeader title="Groupes d'accès" count={groups.length} />
+          <div className="table-wrap">
+            <table className="data-table data-table--compact">
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th className="data-table__num">Membres</th>
+                  <th>Droits accordés</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groups.map((g) => {
+                  const labels = cat?.permissions ?? {}
+                  const gPerms = g.permissions ?? []
+                  return (
+                    <tr key={g.id}>
+                      <td>
+                        <strong>{g.name}</strong>
+                        {g.description ? (
+                          <div className="text-muted" style={{ fontSize: '0.8rem' }}>{g.description}</div>
+                        ) : null}
+                      </td>
+                      <td className="data-table__num">{g.users_count ?? '—'}</td>
+                      <td>
+                        {gPerms.length === 0 ? (
+                          <span className="text-muted" style={{ fontSize: '0.82rem' }}>
+                            Aucun droit
+                          </span>
+                        ) : (
+                          <div className="settings-groups__perms-list">
+                            {gPerms.map((p) => (
+                              <span key={p} className="settings-groups__perm-chip" title={labels[p] ?? p}>
+                                {labels[p] ?? p}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <div className="crud-actions">
+                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEdit(g)}>
+                            Modifier
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm btn-danger-outline"
+                            onClick={() => {
+                              if (window.confirm(`Supprimer le groupe « ${g.name} » ?`)) deleteMut.mutate(g.id)
+                            }}
+                          >
+                            Supprimer
+                          </button>
                         </div>
-                      )}
-                    </td>
-                    <td>
-                      <div className="crud-actions">
-                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEdit(g)}>
-                          Modifier
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm btn-danger-outline"
-                          onClick={() => {
-                            if (window.confirm(`Supprimer le groupe « ${g.name} » ?`)) deleteMut.mutate(g.id)
-                          }}
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </td>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {groups.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="dossier-tab-empty">Aucun groupe configuré.</td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {modal && (
         <Modal title={modal === 'create' ? 'Nouveau groupe' : `Groupe : ${name}`} onClose={() => setModal(null)} size="xl">
           <form
+            className="settings-groups-form"
             onSubmit={(e) => {
               e.preventDefault()
               if (modal === 'create') createMut.mutate()
               else updateMut.mutate()
             }}
           >
-            <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '1.5rem', alignItems: 'start' }}>
+            <div className="settings-groups-form__layout">
               {/* Colonne gauche — informations groupe */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                <div className="form-group" style={{ margin: 0 }}>
+              <div className="settings-groups-form__left">
+                <div className="form-group">
                   <label>Nom</label>
                   <input value={name} onChange={(e) => setName(e.target.value)} required />
                 </div>
-                <div className="form-group" style={{ margin: 0 }}>
+                <div className="form-group">
                   <label>Slug technique</label>
                   <input
                     value={slug}
@@ -209,87 +208,43 @@ export default function SettingsGroupsPage() {
                     pattern="[a-z0-9\-]*"
                   />
                 </div>
-                <div className="form-group" style={{ margin: 0 }}>
+                <div className="form-group">
                   <label>Description</label>
                   <input value={description} onChange={(e) => setDescription(e.target.value)} />
                 </div>
-                <div style={{ marginTop: '0.25rem' }}>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: 0, lineHeight: 1.5 }}>
-                    Cochez les <strong>modules</strong> visibles dans le menu, puis les fonctions fines selon le rôle.
-                    Les droits cochés sont hérités par tous les membres du groupe.
+                <p className="text-muted settings-groups-form__help">
+                  Cochez les <strong>modules</strong> visibles dans le menu, puis les fonctions fines selon le rôle.
+                  Les droits cochés sont hérités par tous les membres du groupe.
+                </p>
+                {perms.length > 0 && (
+                  <p className="settings-groups-form__perm-count">
+                    {perms.length} droit{perms.length > 1 ? 's' : ''} accordé{perms.length > 1 ? 's' : ''}
                   </p>
-                  {perms.length > 0 ? (
-                    <p style={{ fontSize: '0.8rem', margin: '0.5rem 0 0', color: 'var(--color-primary, #3b82f6)', fontWeight: 600 }}>
-                      {perms.length} droit{perms.length > 1 ? 's' : ''} accordé{perms.length > 1 ? 's' : ''}
-                    </p>
-                  ) : null}
-                </div>
+                )}
               </div>
 
               {/* Colonne droite — éditeur de droits */}
-              <div>
-                <p style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)', margin: '0 0 0.6rem' }}>
-                  Droits accordés aux membres
-                </p>
-                <div
-                  className="permissions-editor"
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1.2rem',
-                    maxHeight: 480,
-                    overflowY: 'auto',
-                    padding: '0.75rem 0.85rem',
-                    border: '1px solid var(--color-border, #e2e8f0)',
-                    borderRadius: 8,
-                    background: 'var(--color-surface-subtle, #fafafa)',
-                  }}
-                >
+              <div className="settings-groups-form__right">
+                <p className="settings-groups-form__rights-label">Droits accordés aux membres</p>
+                <div className="permissions-editor">
                   {permSections.map((section) => (
-                    <section key={section.title}>
-                      <h4
-                        style={{
-                          margin: '0 0 0.45rem',
-                          fontSize: '0.73rem',
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.06em',
-                          color: 'var(--color-muted)',
-                          borderBottom: '1px solid var(--color-border, #e2e8f0)',
-                          paddingBottom: '0.25rem',
-                        }}
-                      >
-                        {section.title}
-                      </h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                    <section key={section.title} className="permissions-editor__section">
+                      <h4 className="permissions-editor__section-title">{section.title}</h4>
+                      <div className="permissions-editor__entries">
                         {section.entries.map(([key, label]) => {
                           const checked = perms.includes(key)
                           return (
                             <label
                               key={key}
-                              style={{
-                                display: 'flex',
-                                gap: '0.55rem',
-                                alignItems: 'center',
-                                cursor: 'pointer',
-                                padding: '0.3rem 0.5rem',
-                                borderRadius: 5,
-                                background: checked
-                                  ? 'var(--color-primary-alpha, rgba(59,130,246,0.08))'
-                                  : 'transparent',
-                                border: checked
-                                  ? '1px solid rgba(59,130,246,0.2)'
-                                  : '1px solid transparent',
-                                transition: 'background 0.1s',
-                              }}
+                              className={`permissions-editor__entry${checked ? ' permissions-editor__entry--checked' : ''}`}
                             >
                               <input
                                 type="checkbox"
                                 checked={checked}
                                 onChange={() => togglePerm(key)}
-                                style={{ flexShrink: 0, accentColor: 'var(--color-primary, #3b82f6)' }}
+                                className="permissions-editor__checkbox"
                               />
-                              <span style={{ fontSize: '0.875rem', fontWeight: checked ? 600 : 400 }}>{label}</span>
+                              <span className="permissions-editor__entry-label">{label}</span>
                             </label>
                           )
                         })}
@@ -303,7 +258,7 @@ export default function SettingsGroupsPage() {
             {(createMut.isError || updateMut.isError) && (
               <p className="error" style={{ marginTop: '0.75rem' }}>{((createMut.error || updateMut.error) as Error).message}</p>
             )}
-            <div className="crud-actions" style={{ marginTop: '1rem' }}>
+            <div className="crud-actions settings-groups-form__actions">
               <button type="submit" className="btn btn-primary" disabled={createMut.isPending || updateMut.isPending}>
                 Enregistrer
               </button>

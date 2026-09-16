@@ -174,7 +174,6 @@ export function buildBcLigneDisplayRows<T extends GroupableLigne>(
     let forfaitLigne: T | undefined
     for (const l of sorted) {
       if (usedIds.has(l.id)) continue
-      if (l.ref_article_id != null) continue
       if (l.libelle === forfaitLibelle) { forfaitLigne = l; break }
     }
     if (forfaitLigne) usedIds.add(forfaitLigne.id)

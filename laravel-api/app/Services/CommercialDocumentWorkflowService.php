@@ -53,72 +53,77 @@ class CommercialDocumentWorkflowService
                 'created_by' => $user->id,
             ]);
 
+            $ordre = 0;
+            $quoteMeta = is_array($quote->meta) ? $quote->meta : [];
+            $documentTva = (float) $quote->tva_rate;
+
+            if (QuotePricingService::isDocumentForfait($quoteMeta)) {
+                $globalHt = round(max(0.0, (float) ($quoteMeta['tarif_global_hors_lignes_ht'] ?? 0)), 2);
+                if ($globalHt > 0) {
+                    $qty = max(1, (int) ($quoteMeta['tarif_global_quantity'] ?? 1));
+                    $pu = round($globalHt / $qty, 4);
+                    BonCommandeLigne::query()->create([
+                        'bon_commande_id' => $bc->id,
+                        'ref_article_id' => null,
+                        'libelle' => $quoteMeta['tarif_global_designation'] ?? 'Prestation forfaitaire',
+                        'ordre' => $ordre++,
+                        'quantite' => $qty,
+                        'quantite_devis' => $qty,
+                        'prix_unitaire_ht' => $pu,
+                        'tva_rate' => $documentTva,
+                        'montant_ht' => $globalHt,
+                    ]);
+                } else {
+                    foreach ($quoteMeta['devis_jalons'] ?? [] as $jalon) {
+                        if (is_array($jalon)) {
+                            $this->createBcLigneFromJalon($bc, $jalon, $documentTva, $ordre++);
+                        }
+                    }
+                }
+            } else {
+                $forfaitRefIds = [];
+                $forfaitJalons = [];
+                foreach ($quoteMeta['devis_jalons'] ?? [] as $jalon) {
+                    if (! is_array($jalon) || ! QuotePricingService::isJalonForfait($jalon)) {
+                        continue;
+                    }
+                    $forfaitJalons[] = $jalon;
+                    foreach ($jalon['product_ref_article_ids'] ?? [] as $refId) {
+                        $id = (int) $refId;
+                        if ($id > 0) {
+                            $forfaitRefIds[$id] = true;
+                        }
+                    }
+                }
+
+                /** @var QuoteLine $line */
+                foreach ($quote->quoteLines as $line) {
+                    $refId = (int) ($line->ref_article_id ?? 0);
+                    if ($refId > 0 && isset($forfaitRefIds[$refId])) {
+                        continue;
+                    }
+                    BonCommandeLigne::query()->create([
+                        'bon_commande_id' => $bc->id,
+                        'ref_article_id' => $line->ref_article_id,
+                        'libelle' => $line->description,
+                        'ordre' => $ordre++,
+                        'quantite' => (float) $line->quantity,
+                        'quantite_devis' => (float) $line->quantity,
+                        'prix_unitaire_ht' => (float) $line->unit_price,
+                        'tva_rate' => (float) $line->tva_rate,
+                        'montant_ht' => (float) $line->total,
+                    ]);
+                }
+
+                foreach ($forfaitJalons as $jalon) {
+                    $this->createBcLigneFromJalon($bc, $jalon, $documentTva, $ordre++);
+                }
+            }
+
             $meta = $quote->meta ?? [];
             if (! is_array($meta)) {
                 $meta = [];
             }
-
-            $ordre = 0;
-            /** @var QuoteLine $line */
-            foreach ($quote->quoteLines as $line) {
-                $ht = (float) $line->total;
-                BonCommandeLigne::query()->create([
-                    'bon_commande_id' => $bc->id,
-                    'ref_article_id' => $line->ref_article_id,
-                    'libelle' => $line->description,
-                    'ordre' => $ordre++,
-                    'quantite' => (float) $line->quantity,
-                    'quantite_devis' => (float) $line->quantity,
-                    'prix_unitaire_ht' => (float) $line->unit_price,
-                    'tva_rate' => (float) $line->tva_rate,
-                    'montant_ht' => $ht,
-                ]);
-            }
-
-            // Un devis "forfait" (global ou par jalon) laisse les lignes à 0 : le vrai
-            // prix vit dans meta.tarif_global_hors_lignes_ht ou meta.devis_jalons[].
-            // Sans ceci, le BC généré affiche 0 partout — on ajoute donc une ligne de
-            // synthèse par forfait, à l'image de ce que fait déjà le PDF du devis.
-            if (QuotePricingService::isDocumentForfait($meta)) {
-                $ht = round(max(0, (float) ($meta['tarif_global_hors_lignes_ht'] ?? 0)), 2);
-                if ($ht > 0) {
-                    BonCommandeLigne::query()->create([
-                        'bon_commande_id' => $bc->id,
-                        'ref_article_id' => null,
-                        'libelle' => 'Prestation forfaitaire',
-                        'ordre' => $ordre++,
-                        'quantite' => 1,
-                        'quantite_devis' => 1,
-                        'prix_unitaire_ht' => $ht,
-                        'tva_rate' => (float) $quote->tva_rate,
-                        'montant_ht' => $ht,
-                    ]);
-                }
-            } else {
-                $jalons = $meta['devis_jalons'] ?? [];
-                foreach (is_array($jalons) ? $jalons : [] as $jalon) {
-                    if (! is_array($jalon) || ! QuotePricingService::isJalonForfait($jalon)) {
-                        continue;
-                    }
-                    $ht = QuotePricingService::forfaitJalonTotalHt($jalon);
-                    if ($ht <= 0) {
-                        continue;
-                    }
-                    $libelle = trim((string) ($jalon['libelle'] ?? ''));
-                    BonCommandeLigne::query()->create([
-                        'bon_commande_id' => $bc->id,
-                        'ref_article_id' => null,
-                        'libelle' => 'Prestation forfaitaire'.($libelle !== '' ? ' — '.$libelle : ''),
-                        'ordre' => $ordre++,
-                        'quantite' => 1,
-                        'quantite_devis' => 1,
-                        'prix_unitaire_ht' => $ht,
-                        'tva_rate' => isset($jalon['tva_rate']) ? (float) $jalon['tva_rate'] : (float) $quote->tva_rate,
-                        'montant_ht' => $ht,
-                    ]);
-                }
-            }
-
             $meta['bon_commande_id'] = $bc->id;
             $existingIds = $meta['bon_commande_ids'] ?? [];
             if (! is_array($existingIds)) {
@@ -130,6 +135,30 @@ class CommercialDocumentWorkflowService
 
             return $bc->load('lignes');
         });
+    }
+
+    /** @param array<string, mixed> $jalon */
+    private function createBcLigneFromJalon(BonCommande $bc, array $jalon, float $documentTva, int $ordre): void
+    {
+        $qty = max(1, (int) ($jalon['quantity'] ?? 1));
+        $ht = QuotePricingService::forfaitJalonTotalHt($jalon);
+        $pu = array_key_exists('prix_unitaire_ht', $jalon)
+            ? round(max(0.0, (float) $jalon['prix_unitaire_ht']), 4)
+            : ($qty > 0 ? round($ht / $qty, 4) : 0.0);
+        $tva = isset($jalon['tva_rate']) ? (float) $jalon['tva_rate'] : $documentTva;
+        $refId = isset($jalon['ref_article_id']) ? (int) $jalon['ref_article_id'] : 0;
+
+        BonCommandeLigne::query()->create([
+            'bon_commande_id' => $bc->id,
+            'ref_article_id' => $refId > 0 ? $refId : null,
+            'libelle' => $jalon['libelle'] ?? 'Prestation forfaitaire',
+            'ordre' => $ordre,
+            'quantite' => $qty,
+            'quantite_devis' => $qty,
+            'prix_unitaire_ht' => $pu,
+            'tva_rate' => $tva,
+            'montant_ht' => $ht,
+        ]);
     }
 
     public function createBonLivraisonFromBonCommande(BonCommande $bc, User $user): BonLivraison

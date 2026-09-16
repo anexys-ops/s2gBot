@@ -62,11 +62,27 @@ class CommercialDocumentWorkflowService
             $quoteMeta = is_array($quote->meta) ? $quote->meta : [];
             $documentTva = (float) $quote->tva_rate;
 
+            // Step 1: copy ALL quote lines — forfait product lines included
+            /** @var QuoteLine $line */
+            foreach ($quote->quoteLines as $line) {
+                BonCommandeLigne::query()->create([
+                    'bon_commande_id' => $bc->id,
+                    'ref_article_id' => $line->ref_article_id,
+                    'libelle' => $line->description,
+                    'ordre' => $ordre++,
+                    'quantite' => (float) $line->quantity,
+                    'quantite_devis' => (float) $line->quantity,
+                    'prix_unitaire_ht' => (float) $line->unit_price,
+                    'tva_rate' => (float) $line->tva_rate,
+                    'montant_ht' => (float) $line->total,
+                ]);
+            }
+
+            // Step 2: append forfait summary lines so prices are visible and editable
             if (QuotePricingService::isDocumentForfait($quoteMeta)) {
                 $globalHt = round(max(0.0, (float) ($quoteMeta['tarif_global_hors_lignes_ht'] ?? 0)), 2);
                 if ($globalHt > 0) {
                     $qty = max(1, (int) ($quoteMeta['tarif_global_quantity'] ?? 1));
-                    $pu = round($globalHt / $qty, 4);
                     BonCommandeLigne::query()->create([
                         'bon_commande_id' => $bc->id,
                         'ref_article_id' => null,
@@ -74,7 +90,7 @@ class CommercialDocumentWorkflowService
                         'ordre' => $ordre++,
                         'quantite' => $qty,
                         'quantite_devis' => $qty,
-                        'prix_unitaire_ht' => $pu,
+                        'prix_unitaire_ht' => round($globalHt / $qty, 4),
                         'tva_rate' => $documentTva,
                         'montant_ht' => $globalHt,
                     ]);
@@ -86,42 +102,10 @@ class CommercialDocumentWorkflowService
                     }
                 }
             } else {
-                $forfaitRefIds = [];
-                $forfaitJalons = [];
                 foreach ($quoteMeta['devis_jalons'] ?? [] as $jalon) {
-                    if (! is_array($jalon) || ! QuotePricingService::isJalonForfait($jalon)) {
-                        continue;
+                    if (is_array($jalon) && QuotePricingService::isJalonForfait($jalon)) {
+                        $this->createBcLigneFromJalon($bc, $jalon, $documentTva, $ordre++);
                     }
-                    $forfaitJalons[] = $jalon;
-                    foreach ($jalon['product_ref_article_ids'] ?? [] as $refId) {
-                        $id = (int) $refId;
-                        if ($id > 0) {
-                            $forfaitRefIds[$id] = true;
-                        }
-                    }
-                }
-
-                /** @var QuoteLine $line */
-                foreach ($quote->quoteLines as $line) {
-                    $refId = (int) ($line->ref_article_id ?? 0);
-                    if ($refId > 0 && isset($forfaitRefIds[$refId])) {
-                        continue;
-                    }
-                    BonCommandeLigne::query()->create([
-                        'bon_commande_id' => $bc->id,
-                        'ref_article_id' => $line->ref_article_id,
-                        'libelle' => $line->description,
-                        'ordre' => $ordre++,
-                        'quantite' => (float) $line->quantity,
-                        'quantite_devis' => (float) $line->quantity,
-                        'prix_unitaire_ht' => (float) $line->unit_price,
-                        'tva_rate' => (float) $line->tva_rate,
-                        'montant_ht' => (float) $line->total,
-                    ]);
-                }
-
-                foreach ($forfaitJalons as $jalon) {
-                    $this->createBcLigneFromJalon($bc, $jalon, $documentTva, $ordre++);
                 }
             }
 

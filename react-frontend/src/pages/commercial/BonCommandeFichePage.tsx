@@ -17,7 +17,6 @@ import {
   filterForfaitBcLigneIds,
   filterForfaitBcLignes,
   isForfaitBcJalon,
-  isForfaitBcLigne,
   resolveDevisDisplayMeta,
   resolveQuantiteDevis,
 } from '../../lib/bcLigneDisplay'
@@ -198,8 +197,8 @@ export default function BonCommandeFichePage() {
 
   const mutQuantites = useMutation({
     mutationFn: async (edits: { qty: Record<number, string>; prix: Record<number, string> }) => {
-      if (!forfaitLignes.length) return
-      for (const l of forfaitLignes) {
+      if (!bc?.lignes?.length) return
+      for (const l of bc.lignes) {
         const body: { quantite?: number; prix_unitaire_ht?: number } = {}
         const rawQty = edits.qty[l.id]
         if (rawQty !== undefined) {
@@ -291,8 +290,8 @@ export default function BonCommandeFichePage() {
     [bc?.lignes, devisDisplayMeta],
   )
   const qtyDirty = useMemo(() => {
-    if (!forfaitLignes.length) return false
-    return forfaitLignes.some((l) => {
+    if (!bc?.lignes?.length) return false
+    return (bc.lignes ?? []).some((l) => {
       const rawQty = qtyEdits[l.id]
       if (rawQty !== undefined) {
         const n = Number(String(rawQty).replace(',', '.'))
@@ -307,7 +306,7 @@ export default function BonCommandeFichePage() {
       }
       return false
     })
-  }, [forfaitLignes, qtyEdits, prixEdits])
+  }, [bc?.lignes, qtyEdits, prixEdits])
   const previewTotals = useMemo(() => {
     if (!bc?.lignes?.length) return null
     let ht = 0
@@ -678,7 +677,6 @@ export default function BonCommandeFichePage() {
                           )
                         }
                         const l = row.ligne
-                        const isForfaitLine = isForfaitBcLigne(l, devisDisplayMeta)
                         const canEditQty = canEditQuantites
                         const maxDevis = resolveQuantiteDevis(l)
                         const rawQty = qtyEdits[l.id] ?? qtyInputFromApi(l.quantite)

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Support\AgencyAccess;
 use App\Support\ClientListEnrichment;
+use App\Support\PermissionCatalog;
 use App\Services\DocumentActivityLogger;
 use App\Support\ClientPortalAccess;
 use App\Support\ClientPortalCatalog;
@@ -89,7 +90,8 @@ class ClientController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        $u = $request->user();
+        if (! $u->isLabAdmin() && ! $u->hasCapability(PermissionCatalog::CLIENTS_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -122,7 +124,8 @@ class ClientController extends Controller
 
     public function update(Request $request, Client $client): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        $u = $request->user();
+        if (! $u->isLabAdmin() && ! $u->hasCapability(PermissionCatalog::CLIENTS_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -266,6 +269,8 @@ class ClientController extends Controller
             // GPS
             'lat'                         => 'nullable|numeric|between:-90,90',
             'lng'                         => 'nullable|numeric|between:-180,180',
+            // Centre labo
+            'lab_centre_group_id'         => 'nullable|integer|exists:lab_centre_groups,id',
         ];
     }
 }

@@ -23,6 +23,7 @@ class BonLivraison extends Model
         'numero',
         'bon_commande_id',
         'dossier_id',
+        'lab_centre_group_id',
         'client_id',
         'contact_id',
         'statut',
@@ -47,6 +48,11 @@ class BonLivraison extends Model
         }
 
         return $array;
+    }
+
+    public function centreGroup(): BelongsTo
+    {
+        return $this->belongsTo(LabCentreGroup::class, 'lab_centre_group_id');
     }
 
     public function bonCommande(): BelongsTo

@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { clientsApi, adminUsersApi, type Client, type EntityMetaPayload } from '../../api/client'
-import ClientMoroccoFormFields from '../../components/clients/ClientMoroccoFormFields'
+import ClientFormModal from '../../components/clients/ClientFormModal'
 import EntityMetaCard from '../../components/module/EntityMetaCard'
-import Modal from '../../components/Modal'
+import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
 import { legalFormLabel } from '../../constants/moroccoClient'
+import { currencyName, currencyLabel } from '../../lib/currencies'
+import ClientPortalModulesPanel from '../../components/clients/ClientPortalModulesPanel'
 import type { ClientOutletContext } from './ClientLayout'
 
 function parseCapital(v: Client['capital_social']): number | undefined {
@@ -36,6 +38,8 @@ const emptyForm = (c: Client): Partial<Client> => ({
   responsable_recouvrement_id: c.responsable_recouvrement_id ?? null,
   lat: c.lat ?? null,
   lng: c.lng ?? null,
+  lab_centre_group_id: c.lab_centre_group_id ?? null,
+  currency_code: c.currency_code ?? 'MAD',
 })
 
 const INTERNAL_ROLES = ['lab_admin', 'lab_technician', 'lab_manager', 'commercial', 'admin']
@@ -46,6 +50,7 @@ export default function ClientFicheTab() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState<Partial<Client>>(() => emptyForm(client))
+  const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
 
   // Liste des utilisateurs internes pour les selects référents
   const { data: usersData } = useQuery({
@@ -76,6 +81,13 @@ export default function ClientFicheTab() {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       queryClient.invalidateQueries({ queryKey: ['client-commercial', clientId] })
       setModalOpen(false)
+      setToast({ message: 'Client mis à jour avec succès.', variant: 'success' })
+    },
+    onError: (err) => {
+      setToast({
+        message: toastErrorMessage(err, 'Échec de la mise à jour du client.'),
+        variant: 'error',
+      })
     },
   })
 
@@ -134,6 +146,12 @@ export default function ClientFicheTab() {
           <div><dt>Email</dt><dd>{client.email ?? '—'}</dd></div>
           <div><dt>Téléphone</dt><dd>{client.phone?.trim() ? client.phone : '—'}</dd></div>
           <div><dt>WhatsApp</dt><dd>{client.whatsapp?.trim() ? client.whatsapp : '—'}</dd></div>
+          <div>
+            <dt>Devise</dt>
+            <dd>
+              {currencyName(client.currency_code)} ({currencyLabel(client.currency_code)})
+            </dd>
+          </div>
           <div><dt>Ville</dt><dd>{client.city?.trim() ? client.city : '—'}</dd></div>
           <div><dt>Code postal</dt><dd>{client.postal_code?.trim() ? client.postal_code : '—'}</dd></div>
           <div style={{ gridColumn: '1 / -1' }}>
@@ -147,6 +165,13 @@ export default function ClientFicheTab() {
             </div>
           )}
         </dl>
+
+        {client.lab_centre_group_id ? (
+          <div>
+            <dt>Agence / Centre labo</dt>
+            <dd>{client.centre_group ? `${client.centre_group.code} — ${client.centre_group.name}` : `#${client.lab_centre_group_id}`}</dd>
+          </div>
+        ) : null}
 
         {/* ---- Référents S2G ---- */}
         <h3 className="module-fiche-section-title" style={{ margin: '1.25rem 0 0.75rem', fontSize: '1rem' }}>
@@ -176,6 +201,10 @@ export default function ClientFicheTab() {
         </h3>
         <dl className="module-fiche-grid">
           <div><dt>ICE</dt><dd>{client.ice?.trim() ? client.ice : '—'}</dd></div>
+          <div>
+            <dt>TVA État</dt>
+            <dd>{client.ca_annuel_tva_regime ? 'Oui — 25 % récup. / 75 % État' : 'Non'}</dd>
+          </div>
           <div><dt>RC</dt><dd>{client.rc?.trim() ? client.rc : '—'}</dd></div>
           <div><dt>Patente</dt><dd>{client.patente?.trim() ? client.patente : '—'}</dd></div>
           <div><dt>IF (identifiant fiscal)</dt><dd>{client.if_number?.trim() ? client.if_number : '—'}</dd></div>
@@ -186,6 +215,8 @@ export default function ClientFicheTab() {
         </dl>
       </div>
 
+      <ClientPortalModulesPanel clientId={clientId} client={client} canEdit={isAdmin} />
+
       <EntityMetaCard
         meta={client.meta}
         editable={isAdmin}
@@ -195,72 +226,19 @@ export default function ClientFicheTab() {
       />
 
       {modalOpen && isAdmin && (
-        <Modal title="Modifier le client" onClose={() => setModalOpen(false)}>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>Nom *</label>
-              <input value={form.name ?? ''} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
-            </div>
-            <div className="form-group">
-              <label>Adresse</label>
-              <input value={form.address ?? ''} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label>Email</label>
-              <input type="email" value={form.email ?? ''} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-            </div>
-            <ClientMoroccoFormFields form={form} setForm={setForm} />
-
-            {/* GPS */}
-            <fieldset style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: '0.75rem', marginTop: '0.75rem' }}>
-              <legend style={{ fontSize: '0.85rem', fontWeight: 600, padding: '0 0.25rem' }}>Coordonnées GPS (optionnel)</legend>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Latitude</label>
-                  <input type="number" step="any" value={form.lat ?? ''} onChange={(e) => setForm((f) => ({ ...f, lat: e.target.value ? Number(e.target.value) : null }))} placeholder="ex: 33.5731" />
-                </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Longitude</label>
-                  <input type="number" step="any" value={form.lng ?? ''} onChange={(e) => setForm((f) => ({ ...f, lng: e.target.value ? Number(e.target.value) : null }))} placeholder="ex: -7.5898" />
-                </div>
-              </div>
-            </fieldset>
-
-            {/* Référents S2G */}
-            <fieldset style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: '0.75rem', marginTop: '0.75rem' }}>
-              <legend style={{ fontSize: '0.85rem', fontWeight: 600, padding: '0 0.25rem' }}>Référents S2G</legend>
-              {[
-                { key: 'commercial_id', label: 'Commercial' },
-                { key: 'responsable_technique_id', label: 'Responsable technique' },
-                { key: 'responsable_facturation_id', label: 'Facturation' },
-                { key: 'responsable_recouvrement_id', label: 'Recouvrement' },
-              ].map(({ key, label }) => (
-                <div key={key} className="form-group">
-                  <label>{label}</label>
-                  <select
-                    value={String(form[key as keyof typeof form] ?? '')}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value ? Number(e.target.value) : null }))}
-                  >
-                    <option value="">— Aucun —</option>
-                    {staffUsers.map((u) => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-            </fieldset>
-
-            {updateMut.isError && <p className="error">{(updateMut.error as Error).message}</p>}
-            <div className="crud-actions" style={{ marginTop: '1rem' }}>
-              <button type="submit" className="btn btn-primary" disabled={updateMut.isPending}>
-                Enregistrer
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>
-                Annuler
-              </button>
-            </div>
-          </form>
-        </Modal>
+        <ClientFormModal
+          mode="edit"
+          form={form}
+          setForm={setForm}
+          onSubmit={handleSubmit}
+          onClose={() => setModalOpen(false)}
+          isPending={updateMut.isPending}
+          errorMessage={updateMut.isError ? (updateMut.error as Error).message : null}
+          staffUsers={staffUsers}
+        />
+      )}
+      {toast && (
+        <Toast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} />
       )}
     </>
   )

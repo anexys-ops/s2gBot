@@ -3,6 +3,7 @@ import type { Client } from '../../api/client'
 import { useCurrencyCatalog } from '../../hooks/useCurrencyCatalog'
 import Modal from '../Modal'
 import ClientMoroccoFormFields from './ClientMoroccoFormFields'
+import CentreGroupField from '../centres/CentreGroupField'
 
 type StaffUser = { id: number; name: string }
 
@@ -173,6 +174,23 @@ export default function ClientFormModal({
                       placeholder="-7.5898"
                     />
                   </div>
+                </div>
+              </section>
+
+              <section className="client-form-modal__panel">
+                <header className="client-form-modal__panel-head">
+                  <span className="client-form-modal__panel-icon" aria-hidden>🏢</span>
+                  <div>
+                    <h3 className="client-form-modal__panel-title">Agence / Centre labo</h3>
+                    <p className="client-form-modal__panel-desc">Centre du laboratoire associé à ce client</p>
+                  </div>
+                </header>
+                <div className="client-form-modal__grid" style={{ maxWidth: 340 }}>
+                  <CentreGroupField
+                    value={form.lab_centre_group_id ?? null}
+                    onChange={(v) => setForm((f) => ({ ...f, lab_centre_group_id: v ?? null }))}
+                    label="Centre"
+                  />
                 </div>
               </section>
 

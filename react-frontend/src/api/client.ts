@@ -859,6 +859,8 @@ export type DossierCreateInput = {
   statut: DossierStatut
   date_debut: string
   mission_id?: number | null
+  lab_centre_group_id?: number | null
+  lien_dossier_id?: number | null
   date_fin_prevue?: string | null
   maitre_ouvrage?: string | null
   entreprise_chantier?: string | null
@@ -884,6 +886,10 @@ export interface DossierRow {
   client_id: number
   site_id: number
   mission_id?: number | null
+  lab_centre_group_id?: number | null
+  lien_dossier_id?: number | null
+  centre_group?: { id: number; code: string; name: string } | null
+  lien_dossier?: { id: number; reference: string; titre: string } | null
   statut: DossierStatut
   date_debut: string
   date_fin_prevue?: string | null
@@ -1001,6 +1007,8 @@ export type BonLivraison = {
     quote?: Pick<Quote, 'id' | 'number' | 'status'> & { meta?: EntityMetaPayload }
   }
   autres_bons_livraison?: Array<Pick<BonLivraison, 'id' | 'numero' | 'statut' | 'date_livraison'>>
+  lab_centre_group_id?: number | null
+  centre_group?: { id: number; code: string; name: string } | null
 }
 
 export const dossiersApi = {
@@ -1053,6 +1061,12 @@ export const dossiersApi = {
     api<{ bons_commande: BonCommande[]; bons_livraison: BonLivraison[] }>(`/v1/dossiers/${id}/bons`),
   addContact: (id: number, body: Omit<DossierContactInput, 'id'>) =>
     api<DossierContactRow>(`/v1/dossiers/${id}/contacts`, { method: 'POST', body: JSON.stringify(body) }),
+  listBySite: (siteId: number) =>
+    api<{ id: number; reference: string; titre: string; statut: string }[]>(`/v1/sites/${siteId}/dossiers`),
+}
+
+export const labCentreGroupsApi = {
+  list: () => api<{ id: number; code: string; name: string; sort_order: number; active: boolean }[]>('/v1/lab-centre-groups'),
 }
 
 export const bonsCommandeApi = {
@@ -1070,6 +1084,7 @@ export const bonsCommandeApi = {
   update: (id: number, body: { notes?: string; date_livraison_prevue?: string; montant_ht?: number; montant_ttc?: number; contact_id?: number | null; statut?: string }) =>
     api<BonCommande>(`/v1/bons-commande/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api<null>(`/v1/bons-commande/${id}`, { method: 'DELETE' }),
+  syncPrixDevis: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}/sync-prix-devis`, { method: 'POST' }),
   confirmer: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}/confirmer`, { method: 'POST' }),
   transformerBl: (id: number) => api<BonLivraison>(`/v1/bons-commande/${id}/transformer-bl`, { method: 'POST' }),
   updateLigne: (
@@ -1082,6 +1097,7 @@ export const bonsCommandeApi = {
       date_livraison?: string | null
       notes_ligne?: string | null
       quantite?: number
+      prix_unitaire_ht?: number
     },
   ) =>
     api<BonCommandeLigne>(`/v1/bons-commande/${bcId}/lignes/${ligneId}`, { method: 'PUT', body: JSON.stringify(body) }),
@@ -2848,6 +2864,9 @@ export interface Client {
   // GPS
   lat?: number | null
   lng?: number | null
+  // Centre labo
+  lab_centre_group_id?: number | null
+  centre_group?: { id: number; code: string; name: string } | null
   created_at?: string
   sites?: Site[]
   addresses?: ClientAddress[]
@@ -3220,6 +3239,8 @@ export interface OrdreMission {
   /** Sérialisation Laravel (snake_case) */
   bon_commande?: OrdreMission['bonCommande']
   lignes?: OrdreMissionLigne[]
+  lab_centre_group_id?: number | null
+  centre_group?: { id: number; code: string; name: string } | null
 }
 
 /** Ligne de déplacement km — stockée dans expense_lines (note de frais / NDF). */

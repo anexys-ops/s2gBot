@@ -16,6 +16,7 @@ use App\Support\ActivityChangeTracker;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
 use App\Support\ClientFilialeResolver;
+use App\Support\PermissionCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\DocumentActivityLogger;
@@ -181,7 +182,8 @@ class InvoiceController extends Controller
 
     public function fromOrders(Request $request): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        $u = $request->user();
+        if (! $u->isLab() && ! $u->hasCapability(PermissionCatalog::COMMERCIAL_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -205,7 +207,8 @@ class InvoiceController extends Controller
 
     public function eligibleBonsCommande(Request $request): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        $u = $request->user();
+        if (! $u->isLab() && ! $u->hasCapability(PermissionCatalog::COMMERCIAL_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -237,7 +240,8 @@ class InvoiceController extends Controller
 
     public function fromBonsCommande(Request $request): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        $u = $request->user();
+        if (! $u->isLab() && ! $u->hasCapability(PermissionCatalog::COMMERCIAL_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -261,7 +265,8 @@ class InvoiceController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        $u = $request->user();
+        if (! $u->isLabAdmin() && ! $u->hasCapability(PermissionCatalog::COMMERCIAL_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -294,6 +299,7 @@ class InvoiceController extends Controller
             'contact_id' => 'nullable|exists:client_contacts,id',
             'filiale_agency_id' => 'nullable|integer|exists:agencies,id',
             'site_id' => 'nullable|exists:sites,id',
+            'lab_centre_group_id' => 'nullable|integer|exists:lab_centre_groups,id',
         ]);
 
         ClientContactDocument::assertBelongsToClient(
@@ -322,6 +328,7 @@ class InvoiceController extends Controller
             'client_id' => $validated['client_id'],
             'contact_id' => $validated['contact_id'] ?? null,
             'agency_id' => $agencyId,
+            'lab_centre_group_id' => $validated['lab_centre_group_id'] ?? null,
             'invoice_date' => $validated['invoice_date'],
             'order_date' => $validated['order_date'] ?? null,
             'site_delivery_date' => $validated['site_delivery_date'] ?? null,
@@ -403,7 +410,8 @@ class InvoiceController extends Controller
 
     public function update(Request $request, Invoice $invoice): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        $u = $request->user();
+        if (! $u->isLabAdmin() && ! $u->hasCapability(PermissionCatalog::COMMERCIAL_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -421,6 +429,7 @@ class InvoiceController extends Controller
                 'pdf_template_id' => 'nullable|exists:document_pdf_templates,id',
                 'meta' => 'nullable|array',
                 'contact_id' => 'nullable|exists:client_contacts,id',
+                'lab_centre_group_id' => 'nullable|integer|exists:lab_centre_groups,id',
             ]);
             $invoice->update($validated);
             $invoice->refresh();
@@ -463,6 +472,7 @@ class InvoiceController extends Controller
             'reminder_notes' => 'nullable|string|max:5000',
             'meta' => 'nullable|array',
             'contact_id' => 'nullable|exists:client_contacts,id',
+            'lab_centre_group_id' => 'nullable|integer|exists:lab_centre_groups,id',
         ]);
 
         $invoice->fill(collect($validated)->except('lines')->toArray());

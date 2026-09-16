@@ -54,9 +54,12 @@ class CommercialDocumentWorkflowService
             ]);
 
             $ordre = 0;
+            $quoteMeta = is_array($quote->meta) ? $quote->meta : [];
+            $documentTva = (float) $quote->tva_rate;
+
+            // Step 1: copy ALL quote lines — forfait product lines included
             /** @var QuoteLine $line */
             foreach ($quote->quoteLines as $line) {
-                $ht = (float) $line->total;
                 BonCommandeLigne::query()->create([
                     'bon_commande_id' => $bc->id,
                     'ref_article_id' => $line->ref_article_id,
@@ -66,8 +69,39 @@ class CommercialDocumentWorkflowService
                     'quantite_devis' => (float) $line->quantity,
                     'prix_unitaire_ht' => (float) $line->unit_price,
                     'tva_rate' => (float) $line->tva_rate,
-                    'montant_ht' => $ht,
+                    'montant_ht' => (float) $line->total,
                 ]);
+            }
+
+            // Step 2: append forfait summary lines so prices are visible and editable
+            if (QuotePricingService::isDocumentForfait($quoteMeta)) {
+                $globalHt = round(max(0.0, (float) ($quoteMeta['tarif_global_hors_lignes_ht'] ?? 0)), 2);
+                if ($globalHt > 0) {
+                    $qty = max(1, (int) ($quoteMeta['tarif_global_quantity'] ?? 1));
+                    BonCommandeLigne::query()->create([
+                        'bon_commande_id' => $bc->id,
+                        'ref_article_id' => null,
+                        'libelle' => $quoteMeta['tarif_global_designation'] ?? 'Prestation forfaitaire',
+                        'ordre' => $ordre++,
+                        'quantite' => $qty,
+                        'quantite_devis' => $qty,
+                        'prix_unitaire_ht' => round($globalHt / $qty, 4),
+                        'tva_rate' => $documentTva,
+                        'montant_ht' => $globalHt,
+                    ]);
+                } else {
+                    foreach ($quoteMeta['devis_jalons'] ?? [] as $jalon) {
+                        if (is_array($jalon)) {
+                            $this->createBcLigneFromJalon($bc, $jalon, $documentTva, $ordre++);
+                        }
+                    }
+                }
+            } else {
+                foreach ($quoteMeta['devis_jalons'] ?? [] as $jalon) {
+                    if (is_array($jalon) && QuotePricingService::isJalonForfait($jalon)) {
+                        $this->createBcLigneFromJalon($bc, $jalon, $documentTva, $ordre++);
+                    }
+                }
             }
 
             $meta = $quote->meta ?? [];
@@ -85,6 +119,34 @@ class CommercialDocumentWorkflowService
 
             return $bc->load('lignes');
         });
+    }
+
+    /** @param array<string, mixed> $jalon */
+    private function createBcLigneFromJalon(BonCommande $bc, array $jalon, float $documentTva, int $ordre): void
+    {
+        $qty = max(1, (int) ($jalon['quantity'] ?? 1));
+        $ht = QuotePricingService::forfaitJalonTotalHt($jalon);
+        $pu = array_key_exists('prix_unitaire_ht', $jalon)
+            ? round(max(0.0, (float) $jalon['prix_unitaire_ht']), 4)
+            : ($qty > 0 ? round($ht / $qty, 4) : 0.0);
+        $tva = isset($jalon['tva_rate']) ? (float) $jalon['tva_rate'] : $documentTva;
+        $refId = isset($jalon['ref_article_id']) ? (int) $jalon['ref_article_id'] : 0;
+
+        $libelle = isset($jalon['libelle']) && trim((string) $jalon['libelle']) !== ''
+            ? 'Prestation forfaitaire — '.$jalon['libelle']
+            : 'Prestation forfaitaire';
+
+        BonCommandeLigne::query()->create([
+            'bon_commande_id' => $bc->id,
+            'ref_article_id' => $refId > 0 ? $refId : null,
+            'libelle' => $libelle,
+            'ordre' => $ordre,
+            'quantite' => $qty,
+            'quantite_devis' => $qty,
+            'prix_unitaire_ht' => $pu,
+            'tva_rate' => $tva,
+            'montant_ht' => $ht,
+        ]);
     }
 
     public function createBonLivraisonFromBonCommande(BonCommande $bc, User $user): BonLivraison

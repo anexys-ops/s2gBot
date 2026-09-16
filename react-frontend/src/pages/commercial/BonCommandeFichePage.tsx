@@ -646,6 +646,17 @@ export default function BonCommandeFichePage() {
                             canEditQuantites &&
                             isForfaitBcJalon(row.jalonId, devisDisplayMeta) &&
                             editableJalonIds.length > 0
+                          const fl = row.forfaitLigne
+                          const flRawQty = fl ? (qtyEdits[fl.id] ?? qtyInputFromApi(fl.quantite)) : null
+                          const flRawPrix = fl ? (prixEdits[fl.id] ?? prixInputFromApi(fl.prix_unitaire_ht)) : null
+                          const flPreviewQty = flRawQty != null ? Number(String(flRawQty).replace(',', '.')) : 0
+                          const flPreviewPrix = flRawPrix != null ? Number(String(flRawPrix).replace(',', '.')) : 0
+                          const flMontant = fl
+                            ? (Number.isFinite(flPreviewQty) && Number.isFinite(flPreviewPrix)
+                              ? Math.round(flPreviewQty * flPreviewPrix * 100) / 100
+                              : Number(fl.montant_ht))
+                            : null
+                          const flMaxDevis = fl ? resolveQuantiteDevis(fl) : null
                           return (
                             <tr key={row.key} className="bc-lignes-table__jalon">
                               <td className="bc-lignes-table__jalon-label">
@@ -656,21 +667,70 @@ export default function BonCommandeFichePage() {
                                   </>
                                 ) : null}
                                 {row.label}
-                              </td>
-                              <td colSpan={4} className="data-table__num bc-lignes-table__jalon-mass">
                                 {showJalonMassQty ? (
-                                  <BcJalonQtyMass
-                                    jalonLabel={row.label}
-                                    value={jalonMassQty[row.jalonId] ?? ''}
-                                    lineCount={editableJalonIds.length}
-                                    onChange={(value) =>
-                                      setJalonMassQty((prev) => ({ ...prev, [row.jalonId]: value }))
-                                    }
-                                    onApply={() => applyJalonMassQty(row.jalonId, row.ligneIds)}
-                                  />
+                                  <div style={{ marginTop: '0.4rem' }}>
+                                    <BcJalonQtyMass
+                                      jalonLabel={row.label}
+                                      value={jalonMassQty[row.jalonId] ?? ''}
+                                      lineCount={editableJalonIds.length}
+                                      onChange={(value) =>
+                                        setJalonMassQty((prev) => ({ ...prev, [row.jalonId]: value }))
+                                      }
+                                      onApply={() => applyJalonMassQty(row.jalonId, row.ligneIds)}
+                                    />
+                                  </div>
                                 ) : null}
                               </td>
-                              <td />
+                              {fl && flRawQty != null && flRawPrix != null ? (
+                                <>
+                                  <td className="data-table__num bc-lignes-table__qty-cell">
+                                    {canEditQuantites ? (
+                                      <input
+                                        type="number"
+                                        className="bc-lignes-table__qty-input"
+                                        min={0}
+                                        step="any"
+                                        inputMode="decimal"
+                                        value={flRawQty}
+                                        onChange={(e) => {
+                                          mutQuantites.reset()
+                                          setQtyEdits((s) => ({ ...s, [fl.id]: e.target.value }))
+                                        }}
+                                        aria-label={`Quantité pour ${row.label}`}
+                                      />
+                                    ) : formatQuantity(fl.quantite)}
+                                  </td>
+                                  <td className="data-table__num bc-lignes-table__qty-devis">
+                                    {flMaxDevis != null ? formatQuantity(flMaxDevis) : '—'}
+                                  </td>
+                                  <td className="data-table__num bc-lignes-table__prix-cell">
+                                    {canEditQuantites ? (
+                                      <input
+                                        type="number"
+                                        className="bc-lignes-table__qty-input"
+                                        min={0}
+                                        step="any"
+                                        inputMode="decimal"
+                                        value={flRawPrix}
+                                        onChange={(e) => {
+                                          mutQuantites.reset()
+                                          setPrixEdits((s) => ({ ...s, [fl.id]: e.target.value }))
+                                        }}
+                                        aria-label={`Prix pour ${row.label}`}
+                                      />
+                                    ) : formatMoney(Number(fl.prix_unitaire_ht))}
+                                  </td>
+                                  <td className="data-table__num bc-lignes-table__tva-cell">
+                                    {Number(fl.tva_rate) > 0 ? `${Number(fl.tva_rate)} %` : '—'}
+                                  </td>
+                                  <td className="data-table__num">{formatMoney(flMontant ?? 0)}</td>
+                                </>
+                              ) : (
+                                <>
+                                  <td colSpan={4} />
+                                  <td />
+                                </>
+                              )}
                             </tr>
                           )
                         }

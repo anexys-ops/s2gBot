@@ -3,6 +3,7 @@ import type { BonCommandeLigne, EntityMetaPayload } from '../api/client'
 export type GroupableLigne = {
   id: number
   ref_article_id?: number | null
+  libelle?: string
   ordre?: number
 }
 
@@ -27,7 +28,7 @@ export function resolveDevisDisplayMeta(
 }
 
 export type BcLigneDisplayRow<T extends GroupableLigne = BonCommandeLigne> =
-  | { type: 'jalon_header'; key: string; jalonId: string; label: string; code?: string | null; ligneIds: number[] }
+  | { type: 'jalon_header'; key: string; jalonId: string; label: string; code?: string | null; ligneIds: number[]; forfaitLigne?: T }
   | { type: 'product'; key: string; ligne: T; nested: boolean }
 
 export function isDocumentForfaitMeta(meta?: EntityMetaPayload | null): boolean {
@@ -166,6 +167,17 @@ export function buildBcLigneDisplayRows<T extends GroupableLigne>(
       const ligne = findByRefId(refId)
       if (ligne) childLignes.push(ligne)
     }
+    // Find the "Prestation forfaitaire" summary line for this jalon (ref_article_id=null)
+    const forfaitLibelle = jalon.libelle
+      ? `Prestation forfaitaire — ${jalon.libelle}`
+      : 'Prestation forfaitaire'
+    let forfaitLigne: T | undefined
+    for (const l of sorted) {
+      if (usedIds.has(l.id)) continue
+      if (l.ref_article_id != null) continue
+      if (l.libelle === forfaitLibelle) { forfaitLigne = l; break }
+    }
+    if (forfaitLigne) usedIds.add(forfaitLigne.id)
     rows.push({
       type: 'jalon_header',
       key: `j-${jalonId}`,
@@ -173,6 +185,7 @@ export function buildBcLigneDisplayRows<T extends GroupableLigne>(
       label: jalon.libelle,
       code: jalon.s2g_code ?? null,
       ligneIds: childLignes.map((l) => l.id),
+      forfaitLigne,
     })
     for (const ligne of childLignes) emitProduct(ligne, true)
   }

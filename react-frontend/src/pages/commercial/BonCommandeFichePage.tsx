@@ -679,7 +679,7 @@ export default function BonCommandeFichePage() {
                         }
                         const l = row.ligne
                         const isForfaitLine = isForfaitBcLigne(l, devisDisplayMeta)
-                        const canEditQty = canEditQuantites && isForfaitLine
+                        const canEditQty = canEditQuantites
                         const maxDevis = resolveQuantiteDevis(l)
                         const rawQty = qtyEdits[l.id] ?? qtyInputFromApi(l.quantite)
                         const rawPrix = prixEdits[l.id] ?? prixInputFromApi(l.prix_unitaire_ht)

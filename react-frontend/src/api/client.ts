@@ -2598,8 +2598,6 @@ export interface Quote {
   status: string
   notes?: string
   meta?: EntityMetaPayload | null
-  lab_centre_group_id?: number | null
-  centre_group?: { id: number; code: string; name: string } | null
   client?: Client
   client_contact?: ClientContactRow
   site?: Site
@@ -3131,6 +3129,8 @@ export interface Invoice {
   next_reminder_date?: string | null
   reminder_notes?: string | null
   meta?: EntityMetaPayload | null
+  lab_centre_group_id?: number | null
+  centre_group?: LabCentreGroup | null
   client?: Client
   client_contact?: ClientContactRow
   orders?: Order[]

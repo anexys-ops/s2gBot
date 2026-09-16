@@ -618,10 +618,10 @@ export default function BonCommandeFichePage() {
                       <tr>
                         <th scope="col">Libellé</th>
                         <th scope="col" className="data-table__num">
-                          Qté devis
+                          Qté BC
                         </th>
                         <th scope="col" className="data-table__num">
-                          Qté BC
+                          Réf. devis
                         </th>
                         <th scope="col" className="data-table__num">
                           PU HT ({MONEY_UNIT_LABEL})
@@ -657,9 +657,6 @@ export default function BonCommandeFichePage() {
                                 ) : null}
                                 {row.label}
                               </td>
-                              <td className="data-table__num bc-lignes-table__qty-devis" aria-hidden="true">
-                                —
-                              </td>
                               <td colSpan={4} className="data-table__num bc-lignes-table__jalon-mass">
                                 {showJalonMassQty ? (
                                   <BcJalonQtyMass
@@ -673,6 +670,7 @@ export default function BonCommandeFichePage() {
                                   />
                                 ) : null}
                               </td>
+                              <td />
                             </tr>
                           )
                         }
@@ -693,34 +691,27 @@ export default function BonCommandeFichePage() {
                             className={row.nested ? 'bc-lignes-table__product--nested' : undefined}
                           >
                             <td>{l.libelle}</td>
-                            <td className="data-table__num bc-lignes-table__qty-devis">
-                              {maxDevis != null ? formatQuantity(maxDevis) : '—'}
-                            </td>
                             <td className="data-table__num bc-lignes-table__qty-cell">
                               {canEditQty ? (
-                                <div className="bc-lignes-table__qty-editor">
-                                  <input
-                                    type="number"
-                                    className="bc-lignes-table__qty-input"
-                                    min={0}
-                                    step="any"
-                                    inputMode="decimal"
-                                    value={rawQty}
-                                    onChange={(e) => {
-                                      mutQuantites.reset()
-                                      setQtyEdits((s) => ({ ...s, [l.id]: e.target.value }))
-                                    }}
-                                    aria-label={`Quantité BC pour ${l.libelle}`}
-                                  />
-                                  {maxDevis != null ? (
-                                    <span className="bc-lignes-table__qty-cap text-muted">
-                                      devis : {formatQuantity(maxDevis)}
-                                    </span>
-                                  ) : null}
-                                </div>
+                                <input
+                                  type="number"
+                                  className="bc-lignes-table__qty-input"
+                                  min={0}
+                                  step="any"
+                                  inputMode="decimal"
+                                  value={rawQty}
+                                  onChange={(e) => {
+                                    mutQuantites.reset()
+                                    setQtyEdits((s) => ({ ...s, [l.id]: e.target.value }))
+                                  }}
+                                  aria-label={`Quantité BC pour ${l.libelle}`}
+                                />
                               ) : (
                                 formatQuantity(l.quantite)
                               )}
+                            </td>
+                            <td className="data-table__num bc-lignes-table__qty-devis">
+                              {maxDevis != null ? formatQuantity(maxDevis) : '—'}
                             </td>
                             <td className="data-table__num bc-lignes-table__prix-cell">
                               {canEditQty ? (

@@ -148,10 +148,14 @@ class CommercialDocumentWorkflowService
         $tva = isset($jalon['tva_rate']) ? (float) $jalon['tva_rate'] : $documentTva;
         $refId = isset($jalon['ref_article_id']) ? (int) $jalon['ref_article_id'] : 0;
 
+        $libelle = isset($jalon['libelle']) && trim((string) $jalon['libelle']) !== ''
+            ? 'Prestation forfaitaire — '.$jalon['libelle']
+            : 'Prestation forfaitaire';
+
         BonCommandeLigne::query()->create([
             'bon_commande_id' => $bc->id,
             'ref_article_id' => $refId > 0 ? $refId : null,
-            'libelle' => $jalon['libelle'] ?? 'Prestation forfaitaire',
+            'libelle' => $libelle,
             'ordre' => $ordre,
             'quantite' => $qty,
             'quantite_devis' => $qty,

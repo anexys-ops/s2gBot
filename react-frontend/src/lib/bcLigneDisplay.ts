@@ -135,6 +135,28 @@ export function buildBcLigneDisplayRows<T extends GroupableLigne>(
   const usedIds = new Set<number>()
   const rows: BcLigneDisplayRow<T>[] = []
 
+  // Pré-clamer les lignes "Prestation forfaitaire" pour chaque jalon AVANT le parcours,
+  // pour éviter que nextStandalone() les vole avant que le jalon soit traité.
+  const forfaitLigneByJalonId = new Map<string, T>()
+  for (const jalon of jalons) {
+    if (!jalon.id) continue
+    const forfaitLibelle = jalon.libelle
+      ? `Prestation forfaitaire — ${jalon.libelle}`
+      : 'Prestation forfaitaire'
+    for (const l of sorted) {
+      if (usedIds.has(l.id)) continue
+      if (forfaitLigneByJalonId.has(jalon.id)) break
+      // Skip lines already claimed by another jalon
+      const alreadyClaimed = [...forfaitLigneByJalonId.values()].some((fl) => fl.id === l.id)
+      if (alreadyClaimed) continue
+      if (l.libelle === forfaitLibelle) {
+        forfaitLigneByJalonId.set(jalon.id, l)
+        usedIds.add(l.id)
+        break
+      }
+    }
+  }
+
   const findByRefId = (refId: number): T | undefined => {
     for (const l of sorted) {
       if (usedIds.has(l.id)) continue
@@ -167,16 +189,7 @@ export function buildBcLigneDisplayRows<T extends GroupableLigne>(
       const ligne = findByRefId(refId)
       if (ligne) childLignes.push(ligne)
     }
-    // Find the "Prestation forfaitaire" summary line for this jalon (ref_article_id=null)
-    const forfaitLibelle = jalon.libelle
-      ? `Prestation forfaitaire — ${jalon.libelle}`
-      : 'Prestation forfaitaire'
-    let forfaitLigne: T | undefined
-    for (const l of sorted) {
-      if (usedIds.has(l.id)) continue
-      if (l.libelle === forfaitLibelle) { forfaitLigne = l; break }
-    }
-    if (forfaitLigne) usedIds.add(forfaitLigne.id)
+    const forfaitLigne = forfaitLigneByJalonId.get(jalonId)
     rows.push({
       type: 'jalon_header',
       key: `j-${jalonId}`,

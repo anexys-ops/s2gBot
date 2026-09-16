@@ -1009,6 +1009,8 @@ export type BonLivraison = {
     quote?: Pick<Quote, 'id' | 'number' | 'status'> & { meta?: EntityMetaPayload }
   }
   autres_bons_livraison?: Array<Pick<BonLivraison, 'id' | 'numero' | 'statut' | 'date_livraison'>>
+  lab_centre_group_id?: number | null
+  centre_group?: { id: number; code: string; name: string } | null
 }
 
 export const dossiersApi = {
@@ -2875,6 +2877,9 @@ export interface Client {
   // GPS
   lat?: number | null
   lng?: number | null
+  // Centre labo
+  lab_centre_group_id?: number | null
+  centre_group?: { id: number; code: string; name: string } | null
   created_at?: string
   sites?: Site[]
   addresses?: ClientAddress[]
@@ -3247,6 +3252,8 @@ export interface OrdreMission {
   /** Sérialisation Laravel (snake_case) */
   bon_commande?: OrdreMission['bonCommande']
   lignes?: OrdreMissionLigne[]
+  lab_centre_group_id?: number | null
+  centre_group?: { id: number; code: string; name: string } | null
 }
 
 /** Ligne de déplacement km — stockée dans expense_lines (note de frais / NDF). */

@@ -16,6 +16,7 @@ import OmLigneAddPanel from '../../components/ordres-mission/OmLigneAddPanel'
 import SaveButton from '../../components/ds/SaveButton'
 import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import CentreGroupField from '../../components/centres/CentreGroupField'
 import { useAuth } from '../../contexts/AuthContext'
 import { dateInputFromApi, formatAppDate } from '../../lib/appLocale'
 import {
@@ -37,6 +38,7 @@ const STATUTS_LIGNE = ['a_faire', 'en_cours', 'realise', 'annule'] as const
 type OmDraft = {
   statut: OrdreMission['statut']
   responsable_id: number | null
+  lab_centre_group_id: number | null
 }
 
 type LigneDraft = {
@@ -58,6 +60,7 @@ function buildDraftsFromOm(om: OrdreMission): { omDraft: OmDraft; ligneDrafts: R
     omDraft: {
       statut: om.statut,
       responsable_id: om.responsable_id ?? null,
+      lab_centre_group_id: om.lab_centre_group_id ?? null,
     },
     ligneDrafts,
   }
@@ -66,6 +69,7 @@ function buildDraftsFromOm(om: OrdreMission): { omDraft: OmDraft; ligneDrafts: R
 function computeIsDirty(om: OrdreMission, omDraft: OmDraft, ligneDrafts: Record<number, LigneDraft>): boolean {
   if (omDraft.statut !== om.statut) return true
   if (omDraft.responsable_id !== (om.responsable_id ?? null)) return true
+  if (omDraft.lab_centre_group_id !== (om.lab_centre_group_id ?? null)) return true
   for (const ligne of om.lignes ?? []) {
     const draft = ligneDrafts[ligne.id]
     if (!draft) continue
@@ -127,6 +131,9 @@ export default function OrdreMissionFichePage() {
       if (omDraft.statut !== om.statut) omBody.statut = omDraft.statut
       if (omDraft.responsable_id !== (om.responsable_id ?? null)) {
         omBody.responsable_id = omDraft.responsable_id ?? undefined
+      }
+      if (omDraft.lab_centre_group_id !== (om.lab_centre_group_id ?? null)) {
+        omBody.lab_centre_group_id = omDraft.lab_centre_group_id
       }
       if (Object.keys(omBody).length > 0) {
         await ordresMissionApi.update(omId, omBody)
@@ -383,6 +390,18 @@ export default function OrdreMissionFichePage() {
           </div>
         </div>
         {om.notes ? <p className="om-fiche__notes">{om.notes}</p> : null}
+        {isLab ? (
+          <div style={{ marginTop: '0.75rem', maxWidth: 320 }}>
+            <CentreGroupField
+              value={omDraft.lab_centre_group_id}
+              onChange={(v) =>
+                setOmDraft((prev) => (prev ? { ...prev, lab_centre_group_id: v ?? null } : prev))
+              }
+              disabled={saveMut.isPending}
+              label="Agence / Centre"
+            />
+          </div>
+        ) : null}
       </section>
 
       {/* Lignes */}

@@ -39,6 +39,7 @@ class Invoice extends Model
         'client_id',
         'contact_id',
         'agency_id',
+        'lab_centre_group_id',
         'invoice_date',
         'order_date',
         'site_delivery_date',
@@ -109,6 +110,11 @@ class Invoice extends Model
     public function agency(): BelongsTo
     {
         return $this->belongsTo(Agency::class);
+    }
+
+    public function centreGroup(): BelongsTo
+    {
+        return $this->belongsTo(LabCentreGroup::class, 'lab_centre_group_id');
     }
 
     public function billingAddress(): BelongsTo

@@ -11,6 +11,7 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ClientContactPicker, { formatClientContactLabel } from '../../components/clients/ClientContactPicker'
+import CentreGroupField from '../../components/centres/CentreGroupField'
 import { dateInputFromApi, formatAppDate, formatQuantity } from '../../lib/appLocale'
 import { buildBcLigneDisplayRows, resolveDevisDisplayMeta } from '../../lib/bcLigneDisplay'
 
@@ -37,6 +38,7 @@ export default function BonLivraisonFichePage() {
   const [notes, setNotes] = useState('')
   const [contactId, setContactId] = useState<number | null>(null)
   const [dateLivraison, setDateLivraison] = useState('')
+  const [centreGroupId, setCentreGroupId] = useState<number | null>(null)
   const [ligneQty, setLigneQty] = useState<Record<number, string>>({})
   const [confirmValider, setConfirmValider] = useState(false)
   const [pdfOpen, setPdfOpen] = useState(false)
@@ -53,6 +55,7 @@ export default function BonLivraisonFichePage() {
     setNotes(typeof bl.notes === 'string' ? bl.notes : '')
     setContactId(bl.contact_id ?? null)
     setDateLivraison(dateInputFromApi(bl.date_livraison))
+    setCentreGroupId(bl.lab_centre_group_id ?? null)
   }, [bl?.id])
 
   const serverLignesKey = useMemo(
@@ -138,6 +141,7 @@ export default function BonLivraisonFichePage() {
         notes: notes || undefined,
         contact_id: contactId,
         date_livraison: dateLivraison || undefined,
+        lab_centre_group_id: centreGroupId,
       }),
     onSuccess: () => {
       setToast({ message: 'Informations du BL enregistrées.', variant: 'success' })
@@ -540,6 +544,12 @@ export default function BonLivraisonFichePage() {
             {lab ? (
               <section className="card bc-fiche__aside-panel">
                 <h2 className="ds-form-section__title">Contact &amp; date</h2>
+                <CentreGroupField
+                  value={centreGroupId}
+                  onChange={(v) => setCentreGroupId(v ?? null)}
+                  disabled={!canEdit}
+                  label="Agence / Centre"
+                />
                 <ClientContactPicker
                   clientId={bl.client_id}
                   value={contactId}

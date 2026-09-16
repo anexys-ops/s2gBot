@@ -57,6 +57,7 @@ class OrdreMissionFromBonCommandeService
                     'numero' => OrdreMission::nextNumero($type),
                     'bon_commande_id' => $bc->id,
                     'dossier_id' => $bc->dossier_id,
+                    'lab_centre_group_id' => $bc->lab_centre_group_id,
                     'client_id' => $bc->client_id,
                     'site_id' => $bc->dossier?->site_id,
                     'type' => $type,

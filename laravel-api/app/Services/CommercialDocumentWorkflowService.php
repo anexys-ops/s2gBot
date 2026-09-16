@@ -173,6 +173,7 @@ class CommercialDocumentWorkflowService
                 'numero' => $numero,
                 'bon_commande_id' => $bc->id,
                 'dossier_id' => $bc->dossier_id,
+                'lab_centre_group_id' => $bc->lab_centre_group_id,
                 'client_id' => $bc->client_id,
                 'contact_id' => $bc->contact_id,
                 'statut' => BonLivraison::STATUT_BROUILLON,

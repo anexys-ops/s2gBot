@@ -18,6 +18,7 @@ import {
   moduleSettingsApi,
   type Invoice,
 } from '../../api/client'
+import CentreGroupField from '../../components/centres/CentreGroupField'
 import { useAuth } from '../../contexts/AuthContext'
 import { dateInputFromApi, formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import { invoiceReminderTone } from '../../lib/invoiceReminder'
@@ -53,6 +54,8 @@ export default function InvoiceEditorPage() {
 
   const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
   const [lines, setLines] = useState<InvoiceLineDraft[]>([])
+  const [centreGroupId, setCentreGroupId] = useState<number | null>(null)
+
   const [form, setForm] = useState({
     status: 'draft',
     invoice_date: '',
@@ -122,6 +125,7 @@ export default function InvoiceEditorPage() {
       next_reminder_date: dateInputFromApi(invoice.next_reminder_date),
       reminder_notes: invoice.reminder_notes ?? '',
     })
+    setCentreGroupId(invoice.lab_centre_group_id ?? null)
     setLines(
       invoiceLinesFromApi(invoice.invoice_lines, Number(invoice.tva_rate)).length
         ? invoiceLinesFromApi(invoice.invoice_lines, Number(invoice.tva_rate))
@@ -142,6 +146,7 @@ export default function InvoiceEditorPage() {
         notes: form.notes || undefined,
         next_reminder_date: form.next_reminder_date || undefined,
         reminder_notes: form.reminder_notes || undefined,
+        lab_centre_group_id: centreGroupId,
       }
       if (isDraft) {
         Object.assign(body, {
@@ -299,6 +304,12 @@ export default function InvoiceEditorPage() {
           <h2 className="h2" style={{ fontSize: '1.05rem', marginBottom: '0.75rem' }}>
             Informations
           </h2>
+          <CentreGroupField
+            value={centreGroupId}
+            onChange={(v) => setCentreGroupId(v ?? null)}
+            disabled={!isAdmin}
+            label="Agence / Centre"
+          />
           <div className="form-grid-2">
             <label className="form-group">
               Statut

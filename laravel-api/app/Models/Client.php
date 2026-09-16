@@ -58,6 +58,7 @@ class Client extends Model
         // GPS
         'lat',
         'lng',
+        'lab_centre_group_id',
     ];
 
     protected function casts(): array
@@ -75,6 +76,11 @@ class Client extends Model
     public function usesCaAnnuelTvaRegime(): bool
     {
         return (bool) $this->ca_annuel_tva_regime;
+    }
+
+    public function centreGroup(): BelongsTo
+    {
+        return $this->belongsTo(LabCentreGroup::class, 'lab_centre_group_id');
     }
 
     // ----------------------------------------------------------------

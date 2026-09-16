@@ -22,6 +22,7 @@ class OrdreMissionController extends Controller
         'client:id,name',
         'site:id,name',
         'dossier:id,reference,titre',
+        'centreGroup:id,code,name',
         'responsable:id,name',
         'bonCommande:id,numero,quote_id,dossier_id',
         'bonCommande.quote:id,number',
@@ -122,12 +123,13 @@ class OrdreMissionController extends Controller
         }
 
         $validated = $request->validate([
-            'statut'         => 'sometimes|in:brouillon,planifie,en_cours,termine,annule',
-            'date_prevue'    => 'nullable|date',
-            'date_debut'     => 'nullable|date',
-            'date_fin'       => 'nullable|date',
-            'responsable_id' => 'nullable|exists:users,id',
-            'notes'          => 'nullable|string',
+            'statut'              => 'sometimes|in:brouillon,planifie,en_cours,termine,annule',
+            'date_prevue'         => 'nullable|date',
+            'date_debut'          => 'nullable|date',
+            'date_fin'            => 'nullable|date',
+            'responsable_id'      => 'nullable|exists:users,id',
+            'notes'               => 'nullable|string',
+            'lab_centre_group_id' => 'sometimes|nullable|integer|exists:lab_centre_groups,id',
         ]);
 
         $ordreMission->update($validated);

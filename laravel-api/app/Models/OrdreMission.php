@@ -28,6 +28,7 @@ class OrdreMission extends Model
         'unique_number',
         'bon_commande_id',
         'dossier_id',
+        'lab_centre_group_id',
         'client_id',
         'site_id',
         'type',
@@ -56,6 +57,11 @@ class OrdreMission extends Model
                 $model->unique_number = Sequence::next('OM');
             }
         });
+    }
+
+    public function centreGroup(): BelongsTo
+    {
+        return $this->belongsTo(LabCentreGroup::class, 'lab_centre_group_id');
     }
 
     public function bonCommande(): BelongsTo

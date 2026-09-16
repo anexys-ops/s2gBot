@@ -38,6 +38,7 @@ const emptyForm = (c: Client): Partial<Client> => ({
   responsable_recouvrement_id: c.responsable_recouvrement_id ?? null,
   lat: c.lat ?? null,
   lng: c.lng ?? null,
+  lab_centre_group_id: c.lab_centre_group_id ?? null,
   currency_code: c.currency_code ?? 'MAD',
 })
 
@@ -164,6 +165,13 @@ export default function ClientFicheTab() {
             </div>
           )}
         </dl>
+
+        {client.lab_centre_group_id ? (
+          <div>
+            <dt>Agence / Centre labo</dt>
+            <dd>{client.centre_group ? `${client.centre_group.code} — ${client.centre_group.name}` : `#${client.lab_centre_group_id}`}</dd>
+          </div>
+        ) : null}
 
         {/* ---- Référents S2G ---- */}
         <h3 className="module-fiche-section-title" style={{ margin: '1.25rem 0 0.75rem', fontSize: '1rem' }}>

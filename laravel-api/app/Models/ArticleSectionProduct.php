@@ -25,12 +25,14 @@ class ArticleSectionProduct extends Model
         'product_article_id',
         'section_type',
         'ordre',
+        'quantite',
     ];
 
     protected function casts(): array
     {
         return [
             'ordre' => 'integer',
+            'quantite' => 'integer',
         ];
     }
 

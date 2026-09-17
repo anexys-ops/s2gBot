@@ -113,6 +113,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('dossiers', [DossierController::class, 'index']);
         Route::post('dossiers', [DossierController::class, 'store']);
+        Route::get('lab-centre-groups', fn () => response()->json(\App\Models\LabCentreGroup::query()->where('active', true)->orderBy('sort_order')->orderBy('name')->get()));
+        Route::get('sites/{site}/dossiers', fn (\Illuminate\Http\Request $req, \App\Models\Site $site) => response()->json(
+            \App\Models\Dossier::query()
+                ->where('site_id', $site->id)
+                ->select(['id', 'reference', 'titre', 'statut'])
+                ->orderByDesc('id')
+                ->get()
+        ))->whereNumber('site');
         Route::get('workflow-definitions', [WorkflowDefinitionController::class, 'index']);
         Route::get('workflow-definitions/{workflow_definition}', [WorkflowDefinitionController::class, 'show'])
             ->whereNumber('workflow_definition');
@@ -134,6 +142,8 @@ Route::middleware('auth:sanctum')->group(function () {
             ->whereNumber('bonCommande')
             ->whereNumber('ligne');
         // v1.2.0 — validation de statut réservée à responsable / lab_admin (RBAC)
+        Route::post('bons-commande/{bonCommande}/sync-prix-devis', [BonCommandeController::class, 'syncPrixDevis'])
+            ->whereNumber('bonCommande');
         Route::post('bons-commande/{bonCommande}/confirmer', [BonCommandeController::class, 'confirmer'])
             ->middleware('role:responsable')
             ->whereNumber('bonCommande');
@@ -365,6 +375,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('articles/{article}/equipment-requirements', [ArticleActionController::class, 'equipmentStore']);
     Route::delete('articles/{article}/equipment-requirements/{requirement}', [ArticleActionController::class, 'equipmentDestroy']);
     Route::get('articles/{article}/section-products', [ArticleSectionProductController::class, 'index']);
+    Route::post('articles/{article}/section-products', [ArticleSectionProductController::class, 'store']);
+    Route::patch('articles/{article}/section-products/{sectionProduct}', [ArticleSectionProductController::class, 'update']);
+    Route::delete('articles/{article}/section-products/{sectionProduct}', [ArticleSectionProductController::class, 'destroy']);
     Route::put('articles/{article}/section-products', [ArticleSectionProductController::class, 'sync']);
 
     // ── Configuration des mesures par action ─────────────────────────────────

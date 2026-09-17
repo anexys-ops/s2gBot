@@ -33,6 +33,58 @@ class ArticleSectionProductController extends Controller
         return response()->json($this->sectionProducts->groupedForArticle($article));
     }
 
+    public function store(Request $request, Article $article): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $data = $request->validate([
+            'section_type' => ['required', Rule::in(ArticleSectionProduct::SECTIONS)],
+            'product_article_id' => 'required|integer|exists:ref_articles,id',
+            'quantite' => 'sometimes|integer|min:1|max:9999',
+        ]);
+
+        $grouped = $this->sectionProducts->addProduct(
+            $article,
+            $data['section_type'],
+            (int) $data['product_article_id'],
+            (int) ($data['quantite'] ?? 1),
+        );
+
+        return response()->json($grouped);
+    }
+
+    public function update(Request $request, Article $article, ArticleSectionProduct $sectionProduct): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $data = $request->validate([
+            'quantite' => 'required|integer|min:1|max:9999',
+        ]);
+
+        $grouped = $this->sectionProducts->updateQuantite(
+            $article,
+            $sectionProduct,
+            (int) $data['quantite'],
+        );
+
+        return response()->json($grouped);
+    }
+
+    public function destroy(Request $request, Article $article, ArticleSectionProduct $sectionProduct): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $grouped = $this->sectionProducts->removeProduct($article, $sectionProduct);
+
+        return response()->json($grouped);
+    }
+
     public function sync(Request $request, Article $article): JsonResponse
     {
         if (! $request->user()->isLabAdmin()) {

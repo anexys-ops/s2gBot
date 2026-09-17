@@ -35,6 +35,7 @@ class ArticleSectionProductService
             $grouped[$row->section_type][] = [
                 'id' => $row->id,
                 'ordre' => $row->ordre,
+                'quantite' => $row->quantite ?? 1,
                 'product_article_id' => $row->product_article_id,
                 'product' => $product ? [
                     'id' => $product->id,
@@ -49,6 +50,100 @@ class ArticleSectionProductService
         }
 
         return $grouped;
+    }
+
+    /**
+     * Add a product to a section. Any product can be added any number of times.
+     *
+     * @return array{
+     *   technicien: list<array<string, mixed>>,
+     *   ingenieur: list<array<string, mixed>>,
+     *   labo: list<array<string, mixed>>
+     * }
+     */
+    public function addProduct(Article $article, string $sectionType, int $productArticleId, int $quantite = 1): array
+    {
+        if (! in_array($sectionType, ArticleSectionProduct::SECTIONS, true)) {
+            throw ValidationException::withMessages([
+                'section_type' => ['Section invalide.'],
+            ]);
+        }
+
+        if (! $article->isJalon() && ! $article->isProduct()) {
+            throw ValidationException::withMessages([
+                'ref_article_id' => ['Seuls les articles S2G (jalon ou produit) supportent cette affectation.'],
+            ]);
+        }
+
+        $product = Article::query()->where('id', $productArticleId)->first();
+        if (! $product) {
+            throw ValidationException::withMessages([
+                'product_article_id' => ['Produit introuvable.'],
+            ]);
+        }
+
+        $quantite = max(1, $quantite);
+
+        return DB::transaction(function () use ($article, $sectionType, $productArticleId, $quantite) {
+            $maxOrdre = ArticleSectionProduct::query()
+                ->where('ref_article_id', $article->id)
+                ->where('section_type', $sectionType)
+                ->max('ordre') ?? 0;
+
+            ArticleSectionProduct::query()->create([
+                'ref_article_id' => $article->id,
+                'product_article_id' => $productArticleId,
+                'section_type' => $sectionType,
+                'ordre' => $maxOrdre + 1,
+                'quantite' => $quantite,
+            ]);
+
+            return $this->groupedForArticle($article->fresh());
+        });
+    }
+
+    /**
+     * Update the quantity of an existing section product assignment.
+     *
+     * @return array{
+     *   technicien: list<array<string, mixed>>,
+     *   ingenieur: list<array<string, mixed>>,
+     *   labo: list<array<string, mixed>>
+     * }
+     */
+    public function updateQuantite(Article $article, ArticleSectionProduct $sectionProduct, int $quantite): array
+    {
+        if ($sectionProduct->ref_article_id !== $article->id) {
+            throw ValidationException::withMessages([
+                'id' => ['Cette entrée n\'appartient pas à cet article.'],
+            ]);
+        }
+
+        $sectionProduct->update(['quantite' => max(1, $quantite)]);
+
+        return $this->groupedForArticle($article->fresh());
+    }
+
+    /**
+     * Remove a single section product assignment.
+     *
+     * @return array{
+     *   technicien: list<array<string, mixed>>,
+     *   ingenieur: list<array<string, mixed>>,
+     *   labo: list<array<string, mixed>>
+     * }
+     */
+    public function removeProduct(Article $article, ArticleSectionProduct $sectionProduct): array
+    {
+        if ($sectionProduct->ref_article_id !== $article->id) {
+            throw ValidationException::withMessages([
+                'id' => ['Cette entrée n\'appartient pas à cet article.'],
+            ]);
+        }
+
+        $sectionProduct->delete();
+
+        return $this->groupedForArticle($article->fresh());
     }
 
     /**
@@ -103,6 +198,7 @@ class ArticleSectionProductService
                     'product_article_id' => $productId,
                     'section_type' => $sectionType,
                     'ordre' => $ordre++,
+                    'quantite' => 1,
                 ]);
             }
 
@@ -122,7 +218,7 @@ class ArticleSectionProductService
         if ($article->isProduct()) {
             if ($productArticleIds !== [$article->id]) {
                 throw ValidationException::withMessages([
-                    'product_article_ids' => ['Un produit S2G ne peut être assigné qu’à lui-même.'],
+                    'product_article_ids' => ['Un produit S2G ne peut être assigné qu\'à lui-même.'],
                 ]);
             }
 

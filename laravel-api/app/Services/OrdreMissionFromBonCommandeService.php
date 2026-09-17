@@ -284,36 +284,46 @@ class OrdreMissionFromBonCommandeService
 
         $jalon->loadMissing(['sectionProducts.productArticle.actions', 'jalonProductLinks.product.actions']);
 
-        $products = collect();
+        // [product, quantite] pairs — quantite from section product drives how many OM lignes are created.
+        $productEntries = collect();
 
         if ($sectionType !== null) {
             foreach ($jalon->sectionProducts->where('section_type', $sectionType)->sortBy('ordre') as $row) {
                 if ($row->productArticle) {
-                    $products->push($row->productArticle);
+                    $productEntries->push([
+                        'product' => $row->productArticle,
+                        'quantite' => max(1, (int) ($row->quantite ?? 1)),
+                    ]);
                 }
             }
         }
 
         // Sans sections catalogue : tous les sous-produits du jalon (legacy).
-        if ($products->isEmpty() && $jalon->sectionProducts->isEmpty()) {
+        if ($productEntries->isEmpty() && $jalon->sectionProducts->isEmpty()) {
             foreach ($jalon->jalonProductLinks->sortBy('ordre') as $link) {
                 if ($link->product) {
-                    $products->push($link->product);
+                    $productEntries->push(['product' => $link->product, 'quantite' => 1]);
                 }
             }
         }
 
         $actions = collect();
-        foreach ($products->unique(fn (Article $product) => $product->id) as $product) {
+        foreach ($productEntries as ['product' => $product, 'quantite' => $quantite]) {
             $productActions = $product->actions->where('type', $type)->values();
             if ($productActions->isNotEmpty()) {
-                $actions = $actions->merge($productActions);
+                foreach ($productActions as $action) {
+                    for ($i = 0; $i < $quantite; $i++) {
+                        $actions->push($action);
+                    }
+                }
 
                 continue;
             }
 
             if ($this->articleTriggersOm($product, $type)) {
-                $actions->push($this->syntheticAction($product, $type));
+                for ($i = 0; $i < $quantite; $i++) {
+                    $actions->push($this->syntheticAction($product, $type));
+                }
             }
         }
 

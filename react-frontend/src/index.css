@@ -8205,6 +8205,95 @@ a.catalogue-tree__link-article:hover {
   margin: 0;
   font-size: 0.875rem;
 }
+.article-section-products__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin: 0.5rem 0 0.75rem;
+}
+.article-section-products__table th {
+  text-align: left;
+  font-weight: 600;
+  color: #64748b;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+.article-section-products__table td {
+  padding: 0.35rem 0.5rem;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f5f9;
+}
+.article-section-products__table tr:last-child td {
+  border-bottom: none;
+}
+.article-section-products__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+.article-section-products__picker {
+  margin-top: 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+.article-section-products__picker-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+.article-section-products__picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.article-section-products__picker-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.75rem;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #334155;
+}
+.article-section-products__picker-item:hover {
+  background: #f1f5f9;
+}
+.article-section-products__remove-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: #94a3b8;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.article-section-products__remove-btn:hover:not(:disabled) {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.article-section-products__remove-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .article-actions-type-dot {
   display: inline-block;
   width: 0.75rem;

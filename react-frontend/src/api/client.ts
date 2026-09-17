@@ -3293,6 +3293,7 @@ export interface FraisDeplacement {
 export interface ArticleSectionProductAssignment {
   id: number
   ordre: number
+  quantite: number
   product_article_id: number
   product?: Pick<RefArticleRow, 'id' | 'code' | 'libelle' | 'unite' | 'prix_unitaire_ht' | 'kind' | 'actif'> | null
 }
@@ -3305,6 +3306,23 @@ export type ArticleSectionProductsGrouped = {
 
 export const articleSectionProductsApi = {
   list: (articleId: number) => api<ArticleSectionProductsGrouped>(`/articles/${articleId}/section-products`),
+  add: (
+    articleId: number,
+    body: { section_type: 'technicien' | 'ingenieur' | 'labo'; product_article_id: number; quantite?: number },
+  ) =>
+    api<ArticleSectionProductsGrouped>(`/articles/${articleId}/section-products`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateQuantite: (articleId: number, assignmentId: number, quantite: number) =>
+    api<ArticleSectionProductsGrouped>(`/articles/${articleId}/section-products/${assignmentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ quantite }),
+    }),
+  remove: (articleId: number, assignmentId: number) =>
+    api<ArticleSectionProductsGrouped>(`/articles/${articleId}/section-products/${assignmentId}`, {
+      method: 'DELETE',
+    }),
   sync: (
     articleId: number,
     body: { section_type: 'technicien' | 'ingenieur' | 'labo'; product_article_ids: number[] },

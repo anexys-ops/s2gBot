@@ -381,6 +381,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('articles/{article}/equipment-requirements', [ArticleActionController::class, 'equipmentStore']);
     Route::delete('articles/{article}/equipment-requirements/{requirement}', [ArticleActionController::class, 'equipmentDestroy']);
     Route::get('articles/{article}/section-products', [ArticleSectionProductController::class, 'index']);
+    Route::post('articles/{article}/section-products', [ArticleSectionProductController::class, 'store']);
+    Route::patch('articles/{article}/section-products/{sectionProduct}', [ArticleSectionProductController::class, 'update']);
+    Route::delete('articles/{article}/section-products/{sectionProduct}', [ArticleSectionProductController::class, 'destroy']);
     Route::put('articles/{article}/section-products', [ArticleSectionProductController::class, 'sync']);
 
     // ── Configuration des mesures par action ─────────────────────────────────

@@ -182,6 +182,15 @@ class MissionTaskController extends Controller
         return response()->json($task->fresh(['result', 'measures.measureConfig']));
     }
 
+    /** DELETE /mission-tasks/{task} */
+    public function destroy(int $id): JsonResponse
+    {
+        $task = MissionTask::findOrFail($id);
+        $task->delete();
+
+        return response()->json(null, 204);
+    }
+
     /**
      * GET /mission-tasks/labo — tâches labo avec leurs formulaires (vue laborantin)
      */

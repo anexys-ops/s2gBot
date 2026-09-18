@@ -182,7 +182,7 @@ export default function AppNavigation() {
           ...(canOdm
             ? [{ to: '/ordres-mission?context=labo&type=labo', label: 'Ordres de mission', module: 'laboratoire' as StaffModuleKey }]
             : []),
-          { to: '/labo/taches', label: 'Tâches en cours', module: 'laboratoire' },
+          { to: '/labo/taches', label: 'Tâches labo', module: 'laboratoire' },
           { to: '/labo/planning', label: 'Planning labo', module: 'laboratoire' },
           { to: '/labo/rapports', label: "Rapports d'essais", module: 'laboratoire' },
           { to: '/labo/fiches', label: 'Fiches techniques', module: 'laboratoire' },

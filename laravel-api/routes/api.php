@@ -403,6 +403,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('mission-tasks/{task}', [MissionTaskController::class, 'update']);
     Route::post('mission-tasks/{task}/measures', [MissionTaskController::class, 'storeMeasures']);
     Route::post('mission-tasks/{task}/validate', [MissionTaskController::class, 'validate']);
+    Route::delete('mission-tasks/{task}', [MissionTaskController::class, 'destroy']);
 
     // ── Rapport BC ───────────────────────────────────────────────────────────
     Route::get('rapport-bc', [RapportBCController::class, 'index']);

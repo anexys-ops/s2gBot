@@ -3628,6 +3628,7 @@ export const missionTasksApi = {
     normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}/measures`, { method: 'POST', body: JSON.stringify({ measures }) })),
   validate: async (id: number, body: { is_conform: boolean; value_final?: number; conclusion?: string; observations?: string; rapport_path?: string }) =>
     normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}/validate`, { method: 'POST', body: JSON.stringify(body) })),
+  delete: (id: number) => api<void>(`/mission-tasks/${id}`, { method: 'DELETE' }),
 }
 
 // ── Planning & Stock ───────────────────────────────────────────────────────

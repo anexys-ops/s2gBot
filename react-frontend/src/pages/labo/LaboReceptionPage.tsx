@@ -11,6 +11,8 @@ import {
   type LabReceptionAttendu,
   type ReceptionSample,
   type SampleLabelData,
+  type SampleStatusLog,
+  type SampleStatusStats,
 } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import SampleReceptionModal, { type ReceptionMode } from '../../components/labo/SampleReceptionModal'
@@ -19,6 +21,25 @@ import SampleLabelPrint, { type LabelFormat } from '../../components/labo/Sample
 import { parseSampleQrContent } from '../../lib/sampleQr'
 
 type AttenduFilter = 'all' | 'pending' | 'complete'
+
+const STATUS_TABS: { key: string; label: string; color: string; bg: string }[] = [
+  { key: 'en_transit', label: 'En transit', color: '#d97706', bg: '#fef3c7' },
+  { key: 'receptionne', label: 'Réceptionné', color: '#3b82f6', bg: '#dbeafe' },
+  { key: 'imprime', label: 'Imprimé', color: '#0891b2', bg: '#cffafe' },
+  { key: 'stocke', label: 'Stocké', color: '#059669', bg: '#d1fae5' },
+  { key: 'en_essai', label: 'En essai', color: '#7c3aed', bg: '#ede9fe' },
+  { key: 'termine', label: 'Terminé', color: '#10b981', bg: '#d1fae5' },
+  { key: 'rejete', label: 'Rejeté', color: '#dc2626', bg: '#fee2e2' },
+  { key: 'perdu', label: 'Perdu', color: '#ea580c', bg: '#ffedd5' },
+  { key: 'archive', label: 'Archivé', color: '#6366f1', bg: '#e0e7ff' },
+  { key: 'annule', label: 'Annulé', color: '#6b7280', bg: '#f3f4f6' },
+]
+
+function statusTabInfo(key: string) {
+  return STATUS_TABS.find((t) => t.key === key) ?? { key, label: key, color: '#6b7280', bg: '#f3f4f6' }
+}
+
+const CHANGEABLE_STATUSES = ['imprime', 'stocke', 'perdu', 'archive']
 
 function formatQty(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
@@ -70,6 +91,849 @@ function ProgressCell({ row }: { row: LabReceptionAttendu }) {
           {formatQty(quantite_manquante)} manquant(s)
         </div>
       )}
+    </div>
+  )
+}
+
+export default function LaboReceptionPage() {
+  const qc = useQueryClient()
+  const [search, setSearch] = useState('')
+  const [foldSearch, setFoldSearch] = useState('')
+  const [attenduFilter, setAttenduFilter] = useState<AttenduFilter>('pending')
+  const [selectedTab, setSelectedTab] = useState('receptionne')
+  const [receptionMode, setReceptionMode] = useState<ReceptionMode | null>(null)
+  const [labelData, setLabelData] = useState<SampleLabelData | null>(null)
+  const [labelQueue, setLabelQueue] = useState<SampleLabelData[]>([])
+  const [labelIndex, setLabelIndex] = useState(0)
+  const [labelFormat, setLabelFormat] = useState<LabelFormat>('a6')
+  const [expandedLineId, setExpandedLineId] = useState<number | null>(null)
+  const [editSample, setEditSample] = useState<ReceptionSample | null>(null)
+  const [historyTarget, setHistoryTarget] = useState<ReceptionSample | null>(null)
+  const [showChangeStatus, setShowChangeStatus] = useState<ReceptionSample | null>(null)
+
+  const { data: attendusRes, isLoading: loadingAttendus } = useQuery({
+    queryKey: ['lab-reception', 'attendus', search],
+    queryFn: () => labReceptionApi.attendus({ search: search || undefined }),
+    staleTime: 30_000,
+  })
+
+  const { data: sampleStats } = useQuery<SampleStatusStats>({
+    queryKey: ['lab-reception', 'sample-stats'],
+    queryFn: () => samplesReceptionApi.stats(),
+    staleTime: 20_000,
+  })
+
+  const { data: tabSamplesRes, isLoading: loadingTabSamples } = useQuery({
+    queryKey: ['lab-reception', 'samples', selectedTab, foldSearch],
+    queryFn: () =>
+      samplesReceptionApi.list({ status: selectedTab, fold: foldSearch || undefined, per_page: 100 }),
+    staleTime: 15_000,
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => samplesReceptionApi.delete(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['lab-reception'] })
+    },
+  })
+
+  const changeStatusMut = useMutation({
+    mutationFn: ({ id, status, notes }: { id: number; status: string; notes?: string }) =>
+      samplesReceptionApi.changeStatus(id, status, notes),
+    onSuccess: () => {
+      setShowChangeStatus(null)
+      void qc.invalidateQueries({ queryKey: ['lab-reception'] })
+    },
+  })
+
+  const attendus = attendusRes?.data ?? []
+  const stats = attendusRes?.stats
+  const tabSamples = tabSamplesRes?.data ?? []
+
+  const filteredAttendus = useMemo(() => {
+    return attendus.filter((row) => {
+      if (attenduFilter === 'pending') return !row.reception_complete
+      if (attenduFilter === 'complete') return row.reception_complete
+      return true
+    })
+  }, [attendus, attenduFilter])
+
+  const invalidateAll = () => {
+    void qc.invalidateQueries({ queryKey: ['lab-reception'] })
+  }
+
+  const openLabel = async (sampleId: number) => {
+    const data = await samplesReceptionApi.labelData(sampleId)
+    setLabelQueue([data])
+    setLabelIndex(0)
+    setLabelData(data)
+  }
+
+  const openLabelBatch = async (sampleIds: number[]) => {
+    const labels = await Promise.all(sampleIds.map((id) => samplesReceptionApi.labelData(id)))
+    setLabelQueue(labels)
+    setLabelIndex(0)
+    setLabelData(labels[0] ?? null)
+  }
+
+  const handleReceptionSuccess = async (samples: ReceptionSample[]) => {
+    setReceptionMode(null)
+    invalidateAll()
+    try {
+      await openLabelBatch(samples.map((s) => s.id))
+    } catch {
+      // étiquettes optionnelles
+    }
+  }
+
+  const closeLabels = () => {
+    setLabelData(null)
+    setLabelQueue([])
+    setLabelIndex(0)
+  }
+
+  return (
+    <ModuleEntityShell
+      breadcrumbs={[
+        { label: 'Accueil', to: '/' },
+        { label: 'Laboratoire', to: '/labo' },
+        { label: 'Réception' },
+      ]}
+      moduleBarLabel="Laboratoire — Réception"
+      title="Réception Laboratoire"
+      subtitle="Lignes de BC confirmés prêtes pour la réception terrain"
+    >
+      <p className="text-muted" style={{ marginBottom: '1.25rem', maxWidth: 720, lineHeight: 1.5 }}>
+        Réceptionnez les échantillons depuis les lignes de bon de commande (issues des devis signés).
+        Chaque réception génère un numéro FOLD, un numéro transco (code-barres) et une étiquette QR (A6 ou A5).
+      </p>
+
+      {stats && (
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+          {[
+            { label: 'Produits en attente', value: stats.produits_en_attente, color: '#d97706', bg: '#fef3c7' },
+            { label: 'Essais attendus', value: stats.essais_attendus, color: '#3b82f6', bg: '#dbeafe' },
+            { label: 'Essais reçus', value: stats.essais_recus, color: '#10b981', bg: '#d1fae5' },
+            { label: 'En transit', value: stats.essais_en_transit, color: '#8b5cf6', bg: '#ede9fe' },
+          ].map(({ label, value, color, bg }) => (
+            <div key={label} style={{ flex: '1 1 140px', padding: '0.75rem 1rem', borderRadius: 8, background: bg }}>
+              <div style={{ fontWeight: 700, color, fontSize: '1.4rem' }}>{value}</div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          placeholder="Rechercher BC, chantier, dossier, produit, technicien…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ flex: '1 1 260px', maxWidth: 400 }}
+        />
+        <select
+          value={attenduFilter}
+          onChange={(e) => setAttenduFilter(e.target.value as AttenduFilter)}
+          style={{ flex: '1 1 180px', maxWidth: 220 }}
+        >
+          <option value="pending">En attente de réception</option>
+          <option value="all">Tous les produits</option>
+          <option value="complete">Réception complète</option>
+        </select>
+        {(search || attenduFilter !== 'pending') && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              setSearch('')
+              setAttenduFilter('pending')
+            }}
+          >
+            Réinitialiser
+          </button>
+        )}
+      </div>
+
+      <h2 style={{ fontSize: '1.05rem', marginBottom: '0.5rem' }}>Produits attendus</h2>
+      {loadingAttendus && <p>Chargement…</p>}
+      {!loadingAttendus && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '2rem' }}>
+          <div className="table-wrap">
+            <table className="data-table data-table--compact">
+              <thead>
+                <tr>
+                  <th>Produit / Essai</th>
+                  <th className="data-table__code">BC</th>
+                  <th className="data-table__reference">Chantier / Dossier</th>
+                  <th>Technicien</th>
+                  <th className="data-table__num">Réception</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAttendus.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '1.5rem', textAlign: 'center', color: '#6b7280' }}>
+                      Aucun produit en attente de réception.
+                    </td>
+                  </tr>
+                )}
+                {filteredAttendus.map((row) => (
+                  <Fragment key={row.id}>
+                    <tr>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{row.libelle}</div>
+                        {row.article && (
+                          <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>[{row.article.code}]</div>
+                        )}
+                      </td>
+                      <td className="data-table__code">
+                        {row.bon_commande ? (
+                          <Link to={`/bons-commande/${row.bon_commande.id}`} className="link-inline">
+                            {row.bon_commande.numero}
+                          </Link>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
+                        {row.client && (
+                          <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{row.client.name}</div>
+                        )}
+                      </td>
+                      <td className="data-table__reference">
+                        {row.chantier?.name ?? <span className="text-muted">—</span>}
+                        {row.dossier && (
+                          <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                            {row.dossier.reference}
+                            {row.dossier.titre ? ` · ${row.dossier.titre}` : ''}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ fontSize: '0.88rem' }}>{row.technicien?.name ?? '—'}</td>
+                      <td className="data-table__num">
+                        <ProgressCell row={row} />
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                          {!row.reception_complete && (
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={() => setReceptionMode({ kind: 'from_line', line: row })}
+                            >
+                              Réception
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setExpandedLineId(expandedLineId === row.id ? null : row.id)}
+                          >
+                            {expandedLineId === row.id ? 'Masquer' : 'Historique'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedLineId === row.id && (
+                      <tr>
+                        <td colSpan={6} style={{ background: '#f9fafb', padding: '0.75rem 1rem' }}>
+                          <LineSamplesHistory
+                            lineId={row.id}
+                            onPrintLabel={(id) => void openLabel(id)}
+                            onEdit={setEditSample}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Stat cards par statut ── */}
+      {sampleStats && (
+        <div style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>
+          <h2 style={{ fontSize: '1.05rem', marginBottom: '0.75rem' }}>Vue d'ensemble des échantillons FOLD</h2>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+            {STATUS_TABS.map(({ key, label, color, bg }) => {
+              const count = (sampleStats as Record<string, number>)[key] ?? 0
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSelectedTab(key)}
+                  style={{
+                    flex: '1 1 120px',
+                    padding: '0.6rem 0.75rem',
+                    borderRadius: 8,
+                    background: selectedTab === key ? color : bg,
+                    color: selectedTab === key ? '#fff' : color,
+                    border: `2px solid ${color}`,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    textAlign: 'left',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  <div style={{ fontSize: '1.3rem', fontWeight: 700 }}>{count}</div>
+                  <div style={{ fontSize: '0.78rem' }}>{label}</div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Onglets + recherche ── */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+          {STATUS_TABS.map(({ key, label, color }) => (
+            <button
+              key={key}
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setSelectedTab(key)}
+              style={{
+                background: selectedTab === key ? color : undefined,
+                color: selectedTab === key ? '#fff' : undefined,
+                borderColor: selectedTab === key ? color : undefined,
+                fontWeight: selectedTab === key ? 700 : undefined,
+              }}
+            >
+              {label}
+              {sampleStats && (
+                <span style={{ marginLeft: 4, opacity: 0.85 }}>
+                  ({(sampleStats as Record<string, number>)[key] ?? 0})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <input
+          type="text"
+          placeholder="Scan FOLD / transco / QR…"
+          value={foldSearch}
+          onChange={(e) => setFoldSearch(e.target.value)}
+          onPaste={(e) => {
+            const pasted = e.clipboardData.getData('text')
+            const parsed = parseSampleQrContent(pasted)
+            if (parsed && parsed !== pasted.trim()) {
+              e.preventDefault()
+              setFoldSearch(parsed)
+            }
+          }}
+          style={{ flex: '1 1 200px', maxWidth: 280 }}
+          className="btn-sm"
+        />
+        {foldSearch && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setFoldSearch('')}>
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* ── Tableau des échantillons de l'onglet sélectionné ── */}
+      {loadingTabSamples && <p>Chargement…</p>}
+      {!loadingTabSamples && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="table-wrap">
+            <table className="data-table data-table--compact">
+              <thead>
+                <tr>
+                  <th className="data-table__code">FOLD</th>
+                  <th className="data-table__code">Transco</th>
+                  <th>Produit / Essai</th>
+                  <th>Dossier</th>
+                  <th style={{ whiteSpace: 'nowrap' }}>Date / Statut</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tabSamples.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '1.5rem', textAlign: 'center', color: '#6b7280' }}>
+                      Aucun échantillon avec ce statut.
+                    </td>
+                  </tr>
+                )}
+                {tabSamples.map((sample) => {
+                  const tab = statusTabInfo(sample.status)
+                  return (
+                    <tr key={sample.id}>
+                      <td className="data-table__code" style={{ fontWeight: 600, fontFamily: 'monospace' }}>
+                        {sample.fold_number ?? '—'}
+                      </td>
+                      <td className="data-table__code" style={{ fontFamily: 'monospace' }}>
+                        {sample.transco_number ?? '—'}
+                      </td>
+                      <td>
+                        <div>{sample.product?.libelle ?? sample.bon_commande_ligne?.libelle ?? '—'}</div>
+                        {sample.product?.code && (
+                          <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>[{sample.product.code}]</div>
+                        )}
+                      </td>
+                      <td style={{ fontSize: '0.85rem' }}>
+                        {sample.dossier?.reference ?? '—'}
+                        {sample.collected_by?.name && (
+                          <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>{sample.collected_by.name}</div>
+                        )}
+                      </td>
+                      <td style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                        <div>{formatDateTime(sample.received_at ?? sample.collected_at)}</div>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            marginTop: 2,
+                            padding: '1px 7px',
+                            borderRadius: 10,
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            background: tab.bg,
+                            color: tab.color,
+                          }}
+                        >
+                          {tab.label}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                          {selectedTab === 'en_transit' && (
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={() => setReceptionMode({ kind: 'transit', sample })}
+                            >
+                              Réceptionner
+                            </button>
+                          )}
+                          {selectedTab === 'receptionne' && (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => setEditSample(sample)}
+                              >
+                                Modifier
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => void openLabel(sample.id)}
+                              >
+                                Étiquette
+                              </button>
+                            </>
+                          )}
+                          {CHANGEABLE_STATUSES.some((s) => s !== sample.status) && sample.status !== 'en_transit' && sample.status !== 'annule' && sample.status !== 'rejete' && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => setShowChangeStatus(sample)}
+                            >
+                              Statut
+                            </button>
+                          )}
+                          {sample.transco_number && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => void openLabel(sample.id)}
+                            >
+                              Étiquette
+                            </button>
+                          )}
+                          {sample.photo_path && (
+                            <a
+                              href={samplesReceptionApi.photoUrl(sample.id)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-secondary btn-sm"
+                            >
+                              Photo
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setHistoryTarget(sample)}
+                          >
+                            Historique
+                          </button>
+                          {(selectedTab === 'en_transit' || selectedTab === 'receptionne') && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              disabled={deleteMut.isPending}
+                              onClick={() => {
+                                if (window.confirm(`Supprimer l'échantillon ${sample.fold_number} ?`)) {
+                                  deleteMut.mutate(sample.id)
+                                }
+                              }}
+                            >
+                              Suppr.
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {receptionMode && (
+        <SampleReceptionModal
+          mode={receptionMode}
+          onClose={() => setReceptionMode(null)}
+          onSuccess={(samples) => void handleReceptionSuccess(samples)}
+        />
+      )}
+
+      {historyTarget && (
+        <SampleHistoryModal sample={historyTarget} onClose={() => setHistoryTarget(null)} />
+      )}
+
+      {showChangeStatus && (
+        <ChangeStatusModal
+          sample={showChangeStatus}
+          onClose={() => setShowChangeStatus(null)}
+          onConfirm={(status, notes) => changeStatusMut.mutate({ id: showChangeStatus.id, status, notes })}
+          isPending={changeStatusMut.isPending}
+        />
+      )}
+
+      {editSample && (
+        <SampleEditModal
+          sample={editSample}
+          onClose={() => setEditSample(null)}
+          onSaved={() => {
+            setEditSample(null)
+            invalidateAll()
+          }}
+          onDeleted={() => {
+            setEditSample(null)
+            invalidateAll()
+          }}
+          onPrintLabel={(id) => void openLabel(id)}
+        />
+      )}
+
+      {labelData && (
+        <SampleLabelPrint
+          label={labelData}
+          format={labelFormat}
+          onFormatChange={setLabelFormat}
+          onClose={closeLabels}
+          batchIndex={labelIndex}
+          batchTotal={labelQueue.length}
+          onBatchPrev={
+            labelIndex > 0
+              ? () => {
+                  const next = labelIndex - 1
+                  setLabelIndex(next)
+                  setLabelData(labelQueue[next] ?? null)
+                }
+              : undefined
+          }
+          onBatchNext={
+            labelIndex < labelQueue.length - 1
+              ? () => {
+                  const next = labelIndex + 1
+                  setLabelIndex(next)
+                  setLabelData(labelQueue[next] ?? null)
+                }
+              : undefined
+          }
+        />
+      )}
+    </ModuleEntityShell>
+  )
+}
+
+function LineSamplesHistory({
+  lineId,
+  onPrintLabel,
+  onEdit,
+}: {
+  lineId: number
+  onPrintLabel: (id: number) => void
+  onEdit: (sample: ReceptionSample) => void
+}) {
+  const qc = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: ['lab-reception', 'line-samples', lineId],
+    queryFn: () =>
+      samplesReceptionApi.list({
+        bon_commande_ligne_id: lineId,
+        per_page: 50,
+        include_cancelled: true,
+      }),
+  })
+  const { data: cancellationsRes } = useQuery({
+    queryKey: ['lab-reception', 'line-cancellations', lineId],
+    queryFn: () => samplesReceptionApi.listCancellations(lineId),
+  })
+  const cancelMut = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
+      samplesReceptionApi.cancel(id, { reason }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['lab-reception'] }),
+  })
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => samplesReceptionApi.delete(id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['lab-reception'] }),
+  })
+  const samples = data?.data ?? []
+  const cancellations = cancellationsRes?.data ?? []
+
+  if (isLoading) return <p className="text-muted">Chargement…</p>
+  if (samples.length === 0 && cancellations.length === 0) {
+    return <p className="text-muted">Aucun échantillon pour cette ligne.</p>
+  }
+
+  const statusLabel = (status: string) => {
+    if (status === 'annule') return 'Annulé'
+    if (status === 'receptionne') return 'Réceptionné'
+    if (status === 'en_transit') return 'En transit'
+    return status
+  }
+
+  return (
+    <>
+      {cancellations.length > 0 && (
+        <p className="text-muted" style={{ fontSize: '0.82rem', marginBottom: '0.5rem' }}>
+          Étiquettes annulées avant réception :{' '}
+          {cancellations
+            .map((c) => `${c.reception_index}/${c.reception_batch_total}`)
+            .join(', ')}
+        </p>
+      )}
+      <table className="data-table data-table--compact" style={{ fontSize: '0.85rem' }}>
+        <thead>
+          <tr>
+            <th>N°</th>
+            <th>FOLD</th>
+            <th>Transco</th>
+            <th>Statut</th>
+            <th>Réception</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {samples.map((s) => (
+            <tr key={s.id} style={s.status === 'annule' ? { opacity: 0.65 } : undefined}>
+              <td>
+                {s.reception_index && s.reception_batch_total
+                  ? `${s.reception_index}/${s.reception_batch_total}`
+                  : '—'}
+              </td>
+              <td style={{ fontFamily: 'monospace' }}>{s.fold_number ?? '—'}</td>
+              <td style={{ fontFamily: 'monospace' }}>{s.transco_number ?? '—'}</td>
+              <td>{statusLabel(s.status)}</td>
+              <td>{formatDateTime(s.received_at)}</td>
+              <td>
+                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                  {s.status !== 'annule' && (
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => onEdit(s)}>
+                      Modifier
+                    </button>
+                  )}
+                  {s.transco_number && s.status !== 'annule' && (
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => onPrintLabel(s.id)}>
+                      Étiquette
+                    </button>
+                  )}
+                  {s.status === 'en_transit' && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={deleteMut.isPending}
+                      onClick={() => {
+                        if (window.confirm(`Supprimer ${s.fold_number} ?`)) deleteMut.mutate(s.id)
+                      }}
+                    >
+                      Suppr.
+                    </button>
+                  )}
+                  {s.status === 'receptionne' && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={cancelMut.isPending}
+                      onClick={() => {
+                        const reason = window.prompt(`Motif d'annulation de ${s.fold_number} :`)
+                        if (reason === null) return
+                        cancelMut.mutate({ id: s.id, reason: reason.trim() || undefined })
+                      }}
+                    >
+                      Annuler
+                    </button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+          {cancellations.map((c) => (
+            <tr key={`cancel-${c.id}`} style={{ opacity: 0.65 }}>
+              <td>{c.reception_index}/{c.reception_batch_total}</td>
+              <td colSpan={2} className="text-muted">— (non créé)</td>
+              <td>Annulé avant réception</td>
+              <td>{formatDateTime(c.created_at)}</td>
+              <td className="text-muted" style={{ fontSize: '0.8rem' }}>
+                {c.reason ?? '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  )
+}
+
+function SampleHistoryModal({ sample, onClose }: { sample: ReceptionSample; onClose: () => void }) {
+  const { data, isLoading } = useQuery<{ data: SampleStatusLog[] }>({
+    queryKey: ['sample-history', sample.id],
+    queryFn: () => samplesReceptionApi.history(sample.id),
+  })
+
+  const logs = data?.data ?? []
+
+  return (
+    <div
+      className="modal-backdrop"
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onClick={onClose}
+    >
+      <div
+        className="card"
+        style={{ width: '100%', maxWidth: 520, maxHeight: '80vh', overflowY: 'auto', padding: '1.5rem' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Historique — {sample.fold_number}</h3>
+            {sample.transco_number && <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>Transco : {sample.transco_number}</div>}
+          </div>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>✕</button>
+        </div>
+
+        {isLoading && <p>Chargement…</p>}
+        {!isLoading && logs.length === 0 && (
+          <p className="text-muted">Aucun historique disponible pour cet échantillon.</p>
+        )}
+        {logs.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {logs.map((log) => {
+              const toTab = statusTabInfo(log.status_to)
+              return (
+                <div
+                  key={log.id}
+                  style={{
+                    padding: '0.6rem 0.75rem',
+                    borderRadius: 6,
+                    background: '#f9fafb',
+                    borderLeft: `3px solid ${toTab.color}`,
+                  }}
+                >
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {log.status_from && (
+                      <>
+                        <span style={{ fontSize: '0.8rem', color: statusTabInfo(log.status_from).color, fontWeight: 600 }}>
+                          {statusTabInfo(log.status_from).label}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>→</span>
+                      </>
+                    )}
+                    <span style={{ fontSize: '0.8rem', color: toTab.color, fontWeight: 700 }}>
+                      {toTab.label}
+                    </span>
+                    <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: '#9ca3af' }}>
+                      {formatDateTime(log.created_at)}
+                    </span>
+                  </div>
+                  {log.user && (
+                    <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 2 }}>par {log.user.name}</div>
+                  )}
+                  {log.notes && (
+                    <div style={{ fontSize: '0.82rem', color: '#374151', marginTop: 4, fontStyle: 'italic' }}>
+                      {log.notes}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ChangeStatusModal({
+  sample,
+  onClose,
+  onConfirm,
+  isPending,
+}: {
+  sample: ReceptionSample
+  onClose: () => void
+  onConfirm: (status: string, notes?: string) => void
+  isPending: boolean
+}) {
+  const [newStatus, setNewStatus] = useState(CHANGEABLE_STATUSES[0] ?? '')
+  const [notes, setNotes] = useState('')
+
+  return (
+    <div
+      className="modal-backdrop"
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onClick={onClose}
+    >
+      <div
+        className="card"
+        style={{ width: '100%', maxWidth: 420, padding: '1.5rem' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 style={{ marginBottom: '1rem' }}>Changer le statut — {sample.fold_number}</h3>
+        <div style={{ marginBottom: '0.75rem' }}>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 4 }}>Nouveau statut</label>
+          <select
+            value={newStatus}
+            onChange={(e) => setNewStatus(e.target.value)}
+            style={{ width: '100%' }}
+          >
+            {STATUS_TABS.filter((t) => t.key !== 'en_transit' && t.key !== 'receptionne').map((t) => (
+              <option key={t.key} value={t.key}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 4 }}>Note (optionnel)</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            style={{ width: '100%' }}
+            placeholder="Raison du changement de statut…"
+          />
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Annuler</button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={isPending}
+            onClick={() => onConfirm(newStatus, notes.trim() || undefined)}
+          >
+            {isPending ? 'En cours…' : 'Confirmer'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

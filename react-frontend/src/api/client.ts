@@ -1861,12 +1861,24 @@ export type ReceptionSample = {
   weight_g?: number | null
   quantity?: number | null
   notes?: string | null
+  origin_location?: string | null
+  depth_m?: number | null
   dossier?: { id: number; reference: string; titre: string } | null
   product?: { id: number; code: string; libelle: string } | null
   collected_by?: { id: number; name: string } | null
   received_by?: { id: number; name: string } | null
   cancelled_by?: { id: number; name: string } | null
-  bon_commande_ligne?: { id: number; libelle: string; bon_commande_id: number } | null
+  bon_commande_ligne?: {
+    id: number
+    libelle: string
+    bon_commande_id: number
+    bon_commande?: {
+      id: number
+      numero: string
+      client?: { id: number; name: string; email?: string | null; phone?: string | null } | null
+      dossier?: { id: number; reference: string; titre?: string | null } | null
+    } | null
+  } | null
 }
 
 export type SampleReceptionCancellation = {
@@ -1905,6 +1917,29 @@ export type SampleLabelData = {
   payload: SampleLabelPayload
   qr_json: string
   barcode: string | null
+}
+
+export type SampleStatusLog = {
+  id: number
+  status_from: string | null
+  status_to: string
+  notes: string | null
+  user: { id: number; name: string } | null
+  created_at: string
+}
+
+export type SampleStatusStats = {
+  en_transit: number
+  receptionne: number
+  imprime: number
+  en_essai: number
+  termine: number
+  rejete: number
+  annule: number
+  perdu: number
+  archive: number
+  stocke: number
+  receptionnes_today: number
 }
 
 export type ReceiveFromLineBody = {
@@ -1995,6 +2030,13 @@ export const samplesReceptionApi = {
   cancel: (id: number, body?: { reason?: string }) =>
     api<ReceptionSample>(`/v1/samples/${id}/cancel`, { method: 'PATCH', body: JSON.stringify(body ?? {}) }),
   labelData: (id: number) => api<SampleLabelData>(`/v1/samples/${id}/label`),
+  stats: () => api<SampleStatusStats>('/v1/samples/stats'),
+  history: (id: number) => api<{ data: SampleStatusLog[] }>(`/v1/samples/${id}/history`),
+  changeStatus: (id: number, status: string, notes?: string) =>
+    api<ReceptionSample>(`/v1/samples/${id}/change-status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, notes }),
+    }),
   photoUrl: (id: number) => `/api/v1/samples/${id}/photo`,
   async uploadPhoto(id: number, file: File): Promise<{ photo_path: string; photo_url: string }> {
     const token = getToken()

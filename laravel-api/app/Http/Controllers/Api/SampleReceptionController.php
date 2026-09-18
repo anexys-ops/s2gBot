@@ -7,6 +7,7 @@ use App\Models\BonCommandeLigne;
 use App\Models\OrderItem;
 use App\Models\Sample;
 use App\Models\SampleReceptionCancellation;
+use App\Models\SampleStatusLog;
 use App\Models\Sequence;
 use App\Models\User;
 use App\Services\LabReceptionService;
@@ -32,7 +33,9 @@ class SampleReceptionController extends Controller
         'task:id,unique_number,statut',
         'product:id,libelle,code',
         'bonCommandeLigne:id,libelle,bon_commande_id',
-        'bonCommandeLigne.bonCommande:id,numero,quote_id',
+        'bonCommandeLigne.bonCommande:id,numero,client_id,dossier_id',
+        'bonCommandeLigne.bonCommande.client:id,name,email,phone',
+        'bonCommandeLigne.bonCommande.dossier:id,reference,titre',
         'collectedBy:id,name,role',
         'receivedBy:id,name,role',
         'cancelledBy:id,name,role',
@@ -313,11 +316,21 @@ class SampleReceptionController extends Controller
         ]);
 
         $user = $request->user();
+        $prevStatus = $sample->status;
         $sample->status = Sample::STATUS_ANNULE;
         $sample->cancelled_at = now();
         $sample->cancelled_by = $user instanceof User ? $user->id : null;
         $sample->cancellation_reason = $data['reason'] ?? 'Annulé par l\'utilisateur';
         $sample->save();
+
+        SampleStatusLog::create([
+            'sample_id'   => $sample->id,
+            'status_from' => $prevStatus,
+            'status_to'   => Sample::STATUS_ANNULE,
+            'user_id'     => $user instanceof User ? $user->id : null,
+            'notes'       => $data['reason'] ?? null,
+            'created_at'  => now(),
+        ]);
 
         return response()->json($sample->load(self::REL));
     }
@@ -388,16 +401,67 @@ class SampleReceptionController extends Controller
         $by = fn (string $status): int => Sample::query()->where('status', $status)->count();
 
         return response()->json([
-            'en_transit' => $by(Sample::STATUS_EN_TRANSIT),
-            'receptionne' => $by(Sample::STATUS_RECEPTIONNE),
-            'en_essai' => $by(Sample::STATUS_EN_ESSAI),
-            'termine' => $by(Sample::STATUS_TERMINE),
-            'rejete' => $by(Sample::STATUS_REJETE),
+            'en_transit'      => $by(Sample::STATUS_EN_TRANSIT),
+            'receptionne'     => $by(Sample::STATUS_RECEPTIONNE),
+            'imprime'         => $by(Sample::STATUS_IMPRIME),
+            'en_essai'        => $by(Sample::STATUS_EN_ESSAI),
+            'termine'         => $by(Sample::STATUS_TERMINE),
+            'rejete'          => $by(Sample::STATUS_REJETE),
+            'annule'          => $by(Sample::STATUS_ANNULE),
+            'perdu'           => $by(Sample::STATUS_PERDU),
+            'archive'         => $by(Sample::STATUS_ARCHIVE),
+            'stocke'          => $by(Sample::STATUS_STOCKE),
             'receptionnes_today' => Sample::query()
                 ->where('status', Sample::STATUS_RECEPTIONNE)
                 ->whereDate('received_at', today())
                 ->count(),
         ]);
+    }
+
+    public function history(Sample $sample): JsonResponse
+    {
+        $logs = $sample->statusLogs()->with('user:id,name')->get()->map(fn (SampleStatusLog $log) => [
+            'id'          => $log->id,
+            'status_from' => $log->status_from,
+            'status_to'   => $log->status_to,
+            'notes'       => $log->notes,
+            'user'        => $log->user ? ['id' => $log->user->id, 'name' => $log->user->name] : null,
+            'created_at'  => $log->created_at,
+        ]);
+
+        return response()->json(['data' => $logs]);
+    }
+
+    public function changeStatus(Request $request, Sample $sample): JsonResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', Rule::in([
+                Sample::STATUS_IMPRIME,
+                Sample::STATUS_PERDU,
+                Sample::STATUS_ARCHIVE,
+                Sample::STATUS_STOCKE,
+                Sample::STATUS_EN_ESSAI,
+                Sample::STATUS_TERMINE,
+            ])],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $user = $request->user();
+        $prevStatus = $sample->status;
+
+        $sample->status = $data['status'];
+        $sample->save();
+
+        SampleStatusLog::create([
+            'sample_id'   => $sample->id,
+            'status_from' => $prevStatus,
+            'status_to'   => $data['status'],
+            'user_id'     => $user instanceof User ? $user->id : null,
+            'notes'       => $data['notes'] ?? null,
+            'created_at'  => now(),
+        ]);
+
+        return response()->json($sample->load(self::REL));
     }
 
     /** @param  array<string, mixed>  $data */

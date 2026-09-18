@@ -516,6 +516,9 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('role:laborantin,responsable')->whereNumber('sample');
         Route::patch('samples/{sample}/reject',      [SampleReceptionController::class, 'reject'])
             ->middleware('role:responsable')->whereNumber('sample');
+        Route::get('samples/{sample}/history',       [SampleReceptionController::class, 'history'])->whereNumber('sample');
+        Route::patch('samples/{sample}/change-status', [SampleReceptionController::class, 'changeStatus'])
+            ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur,lab_admin')->whereNumber('sample');
     });
 
     // ── Recherche globale & tags ──────────────────────────────────────────────

@@ -22,18 +22,26 @@ class Sample extends Model
     // v1.2.0 — flux Réception
     public const STATUS_EN_TRANSIT  = 'en_transit';
     public const STATUS_RECEPTIONNE = 'receptionne';
+    public const STATUS_IMPRIME     = 'imprime';
     public const STATUS_EN_ESSAI    = 'en_essai';
     public const STATUS_TERMINE     = 'termine';
     public const STATUS_REJETE      = 'rejete';
     public const STATUS_ANNULE      = 'annule';
+    public const STATUS_PERDU       = 'perdu';
+    public const STATUS_ARCHIVE     = 'archive';
+    public const STATUS_STOCKE      = 'stocke';
 
     public const STATUSES_RECEPTION = [
         self::STATUS_EN_TRANSIT,
         self::STATUS_RECEPTIONNE,
+        self::STATUS_IMPRIME,
         self::STATUS_EN_ESSAI,
         self::STATUS_TERMINE,
         self::STATUS_REJETE,
         self::STATUS_ANNULE,
+        self::STATUS_PERDU,
+        self::STATUS_ARCHIVE,
+        self::STATUS_STOCKE,
     ];
 
     public const TYPES = ['sol', 'eau', 'beton', 'granulat', 'roche', 'enrobe', 'autre'];
@@ -164,5 +172,10 @@ class Sample extends Model
     public function nonConformities(): HasMany
     {
         return $this->hasMany(NonConformity::class);
+    }
+
+    public function statusLogs(): HasMany
+    {
+        return $this->hasMany(SampleStatusLog::class)->orderBy('created_at');
     }
 }

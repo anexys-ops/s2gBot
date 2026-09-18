@@ -10,12 +10,13 @@ use App\Models\ExpenseReport;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Quote;
-use App\Models\Dossier;
+use App\Models\RapportBC;
 use App\Services\BonCommandePdfGenerator;
 use App\Services\BonLivraisonPdfGenerator;
 use App\Services\DossierPdfGenerator;
 use App\Services\ExpenseReportPdfGenerator;
 use App\Services\QuotePdfGenerator;
+use App\Services\RapportBCPdfGenerator;
 use App\Services\ReportService;
 use App\Support\AppBranding;
 use App\Support\PdfTemplateResolver;
@@ -37,7 +38,7 @@ class PdfController extends Controller
         'purchase_order',
         'delivery_note',
         'expense_report',
-        'dossier',
+        'rapport_bc',
     ];
 
     public function __construct(
@@ -46,7 +47,7 @@ class PdfController extends Controller
         private BonCommandePdfGenerator $bonCommandePdfGenerator,
         private BonLivraisonPdfGenerator $bonLivraisonPdfGenerator,
         private ExpenseReportPdfGenerator $expenseReportPdfGenerator,
-        private DossierPdfGenerator $dossierPdfGenerator,
+        private RapportBCPdfGenerator $rapportBCPdfGenerator,
     ) {}
 
     public function templates(Request $request): JsonResponse
@@ -162,7 +163,7 @@ class PdfController extends Controller
             'purchase_order' => $this->streamPurchaseOrderPdf($id, $templateId, $inline),
             'delivery_note' => $this->streamDeliveryNotePdf($id, $templateId, $inline),
             'expense_report' => $this->streamExpenseReportPdf($id, $templateId, $inline),
-            'dossier' => $this->streamDossierPdf($id, $inline),
+            'rapport_bc' => $this->streamRapportBCPdf($id, $templateId, $inline),
             default => response()->json(['message' => 'Type PDF non pris en charge'], 422),
         };
     }
@@ -326,14 +327,13 @@ class PdfController extends Controller
         );
     }
 
-
-    private function streamDossierPdf(int $id, bool $inline = false): Response|StreamedResponse|JsonResponse
+    private function streamRapportBCPdf(int $id, ?int $templateId, bool $inline = false): Response|StreamedResponse|JsonResponse
     {
-        $dossier = Dossier::find($id);
-        if (! $dossier) {
-            return response()->json(['message' => 'Dossier introuvable'], 404);
+        $rapport = RapportBC::find($id);
+        if (! $rapport) {
+            return response()->json(['message' => 'Rapport introuvable'], 404);
         }
-        [$pdfBytes, $filename] = $this->dossierPdfGenerator->generate($dossier);
+        [$pdfBytes, $filename] = $this->rapportBCPdfGenerator->generate($rapport, $templateId);
 
         if ($inline) {
             return $this->inlinePdfResponse($pdfBytes, $filename);
@@ -355,7 +355,7 @@ class PdfController extends Controller
             'purchase_order' => 'Bon de commande',
             'delivery_note' => 'Bon de livraison',
             'expense_report' => 'Note de frais',
-            'dossier' => 'Fiche dossier',
+            'rapport_bc' => 'Rapport de mission',
             default => $type,
         };
     }

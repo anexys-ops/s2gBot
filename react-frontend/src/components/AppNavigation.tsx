@@ -128,6 +128,7 @@ export default function AppNavigation() {
   const pathname = location.pathname
   const [mobileOpen, setMobileOpen] = useState(false)
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const [configOpen, setConfigOpen] = useState(false)
   const navRef = useRef<HTMLElement>(null)
 
   const groups: MenuGroup[] = useMemo(() => {
@@ -209,41 +210,6 @@ export default function AppNavigation() {
         ]),
       },
       {
-        id: 'catalogue',
-        label: 'Catalogue',
-        module: 'catalogue',
-        items: filterItems([
-          { to: '/catalogue', label: 'Articles & essais', module: 'catalogue' },
-          { to: '/materiel/equipements', label: 'Matériel / Équipements', module: 'catalogue' },
-          { to: '/labo/fiches', label: 'Fiches techniques dynamiques', module: 'catalogue' },
-        ]),
-      },
-      {
-        id: 'configuration',
-        label: 'Configuration',
-        module: 'configuration',
-        items: filterItems([
-          ...(canManageAppConfig(user) || user?.role === 'lab_admin'
-            ? [
-                { to: '/config/agences', label: 'Agences', module: 'configuration' as StaffModuleKey },
-                { to: '/config/centres', label: 'Centres', module: 'configuration' as StaffModuleKey },
-              ]
-            : []),
-          ...(canManageUsers(user)
-            ? [{ to: '/settings/utilisateurs', label: 'Utilisateurs', module: 'configuration' as StaffModuleKey }]
-            : []),
-          ...(canManageGroups(user)
-            ? [{ to: '/settings/groupes', label: 'Groupes & droits', module: 'configuration' as StaffModuleKey, permission: 'groups.manage' }]
-            : []),
-          ...(canManageAppConfig(user)
-            ? [
-                { to: '/back-office/modeles-documents-pdf', label: 'PDF devis/factures', module: 'configuration' as StaffModuleKey },
-                { to: '/back-office/configuration', label: 'Modules', module: 'configuration' as StaffModuleKey },
-              ]
-            : []),
-        ]),
-      },
-      {
         id: 'rapports',
         label: 'Statistiques',
         module: 'rapports',
@@ -263,9 +229,42 @@ export default function AppNavigation() {
     })
   }, [user])
 
+  const catalogueItems = useMemo(() => {
+    const filterItems = (items: SubItem[]) =>
+      items.filter((item) => {
+        if (item.permission && !hasStaffCapability(user, item.permission)) return false
+        if (item.module && !canAccessStaffModule(user, item.module)) return false
+        return true
+      })
+    return filterItems([
+      { to: '/catalogue', label: 'Articles & essais', module: 'catalogue' as StaffModuleKey },
+      { to: '/materiel/equipements', label: 'Matériel / Équipements', module: 'catalogue' as StaffModuleKey },
+      { to: '/labo/fiches', label: 'Fiches techniques', module: 'laboratoire' as StaffModuleKey },
+    ])
+  }, [user])
+
+  const configItems = useMemo(() => {
+    const items: SubItem[] = []
+    if (canManageAppConfig(user) || user?.role === 'lab_admin')
+      items.push({ to: '/config/agences', label: 'Agences', module: 'configuration' as StaffModuleKey })
+    if (canManageUsers(user))
+      items.push({ to: '/settings/utilisateurs', label: 'Utilisateurs', module: 'configuration' as StaffModuleKey })
+    if (canManageGroups(user))
+      items.push({ to: '/settings/groupes', label: 'Groupes & droits', module: 'configuration' as StaffModuleKey })
+    if (canManageAppConfig(user)) {
+      items.push({ to: '/back-office/modeles-documents-pdf', label: 'Modèles PDF', module: 'configuration' as StaffModuleKey })
+      items.push({ to: '/back-office/configuration', label: 'Modules', module: 'configuration' as StaffModuleKey })
+    }
+    items.push({ to: '/settings', label: 'Mon compte', module: 'configuration' as StaffModuleKey })
+    return items
+  }, [user])
+
+  const isConfigOrCatalogueActive = isCatalogueActive(pathname) || isConfigurationActive(pathname) || pathname.startsWith('/settings') || pathname.startsWith('/config/')
+
   const closeAll = useCallback(() => {
     setOpenDropdown(null)
     setMobileOpen(false)
+    setConfigOpen(false)
   }, [])
 
   useEffect(() => {
@@ -276,6 +275,7 @@ export default function AppNavigation() {
     function handleClickOutside(e: MouseEvent) {
       if (navRef.current && !navRef.current.contains(e.target as Node)) {
         setOpenDropdown(null)
+        setConfigOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -386,18 +386,56 @@ export default function AppNavigation() {
             >
               Aide
             </NavLink>
-            <NavLink
-              to="/settings"
-              className={({ isActive }) => `nav-settings-gear${isActive ? ' nav-settings-gear--active' : ''}`}
-              title="Paramètres"
-              aria-label="Paramètres"
-              onClick={closeAll}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </NavLink>
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className={`nav-settings-gear${isConfigOrCatalogueActive || configOpen ? ' nav-settings-gear--active' : ''}`}
+                title="Configuration & Catalogue"
+                aria-label="Configuration & Catalogue"
+                aria-expanded={configOpen}
+                onClick={() => { setConfigOpen((v) => !v); setOpenDropdown(null) }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
+              {configOpen && (
+                <div style={{
+                  position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 9999,
+                  background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 220, padding: '8px 0',
+                }}>
+                  {catalogueItems.length > 0 && (
+                    <>
+                      <div style={{ padding: '4px 16px 4px', fontSize: '0.7rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        Catalogue
+                      </div>
+                      {catalogueItems.map((item) => (
+                        <NavLink key={item.to} to={item.to} onClick={closeAll}
+                          className={({ isActive }) => `nav-dropdown-link${isActive ? ' nav-dropdown-link--active' : ''}`}
+                          style={{ display: 'block', padding: '7px 16px' }}
+                        >
+                          {item.label}
+                        </NavLink>
+                      ))}
+                      <hr style={{ margin: '6px 0', border: 'none', borderTop: '1px solid #f3f4f6' }} />
+                    </>
+                  )}
+                  <div style={{ padding: '4px 16px 4px', fontSize: '0.7rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    Configuration
+                  </div>
+                  {configItems.map((item) => (
+                    <NavLink key={item.to} to={item.to} onClick={closeAll}
+                      className={({ isActive }) => `nav-dropdown-link${isActive ? ' nav-dropdown-link--active' : ''}`}
+                      style={{ display: 'block', padding: '7px 16px' }}
+                    >
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
             <span className="nav-user-name" title={user?.email}>
               {user?.name}
               <span className="nav-user-role">({user?.role})</span>

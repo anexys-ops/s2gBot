@@ -4029,7 +4029,21 @@ export type RapportBCBonCommande = {
   created_at: string
 }
 
+export type RapportBCSuivi = {
+  id: number
+  type: 'note' | 'statut_change' | 'upload' | 'validation'
+  message: string
+  statut_from: string | null
+  statut_to: string | null
+  user: { id: number; name: string } | null
+  created_at: string
+}
+
 export const rapportBCApi = {
+  list: (params?: { q?: string; statut?: string }) => {
+    const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString() : ''
+    return api<RapportBC[]>(`/rapport-bc${qs}`)
+  },
   statuts: () => api<string[]>('/rapport-bc/statuts'),
   updateStatuts: (statuts: string[]) =>
     api<string[]>('/rapport-bc/statuts', { method: 'PUT', body: JSON.stringify({ statuts }) }),
@@ -4060,4 +4074,8 @@ export const rapportBCApi = {
   },
   downloadVersionUrl: (id: number, versionId: number) => `/api/rapport-bc/${id}/versions/${versionId}/download`,
   deleteVersion: (id: number, versionId: number) => api<RapportBC>(`/rapport-bc/${id}/versions/${versionId}`, { method: 'DELETE' }),
+  listSuivis: (id: number) => api<RapportBCSuivi[]>(`/rapport-bc/${id}/suivis`),
+  addSuivi: (id: number, message: string) => api<RapportBCSuivi>(`/rapport-bc/${id}/suivis`, { method: 'POST', body: JSON.stringify({ message }) }),
+  requestValidation: (id: number, body: { validator_id?: number; message?: string }) =>
+    api<RapportBC>(`/rapport-bc/${id}/request-validation`, { method: 'POST', body: JSON.stringify(body) }),
 }

@@ -405,6 +405,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('mission-tasks/{task}/validate', [MissionTaskController::class, 'validate']);
 
     // ── Rapport BC ───────────────────────────────────────────────────────────
+    Route::get('rapport-bc', [RapportBCController::class, 'index']);
     Route::get('rapport-bc/statuts', [RapportBCController::class, 'statuts']);
     Route::put('rapport-bc/statuts', [RapportBCController::class, 'updateStatutsConfig']);
     Route::get('rapport-bc/bons-commande', [RapportBCController::class, 'bcsWithRapports']);
@@ -415,6 +416,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('rapport-bc/{rapportBC}', [RapportBCController::class, 'update']);
     Route::delete('rapport-bc/{rapportBC}', [RapportBCController::class, 'destroy']);
     Route::get('rapport-bc/{rapportBC}/recap', [RapportBCController::class, 'recap']);
+    Route::get('rapport-bc/{rapportBC}/suivis', [RapportBCController::class, 'listSuivis']);
+    Route::post('rapport-bc/{rapportBC}/suivis', [RapportBCController::class, 'addSuivi']);
+    Route::post('rapport-bc/{rapportBC}/request-validation', [RapportBCController::class, 'requestValidation']);
     Route::post('rapport-bc/{rapportBC}/versions', [RapportBCController::class, 'uploadVersion']);
     Route::get('rapport-bc/{rapportBC}/versions/{version}/download', [RapportBCController::class, 'downloadVersion']);
     Route::delete('rapport-bc/{rapportBC}/versions/{version}', [RapportBCController::class, 'destroyVersion']);

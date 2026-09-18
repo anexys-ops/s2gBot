@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { rapportBCApi, type RapportBCTask, type RapportBCVersion } from '../../api/client'
+import { rapportBCApi, type RapportBCTask, type RapportBCVersion, type RapportBCSuivi } from '../../api/client'
 import { formatAppDate } from '../../lib/appLocale'
 import { useAuth } from '../../contexts/AuthContext'
 import { hasStaffCapability } from '../../lib/staffAccess'
@@ -51,6 +51,9 @@ export default function RapportBCDetailPage() {
   const [uploadNotes, setUploadNotes] = useState('')
   const [showTaches, setShowTaches] = useState(false)
   const [selectedTacheIds, setSelectedTacheIds] = useState<number[]>([])
+  const [newNote, setNewNote] = useState('')
+  const [showValidationModal, setShowValidationModal] = useState(false)
+  const [validationMessage, setValidationMessage] = useState('')
 
   const { data: rapport, isLoading } = useQuery({
     queryKey: ['rapport-bc', rapportId],
@@ -110,6 +113,44 @@ export default function RapportBCDetailPage() {
     onSuccess: () => navigate('/rapport-bc'),
   })
 
+  const { data: suivis = [], refetch: refetchSuivis } = useQuery({
+    queryKey: ['rapport-bc-suivis', rapportId],
+    queryFn: () => rapportBCApi.listSuivis(rapportId),
+    staleTime: 10_000,
+    enabled: !isNaN(rapportId),
+  })
+
+  const addSuiviMut = useMutation({
+    mutationFn: (message: string) => rapportBCApi.addSuivi(rapportId, message),
+    onSuccess: () => { void refetchSuivis(); setNewNote('') },
+  })
+
+  const requestValidationMut = useMutation({
+    mutationFn: (message?: string) => rapportBCApi.requestValidation(rapportId, { message }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['rapport-bc', rapportId] })
+      void refetchSuivis()
+      setShowValidationModal(false)
+      setValidationMessage('')
+    },
+  })
+
+  const validateMut = useMutation({
+    mutationFn: () => rapportBCApi.update(rapportId, { statut: 'valide' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['rapport-bc', rapportId] })
+      void refetchSuivis()
+    },
+  })
+
+  const rejectMut = useMutation({
+    mutationFn: () => rapportBCApi.update(rapportId, { statut: 'brouillon' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['rapport-bc', rapportId] })
+      void refetchSuivis()
+    },
+  })
+
   if (isLoading) return <div style={{ padding: 32, color: '#6b7280' }}>Chargement…</div>
   if (!rapport) return <div style={{ padding: 32, color: '#ef4444' }}>Rapport introuvable.</div>
 
@@ -162,7 +203,41 @@ export default function RapportBCDetailPage() {
             )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {/* Demander validation (brouillon → preliminaire) */}
+          {rapport.statut === 'brouillon' && (
+            <button
+              onClick={() => setShowValidationModal(true)}
+              style={{ padding: '7px 14px', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer', color: '#b45309', fontWeight: 600 }}
+            >
+              Demander validation
+            </button>
+          )}
+          {/* Valider / Rejeter (lab_admin, preliminaire) */}
+          {rapport.statut === 'preliminaire' && canPublish && (
+            <>
+              <button
+                onClick={() => { if (window.confirm('Valider ce rapport ?')) validateMut.mutate() }}
+                disabled={validateMut.isPending}
+                style={{ padding: '7px 14px', background: '#d1fae5', border: '1px solid #6ee7b7', borderRadius: 6, cursor: 'pointer', color: '#065f46', fontWeight: 600 }}
+              >
+                ✓ Valider
+              </button>
+              <button
+                onClick={() => { if (window.confirm('Rejeter ce rapport (repassera en brouillon) ?')) rejectMut.mutate() }}
+                disabled={rejectMut.isPending}
+                style={{ padding: '7px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer', color: '#dc2626', fontWeight: 600 }}
+              >
+                ✕ Rejeter
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => window.print()}
+            style={{ padding: '7px 14px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+          >
+            🖨 Imprimer
+          </button>
           <button onClick={startEdit} style={{ padding: '7px 14px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>
             Modifier
           </button>
@@ -299,6 +374,92 @@ export default function RapportBCDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Section Activité / Suivis */}
+      <div style={{ marginTop: 24, border: '1px solid #e5e7eb', borderRadius: 8, padding: 16 }}>
+        <div style={{ fontWeight: 700, marginBottom: 14, fontSize: '0.95rem' }}>Activité</div>
+        {/* Timeline */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+          {suivis.length === 0 && (
+            <div style={{ color: '#9ca3af', fontSize: '0.85rem' }}>Aucune activité enregistrée.</div>
+          )}
+          {(suivis as RapportBCSuivi[]).slice().reverse().map((s) => (
+            <div key={s.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem',
+                background: s.type === 'validation' ? '#fef3c7' : s.type === 'statut_change' ? '#ede9fe' : s.type === 'upload' ? '#e0f2fe' : '#f3f4f6',
+                color: s.type === 'validation' ? '#b45309' : s.type === 'statut_change' ? '#7c3aed' : s.type === 'upload' ? '#0369a1' : '#6b7280',
+              }}>
+                {s.type === 'validation' ? '⟳' : s.type === 'statut_change' ? '↕' : s.type === 'upload' ? '↑' : '●'}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.85rem', color: '#111827' }}>{s.message}</div>
+                <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: 2 }}>
+                  {s.user?.name ?? 'Système'} · {formatAppDate(s.created_at)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Ajouter une note */}
+        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 12 }}>
+          <div style={{ fontWeight: 600, fontSize: '0.82rem', marginBottom: 6, color: '#374151' }}>Ajouter une note</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="text"
+              placeholder="Saisir une note…"
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && newNote.trim()) addSuiviMut.mutate(newNote.trim()) }}
+              style={{ flex: 1, padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: '0.85rem' }}
+            />
+            <button
+              onClick={() => { if (newNote.trim()) addSuiviMut.mutate(newNote.trim()) }}
+              disabled={!newNote.trim() || addSuiviMut.isPending}
+              style={{ padding: '7px 14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
+            >
+              {addSuiviMut.isPending ? '…' : 'Ajouter'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal demande de validation */}
+      {showValidationModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 420, boxShadow: '0 16px 48px rgba(0,0,0,0.18)' }}>
+            <h2 style={{ margin: '0 0 14px', fontSize: '1rem', fontWeight: 700 }}>Demander la validation</h2>
+            <p style={{ fontSize: '0.85rem', color: '#6b7280', margin: '0 0 14px' }}>
+              Le rapport passera en statut <strong>Préliminaire</strong> et sera soumis à la validation d'un administrateur.
+            </p>
+            <div>
+              <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Message (optionnel)</label>
+              <textarea
+                value={validationMessage}
+                onChange={(e) => setValidationMessage(e.target.value)}
+                placeholder="Commentaire pour le validateur…"
+                rows={3}
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box', resize: 'vertical' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => { setShowValidationModal(false); setValidationMessage('') }}
+                style={{ padding: '8px 16px', background: '#f3f4f6', border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600 }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => requestValidationMut.mutate(validationMessage || undefined)}
+                disabled={requestValidationMut.isPending}
+                style={{ padding: '8px 20px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 700 }}
+              >
+                {requestValidationMut.isPending ? 'Envoi…' : 'Soumettre'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal sélection tâches */}
       {showTaches && (

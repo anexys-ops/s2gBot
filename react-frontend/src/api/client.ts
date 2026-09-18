@@ -3976,3 +3976,88 @@ export const agencesApi = {
   assignUser: (agencyId: number, userId: number) => api<void>(`/agences/${agencyId}/assign-user`, { method: 'POST', body: JSON.stringify({ user_id: userId }) }),
   users: (agencyId: number) => api<{ id: number; name: string; email: string; role: string }[]>(`/agences/${agencyId}/users`),
 }
+
+// ─── Rapport BC ──────────────────────────────────────────────────────────────
+
+export type RapportBCVersion = {
+  id: number
+  version_number: number
+  original_filename: string | null
+  file_size: number | null
+  file_hash: string | null
+  upload_notes: string | null
+  has_file: boolean
+  uploaded_by: { id: number; name: string } | null
+  created_at: string
+}
+
+export type RapportBC = {
+  id: number
+  numero: string
+  titre: string | null
+  statut: string
+  notes: string | null
+  bon_commande_id: number
+  bon_commande: { id: number; numero: string } | null
+  created_by: { id: number; name: string } | null
+  taches_count?: number
+  tache_ids?: number[]
+  versions: RapportBCVersion[]
+  latest_version?: RapportBCVersion | null
+  created_at: string
+  updated_at: string
+}
+
+export type RapportBCTask = {
+  id: number
+  libelle: string | null
+  statut: string
+  planned_date: string | null
+  completed_at: string | null
+  assigned_user: { id: number; name: string } | null
+  created_at: string
+}
+
+export type RapportBCBonCommande = {
+  id: number
+  numero: string
+  statut: string
+  client_id: number
+  client: { id: number; name: string } | null
+  rapport_b_cs_count: number
+  finished_tasks_count: number
+  created_at: string
+}
+
+export const rapportBCApi = {
+  statuts: () => api<string[]>('/rapport-bc/statuts'),
+  updateStatuts: (statuts: string[]) =>
+    api<string[]>('/rapport-bc/statuts', { method: 'PUT', body: JSON.stringify({ statuts }) }),
+  listBCs: () => api<RapportBCBonCommande[]>('/rapport-bc/bons-commande'),
+  bcTaches: (bcId: number) => api<RapportBCTask[]>(`/rapport-bc/bons-commande/${bcId}/taches`),
+  listByBc: (bcId: number) => api<RapportBC[]>(`/rapport-bc/bons-commande/${bcId}`),
+  create: (bcId: number, body: { titre?: string; statut?: string; notes?: string; tache_ids?: number[] }) =>
+    api<RapportBC>(`/rapport-bc/bons-commande/${bcId}`, { method: 'POST', body: JSON.stringify(body) }),
+  get: (id: number) => api<RapportBC>(`/rapport-bc/${id}`),
+  update: (id: number, body: { titre?: string; statut?: string; notes?: string; tache_ids?: number[] }) =>
+    api<RapportBC>(`/rapport-bc/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api<void>(`/rapport-bc/${id}`, { method: 'DELETE' }),
+  recap: (id: number) => api<{ rapport: RapportBC; bc_statuts: Record<string, number>; taches: RapportBCTask[] }>(`/rapport-bc/${id}/recap`),
+  uploadVersion: async (id: number, file: File, notes?: string): Promise<RapportBCVersion> => {
+    const token = getToken()
+    const fd = new FormData()
+    fd.append('file', file)
+    if (notes) fd.append('upload_notes', notes)
+    const res = await fetch(`${API_BASE}/rapport-bc/${id}/versions`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}`, Accept: 'application/json' } : { Accept: 'application/json' },
+      body: fd,
+    })
+    if (res.status === 401) handleApiUnauthorized(`/rapport-bc/${id}/versions`, Boolean(token))
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error((data as { message?: string }).message || `Erreur ${res.status}`)
+    return data as RapportBCVersion
+  },
+  downloadVersionUrl: (id: number, versionId: number) => `/api/rapport-bc/${id}/versions/${versionId}/download`,
+  deleteVersion: (id: number, versionId: number) => api<RapportBC>(`/rapport-bc/${id}/versions/${versionId}`, { method: 'DELETE' }),
+}

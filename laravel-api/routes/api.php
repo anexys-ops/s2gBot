@@ -56,6 +56,7 @@ use App\Http\Controllers\Api\OpenApiController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PdfController;
 use App\Http\Controllers\Api\QuoteController;
+use App\Http\Controllers\Api\RapportBCController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReportFormDefinitionController;
 use App\Http\Controllers\Api\ReportPdfTemplateController;
@@ -402,6 +403,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('mission-tasks/{task}', [MissionTaskController::class, 'update']);
     Route::post('mission-tasks/{task}/measures', [MissionTaskController::class, 'storeMeasures']);
     Route::post('mission-tasks/{task}/validate', [MissionTaskController::class, 'validate']);
+
+    // ── Rapport BC ───────────────────────────────────────────────────────────
+    Route::get('rapport-bc/statuts', [RapportBCController::class, 'statuts']);
+    Route::put('rapport-bc/statuts', [RapportBCController::class, 'updateStatutsConfig']);
+    Route::get('rapport-bc/bons-commande', [RapportBCController::class, 'bcsWithRapports']);
+    Route::get('rapport-bc/bons-commande/{bonCommande}/taches', [RapportBCController::class, 'bcTaches']);
+    Route::get('rapport-bc/bons-commande/{bonCommande}', [RapportBCController::class, 'indexByBc']);
+    Route::post('rapport-bc/bons-commande/{bonCommande}', [RapportBCController::class, 'store']);
+    Route::get('rapport-bc/{rapportBC}', [RapportBCController::class, 'show']);
+    Route::put('rapport-bc/{rapportBC}', [RapportBCController::class, 'update']);
+    Route::delete('rapport-bc/{rapportBC}', [RapportBCController::class, 'destroy']);
+    Route::get('rapport-bc/{rapportBC}/recap', [RapportBCController::class, 'recap']);
+    Route::post('rapport-bc/{rapportBC}/versions', [RapportBCController::class, 'uploadVersion']);
+    Route::get('rapport-bc/{rapportBC}/versions/{version}/download', [RapportBCController::class, 'downloadVersion']);
+    Route::delete('rapport-bc/{rapportBC}/versions/{version}', [RapportBCController::class, 'destroyVersion']);
 
     // ── Planning & stock ─────────────────────────────────────────────────────
     Route::get('planning/overview', [PlanningController::class, 'overview']);

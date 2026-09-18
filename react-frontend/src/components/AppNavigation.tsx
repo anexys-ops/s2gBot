@@ -26,6 +26,7 @@ type MenuGroupId =
   | 'terrain'
   | 'laboratoire'
   | 'ingenierie'
+  | 'rapport-bc'
   | 'catalogue'
   | 'configuration'
   | 'rapports'
@@ -95,6 +96,8 @@ function isGroupActive(id: MenuGroupId, pathname: string): boolean {
       return isLaboratoireActive(pathname)
     case 'ingenierie':
       return isIngenerieActive(pathname)
+    case 'rapport-bc':
+      return pathname.startsWith('/rapport-bc')
     case 'catalogue':
       return isCatalogueActive(pathname)
     case 'configuration':
@@ -198,6 +201,14 @@ export default function AppNavigation() {
         ]),
       },
       {
+        id: 'rapport-bc',
+        label: 'Rapport',
+        module: 'rapport-bc',
+        items: filterItems([
+          { to: '/rapport-bc', label: 'Rapports de mission', module: 'rapport-bc' as StaffModuleKey },
+        ]),
+      },
+      {
         id: 'catalogue',
         label: 'Catalogue',
         module: 'catalogue',
@@ -234,7 +245,7 @@ export default function AppNavigation() {
       },
       {
         id: 'rapports',
-        label: 'Rapports',
+        label: 'Statistiques',
         module: 'rapports',
         items: filterItems([
           { to: '/rapports/ventes', label: 'Ventes', module: 'rapports' },

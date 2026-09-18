@@ -86,6 +86,16 @@ class BonCommande extends Model
         return $this->hasMany(BonCommandeLigne::class, 'bon_commande_id');
     }
 
+    public function ordresMission(): HasMany
+    {
+        return $this->hasMany(OrdreMission::class, 'bon_commande_id');
+    }
+
+    public function rapportBCs(): HasMany
+    {
+        return $this->hasMany(RapportBC::class, 'bon_commande_id');
+    }
+
     public function bonsLivraison(): HasMany
     {
         return $this->hasMany(BonLivraison::class, 'bon_commande_id');

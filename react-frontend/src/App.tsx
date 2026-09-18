@@ -102,6 +102,8 @@ import PlanningLaboPage from './pages/labo/PlanningLaboPage'
 import TranscoFoldPage from './pages/labo/TranscoFoldPage'
 import LabReportsListPage from './pages/labo/LabReportsListPage'
 import LabReportViewPage from './pages/labo/LabReportViewPage'
+import RapportBCListPage from './pages/rapport-bc/RapportBCListPage'
+import RapportBCDetailPage from './pages/rapport-bc/RapportBCDetailPage'
 import NotFoundPage from './pages/NotFoundPage'
 import PortalLayout from './components/PortalLayout'
 import PortalHomePage from './pages/portal/PortalHomePage'
@@ -251,6 +253,8 @@ function AppRoutes() {
         <Route path="ordres-mission/planning" element={<OrdreMissionPlanningPage />} />
         <Route path="ordres-mission/:id" element={<OrdreMissionFichePage />} />
         <Route path="compta-fondation" element={<ComptaFondationPage />} />
+        <Route path="rapport-bc" element={<RapportBCListPage />} />
+        <Route path="rapport-bc/:id" element={<RapportBCDetailPage />} />
         <Route path="catalogue" element={<CatalogueListePage />} />
         <Route path="catalogue/services" element={<CommercialCatalogPage />} />
         <Route path="catalogue/articles/:id" element={<ArticleFichePage />} />

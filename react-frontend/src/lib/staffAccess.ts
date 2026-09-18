@@ -7,6 +7,7 @@ export type StaffModuleKey =
   | 'terrain'
   | 'laboratoire'
   | 'ingenierie'
+  | 'rapport-bc'
   | 'catalogue'
   | 'rapports'
   | 'configuration'
@@ -17,6 +18,7 @@ export const STAFF_MODULE_PERMISSION: Record<StaffModuleKey, string> = {
   terrain: 'modules.terrain',
   laboratoire: 'modules.laboratoire',
   ingenierie: 'modules.ingenierie',
+  'rapport-bc': 'modules.rapport_bc',
   catalogue: 'modules.catalogue',
   rapports: 'modules.rapports',
   configuration: 'modules.configuration',
@@ -82,6 +84,7 @@ export function requiredModuleForPath(pathname: string): StaffModuleKey | StaffM
   if (pathname.startsWith('/labo')) return 'laboratoire'
   if (pathname.startsWith('/ingenierie')) return 'ingenierie'
   if (pathname.startsWith('/catalogue') || pathname.startsWith('/materiel')) return 'catalogue'
+  if (pathname.startsWith('/rapport-bc')) return 'rapport-bc'
   if (pathname.startsWith('/rapports')) return 'rapports'
   if (pathname.startsWith('/ordres-mission')) {
     return ['terrain', 'laboratoire', 'ingenierie']

@@ -17,6 +17,8 @@ final class PermissionCatalog
 
     public const CONFIG_MANAGE = 'config.manage';
 
+    public const CLIENTS_WRITE = 'clients.write';
+
     public const COMMERCIAL_READ = 'commercial.read';
 
     public const COMMERCIAL_WRITE = 'commercial.write';
@@ -26,6 +28,10 @@ final class PermissionCatalog
     public const ORDERS_WRITE = 'orders.write';
 
     public const REPORTS_READ = 'reports.read';
+
+    public const MODULE_RAPPORT_BC = 'modules.rapport_bc';
+
+    public const RAPPORT_BC_PUBLISH = 'rapport_bc.publish';
 
     public const BACK_OFFICE_READ = 'back_office.read';
 
@@ -60,8 +66,11 @@ final class PermissionCatalog
             self::MODULE_LABORATOIRE => 'Module Laboratoire — réception, essais, tâches labo, OdM labo',
             self::MODULE_INGENIERIE => 'Module Ingénierie — tâches et OdM ingénieur',
             self::MODULE_CATALOGUE => 'Module Catalogue — articles S2G, matériel, fiches techniques',
-            self::MODULE_RAPPORTS => 'Module Rapports — ventes, compta, KPI',
+            self::MODULE_RAPPORTS => 'Module Statistiques — ventes, compta, KPI',
+            self::MODULE_RAPPORT_BC => 'Module Rapport de mission — génération rapports BC',
+            self::RAPPORT_BC_PUBLISH => 'Rapport de mission — valider et archiver (publier)',
             self::MODULE_CONFIGURATION => 'Module Configuration — agences, utilisateurs, PDF, modules',
+            self::CLIENTS_WRITE => 'Clients — création et modification (bouton « Nouveau client »)',
             self::COMMERCIAL_READ => 'Commercial — lecture (devis, factures, documents)',
             self::COMMERCIAL_WRITE => 'Commercial — écriture',
             self::ORDERS_READ => 'Commandes & dossiers — lecture',
@@ -94,6 +103,7 @@ final class PermissionCatalog
                 self::MODULE_CONFIGURATION,
             ],
             'Fonctions métier' => [
+                self::CLIENTS_WRITE,
                 self::COMMERCIAL_READ,
                 self::COMMERCIAL_WRITE,
                 self::ORDERS_READ,

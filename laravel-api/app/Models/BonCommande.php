@@ -30,6 +30,7 @@ class BonCommande extends Model
         'numero',
         'quote_id',
         'dossier_id',
+        'lab_centre_group_id',
         'client_id',
         'contact_id',
         'statut',
@@ -55,6 +56,11 @@ class BonCommande extends Model
         return $this->belongsTo(Dossier::class);
     }
 
+    public function centreGroup(): BelongsTo
+    {
+        return $this->belongsTo(LabCentreGroup::class, 'lab_centre_group_id');
+    }
+
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
@@ -78,6 +84,16 @@ class BonCommande extends Model
     public function lignes(): HasMany
     {
         return $this->hasMany(BonCommandeLigne::class, 'bon_commande_id');
+    }
+
+    public function ordresMission(): HasMany
+    {
+        return $this->hasMany(OrdreMission::class, 'bon_commande_id');
+    }
+
+    public function rapportBCs(): HasMany
+    {
+        return $this->hasMany(RapportBC::class, 'bon_commande_id');
     }
 
     public function bonsLivraison(): HasMany

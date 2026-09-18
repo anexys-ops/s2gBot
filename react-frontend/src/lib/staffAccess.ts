@@ -30,9 +30,14 @@ function isLabAdmin(user: User | null | undefined): boolean {
   return user?.role === 'lab_admin'
 }
 
+function isResponsable(user: User | null | undefined): boolean {
+  return user?.role === 'responsable'
+}
+
 export function effectiveStaffPermissions(user: User | null | undefined): string[] {
   if (!user) return []
   if (isLabAdmin(user)) return ['*']
+  if (isResponsable(user)) return ['*']
   return user.effective_permissions ?? []
 }
 

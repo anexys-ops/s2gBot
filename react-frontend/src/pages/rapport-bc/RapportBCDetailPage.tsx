@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { rapportBCApi, type RapportBCTask, type RapportBCVersion, type RapportBCSuivi } from '../../api/client'
+import { rapportBCApi, documentPdfTemplatesApi, pdfApi, type RapportBCTask, type RapportBCVersion, type RapportBCSuivi, type DocumentPdfTemplateRow } from '../../api/client'
 import { formatAppDate } from '../../lib/appLocale'
 import { useAuth } from '../../contexts/AuthContext'
 import { hasStaffCapability } from '../../lib/staffAccess'
@@ -54,6 +54,9 @@ export default function RapportBCDetailPage() {
   const [newNote, setNewNote] = useState('')
   const [showValidationModal, setShowValidationModal] = useState(false)
   const [validationMessage, setValidationMessage] = useState('')
+  const [showPrintModal, setShowPrintModal] = useState(false)
+  const [printTemplateId, setPrintTemplateId] = useState<number | ''>('')
+  const [printLoading, setPrintLoading] = useState(false)
 
   const { data: rapport, isLoading } = useQuery({
     queryKey: ['rapport-bc', rapportId],
@@ -67,6 +70,13 @@ export default function RapportBCDetailPage() {
     queryFn: () => rapportBCApi.statuts(),
     staleTime: 60_000,
   })
+
+  const { data: pdfTemplatesRes } = useQuery({
+    queryKey: ['pdf-templates-rapport-bc'],
+    queryFn: () => documentPdfTemplatesApi.list('rapport_bc', true),
+    staleTime: 120_000,
+  })
+  const pdfTemplates: DocumentPdfTemplateRow[] = pdfTemplatesRes?.data ?? []
 
   const { data: bcTaches = [] } = useQuery({
     queryKey: ['rapport-bc-taches', rapport?.bon_commande_id],
@@ -233,10 +243,10 @@ export default function RapportBCDetailPage() {
             </>
           )}
           <button
-            onClick={() => window.print()}
+            onClick={() => { setPrintTemplateId(pdfTemplates.find((t) => t.is_default)?.id ?? pdfTemplates[0]?.id ?? ''); setShowPrintModal(true) }}
             style={{ padding: '7px 14px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
           >
-            🖨 Imprimer
+            🖨 Imprimer PDF
           </button>
           <button onClick={startEdit} style={{ padding: '7px 14px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>
             Modifier
@@ -423,6 +433,79 @@ export default function RapportBCDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal impression PDF */}
+      {showPrintModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 480, boxShadow: '0 16px 48px rgba(0,0,0,0.18)' }}>
+            <h2 style={{ margin: '0 0 16px', fontSize: '1.05rem', fontWeight: 700 }}>Générer le PDF du rapport</h2>
+
+            {pdfTemplates.length === 0 ? (
+              <div style={{ padding: '16px 0', color: '#6b7280', fontSize: '0.88rem' }}>
+                <p>Aucun modèle PDF actif pour les rapports de mission.</p>
+                <p style={{ marginTop: 8 }}>Créez-en un dans <strong>Configuration → Modèles PDF</strong> avec le type <code>rapport_bc</code>.</p>
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>Modèle PDF</label>
+                  <select
+                    value={printTemplateId}
+                    onChange={(e) => setPrintTemplateId(e.target.value ? Number(e.target.value) : '')}
+                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: '0.9rem' }}
+                  >
+                    {pdfTemplates.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}{t.is_default ? ' (défaut)' : ''}</option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: 5 }}>
+                    Le PDF inclut : infos du rapport, client, dossier, tâches associées, liste des fichiers déposés et activité.
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {/* Aperçu en ligne */}
+                  <button
+                    disabled={printLoading || !printTemplateId}
+                    onClick={async () => {
+                      setPrintLoading(true)
+                      try {
+                        const { url } = await pdfApi.getPreviewLink('rapport_bc', rapportId, printTemplateId ? Number(printTemplateId) : undefined)
+                        window.open(url, '_blank')
+                      } finally { setPrintLoading(false) }
+                    }}
+                    style={{ padding: '8px 16px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 7, color: '#2563eb', fontWeight: 600, cursor: 'pointer', fontSize: '0.88rem' }}
+                  >
+                    {printLoading ? '…' : '👁 Aperçu'}
+                  </button>
+                  {/* Télécharger */}
+                  <button
+                    disabled={printLoading || !printTemplateId}
+                    onClick={async () => {
+                      setPrintLoading(true)
+                      try {
+                        const blob = await pdfApi.fetchGenerate('rapport_bc', rapportId, printTemplateId ? Number(printTemplateId) : undefined)
+                        pdfApi.downloadBlob(blob, `rapport-${rapport.numero}.pdf`)
+                      } finally { setPrintLoading(false) }
+                    }}
+                    style={{ padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 700, cursor: 'pointer', fontSize: '0.88rem' }}
+                  >
+                    {printLoading ? 'Génération…' : '⬇ Télécharger PDF'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            <div style={{ marginTop: 18, textAlign: 'right' }}>
+              <button
+                onClick={() => setShowPrintModal(false)}
+                style={{ padding: '8px 16px', background: '#f3f4f6', border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600 }}
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal demande de validation */}
       {showValidationModal && (

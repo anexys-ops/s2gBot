@@ -68,6 +68,8 @@ class RapportBC extends Model
         return $this->hasMany(RapportBCVersion::class, 'rapport_bc_id')->orderByDesc('version_number');
     }
 
+    public function suivis(): HasMany { return $this->hasMany(RapportBCSuivi::class, 'rapport_bc_id')->latest('created_at'); }
+
     public function taches(): BelongsToMany
     {
         return $this->belongsToMany(MissionTask::class, 'rapport_bc_taches', 'rapport_bc_id', 'mission_task_id');

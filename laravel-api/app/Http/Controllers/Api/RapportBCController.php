@@ -13,6 +13,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Models\RapportBCSuivi;
+use App\Models\User;
 
 class RapportBCController extends Controller
 {
@@ -70,6 +72,53 @@ class RapportBCController extends Controller
             'uploaded_by'       => $v->uploadedByUser ? ['id' => $v->uploadedByUser->id, 'name' => $v->uploadedByUser->name] : null,
             'created_at'        => $v->created_at?->toIso8601String(),
         ];
+    }
+
+    // ── Liste globale des rapports ────────────────────────────────────────────
+
+    public function index(Request $request): JsonResponse
+    {
+        if (! $this->canRead($request)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $q      = trim((string) $request->get('q', ''));
+        $statut = (string) $request->get('statut', '');
+
+        $query = RapportBC::with([
+            'bonCommande:id,numero',
+            'createdBy:id,name',
+            'versions' => fn ($q) => $q->orderByDesc('version_number')->limit(1),
+        ])->withCount('taches');
+
+        if ($q !== '') {
+            $query->where(function ($sq) use ($q) {
+                $sq->where('numero', 'like', "%{$q}%")
+                   ->orWhere('titre', 'like', "%{$q}%");
+            });
+        }
+        if ($statut !== '') {
+            $query->where('statut', $statut);
+        }
+
+        $rows = $query->latest()->get()->map(function (RapportBC $r) {
+            $latest = $r->versions->first();
+            return [
+                'id'              => $r->id,
+                'numero'          => $r->numero,
+                'titre'           => $r->titre,
+                'statut'          => $r->statut,
+                'bon_commande_id' => $r->bon_commande_id,
+                'bon_commande'    => $r->bonCommande ? ['id' => $r->bonCommande->id, 'numero' => $r->bonCommande->numero] : null,
+                'created_by'      => $r->createdBy ? ['id' => $r->createdBy->id, 'name' => $r->createdBy->name] : null,
+                'taches_count'    => $r->taches_count ?? 0,
+                'latest_version'  => $latest ? $this->formatVersion($latest) : null,
+                'created_at'      => $r->created_at?->toIso8601String(),
+                'updated_at'      => $r->updated_at?->toIso8601String(),
+            ];
+        });
+
+        return response()->json($rows);
     }
 
     // ── Statuts config ───────────────────────────────────────────────────────
@@ -250,6 +299,8 @@ class RapportBCController extends Controller
             'tache_ids.*' => 'integer',
         ]);
 
+        $statutFrom = $rapportBC->statut;
+
         DB::transaction(function () use ($rapportBC, $data) {
             $rapportBC->update(array_filter([
                 'titre'  => $data['titre'] ?? $rapportBC->titre,
@@ -261,6 +312,16 @@ class RapportBCController extends Controller
                 $rapportBC->taches()->sync($data['tache_ids'] ?? []);
             }
         });
+
+        if (isset($data['statut']) && $data['statut'] !== $statutFrom) {
+            $rapportBC->suivis()->create([
+                'user_id'     => $request->user()?->id,
+                'type'        => 'statut_change',
+                'message'     => "Statut changé de « {$statutFrom} » vers « {$data['statut']} »",
+                'statut_from' => $statutFrom,
+                'statut_to'   => $data['statut'],
+            ]);
+        }
 
         return response()->json($this->formatRapport($rapportBC->fresh()));
     }
@@ -279,6 +340,72 @@ class RapportBCController extends Controller
         $rapportBC->delete();
 
         return response()->json(null, 204);
+    }
+
+    // ── Suivis ────────────────────────────────────────────────────────────────
+
+    public function listSuivis(RapportBC $rapportBC, Request $request): JsonResponse
+    {
+        if (! $this->canRead($request)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        $suivis = $rapportBC->suivis()->with('user:id,name')->get()->map(fn (RapportBCSuivi $s) => [
+            'id'          => $s->id,
+            'type'        => $s->type,
+            'message'     => $s->message,
+            'statut_from' => $s->statut_from,
+            'statut_to'   => $s->statut_to,
+            'user'        => $s->user ? ['id' => $s->user->id, 'name' => $s->user->name] : null,
+            'created_at'  => $s->created_at?->toIso8601String(),
+        ]);
+        return response()->json($suivis);
+    }
+
+    public function addSuivi(RapportBC $rapportBC, Request $request): JsonResponse
+    {
+        if (! $this->canRead($request)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        $data = $request->validate(['message' => 'required|string|max:2000']);
+        $suivi = $rapportBC->suivis()->create([
+            'user_id' => $request->user()?->id,
+            'type'    => 'note',
+            'message' => $data['message'],
+        ]);
+        $suivi->load('user:id,name');
+        return response()->json([
+            'id'          => $suivi->id,
+            'type'        => $suivi->type,
+            'message'     => $suivi->message,
+            'statut_from' => null,
+            'statut_to'   => null,
+            'user'        => $suivi->user ? ['id' => $suivi->user->id, 'name' => $suivi->user->name] : null,
+            'created_at'  => $suivi->created_at?->toIso8601String(),
+        ], 201);
+    }
+
+    public function requestValidation(RapportBC $rapportBC, Request $request): JsonResponse
+    {
+        if (! $this->canRead($request)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        $data = $request->validate(['validator_id' => 'nullable|exists:users,id', 'message' => 'nullable|string|max:500']);
+        $from = $rapportBC->statut;
+        $rapportBC->update(['statut' => 'preliminaire']);
+
+        $validatorName = $data['validator_id']
+            ? optional(User::find($data['validator_id']))->name
+            : null;
+
+        $rapportBC->suivis()->create([
+            'user_id'     => $request->user()?->id,
+            'type'        => 'validation',
+            'message'     => 'Demande de validation' . ($validatorName ? " auprès de {$validatorName}" : '') . ($data['message'] ? " — {$data['message']}" : ''),
+            'statut_from' => $from,
+            'statut_to'   => 'preliminaire',
+        ]);
+
+        return response()->json($this->formatRapport($rapportBC->fresh()));
     }
 
     // ── Versions (upload fichier) ─────────────────────────────────────────────

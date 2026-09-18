@@ -17,3 +17,7 @@ export function canManageAppConfig(user: User | null | undefined): boolean {
   if (user.role === 'lab_admin') return true
   return (user.effective_permissions ?? []).includes('config.manage')
 }
+
+export function canViewMonitoringLogs(user: User | null | undefined): boolean {
+  return user?.role === 'lab_admin'
+}

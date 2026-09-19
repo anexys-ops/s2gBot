@@ -20,6 +20,12 @@ class Dossier extends Model
 
     public const STATUT_EN_COURS = 'en_cours';
 
+    public const STATUT_PLANIFIE = 'planifie';
+
+    public const STATUT_TERRAIN = 'terrain';
+
+    public const STATUT_EXPERTISE = 'expertise';
+
     public const STATUT_CLOTURE = 'cloture';
 
     public const STATUT_ARCHIVE = 'archive';
@@ -32,6 +38,9 @@ class Dossier extends Model
         return [
             self::STATUT_BROUILLON,
             self::STATUT_EN_COURS,
+            self::STATUT_PLANIFIE,
+            self::STATUT_TERRAIN,
+            self::STATUT_EXPERTISE,
             self::STATUT_CLOTURE,
             self::STATUT_ARCHIVE,
         ];
@@ -43,6 +52,8 @@ class Dossier extends Model
         'client_id',
         'site_id',
         'mission_id',
+        'lab_centre_group_id',
+        'lien_dossier_id',
         'statut',
         'date_debut',
         'date_fin_prevue',
@@ -92,6 +103,16 @@ class Dossier extends Model
     public function mission(): BelongsTo
     {
         return $this->belongsTo(Mission::class);
+    }
+
+    public function centreGroup(): BelongsTo
+    {
+        return $this->belongsTo(LabCentreGroup::class, 'lab_centre_group_id');
+    }
+
+    public function lienDossier(): BelongsTo
+    {
+        return $this->belongsTo(Dossier::class, 'lien_dossier_id');
     }
 
     public function createur(): BelongsTo

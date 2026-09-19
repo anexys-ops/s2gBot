@@ -1,14 +1,8 @@
 import { Link } from 'react-router-dom'
 import type { DossierRow } from '../../api/client'
+import StatusBadge, { dossierStatutBadgeProps } from '../ds/StatusBadge'
 
 type Props = { row: DossierRow; clientName?: string }
-
-const BADGE: Record<string, string> = {
-  brouillon: 'dossier-badge dossier-badge--brouillon',
-  en_cours: 'dossier-badge dossier-badge--cours',
-  cloture: 'dossier-badge dossier-badge--cloture',
-  archive: 'dossier-badge dossier-badge--archive',
-}
 
 export default function DossierCard({ row, clientName }: Props) {
   return (
@@ -20,7 +14,7 @@ export default function DossierCard({ row, clientName }: Props) {
             {row.titre}
           </h3>
         </div>
-        <span className={BADGE[row.statut] ?? 'dossier-badge'}>{row.statut}</span>
+        <StatusBadge {...dossierStatutBadgeProps(row.statut)} size="sm" />
       </div>
       <p className="text-muted" style={{ fontSize: '0.88rem', margin: '0.4rem 0' }}>
         {clientName ?? row.client?.name ?? 'Client #'.concat(String(row.client_id))}

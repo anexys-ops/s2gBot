@@ -850,7 +850,7 @@ export const catalogueApi = {
     ),
 }
 
-export type DossierStatut = 'brouillon' | 'en_cours' | 'cloture' | 'archive'
+export type DossierStatut = 'brouillon' | 'en_cours' | 'planifie' | 'terrain' | 'expertise' | 'cloture' | 'archive'
 
 export type DossierCreateInput = {
   titre: string

@@ -74,4 +74,11 @@ class RapportBC extends Model
     {
         return $this->belongsToMany(MissionTask::class, 'rapport_bc_taches', 'rapport_bc_id', 'mission_task_id');
     }
+
+    public function bonsLivraison(): BelongsToMany
+    {
+        return $this->belongsToMany(BonLivraison::class, 'bon_livraison_rapport_bcs', 'rapport_bc_id', 'bon_livraison_id')
+            ->withPivot('notes')
+            ->withTimestamps();
+    }
 }

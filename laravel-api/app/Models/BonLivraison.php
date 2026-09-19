@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -83,5 +84,12 @@ class BonLivraison extends Model
     public function lignes(): HasMany
     {
         return $this->hasMany(BonLivraisonLigne::class, 'bon_livraison_id');
+    }
+
+    public function rapportBcs(): BelongsToMany
+    {
+        return $this->belongsToMany(RapportBC::class, 'bon_livraison_rapport_bcs', 'bon_livraison_id', 'rapport_bc_id')
+            ->withPivot('notes')
+            ->withTimestamps();
     }
 }

@@ -9,6 +9,7 @@ import {
 const MODULE_CARDS: { key: PortalModuleKey; to: string; hint: string }[] = [
   { key: 'dossiers', to: '/portal/dossiers', hint: 'Consultez vos affaires et chantiers.' },
   { key: 'interventions', to: '/portal/interventions', hint: 'Interventions planifiées ou en cours sur vos sites.' },
+  { key: 'bons_livraison', to: '/portal/bons-livraison', hint: 'Accusez réception de vos bons de livraison et accédez aux rapports associés.' },
   { key: 'rapports', to: '/portal/rapports', hint: 'Téléchargez les rapports d\'essais signés ou émis.' },
   { key: 'devis', to: '/portal/devis', hint: 'Vos propositions commerciales.' },
   { key: 'factures', to: '/portal/factures', hint: 'Vos factures et documents comptables.' },

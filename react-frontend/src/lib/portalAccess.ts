@@ -6,6 +6,7 @@ export type PortalModuleKey =
   | 'dossiers'
   | 'interventions'
   | 'rapports'
+  | 'bons_livraison'
   | 'devis'
   | 'factures'
   | 'documents'
@@ -14,12 +15,13 @@ export const PORTAL_MODULE_LABELS: Record<PortalModuleKey, string> = {
   dossiers: 'Mes dossiers',
   interventions: 'Interventions (planifiées / en cours)',
   rapports: 'Rapports d\'essais livrés',
+  bons_livraison: 'Bons de livraison',
   devis: 'Devis',
   factures: 'Factures',
   documents: 'Documents partagés',
 }
 
-export const PORTAL_MODULE_DEFAULTS: PortalModuleKey[] = ['dossiers', 'interventions', 'rapports']
+export const PORTAL_MODULE_DEFAULTS: PortalModuleKey[] = ['dossiers', 'bons_livraison', 'rapports']
 
 export function isPortalUser(user: User | null | undefined): boolean {
   if (!user) return false

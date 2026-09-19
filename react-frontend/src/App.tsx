@@ -110,6 +110,8 @@ import PortalHomePage from './pages/portal/PortalHomePage'
 import PortalInterventionsPage from './pages/portal/PortalInterventionsPage'
 import PortalRapportsPage from './pages/portal/PortalRapportsPage'
 import PortalRapportViewPage from './pages/portal/PortalRapportViewPage'
+import PortalBonsLivraisonPage from './pages/portal/PortalBonsLivraisonPage'
+import PortalBLFichePage from './pages/portal/PortalBLFichePage'
 import { hasPortalModule, isPortalUser, type PortalModuleKey } from './lib/portalAccess'
 import { canAccessStaffPath, staffHomePath } from './lib/staffAccess'
 
@@ -200,6 +202,22 @@ function AppRoutes() {
           element={
             <PortalModuleRoute module="interventions">
               <PortalInterventionsPage />
+            </PortalModuleRoute>
+          }
+        />
+        <Route
+          path="bons-livraison"
+          element={
+            <PortalModuleRoute module="bons_livraison">
+              <PortalBonsLivraisonPage />
+            </PortalModuleRoute>
+          }
+        />
+        <Route
+          path="bons-livraison/:id"
+          element={
+            <PortalModuleRoute module="bons_livraison">
+              <PortalBLFichePage />
             </PortalModuleRoute>
           }
         />

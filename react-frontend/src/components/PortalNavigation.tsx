@@ -23,6 +23,9 @@ export default function PortalNavigation() {
     if (hasPortalModule(user, 'interventions')) {
       nav.push({ to: '/portal/interventions', label: 'Interventions', module: 'interventions' })
     }
+    if (hasPortalModule(user, 'bons_livraison')) {
+      nav.push({ to: '/portal/bons-livraison', label: 'Bons de livraison', module: 'bons_livraison' })
+    }
     if (hasPortalModule(user, 'rapports')) {
       nav.push({ to: '/portal/rapports', label: 'Rapports livrés', module: 'rapports' })
     }

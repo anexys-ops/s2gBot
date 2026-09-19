@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\BonLivraison;
 use App\Models\BonLivraisonLigne;
+use App\Models\RapportBC;
 use App\Services\BonLivraisonDeliveryService;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
@@ -57,7 +58,67 @@ class BonLivraisonController extends Controller
         if (! AgencyAccess::userMayAccessBonLivraison($request->user(), $bonLivraison)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
-        return response()->json($this->deliveryService->formatBonLivraison($bonLivraison));
+        $bonLivraison->load(['rapportBcs.versions' => fn ($q) => $q->latest('version_number')->limit(1)]);
+        $formatted = $this->deliveryService->formatBonLivraison($bonLivraison);
+        $formatted['rapport_bcs'] = $bonLivraison->rapportBcs->map(fn (RapportBC $r) => [
+            'id'        => $r->id,
+            'numero'    => $r->numero,
+            'titre'     => $r->titre,
+            'statut'    => $r->statut,
+            'notes'     => $r->pivot->notes,
+            'latest_version' => $r->versions->first() ? [
+                'id'           => $r->versions->first()->id,
+                'version_number' => $r->versions->first()->version_number,
+            ] : null,
+        ])->values()->all();
+
+        return response()->json($formatted);
+    }
+
+    public function addRapport(Request $request, BonLivraison $bonLivraison): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if (! AgencyAccess::userMayAccessBonLivraison($request->user(), $bonLivraison)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        $data = $request->validate([
+            'rapport_bc_id' => 'required|integer|exists:rapport_bcs,id',
+            'notes'         => 'sometimes|nullable|string|max:1000',
+        ]);
+        $rapport = RapportBC::findOrFail($data['rapport_bc_id']);
+        $bonLivraison->rapportBcs()->syncWithoutDetaching([
+            $rapport->id => ['notes' => $data['notes'] ?? null],
+        ]);
+
+        return response()->json(['message' => 'Rapport ajouté au BL.'], 200);
+    }
+
+    public function removeRapport(Request $request, BonLivraison $bonLivraison, RapportBC $rapportBC): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if (! AgencyAccess::userMayAccessBonLivraison($request->user(), $bonLivraison)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        $bonLivraison->rapportBcs()->detach($rapportBC->id);
+
+        return response()->json(null, 204);
+    }
+
+    public function accuserReception(Request $request, BonLivraison $bonLivraison): JsonResponse
+    {
+        if (! AgencyAccess::userMayAccessBonLivraison($request->user(), $bonLivraison)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if ($bonLivraison->statut !== BonLivraison::STATUT_LIVRE) {
+            return response()->json(['message' => 'Seul un BL livré peut être signé.'], 422);
+        }
+        $bonLivraison->update(['statut' => BonLivraison::STATUT_SIGNE]);
+
+        return response()->json($this->deliveryService->formatBonLivraison($bonLivraison->fresh()));
     }
 
     public function update(Request $request, BonLivraison $bonLivraison): JsonResponse

@@ -175,6 +175,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('bons-livraison/{bonLivraison}/valider', [BonLivraisonController::class, 'valider'])
             ->middleware('role:responsable')
             ->whereNumber('bonLivraison');
+        // Rapports liés au BL
+        Route::post('bons-livraison/{bonLivraison}/rapports', [BonLivraisonController::class, 'addRapport'])
+            ->whereNumber('bonLivraison');
+        Route::delete('bons-livraison/{bonLivraison}/rapports/{rapportBC}', [BonLivraisonController::class, 'removeRapport'])
+            ->whereNumber(['bonLivraison', 'rapportBC']);
+        // Accusé de réception portail client
+        Route::post('bons-livraison/{bonLivraison}/accuser-reception', [BonLivraisonController::class, 'accuserReception'])
+            ->whereNumber('bonLivraison');
         Route::get('reglements', [ReglementController::class, 'index']);
         Route::post('reglements', [ReglementController::class, 'store']);
         Route::get('reglements/{reglement}', [ReglementController::class, 'show'])->whereNumber('reglement');

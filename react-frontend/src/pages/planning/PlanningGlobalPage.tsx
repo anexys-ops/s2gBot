@@ -11,6 +11,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { planningApi } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import { getTaskStatutMeta } from '../../lib/missionTaskStatuts'
 
 type TabId = 'personnel' | 'materiel' | 'indispo'
 
@@ -91,10 +92,14 @@ export default function PlanningGlobalPage() {
           })),
         ...humanSlots
           .filter((s) => s.user_id === userId && s.date_debut <= d && s.date_fin >= d)
-          .map((s) => ({
-            label: s.missionTask ? `Tâche #${s.mission_task_id}` : s.type_evenement,
-            color: EVENT_COLORS[s.type_evenement] ?? '#6b7280',
-          })),
+          .map((s) => {
+            const taskStatut = s.missionTask?.statut
+            const taskMeta = taskStatut ? getTaskStatutMeta(taskStatut) : null
+            return {
+              label: s.missionTask ? `Tâche ${taskMeta?.label ?? ''} #${s.mission_task_id}` : s.type_evenement,
+              color: taskMeta ? taskMeta.color : (EVENT_COLORS[s.type_evenement] ?? '#6b7280'),
+            }
+          }),
         ...stockPerso
           .filter((s) => s.user_id === userId && s.date_debut <= d && s.date_fin >= d)
           .map((s) => ({ label: s.motif, color: EVENT_COLORS[s.motif] ?? '#6b7280' })),
@@ -104,10 +109,14 @@ export default function PlanningGlobalPage() {
       return [
         ...equipSlots
           .filter((s) => s.equipment_id === equipId && s.date_debut <= d && s.date_fin >= d)
-          .map((s) => ({
-            label: s.missionTask ? `Tâche #${s.mission_task_id}` : s.type_evenement,
-            color: EVENT_COLORS[s.type_evenement] ?? '#6b7280',
-          })),
+          .map((s) => {
+            const taskStatut = s.missionTask?.statut
+            const taskMeta = taskStatut ? getTaskStatutMeta(taskStatut) : null
+            return {
+              label: s.missionTask ? `Tâche ${taskMeta?.label ?? ''} #${s.mission_task_id}` : s.type_evenement,
+              color: taskMeta ? taskMeta.color : (EVENT_COLORS[s.type_evenement] ?? '#6b7280'),
+            }
+          }),
         ...stockEquip
           .filter((s) => s.equipment_id === equipId && s.date_debut <= d && s.date_fin >= d)
           .map((s) => ({ label: s.motif, color: EVENT_COLORS[s.motif] ?? '#6b7280' })),

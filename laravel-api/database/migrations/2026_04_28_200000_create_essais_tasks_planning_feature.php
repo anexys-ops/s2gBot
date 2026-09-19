@@ -55,7 +55,7 @@ return new class extends Migration
                 ->constrained('users')
                 ->nullOnDelete();
             $table->string('statut', 32)->default('todo')
-                ->comment('todo | in_progress | done | validated | rejected');
+                ->comment('todo | in_progress | paused | frozen | done | validated | rejected');
             $table->date('planned_date')->nullable();
             $table->date('due_date')->nullable();
             $table->timestamp('started_at')->nullable();

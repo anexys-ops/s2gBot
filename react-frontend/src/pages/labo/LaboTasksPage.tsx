@@ -8,16 +8,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { missionTasksApi, type ActionMeasureConfig, type MissionTask } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
+import { TASK_STATUT_META, getTaskStatutMeta } from '../../lib/missionTaskStatuts'
 
-const STATUT_META: Record<string, { label: string; color: string; bg: string }> = {
-  todo:        { label: 'À faire',    color: '#6b7280', bg: '#f3f4f6' },
-  in_progress: { label: 'En cours',   color: '#f59e0b', bg: '#fef3c7' },
-  paused:      { label: 'En pause',   color: '#8b5cf6', bg: '#ede9fe' },
-  frozen:      { label: 'Gelée',      color: '#0ea5e9', bg: '#e0f2fe' },
-  done:        { label: 'Terminé',    color: '#3b82f6', bg: '#dbeafe' },
-  validated:   { label: 'Validé',     color: '#10b981', bg: '#d1fae5' },
-  rejected:    { label: 'Rejeté',     color: '#ef4444', bg: '#fee2e2' },
-}
+const STATUT_META = TASK_STATUT_META
 
 function fmtDatetime(iso?: string | null): string {
   if (!iso) return '—'
@@ -211,7 +204,7 @@ function TaskCard({ task, canManage }: { task: MissionTask; canManage: boolean }
   const qc = useQueryClient()
 
   const configs = task.ordreMissionLigne?.articleAction?.measure_configs ?? []
-  const statut = STATUT_META[task.statut] ?? STATUT_META.todo
+  const statut = getTaskStatutMeta(task.statut)
 
   const updateMut = useMutation({
     mutationFn: (body: Partial<MissionTask>) => missionTasksApi.update(task.id, body),

@@ -5,16 +5,9 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { missionTasksApi, type MissionTask } from '../../api/client'
+import { getTaskStatutLabel } from '../../lib/missionTaskStatuts'
 
 export type TerrainHistoryGroupMode = 'name' | 'dossier' | 'day'
-
-const STATUT_LABELS: Record<string, string> = {
-  todo: 'À faire',
-  in_progress: 'En cours',
-  done: 'Terminé',
-  validated: 'Validé',
-  rejected: 'Rejeté',
-}
 
 const TYPE_LABELS: Record<string, string> = {
   technicien: 'Technicien',
@@ -112,7 +105,7 @@ function HistoryTaskRow({ task }: { task: MissionTask }) {
         </td>
         <td>{TYPE_LABELS[om?.type ?? ''] ?? om?.type ?? '—'}</td>
         <td>{task.assignedUser?.name ?? '—'}</td>
-        <td>{STATUT_LABELS[task.statut] ?? task.statut}</td>
+        <td>{getTaskStatutLabel(task.statut)}</td>
         <td>{formatDate(taskReferenceDate(task))}</td>
         <td>
           {task.is_conform === true && <span className="badge badge--ok">Conforme</span>}

@@ -10,21 +10,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { missionTasksApi, type ActionMeasureConfig, type MissionTask } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import TerrainTasksHistoryPanel, { type TerrainHistoryGroupMode, taskDisplayName } from './TerrainTasksHistoryPanel'
+import { TASK_STATUT_META, getTaskStatutMeta } from '../../lib/missionTaskStatuts'
 
 const TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
   technicien: { label: 'Technicien', color: '#f59e0b', bg: '#fef3c7' },
   ingenieur:  { label: 'Ingénieur',  color: '#3b82f6', bg: '#dbeafe' },
 }
 
-const STATUT_META: Record<string, { label: string; color: string }> = {
-  todo:        { label: 'À faire',  color: '#6b7280' },
-  in_progress: { label: 'En cours', color: '#f59e0b' },
-  paused:      { label: 'Pause',    color: '#7c3aed' },
-  frozen:      { label: 'Gelé',     color: '#0891b2' },
-  done:        { label: 'Terminé',  color: '#3b82f6' },
-  validated:   { label: 'Validé',   color: '#10b981' },
-  rejected:    { label: 'Rejeté',   color: '#ef4444' },
-}
+const STATUT_META = TASK_STATUT_META
 
 function MeasureInput({
   config,
@@ -82,7 +75,7 @@ function startedLabel(task: MissionTask): string {
   if (task.statut === 'done') return 'Terminée'
   if (task.statut === 'validated') return 'Validée'
   if (task.statut === 'rejected') return 'Rejetée'
-  return STATUT_META[task.statut]?.label ?? task.statut
+  return getTaskStatutMeta(task.statut).label
 }
 
 function TerrainTaskRow({ task }: { task: MissionTask }) {
@@ -95,7 +88,7 @@ function TerrainTaskRow({ task }: { task: MissionTask }) {
   const dossier = om?.dossier ?? om?.bonCommande?.dossier
   const type = om?.type ?? 'technicien'
   const typeMeta = TYPE_META[type] ?? TYPE_META.technicien
-  const statut = STATUT_META[task.statut] ?? STATUT_META.todo
+  const statut = getTaskStatutMeta(task.statut)
 
   const updateMut = useMutation({
     mutationFn: (body: Partial<MissionTask>) => missionTasksApi.update(task.id, body),
@@ -201,9 +194,47 @@ function TerrainTaskRow({ task }: { task: MissionTask }) {
               >
                 Terminer
               </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => updateMut.mutate({ statut: 'paused' })}
+                disabled={updateMut.isPending}
+                title="Mettre en pause"
+              >
+                ⏸
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => updateMut.mutate({ statut: 'frozen' })}
+                disabled={updateMut.isPending}
+                title="Geler la tâche"
+              >
+                ❄
+              </button>
             </div>
           )}
-          {(task.statut === 'done' || task.statut === 'validated') && (
+          {task.statut === 'paused' && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => updateMut.mutate({ statut: 'in_progress' })}
+              disabled={updateMut.isPending}
+            >
+              ▶ Reprendre
+            </button>
+          )}
+          {task.statut === 'frozen' && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => updateMut.mutate({ statut: 'in_progress' })}
+              disabled={updateMut.isPending}
+            >
+              ▶ Dégeler
+            </button>
+          )}
+          {(task.statut === 'done' || task.statut === 'validated' || task.statut === 'rejected') && (
             <span className="text-muted">—</span>
           )}
         </td>

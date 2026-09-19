@@ -5,6 +5,7 @@ import { rapportBCApi, documentPdfTemplatesApi, pdfApi, type RapportBCTask, type
 import { formatAppDate } from '../../lib/appLocale'
 import { useAuth } from '../../contexts/AuthContext'
 import { hasStaffCapability } from '../../lib/staffAccess'
+import { getTaskStatutMeta } from '../../lib/missionTaskStatuts'
 
 const STATUT_META: Record<string, { label: string; color: string; bg: string }> = {
   brouillon:    { label: 'Brouillon',    color: '#6b7280', bg: '#f3f4f6' },
@@ -23,13 +24,10 @@ function StatutBadge({ statut }: { statut: string }) {
 }
 
 function TaskStatutBadge({ statut }: { statut: string }) {
-  const map: Record<string, string> = {
-    todo: '#9ca3af', in_progress: '#3b82f6', paused: '#f59e0b',
-    frozen: '#6b7280', done: '#10b981', validated: '#8b5cf6', rejected: '#ef4444',
-  }
+  const meta = getTaskStatutMeta(statut)
   return (
-    <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 10, color: '#fff', background: map[statut] ?? '#9ca3af', whiteSpace: 'nowrap' }}>
-      {statut}
+    <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 10, color: meta.color, background: meta.bg, whiteSpace: 'nowrap' }}>
+      {meta.label}
     </span>
   )
 }

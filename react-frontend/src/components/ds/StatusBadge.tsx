@@ -35,15 +35,18 @@ export default function StatusBadge({
   )
 }
 
-/** Dossier chantier PROLAB : brouillon | en_cours | cloture | archive */
+/** Dossier chantier PROLAB : brouillon | en_cours | planifie | terrain | expertise | cloture | archive */
 export function dossierStatutBadgeProps(
   statut: string
 ): Pick<StatusBadgeProps, 'variant' | 'children'> & { label: string } {
   const map: Record<string, { label: string; variant: StatusBadgeVariant }> = {
-    brouillon: { label: 'Brouillon', variant: 'neutral' },
-    en_cours: { label: 'En cours', variant: 'info' },
-    cloture: { label: 'Clôturé', variant: 'success' },
-    archive: { label: 'Archivé', variant: 'neutral' },
+    brouillon:  { label: 'Brouillon',  variant: 'neutral' },
+    en_cours:   { label: 'En cours',   variant: 'warning' },
+    planifie:   { label: 'Planifié',   variant: 'info' },
+    terrain:    { label: 'Terrain',    variant: 'primary' },
+    expertise:  { label: 'Expertise',  variant: 'warning' },
+    cloture:    { label: 'Clôturé',   variant: 'success' },
+    archive:    { label: 'Archivé',   variant: 'neutral' },
   }
   const m = map[statut] ?? { label: statut, variant: 'neutral' as const }
   return { variant: m.variant, children: m.label, label: m.label }
@@ -117,7 +120,7 @@ export function bonLivraisonStatutBadgeProps(
   const map: Record<string, { label: string; variant: StatusBadgeVariant }> = {
     brouillon: { label: 'Brouillon', variant: 'neutral' },
     livre: { label: 'Livré', variant: 'success' },
-    signe: { label: 'Signé', variant: 'success' },
+    signe: { label: 'Signé', variant: 'info' },
   }
   const m = map[statut] ?? { label: statut, variant: 'neutral' as const }
   return { variant: m.variant, children: m.label, label: m.label }

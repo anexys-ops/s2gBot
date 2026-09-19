@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   clientsApi,
   dossiersApi,
+  labCentreGroupsApi,
   missionsApi,
   sitesApi,
   type Client,
@@ -16,12 +17,14 @@ import { useAuth } from '../../contexts/AuthContext'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import ClientSelectField from '../../components/clients/ClientSelectField'
 import SiteSelectField from '../../components/sites/SiteSelectField'
-import CentreGroupField from '../../components/centres/CentreGroupField'
 import { dateInputFromApi, todayLocalDateInput } from '../../lib/appLocale'
 
 const STATUTS: { v: DossierStatut; l: string }[] = [
   { v: 'brouillon', l: 'Brouillon' },
   { v: 'en_cours', l: 'En cours' },
+  { v: 'planifie', l: 'Planifié' },
+  { v: 'terrain', l: 'Terrain' },
+  { v: 'expertise', l: 'Expertise' },
   { v: 'cloture', l: 'Clôturé' },
   { v: 'archive', l: 'Archivé' },
 ]
@@ -108,6 +111,14 @@ export default function DossierNewPage() {
   })
 
   const missions = normalizeList<Mission>(missionsData)
+
+  const { data: centreGroupsData } = useQuery({
+    queryKey: ['lab-centre-groups'],
+    queryFn: () => labCentreGroupsApi.list(),
+    enabled: isLab,
+    staleTime: 300_000,
+  })
+  const centreGroups = centreGroupsData ?? []
 
   const { data: dossiersParSiteData, isLoading: dossiersParSiteLoading } = useQuery({
     queryKey: ['dossiers-site', siteId],
@@ -321,13 +332,23 @@ export default function DossierNewPage() {
                   </p>
                 ) : null}
               </div>
-              <div className="dossier-new-form__col-6">
-                <CentreGroupField
-                  id="dossier-centre"
-                  value={centreGroupId === '' ? undefined : centreGroupId}
-                  onChange={(id) => setCentreGroupId(id ?? '')}
-                />
-              </div>
+              {centreGroups.length > 0 ? (
+                <div className="dossier-new-form__col-6 form-group">
+                  <label htmlFor="dossier-centre">Centre</label>
+                  <select
+                    id="dossier-centre"
+                    value={centreGroupId === '' ? '' : String(centreGroupId)}
+                    onChange={(e) => setCentreGroupId(e.target.value === '' ? '' : Number(e.target.value))}
+                  >
+                    <option value="">— Non défini —</option>
+                    {centreGroups.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.code} — {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
             </div>
           </section>
 

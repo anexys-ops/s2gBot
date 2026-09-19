@@ -10,39 +10,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ordresMissionApi, type OrdreMission, type OrdreMissionLigne } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
 
-const STATUT_META: Record<string, { label: string; color: string; bg: string }> = {
-  brouillon: { label: 'Brouillon',  color: '#6b7280', bg: '#f3f4f6' },
-  planifie:  { label: 'Planifié',   color: '#8b5cf6', bg: '#ede9fe' },
-  en_cours:  { label: 'En cours',   color: '#3b82f6', bg: '#dbeafe' },
-  termine:   { label: 'Terminé',    color: '#10b981', bg: '#d1fae5' },
-  annule:    { label: 'Annulé',     color: '#ef4444', bg: '#fee2e2' },
-}
+const ODM_STATUTS = ['brouillon', 'planifie', 'en_cours', 'termine', 'annule'] as const
 
 const LIGNE_STATUT_META: Record<string, { label: string; color: string }> = {
   a_faire:  { label: 'À faire',   color: '#6b7280' },
   en_cours: { label: 'En cours',  color: '#3b82f6' },
   realise:  { label: 'Réalisé',   color: '#10b981' },
   annule:   { label: 'Annulé',    color: '#ef4444' },
-}
-
-function StatutBadge({ statut }: { statut: string }) {
-  const meta = STATUT_META[statut] ?? { label: statut, color: '#6b7280', bg: '#f3f4f6' }
-  return (
-    <span
-      style={{
-        padding: '0.15rem 0.55rem',
-        borderRadius: 12,
-        fontSize: '0.78rem',
-        fontWeight: 600,
-        color: meta.color,
-        background: meta.bg,
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {meta.label}
-    </span>
-  )
 }
 
 function LignesRow({ om }: { om: OrdreMission }) {
@@ -216,8 +192,8 @@ export default function LaboOdmPage() {
           style={{ flex: '1 1 160px', maxWidth: 200 }}
         >
           <option value="">— Tous statuts —</option>
-          {Object.entries(STATUT_META).map(([v, m]) => (
-            <option key={v} value={v}>{m.label}</option>
+          {ODM_STATUTS.map((v) => (
+            <option key={v} value={v}>{ordreMissionStatutBadgeProps(v).label}</option>
           ))}
         </select>
         {(statutFilter || search) && (
@@ -311,7 +287,7 @@ export default function LaboOdmPage() {
                         </td>
 
                         {/* Statut */}
-                        <td><StatutBadge statut={om.statut} /></td>
+                        <td><StatusBadge {...ordreMissionStatutBadgeProps(om.statut)} size="sm" /></td>
 
                         {/* Assigné à */}
                         <td style={{ fontSize: '0.88rem' }}>

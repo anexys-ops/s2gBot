@@ -20,6 +20,9 @@ import { formatAppDate } from '../../lib/appLocale'
 const STATUT_LABELS: Record<DossierStatut, string> = {
   brouillon: 'Brouillon',
   en_cours: 'En cours',
+  planifie: 'Planifié',
+  terrain: 'Terrain',
+  expertise: 'Expertise',
   cloture: 'Clôturé',
   archive: 'Archivé',
 }

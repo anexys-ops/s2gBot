@@ -55,7 +55,7 @@ export async function api<T>(
     const bodyStr = typeof options.body === 'string' ? options.body : null
     enqueueOfflineRequest(`${API_BASE}${path}`, method, bodyStr)
     throw new Error(
-      'Hors ligne : la requête est en file d’attente locale. Elle pourra être rejouée manuellement ou après reconnexion (fonction expérimentale).',
+      `Hors ligne : la requête est en file d'attente locale. Elle pourra être rejouée manuellement ou après reconnexion (fonction expérimentale).`,
     )
   }
 
@@ -714,7 +714,7 @@ export interface RefArticleRow {
   /** Étiquettes métier (import HFSQL / manuel) */
   tags?: string[] | null
   unite: string
-  /** Unité telle qu’importée / référence HFSQL (souvent alignée sur `unite`) */
+  /** Unité telle qu'importée / référence HFSQL (souvent alignée sur `unite`) */
   hfsql_unite?: string | null
   prix_unitaire_ht: string
   prix_revient_ht?: string | null
@@ -989,6 +989,15 @@ export type BonLivraisonLigne = {
   ordre?: number
 }
 
+export type BonLivraisonRapport = {
+  id: number
+  numero: string
+  titre: string | null
+  statut: string
+  notes: string | null
+  latest_version: { id: number; version_number: number } | null
+}
+
 export type BonLivraison = {
   id: number
   numero: string
@@ -1000,7 +1009,7 @@ export type BonLivraison = {
   date_livraison: string
   notes?: string | null
   lignes?: BonLivraisonLigne[]
-  /** Structure devis (jalons / parcours) pour l’affichage groupé des lignes. */
+  /** Structure devis (jalons / parcours) pour l'affichage groupé des lignes. */
   devis_display_meta?: EntityMetaPayload | null
   client?: { id: number; name: string }
   clientContact?: ClientContactRow
@@ -1011,6 +1020,7 @@ export type BonLivraison = {
   autres_bons_livraison?: Array<Pick<BonLivraison, 'id' | 'numero' | 'statut' | 'date_livraison'>>
   lab_centre_group_id?: number | null
   centre_group?: { id: number; code: string; name: string } | null
+  rapport_bcs?: BonLivraisonRapport[]
 }
 
 export const dossiersApi = {
@@ -1177,6 +1187,12 @@ export const bonsLivraisonApi = {
   ) => api<BonLivraison>(`/v1/bons-livraison/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   valider: (id: number) => api<BonLivraison>(`/v1/bons-livraison/${id}/valider`, { method: 'POST' }),
   delete: (id: number) => api<null>(`/v1/bons-livraison/${id}`, { method: 'DELETE' }),
+  addRapport: (id: number, body: { rapport_bc_id: number; notes?: string }) =>
+    api<{ message: string }>(`/v1/bons-livraison/${id}/rapports`, { method: 'POST', body: JSON.stringify(body) }),
+  removeRapport: (id: number, rapportBcId: number) =>
+    api<null>(`/v1/bons-livraison/${id}/rapports/${rapportBcId}`, { method: 'DELETE' }),
+  accuserReception: (id: number) =>
+    api<BonLivraison>(`/v1/bons-livraison/${id}/accuser-reception`, { method: 'POST' }),
 }
 
 export type GlobalSearchResult = { id: number; type: string; label: string; sub: string; url: string }
@@ -1459,7 +1475,7 @@ export interface EquipmentRow {
   id: number
   name: string
   code: string
-  /** Numéro d’inventaire (parc matériel) */
+  /** Numéro d'inventaire (parc matériel) */
   numero_inventaire?: string | null
   type?: string | null
   brand?: string | null
@@ -2373,7 +2389,7 @@ export const statsApi = {
 export type EntityMetaPayload = {
   indicateurs?: Record<string, string>
   champs_perso?: Record<string, string>
-  /** Ordre d’affichage : enchaîner lignes et jalons (produit, jalon, produit, …). */
+  /** Ordre d'affichage : enchaîner lignes et jalons (produit, jalon, produit, …). */
   devis_parcours?: Array<{ kind: 'ligne' | 'jalon'; id: string }>
   /** Jalons devis (optionnel) : libellé, montant, lien offre ou article PROLAB */
   devis_jalons?: Array<{
@@ -2398,7 +2414,7 @@ export type EntityMetaPayload = {
     /** IDs catalogue des produits rattachés (persistant après enregistrement). */
     product_ref_article_ids?: number[]
   }>
-  /** Tarif forfaitaire lorsqu’il n’y a pas de lignes article (optionnel) */
+  /** Tarif forfaitaire lorsqu'il n'y a pas de lignes article (optionnel) */
   tarif_global_hors_lignes_ht?: number
   /** Désignation de la ligne forfaitaire globale (PDF) */
   tarif_global_designation?: string
@@ -2410,7 +2426,7 @@ export type EntityMetaPayload = {
   tarif_global_unite?: string
   /** Un booléen par ligne (même ordre) : ne pas afficher le prix sur le PDF */
   ligne_masque_prix_pdf?: boolean[]
-  /** Frais complémentaires (brouillon / PDF — le recalcul API n’intègre que port & déplacement) */
+  /** Frais complémentaires (brouillon / PDF — le recalcul API n'intègre que port & déplacement) */
   frais_supplementaires?: Array<{
     id?: string
     description: string
@@ -2897,9 +2913,9 @@ export interface Client {
   phone?: string
   whatsapp?: string | null
   siret?: string
-  /** Maroc — Identifiant Commun de l’Entreprise */
+  /** Maroc — Identifiant Commun de l'Entreprise */
   ice?: string | null
-  /** Régime TVA CA annuel : 25 % récupérable, 75 % reversée à l’État */
+  /** Régime TVA CA annuel : 25 % récupérable, 75 % reversée à l'État */
   ca_annuel_tva_regime?: boolean
   rc?: string | null
   patente?: string | null

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { bonsLivraisonApi, rapportBCApi } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import Modal from '../../components/Modal'
 import { QuotePdfButton } from '../../components/crm/QuoteListTableActions'
 import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
 import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
@@ -82,6 +83,8 @@ export default function BonLivraisonFichePage() {
   }, [bl?.id, serverLignesKey])
 
   const canEdit = lab && bl?.statut === 'brouillon'
+  const canManageRapports = lab && bl?.statut !== 'signe'
+  const canPdf = lab && (bl?.statut === 'brouillon' || bl?.statut === 'livre')
   const statutBadge = useMemo(
     () => (bl ? bonLivraisonStatutBadgeProps(bl.statut) : null),
     [bl?.statut],
@@ -299,17 +302,19 @@ export default function BonLivraisonFichePage() {
         </span>
       }
       actions={
-        lab && canEdit ? (
+        lab ? (
           <div className="bc-fiche__header-actions">
-            <QuotePdfButton onClick={() => setPdfOpen(true)} />
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => setConfirmValider(true)}
-              disabled={mutValider.isPending}
-            >
-              Valider le BL
-            </button>
+            {canPdf && <QuotePdfButton onClick={() => setPdfOpen(true)} />}
+            {canEdit && (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => setConfirmValider(true)}
+                disabled={mutValider.isPending}
+              >
+                Valider le BL
+              </button>
+            )}
           </div>
         ) : null
       }
@@ -673,7 +678,7 @@ export default function BonLivraisonFichePage() {
                           {r.titre && <div style={{ fontSize: '0.82rem', color: '#374151' }}>{r.titre}</div>}
                           {r.notes && <div style={{ fontSize: '0.78rem', color: '#6b7280', fontStyle: 'italic' }}>{r.notes}</div>}
                         </div>
-                        {canEdit && (
+                        {canManageRapports && (
                           <button
                             type="button"
                             className="btn btn-secondary btn-sm"
@@ -693,7 +698,7 @@ export default function BonLivraisonFichePage() {
                 ) : (
                   <p className="text-muted" style={{ fontSize: '0.85rem', margin: 0 }}>Aucun rapport lié.</p>
                 )}
-                {canEdit && bl.bon_commande_id && (
+                {canManageRapports && bl.bon_commande_id && (
                   <div className="bc-fiche__aside-actions" style={{ marginTop: '0.75rem' }}>
                     <button
                       type="button"
@@ -742,7 +747,7 @@ export default function BonLivraisonFichePage() {
         <Toast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} />
       ) : null}
 
-      {pdfOpen && bl ? (
+      {pdfOpen && bl && canPdf ? (
         <DocumentPdfPickerModal
           documentType="delivery_note"
           documentId={bl.id}
@@ -751,67 +756,62 @@ export default function BonLivraisonFichePage() {
         />
       ) : null}
 
-      {addRapportOpen && (
-        <div className="modal-overlay" role="dialog" aria-modal aria-labelledby="add-rapport-title">
-          <div className="modal modal--sm">
-            <div className="modal__header">
-              <h2 id="add-rapport-title" className="modal__title">Ajouter un rapport au BL</h2>
-              <button type="button" className="modal__close" aria-label="Fermer" onClick={() => setAddRapportOpen(false)}>✕</button>
-            </div>
-            <div className="modal__body">
-              {!bl.bon_commande_id ? (
-                <p className="text-muted">Ce BL n'est pas lié à un bon de commande — impossible de rechercher des rapports.</p>
-              ) : (
-                <>
-                  <div className="form-group">
-                    <label htmlFor="rapport-select">Rapport à ajouter</label>
-                    <select
-                      id="rapport-select"
-                      value={selectedRapportId}
-                      onChange={(e) => setSelectedRapportId(Number(e.target.value) || '')}
-                    >
-                      <option value="">— Choisir un rapport —</option>
-                      {availableRapports
-                        .filter((r) => !(bl.rapport_bcs ?? []).some((linked) => linked.id === r.id))
-                        .map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.numero}{r.titre ? ` — ${r.titre}` : ''} ({r.statut})
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="rapport-notes">Notes (optionnel)</label>
-                    <textarea
-                      id="rapport-notes"
-                      value={rapportNotes}
-                      onChange={(e) => setRapportNotes(e.target.value)}
-                      rows={2}
-                      placeholder="Ex. Version préliminaire incluse"
-                    />
-                  </div>
-                </>
+      {addRapportOpen && bl && (
+        <Modal title="Ajouter un rapport au BL" onClose={() => { if (!mutAddRapport.isPending) { setAddRapportOpen(false); setSelectedRapportId(''); setRapportNotes('') } }}>
+          {!bl.bon_commande_id ? (
+            <p className="text-muted">Ce BL n'est pas lié à un bon de commande — impossible de rechercher des rapports.</p>
+          ) : (
+            <>
+              <div className="form-group">
+                <label htmlFor="rapport-select">Rapport à ajouter</label>
+                <select
+                  id="rapport-select"
+                  value={selectedRapportId}
+                  onChange={(e) => setSelectedRapportId(Number(e.target.value) || '')}
+                >
+                  <option value="">— Choisir un rapport —</option>
+                  {availableRapports
+                    .filter((r) => !(bl.rapport_bcs ?? []).some((linked) => linked.id === r.id))
+                    .map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.numero}{r.titre ? ` — ${r.titre}` : ''} ({r.statut})
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="rapport-notes">Notes (optionnel)</label>
+                <textarea
+                  id="rapport-notes"
+                  value={rapportNotes}
+                  onChange={(e) => setRapportNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Ex. Version préliminaire incluse"
+                />
+              </div>
+              {mutAddRapport.isError && (
+                <p className="error">{(mutAddRapport.error as Error).message}</p>
               )}
-            </div>
-            <div className="modal__footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setAddRapportOpen(false)}>
-                Annuler
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={!selectedRapportId || mutAddRapport.isPending}
-                onClick={() => {
-                  if (selectedRapportId) {
-                    mutAddRapport.mutate({ rapportId: Number(selectedRapportId), notes: rapportNotes })
-                  }
-                }}
-              >
-                {mutAddRapport.isPending ? 'Ajout…' : 'Ajouter'}
-              </button>
-            </div>
-          </div>
-        </div>
+              <div className="crud-actions" style={{ marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={!selectedRapportId || mutAddRapport.isPending}
+                  onClick={() => {
+                    if (selectedRapportId) {
+                      mutAddRapport.mutate({ rapportId: Number(selectedRapportId), notes: rapportNotes })
+                    }
+                  }}
+                >
+                  {mutAddRapport.isPending ? 'Ajout…' : 'Ajouter'}
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setAddRapportOpen(false); setSelectedRapportId(''); setRapportNotes('') }}>
+                  Annuler
+                </button>
+              </div>
+            </>
+          )}
+        </Modal>
       )}
     </ModuleEntityShell>
   )

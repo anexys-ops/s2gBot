@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { bonsLivraisonApi } from '../../api/client'
+import { bonsLivraisonApi, rapportBCApi } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { QuotePdfButton } from '../../components/crm/QuoteListTableActions'
 import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
@@ -43,6 +43,9 @@ export default function BonLivraisonFichePage() {
   const [confirmValider, setConfirmValider] = useState(false)
   const [pdfOpen, setPdfOpen] = useState(false)
   const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
+  const [addRapportOpen, setAddRapportOpen] = useState(false)
+  const [selectedRapportId, setSelectedRapportId] = useState<number | ''>('')
+  const [rapportNotes, setRapportNotes] = useState('')
 
   const { data: bl, isLoading, error } = useQuery({
     queryKey: ['bon-livraison', blId],
@@ -169,6 +172,39 @@ export default function BonLivraisonFichePage() {
         message: toastErrorMessage(err, 'Échec de la validation du BL.'),
         variant: 'error',
       })
+    },
+  })
+
+  const { data: availableRapports = [] } = useQuery({
+    queryKey: ['rapport-bc', 'by-bc', bl?.bon_commande_id],
+    queryFn: () => rapportBCApi.listByBc(bl!.bon_commande_id!),
+    enabled: addRapportOpen && !!bl?.bon_commande_id,
+    staleTime: 60_000,
+  })
+
+  const mutAddRapport = useMutation({
+    mutationFn: ({ rapportId, notes }: { rapportId: number; notes: string }) =>
+      bonsLivraisonApi.addRapport(blId, { rapport_bc_id: rapportId, notes: notes || undefined }),
+    onSuccess: () => {
+      setAddRapportOpen(false)
+      setSelectedRapportId('')
+      setRapportNotes('')
+      setToast({ message: 'Rapport ajouté au bon de livraison.', variant: 'success' })
+      void qc.invalidateQueries({ queryKey: ['bon-livraison', blId] })
+    },
+    onError: (err) => {
+      setToast({ message: (err as Error).message ?? 'Erreur lors de l\'ajout du rapport.', variant: 'error' })
+    },
+  })
+
+  const mutRemoveRapport = useMutation({
+    mutationFn: (rapportId: number) => bonsLivraisonApi.removeRapport(blId, rapportId),
+    onSuccess: () => {
+      setToast({ message: 'Rapport retiré du bon de livraison.', variant: 'success' })
+      void qc.invalidateQueries({ queryKey: ['bon-livraison', blId] })
+    },
+    onError: (err) => {
+      setToast({ message: (err as Error).message ?? 'Erreur lors du retrait du rapport.', variant: 'error' })
     },
   })
 
@@ -619,6 +655,59 @@ export default function BonLivraisonFichePage() {
             ) : null}
 
             {lab ? (
+              <section className="card bc-fiche__aside-panel">
+                <h2 className="ds-form-section__title">
+                  Rapports liés
+                  {(bl.rapport_bcs?.length ?? 0) > 0 && (
+                    <span style={{ marginLeft: '0.4rem', fontSize: '0.8rem', fontWeight: 400, color: '#6b7280' }}>
+                      ({bl.rapport_bcs!.length})
+                    </span>
+                  )}
+                </h2>
+                {bl.rapport_bcs?.length ? (
+                  <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {bl.rapport_bcs.map((r) => (
+                      <li key={r.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', padding: '0.4rem 0', borderBottom: '1px solid #f3f4f6' }}>
+                        <div>
+                          <code style={{ fontSize: '0.82rem' }}>{r.numero}</code>
+                          {r.titre && <div style={{ fontSize: '0.82rem', color: '#374151' }}>{r.titre}</div>}
+                          {r.notes && <div style={{ fontSize: '0.78rem', color: '#6b7280', fontStyle: 'italic' }}>{r.notes}</div>}
+                        </div>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            style={{ flexShrink: 0, padding: '0.1rem 0.4rem', fontSize: '0.75rem', color: '#ef4444', borderColor: '#ef4444' }}
+                            onClick={() => {
+                              if (window.confirm(`Retirer le rapport ${r.numero} du BL ?`)) {
+                                mutRemoveRapport.mutate(r.id)
+                              }
+                            }}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-muted" style={{ fontSize: '0.85rem', margin: 0 }}>Aucun rapport lié.</p>
+                )}
+                {canEdit && bl.bon_commande_id && (
+                  <div className="bc-fiche__aside-actions" style={{ marginTop: '0.75rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setAddRapportOpen(true)}
+                    >
+                      + Ajouter un rapport
+                    </button>
+                  </div>
+                )}
+              </section>
+            ) : null}
+
+            {lab ? (
               <ExtrafieldsForm
                 entityType="bon_livraison"
                 entityId={bl.id}
@@ -661,6 +750,69 @@ export default function BonLivraisonFichePage() {
           onClose={() => setPdfOpen(false)}
         />
       ) : null}
+
+      {addRapportOpen && (
+        <div className="modal-overlay" role="dialog" aria-modal aria-labelledby="add-rapport-title">
+          <div className="modal modal--sm">
+            <div className="modal__header">
+              <h2 id="add-rapport-title" className="modal__title">Ajouter un rapport au BL</h2>
+              <button type="button" className="modal__close" aria-label="Fermer" onClick={() => setAddRapportOpen(false)}>✕</button>
+            </div>
+            <div className="modal__body">
+              {!bl.bon_commande_id ? (
+                <p className="text-muted">Ce BL n'est pas lié à un bon de commande — impossible de rechercher des rapports.</p>
+              ) : (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="rapport-select">Rapport à ajouter</label>
+                    <select
+                      id="rapport-select"
+                      value={selectedRapportId}
+                      onChange={(e) => setSelectedRapportId(Number(e.target.value) || '')}
+                    >
+                      <option value="">— Choisir un rapport —</option>
+                      {availableRapports
+                        .filter((r) => !(bl.rapport_bcs ?? []).some((linked) => linked.id === r.id))
+                        .map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.numero}{r.titre ? ` — ${r.titre}` : ''} ({r.statut})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="rapport-notes">Notes (optionnel)</label>
+                    <textarea
+                      id="rapport-notes"
+                      value={rapportNotes}
+                      onChange={(e) => setRapportNotes(e.target.value)}
+                      rows={2}
+                      placeholder="Ex. Version préliminaire incluse"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="modal__footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setAddRapportOpen(false)}>
+                Annuler
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!selectedRapportId || mutAddRapport.isPending}
+                onClick={() => {
+                  if (selectedRapportId) {
+                    mutAddRapport.mutate({ rapportId: Number(selectedRapportId), notes: rapportNotes })
+                  }
+                }}
+              >
+                {mutAddRapport.isPending ? 'Ajout…' : 'Ajouter'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </ModuleEntityShell>
   )
 }

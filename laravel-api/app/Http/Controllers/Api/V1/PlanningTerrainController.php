@@ -7,6 +7,7 @@ use App\Models\BcLignePlanningAffectation;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
 use App\Models\User;
+use App\Services\TerrainPlanningBcLinesService;
 use App\Services\TerrainPlanningPdfGenerator;
 use App\Support\AgencyAccess;
 use App\Support\UserPresentation;
@@ -126,7 +127,7 @@ class PlanningTerrainController extends Controller
         return response()->json($rows);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, TerrainPlanningBcLinesService $planningLines): JsonResponse
     {
         if (! $request->user()->isLab()) {
             return response()->json(['message' => 'Non autorisé'], 403);
@@ -151,6 +152,9 @@ class PlanningTerrainController extends Controller
         }
         if ($ligne->bonCommande->statut === BonCommande::STATUT_ANNULE) {
             return response()->json(['message' => 'Impossible de planifier une ligne d\'un bon de commande annulé.'], 422);
+        }
+        if (! $planningLines->contains($ligne->bonCommande, (int) $ligne->id)) {
+            return response()->json(['message' => 'Cette ligne ne correspond pas à une tâche terrain de ce bon de commande.'], 422);
         }
 
         $this->assertAssignmentWithinLigneWindow($ligne, $data['date_debut'], $data['date_fin']);

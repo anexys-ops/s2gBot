@@ -1236,6 +1236,14 @@ button.link-inline.invoice-number-btn {
   line-height: 1.25;
 }
 
+.terrain-planning__jalon-row td {
+  padding: 0.7rem 0.8rem;
+  border-top: 2px solid #9fb2ca;
+  background: #edf3fa;
+  color: #1d4676;
+  letter-spacing: 0.01em;
+}
+
 @media (max-width: 920px) {
   .terrain-planning__week-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

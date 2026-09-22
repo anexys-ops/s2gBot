@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { bonsCommandeApi, planningTerrainApi, type BonCommande } from '../../api/client'
@@ -106,6 +106,24 @@ export default function PlanningTechniciensPage() {
     }))
   }, [selectedBc])
 
+  const unpositionedGroups = useMemo(() => {
+    if (!selectedBc) return []
+    if (selectedBc.planning_terrain_groups?.length) {
+      return selectedBc.planning_terrain_groups.map((group) => ({
+        ...group,
+        lignes: group.lignes.map((ligne) => ({
+          ...ligne,
+          bc_id: selectedBc.id,
+          bc_numero: selectedBc.numero,
+          bc_statut: selectedBc.statut,
+        })),
+      }))
+    }
+    return unpositionedLignes.length > 0
+      ? [{ jalon: { id: 'standalone', label: 'Tâches terrain hors jalon' }, lignes: unpositionedLignes }]
+      : []
+  }, [selectedBc, unpositionedLignes])
+
   const createUnposMut = useMutation({
     mutationFn: (ligneId: number) => planningTerrainApi.create({
       bon_commande_ligne_id: ligneId,
@@ -176,7 +194,7 @@ export default function PlanningTechniciensPage() {
         <section className="card terrain-planning__unassigned" style={{ marginBottom: '1.5rem' }}>
           <h2 className="h2" style={{ fontSize: '1.05rem', marginBottom: '0.75rem' }}>Bons de commande non affectés</h2>
           <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-            Choisissez un BC pour afficher uniquement ses lignes encore sans affectation terrain.
+            Choisissez un BC pour afficher uniquement ses tâches terrain encore sans affectation, classées par jalon.
           </p>
           <label>
             BC non affecté
@@ -194,11 +212,11 @@ export default function PlanningTechniciensPage() {
 
           {unposBcFilter === '' ? (
             <p className="text-muted" style={{ margin: '0.75rem 0 0' }}>
-              La liste des lignes s’affichera après la sélection d’un BC.
+              Les tâches terrain s’afficheront après la sélection d’un BC.
             </p>
           ) : null}
           {unposBcFilter !== '' && unpositionedLignes.length === 0 ? (
-            <p className="text-muted" style={{ margin: '0.75rem 0 0' }}>Toutes les lignes de ce BC sont affectées.</p>
+            <p className="text-muted" style={{ margin: '0.75rem 0 0' }}>Toutes les tâches terrain de ce BC sont affectées.</p>
           ) : null}
 
           {unpositionedLignes.length > 0 ? (
@@ -206,66 +224,76 @@ export default function PlanningTechniciensPage() {
               <table className="data-table data-table--compact" style={{ width: '100%' }}>
                 <thead>
                   <tr>
-                    <th>BC</th><th>Statut</th><th>Ligne</th><th>Technicien</th><th>Début</th><th>Fin</th><th>Notes</th><th>Action</th>
+                    <th>BC</th><th>Statut</th><th>Tâche terrain</th><th>Technicien</th><th>Début</th><th>Fin</th><th>Notes</th><th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {unpositionedLignes.map((ligne) => (
-                    <tr key={ligne.id}>
-                      <td><Link to={`/bons-commande/${ligne.bc_id}`} className="link-inline">{ligne.bc_numero}</Link></td>
-                      <td><StatusBadge {...bonCommandeStatutBadgeProps(ligne.bc_statut)} /></td>
-                      <td>{ligne.libelle}</td>
-                      <td>
-                        <select
-                          value={unposUserIdMap[ligne.id] ?? ''}
-                          onChange={(event) => setUnposUserIdMap((current) => ({
-                            ...current,
-                            [ligne.id]: event.target.value ? Number(event.target.value) : '',
-                          }))}
-                        >
-                          <option value="">—</option>
-                          {(techniciens ?? []).map((item) => (
-                            <option key={item.id} value={item.id}>{formatTechnicienOption(item)}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        <input
-                          type="date"
-                          value={unposDebutMap[ligne.id] || toYmd(new Date())}
-                          onChange={(event) => {
-                            const value = event.target.value
-                            setUnposDebutMap((current) => ({ ...current, [ligne.id]: value }))
-                            setUnposFinMap((current) => ({ ...current, [ligne.id]: value }))
-                          }}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="date"
-                          value={unposFinMap[ligne.id] || unposDebutMap[ligne.id] || toYmd(new Date())}
-                          onChange={(event) => setUnposFinMap((current) => ({ ...current, [ligne.id]: event.target.value }))}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="text"
-                          value={unposNotesMap[ligne.id] || ''}
-                          onChange={(event) => setUnposNotesMap((current) => ({ ...current, [ligne.id]: event.target.value }))}
-                          placeholder="Notes"
-                        />
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          disabled={createUnposMut.isPending || !unposUserIdMap[ligne.id]}
-                          onClick={() => createUnposMut.mutate(ligne.id)}
-                        >
-                          {createUnposMut.isPending && createUnposMut.variables === ligne.id ? 'Création…' : 'Créer'}
-                        </button>
-                      </td>
-                    </tr>
+                  {unpositionedGroups.map((group) => (
+                    <Fragment key={group.jalon.id}>
+                      <tr className="terrain-planning__jalon-row">
+                        <td colSpan={8}>
+                          {group.jalon.code ? <strong>{group.jalon.code} — </strong> : null}
+                          <strong>{group.jalon.label}</strong>
+                        </td>
+                      </tr>
+                      {group.lignes.map((ligne) => (
+                        <tr key={ligne.id}>
+                          <td><Link to={`/bons-commande/${ligne.bc_id}`} className="link-inline">{ligne.bc_numero}</Link></td>
+                          <td><StatusBadge {...bonCommandeStatutBadgeProps(ligne.bc_statut)} /></td>
+                          <td>{ligne.libelle}</td>
+                          <td>
+                            <select
+                              value={unposUserIdMap[ligne.id] ?? ''}
+                              onChange={(event) => setUnposUserIdMap((current) => ({
+                                ...current,
+                                [ligne.id]: event.target.value ? Number(event.target.value) : '',
+                              }))}
+                            >
+                              <option value="">—</option>
+                              {(techniciens ?? []).map((item) => (
+                                <option key={item.id} value={item.id}>{formatTechnicienOption(item)}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              type="date"
+                              value={unposDebutMap[ligne.id] || toYmd(new Date())}
+                              onChange={(event) => {
+                                const value = event.target.value
+                                setUnposDebutMap((current) => ({ ...current, [ligne.id]: value }))
+                                setUnposFinMap((current) => ({ ...current, [ligne.id]: value }))
+                              }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="date"
+                              value={unposFinMap[ligne.id] || unposDebutMap[ligne.id] || toYmd(new Date())}
+                              onChange={(event) => setUnposFinMap((current) => ({ ...current, [ligne.id]: event.target.value }))}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              value={unposNotesMap[ligne.id] || ''}
+                              onChange={(event) => setUnposNotesMap((current) => ({ ...current, [ligne.id]: event.target.value }))}
+                              placeholder="Notes"
+                            />
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              disabled={createUnposMut.isPending || !unposUserIdMap[ligne.id]}
+                              onClick={() => createUnposMut.mutate(ligne.id)}
+                            >
+                              {createUnposMut.isPending && createUnposMut.variables === ligne.id ? 'Création…' : 'Créer'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

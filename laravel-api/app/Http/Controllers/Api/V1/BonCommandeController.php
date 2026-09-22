@@ -11,6 +11,7 @@ use App\Services\BonCommandeTotalsService;
 use App\Services\BonLivraisonDeliveryService;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\CommercialDocumentWorkflowService;
+use App\Services\TerrainPlanningBcLinesService;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +23,7 @@ class BonCommandeController extends Controller
         private readonly CommercialDocumentWorkflowService $workflow,
         private readonly BonLivraisonDeliveryService $delivery,
         private readonly BonCommandeTotalsService $totals,
+        private readonly TerrainPlanningBcLinesService $terrainPlanningLines,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -66,7 +68,14 @@ class BonCommandeController extends Controller
             });
         }
         if ($request->user()->isLab()) {
-            return response()->json($q->get());
+            $rows = $q->get();
+            if ($unassignedPlanning) {
+                $rows = $rows
+                    ->filter(fn (BonCommande $bonCommande) => $this->terrainPlanningLines->prepare($bonCommande))
+                    ->values();
+            }
+
+            return response()->json($rows);
         }
         if (! $request->user()->client_id) {
             return response()->json(['message' => 'Non autorisé'], 403);

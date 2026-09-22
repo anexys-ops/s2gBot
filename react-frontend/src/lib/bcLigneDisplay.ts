@@ -47,6 +47,17 @@ export function collectForfaitRefArticleIds(meta?: EntityMetaPayload | null): Se
   return ids
 }
 
+/** Ligne de détail informative déjà comprise dans le prix forfaitaire du document ou du jalon. */
+export function isNonBillableForfaitBcLigne(
+  ligne: Pick<BonCommandeLigne, 'ref_article_id'>,
+  meta?: EntityMetaPayload | null,
+): boolean {
+  const refId = ligne.ref_article_id != null ? Number(ligne.ref_article_id) : 0
+  if (refId <= 0) return false
+  if (isDocumentForfaitMeta(meta) && Number(meta?.tarif_global_hors_lignes_ht ?? 0) > 0) return true
+  return collectForfaitRefArticleIds(meta).has(refId)
+}
+
 /** Ligne BC rattachée à un forfait document ou jalon forfait (meta devis source). */
 export function isForfaitBcLigne(
   ligne: Pick<BonCommandeLigne, 'ref_article_id'>,

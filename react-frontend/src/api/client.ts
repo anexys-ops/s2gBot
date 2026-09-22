@@ -3284,7 +3284,7 @@ export interface OrdreMissionLigne {
   assignedUser?: { id: number; name: string } | null
   equipment?: { id: number; name: string; code?: string } | null
   articleAction?: ArticleAction | null
-  article?: { id: number; code: string; libelle: string } | null
+  article?: { id: number; code: string; libelle: string; unite?: string | null } | null
 }
 
 export interface OrdreMission {
@@ -3513,7 +3513,7 @@ export interface MissionTask {
   validated_by?: number | null
   notes?: string | null
   pv_numbers?: string[] | null
-  quantity_unit?: 'echantillon' | 'point' | null
+  quantity_unit?: string | null
   quantity_count?: number | null
   reception_generated_at?: string | null
   ordered_quantity?: number
@@ -3524,7 +3524,7 @@ export interface MissionTask {
   assignedUser?: { id: number; name: string; email?: string }
   ordreMissionLigne?: OrdreMissionLigne & {
     ordreMission?: OrdreMission
-    article?: { id: number; code: string; libelle: string }
+    article?: { id: number; code: string; libelle: string; unite?: string | null }
     articleAction?: ArticleAction & { measure_configs?: ActionMeasureConfig[] }
   }
   measures?: TaskMeasure[]
@@ -3567,7 +3567,7 @@ export function normalizeMissionTask(raw: MissionTaskApiRaw): MissionTask {
             })(),
           } as OrdreMission)
         : undefined,
-      article: articleRaw as { id: number; code: string; libelle: string } | undefined,
+      article: articleRaw as { id: number; code: string; libelle: string; unite?: string | null } | undefined,
       articleAction: articleActionRaw
         ? ({
             ...(articleActionRaw as unknown as ArticleAction),
@@ -3658,7 +3658,7 @@ export const missionTasksApi = {
   get: async (id: number) => normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}`)),
   update: async (id: number, body: Partial<MissionTask>) =>
     normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}`, { method: 'PUT', body: JSON.stringify(body) })),
-  closeReception: async (id: number, body: { pv_numbers: string[]; quantity_unit: 'echantillon' | 'point'; quantity_count: number }) => {
+  closeReception: async (id: number, body: { pv_numbers: string[]; quantity_unit: string; quantity_count: number }) => {
     const result = await api<{ task: MissionTaskApiRaw; samples_created: number; remaining_quantity: number }>(`/mission-tasks/${id}/close-reception`, { method: 'POST', body: JSON.stringify(body) })
     return { ...result, task: normalizeMissionTask(result.task) }
   },

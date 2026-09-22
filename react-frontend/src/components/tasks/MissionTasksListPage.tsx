@@ -62,6 +62,33 @@ export function taskDelayDays(
   return days > 0 ? days : 0
 }
 
+export function normalizePvNumbers(values: string | string[]): string[] {
+  const entries = (Array.isArray(values) ? values : [values])
+    .flatMap((value) => value.split(/[\n,;]+/))
+    .map((value) => value.trim())
+    .filter(Boolean)
+
+  const seen = new Set<string>()
+  return entries.filter((value) => {
+    const key = value.toLocaleLowerCase('fr')
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+export function taskQuantityUnit(task: MissionTask, context: MissionTasksContext): { value: string; source: string } {
+  const taskUnit = task.quantity_unit?.trim()
+  if (taskUnit) return { value: taskUnit, source: 'Tâche' }
+
+  const articleUnit = task.ordreMissionLigne?.article?.unite?.trim()
+  if (articleUnit) return { value: articleUnit, source: 'Produit' }
+
+  return context === 'labo'
+    ? { value: 'echantillon', source: 'Valeur par défaut' }
+    : { value: 'point', source: 'Valeur par défaut' }
+}
+
 function taskLabel(task: MissionTask): string {
   const ligne = task.ordreMissionLigne
   return ligne?.articleAction?.libelle || ligne?.libelle || ligne?.article?.libelle || 'Tâche sans libellé'
@@ -87,10 +114,18 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
   const [assignedUserId, setAssignedUserId] = useState(task.assigned_user_id ? String(task.assigned_user_id) : '')
   const [plannedDate, setPlannedDate] = useState(taskReferenceDate(task))
   const [statut, setStatut] = useState(task.statut)
-  const [pvText, setPvText] = useState((task.pv_numbers ?? []).join('\n'))
-  const [quantityUnit, setQuantityUnit] = useState<'echantillon' | 'point'>(task.quantity_unit ?? (context === 'labo' ? 'echantillon' : 'point'))
+  const [pvNumbers, setPvNumbers] = useState(() => normalizePvNumbers(task.pv_numbers ?? []))
+  const [pvDraft, setPvDraft] = useState('')
+  const quantityUnit = taskQuantityUnit(task, context)
   const [quantityCount, setQuantityCount] = useState(String(task.quantity_count ?? Math.min(1, task.remaining_quantity ?? 1)))
   const [message, setMessage] = useState('')
+
+  const addPvNumbers = () => {
+    const next = normalizePvNumbers([...pvNumbers, pvDraft])
+    setPvNumbers(next)
+    setPvDraft('')
+    return next
+  }
 
   const { data: technicians = [] } = useQuery({
     queryKey: ['task-technicians', context],
@@ -114,8 +149,8 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
 
   const closeReception = useMutation({
     mutationFn: () => missionTasksApi.closeReception(task.id, {
-      pv_numbers: pvText.split(/[\n,;]+/).map((value) => value.trim()).filter(Boolean),
-      quantity_unit: quantityUnit,
+      pv_numbers: normalizePvNumbers([...pvNumbers, pvDraft]),
+      quantity_unit: quantityUnit.value,
       quantity_count: Number(quantityCount),
     }),
     onSuccess: async (result) => {
@@ -133,7 +168,7 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
   })
 
   const error = save.error || closeReception.error || duplicate.error
-  const pvCount = pvText.split(/[\n,;]+/).map((value) => value.trim()).filter(Boolean).length
+  const pvCount = normalizePvNumbers([...pvNumbers, pvDraft]).length
   const maxQuantity = task.reception_generated_at ? (task.quantity_count ?? 1) : (task.remaining_quantity ?? task.ordered_quantity ?? 1)
 
   return (
@@ -157,17 +192,46 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
           </select>
         </label>
         <label>Unité de quantité
-          <select value={quantityUnit} onChange={(event) => setQuantityUnit(event.target.value as 'echantillon' | 'point')} disabled={Boolean(task.reception_generated_at)}>
-            <option value="echantillon">Échantillon</option>
-            <option value="point">Point</option>
-          </select>
+          <span className="mission-task-modal__unit">
+            <strong>{quantityUnit.value}</strong>
+            <small>{quantityUnit.source}</small>
+          </span>
         </label>
         <label>Nombre d’étiquettes
           <input type="number" min={1} max={maxQuantity} value={quantityCount} onChange={(event) => setQuantityCount(event.target.value)} disabled={Boolean(task.reception_generated_at)} />
           <span className="text-muted">Commandé : {task.ordered_quantity ?? '—'} · Déjà réceptionné : {task.received_quantity ?? 0} · Reliquat : {task.remaining_quantity ?? '—'}</span>
         </label>
         <label className="mission-task-modal__pv">Numéro(s) de PV
-          <textarea rows={4} value={pvText} onChange={(event) => setPvText(event.target.value)} placeholder="Un numéro par ligne" />
+          {pvNumbers.length > 0 ? (
+            <span className="mission-task-modal__badges" aria-label="Numéros de PV ajoutés">
+              {pvNumbers.map((pv) => (
+                <span key={pv.toLocaleLowerCase('fr')} className="mission-task-modal__badge">
+                  {pv}
+                  {!task.reception_generated_at ? (
+                    <button type="button" aria-label={`Supprimer le PV ${pv}`} onClick={() => setPvNumbers((current) => current.filter((value) => value !== pv))}>×</button>
+                  ) : null}
+                </span>
+              ))}
+            </span>
+          ) : null}
+          {!task.reception_generated_at ? (
+            <span className="mission-task-modal__pv-entry">
+              <input
+                type="text"
+                value={pvDraft}
+                onChange={(event) => setPvDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ',' || event.key === ';') {
+                    event.preventDefault()
+                    addPvNumbers()
+                  }
+                }}
+                onBlur={() => { if (pvDraft.trim()) addPvNumbers() }}
+                placeholder="Saisir un numéro de PV"
+              />
+              <button type="button" className="btn btn--secondary" disabled={!pvDraft.trim()} onMouseDown={(event) => event.preventDefault()} onClick={addPvNumbers}>Ajouter</button>
+            </span>
+          ) : null}
           <span className="text-muted">{pvCount} numéro{pvCount !== 1 ? 's' : ''} de PV saisi{pvCount !== 1 ? 's' : ''}</span>
         </label>
       </div>

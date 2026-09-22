@@ -28,7 +28,6 @@ type MenuGroupId =
   | 'laboratoire'
   | 'materiel'
   | 'ingenierie'
-  | 'rapport-bc'
   | 'catalogue'
   | 'configuration'
   | 'rapports'
@@ -115,8 +114,6 @@ function isGroupActive(id: MenuGroupId, pathname: string): boolean {
       return isMaterielActive(pathname)
     case 'ingenierie':
       return isIngenerieActive(pathname)
-    case 'rapport-bc':
-      return pathname.startsWith('/rapport-bc')
     case 'catalogue':
       return isCatalogueActive(pathname)
     case 'configuration':
@@ -196,6 +193,7 @@ export default function AppNavigation() {
         items: filterItems([
           { to: '/terrain/chantiers', label: 'Chantiers et carte GPS', module: 'terrain' },
           { to: '/terrain/mesures', label: 'Mesures terrain', module: 'terrain' },
+          { to: '/rapport-bc', label: 'Rapports de mission', module: 'rapport-bc' },
           { to: '/notes-de-frais', label: 'Notes de frais', module: 'terrain' },
         ]),
       },
@@ -206,6 +204,7 @@ export default function AppNavigation() {
         items: filterItems([
           { to: '/labo/reception', label: 'Réception (FOLD)', module: 'laboratoire' },
           { to: '/labo/rapports', label: "Rapports d'essais", module: 'laboratoire' },
+          { to: '/rapport-bc', label: 'Rapports de mission', module: 'rapport-bc' },
           { to: '/labo/fiches', label: 'Fiches techniques', module: 'laboratoire' },
           { to: '/labo/transco', label: 'Transco FOLD', module: 'laboratoire', permission: 'config.manage' },
         ]),
@@ -229,14 +228,7 @@ export default function AppNavigation() {
             : []),
           { to: '/ingenierie/taches', label: 'Tâches ingénieur', module: 'ingenierie' },
           { to: '/ingenierie/planning', label: 'Planning ingénieur', module: 'ingenierie' },
-        ]),
-      },
-      {
-        id: 'rapport-bc',
-        label: 'Rapport',
-        module: 'rapport-bc',
-        items: filterItems([
-          { to: '/rapport-bc', label: 'Rapports de mission', module: 'rapport-bc' as StaffModuleKey },
+          { to: '/rapport-bc', label: 'Rapports de mission', module: 'rapport-bc' },
         ]),
       },
       {

@@ -11281,6 +11281,18 @@ a.catalogue-tree__link-article:hover {
   font-weight: 800;
 }
 
+.om-lignes-table__jalon-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.om-lignes-table__jalon-title {
+  white-space: nowrap;
+}
+
 .om-lignes-table__jalon-qty {
   display: inline-flex;
   margin-left: 0.75rem;
@@ -11302,6 +11314,42 @@ a.catalogue-tree__link-article:hover {
   justify-content: flex-end;
   gap: 0.4rem;
   white-space: nowrap;
+}
+
+.om-lignes-table__qty-input {
+  width: 5.5rem;
+  min-width: 5.5rem;
+  font-size: 0.82rem;
+}
+
+.om-jalon-bulk {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  flex: 1 1 42rem;
+  font-weight: 500;
+}
+
+.om-jalon-bulk label {
+  display: grid;
+  gap: 0.18rem;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.68rem;
+}
+
+.om-jalon-bulk input,
+.om-jalon-bulk select {
+  min-height: 2rem;
+  font-size: 0.78rem;
+}
+
+.om-jalon-bulk input[type='number'] {
+  width: 5.25rem;
+}
+
+.om-jalon-bulk select {
+  max-width: 12rem;
 }
 
 .om-availability {
@@ -11400,6 +11448,19 @@ a.catalogue-tree__link-article:hover {
   box-shadow: inset 0 0 0 2px #2563eb;
 }
 
+.om-availability__day--task-load {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.om-availability__task-count {
+  display: block;
+  margin-top: 0.18rem;
+  color: #374151;
+  font-size: 0.62rem;
+  line-height: 1.15;
+}
+
 .om-availability__events {
   display: flex;
   gap: 0.18rem;
@@ -11418,6 +11479,7 @@ a.catalogue-tree__link-article:hover {
 .om-availability__event--current { background: #2563eb; }
 .om-availability__event--busy { background: #f59e0b; }
 .om-availability__event--unavailable { background: #dc2626; }
+.om-availability__event--task-load { background: #6b7280; }
 
 .om-availability__loading {
   margin: 0;
@@ -11456,5 +11518,11 @@ a.catalogue-tree__link-article:hover {
 
   .om-availability__header {
     flex-direction: column;
+  }
+
+  .om-jalon-bulk {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
   }
 }

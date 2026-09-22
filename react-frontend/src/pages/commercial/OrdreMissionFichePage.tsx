@@ -27,7 +27,11 @@ import {
   ordreMissionQuote,
 } from '../../lib/ordreMissionDisplay'
 import { resolveDevisDisplayMeta } from '../../lib/bcLigneDisplay'
-import { buildOrdreMissionLigneGroups, ordreMissionLigneQuantite } from '../../lib/ordreMissionLigneDisplay'
+import {
+  buildOrdreMissionLigneGroups,
+  ordreMissionLigneQuantite,
+  type OrdreMissionLigneGroup,
+} from '../../lib/ordreMissionLigneDisplay'
 
 const TYPE_META: Record<string, { label: string; color: string }> = {
   labo: { label: 'Laboratoire', color: '#10b981' },
@@ -45,15 +49,26 @@ type OmDraft = {
 }
 
 type LigneDraft = {
+  quantite: string
   assigned_user_id: number | null
   date_prevue: string
   statut: OrdreMissionLigne['statut']
+}
+
+type BulkLignePatch = Pick<OrdreMissionLigne, 'quantite'> &
+  Partial<Pick<OrdreMissionLigne, 'assigned_user_id' | 'date_prevue' | 'statut'>>
+
+type BulkAvailability = {
+  ligneId: number
+  userId: number
+  plannedDate: string
 }
 
 function buildDraftsFromOm(om: OrdreMission): { omDraft: OmDraft; ligneDrafts: Record<number, LigneDraft> } {
   const ligneDrafts: Record<number, LigneDraft> = {}
   for (const ligne of om.lignes ?? []) {
     ligneDrafts[ligne.id] = {
+      quantite: String(ligne.quantite ?? ''),
       assigned_user_id: ligne.assigned_user_id ?? null,
       date_prevue: dateInputFromApi(ligne.date_prevue),
       statut: ligne.statut,
@@ -75,11 +90,108 @@ function computeIsDirty(om: OrdreMission, omDraft: OmDraft, ligneDrafts: Record<
   for (const ligne of om.lignes ?? []) {
     const draft = ligneDrafts[ligne.id]
     if (!draft) continue
+    if (Number(draft.quantite) !== Number(ligne.quantite)) return true
     if (draft.assigned_user_id !== (ligne.assigned_user_id ?? null)) return true
     if (draft.date_prevue !== dateInputFromApi(ligne.date_prevue)) return true
     if (draft.statut !== ligne.statut) return true
   }
   return false
+}
+
+function JalonBulkControls({
+  group,
+  users,
+  pending,
+  onApply,
+  onPreview,
+}: {
+  group: OrdreMissionLigneGroup
+  users: User[]
+  pending: boolean
+  onApply: (patch: BulkLignePatch) => void
+  onPreview: (userId: number, plannedDate: string) => void
+}) {
+  const [quantite, setQuantite] = useState(
+    String(group.jalon?.quantite ?? group.lignes[0]?.quantite ?? ''),
+  )
+  const [assignedUserId, setAssignedUserId] = useState<number | ''>('')
+  const [plannedDate, setPlannedDate] = useState('')
+  const [statut, setStatut] = useState<OrdreMissionLigne['statut'] | ''>('')
+  const parsedQuantity = Number(quantite)
+  const canApply = quantite !== '' && Number.isFinite(parsedQuantity) && parsedQuantity > 0
+
+  function preview(nextUserId = assignedUserId, nextDate = plannedDate) {
+    if (nextUserId !== '') onPreview(nextUserId, nextDate)
+  }
+
+  return (
+    <div className="om-jalon-bulk" aria-label={`Saisie en masse pour ${group.jalon?.label ?? 'le jalon'}`}>
+      <label>
+        <span>Qté</span>
+        <input
+          type="number"
+          min="0.001"
+          step="any"
+          value={quantite}
+          onChange={(event) => setQuantite(event.target.value)}
+          disabled={pending}
+          aria-label={`Quantité en masse pour ${group.jalon?.label ?? 'le jalon'}`}
+        />
+      </label>
+      <label>
+        <span>Technicien</span>
+        <select
+          value={assignedUserId}
+          onChange={(event) => {
+            const nextValue = event.target.value ? Number(event.target.value) : ''
+            setAssignedUserId(nextValue)
+            preview(nextValue, plannedDate)
+          }}
+          disabled={pending}
+        >
+          <option value="">Ne pas modifier</option>
+          {users.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
+      </label>
+      <label>
+        <span>Date</span>
+        <input
+          type="date"
+          value={plannedDate}
+          onChange={(event) => {
+            setPlannedDate(event.target.value)
+            preview(assignedUserId, event.target.value)
+          }}
+          disabled={pending}
+        />
+      </label>
+      <label>
+        <span>Statut</span>
+        <select
+          value={statut}
+          onChange={(event) => setStatut(event.target.value as OrdreMissionLigne['statut'] | '')}
+          disabled={pending}
+        >
+          <option value="">Ne pas modifier</option>
+          {STATUTS_LIGNE.map((item) => <option key={item} value={item}>{item.replace('_', ' ')}</option>)}
+        </select>
+      </label>
+      <button
+        type="button"
+        className="btn btn-primary btn-sm"
+        disabled={!canApply || pending}
+        onClick={() => {
+          const patch: BulkLignePatch = { quantite: parsedQuantity }
+          if (assignedUserId !== '') patch.assigned_user_id = assignedUserId
+          if (plannedDate) patch.date_prevue = plannedDate
+          if (statut) patch.statut = statut
+          onApply(patch)
+        }}
+      >
+        {pending ? 'Validation…' : `Valider (${group.lignes.length})`}
+      </button>
+    </div>
+  )
 }
 
 export default function OrdreMissionFichePage() {
@@ -91,6 +203,7 @@ export default function OrdreMissionFichePage() {
   const [showAddLigne, setShowAddLigne] = useState(false)
   const [deleteLigneTarget, setDeleteLigneTarget] = useState<OrdreMissionLigne | null>(null)
   const [availabilityLigneId, setAvailabilityLigneId] = useState<number | null>(null)
+  const [bulkAvailability, setBulkAvailability] = useState<BulkAvailability | null>(null)
 
   const { data: om, isLoading, error } = useQuery({
     queryKey: ['ordre-mission', omId],
@@ -112,6 +225,14 @@ export default function OrdreMissionFichePage() {
     if (!om || !omDraft) return false
     return computeIsDirty(om, omDraft, ligneDrafts)
   }, [om, omDraft, ligneDrafts])
+
+  const hasInvalidLineQuantity = useMemo(
+    () => Object.values(ligneDrafts).some((draft) => {
+      const value = Number(draft.quantite)
+      return draft.quantite === '' || !Number.isFinite(value) || value <= 0
+    }),
+    [ligneDrafts],
+  )
 
   const { data: frais = [] } = useQuery({
     queryKey: ['ordre-mission-frais', omId],
@@ -147,10 +268,12 @@ export default function OrdreMissionFichePage() {
       if (Object.keys(omBody).length > 0) {
         await ordresMissionApi.update(omId, omBody)
       }
+      const lineUpdates: Array<Partial<OrdreMissionLigne> & { id: number }> = []
       for (const ligne of om.lignes ?? []) {
         const draft = ligneDrafts[ligne.id]
         if (!draft) continue
         const body: Partial<OrdreMissionLigne> = {}
+        if (Number(draft.quantite) !== Number(ligne.quantite)) body.quantite = Number(draft.quantite)
         if (draft.assigned_user_id !== (ligne.assigned_user_id ?? null)) {
           body.assigned_user_id = draft.assigned_user_id
         }
@@ -158,10 +281,9 @@ export default function OrdreMissionFichePage() {
           body.date_prevue = draft.date_prevue || null
         }
         if (draft.statut !== ligne.statut) body.statut = draft.statut
-        if (Object.keys(body).length > 0) {
-          await ordresMissionApi.updateLigne(omId, ligne.id, body)
-        }
+        if (Object.keys(body).length > 0) lineUpdates.push({ id: ligne.id, ...body })
       }
+      if (lineUpdates.length > 0) await ordresMissionApi.updateLignes(omId, lineUpdates)
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
@@ -206,6 +328,7 @@ export default function OrdreMissionFichePage() {
     const draft = ligneDrafts[ligne.id]
     if (!draft) return {}
     const body: Partial<OrdreMissionLigne> = {}
+    if (Number(draft.quantite) !== Number(ligne.quantite)) body.quantite = Number(draft.quantite)
     if (draft.assigned_user_id !== (ligne.assigned_user_id ?? null)) body.assigned_user_id = draft.assigned_user_id
     if (draft.date_prevue !== dateInputFromApi(ligne.date_prevue)) body.date_prevue = draft.date_prevue || null
     if (draft.statut !== ligne.statut) body.statut = draft.statut
@@ -215,6 +338,20 @@ export default function OrdreMissionFichePage() {
   const saveLigneMut = useMutation({
     mutationFn: ({ ligne }: { ligne: OrdreMissionLigne }) =>
       ordresMissionApi.updateLigne(omId, ligne.id, ligneUpdateBody(ligne)),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
+      void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
+      void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+      void qc.invalidateQueries({ queryKey: ['om-availability'] })
+    },
+  })
+
+  const saveGroupMut = useMutation({
+    mutationFn: ({ group, patch }: { group: OrdreMissionLigneGroup; patch: BulkLignePatch }) =>
+      ordresMissionApi.updateLignes(
+        omId,
+        group.lignes.map((ligne) => ({ id: ligne.id, ...patch })),
+      ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
       void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
@@ -285,11 +422,14 @@ export default function OrdreMissionFichePage() {
     bcLignes,
     resolveDevisDisplayMeta(bonCommande),
   )
-  const availabilityLigne = (om.lignes ?? []).find((ligne) => ligne.id === availabilityLigneId) ?? null
+  const selectedAvailabilityLigneId = bulkAvailability?.ligneId ?? availabilityLigneId
+  const availabilityLigne = (om.lignes ?? []).find((ligne) => ligne.id === selectedAvailabilityLigneId) ?? null
   const availabilityDraft = availabilityLigne ? ligneDrafts[availabilityLigne.id] : null
-  const availabilityUser = availabilityDraft?.assigned_user_id
-    ? users.find((item) => item.id === availabilityDraft.assigned_user_id)
+  const availabilityUserId = bulkAvailability?.userId ?? availabilityDraft?.assigned_user_id ?? null
+  const availabilityUser = availabilityUserId
+    ? users.find((item) => item.id === availabilityUserId)
     : null
+  const availabilityDate = bulkAvailability?.plannedDate ?? availabilityDraft?.date_prevue ?? ''
 
   return (
     <ModuleEntityShell
@@ -333,6 +473,7 @@ export default function OrdreMissionFichePage() {
             isPending={saveMut.isPending}
             isSuccess={saveMut.isSuccess}
             isDirty={isDirty}
+            disabled={hasInvalidLineQuantity}
             onClick={() => saveMut.mutate()}
           />
           <button
@@ -518,11 +659,28 @@ export default function OrdreMissionFichePage() {
                   {group.jalon ? (
                     <tr className="om-lignes-table__jalon">
                       <td colSpan={isLab ? 8 : 7}>
-                        <span className="om-lignes-table__jalon-code">{group.jalon.code}</span>
-                        {group.jalon.code ? ' — ' : ''}{group.jalon.label}
-                        {group.jalon.quantite != null ? (
-                          <span className="om-lignes-table__jalon-qty">Qté BC : {group.jalon.quantite}</span>
-                        ) : null}
+                        <div className="om-lignes-table__jalon-content">
+                          <div className="om-lignes-table__jalon-title">
+                            <span className="om-lignes-table__jalon-code">{group.jalon.code}</span>
+                            {group.jalon.code ? ' — ' : ''}{group.jalon.label}
+                            {group.jalon.quantite != null ? (
+                              <span className="om-lignes-table__jalon-qty">Qté BC : {group.jalon.quantite}</span>
+                            ) : null}
+                          </div>
+                          {isLab ? (
+                            <JalonBulkControls
+                              key={`${group.key}-${group.jalon.quantite ?? ''}`}
+                              group={group}
+                              users={users}
+                              pending={saveGroupMut.isPending && saveGroupMut.variables?.group.key === group.key}
+                              onApply={(patch) => saveGroupMut.mutate({ group, patch })}
+                              onPreview={(userId, plannedDate) => {
+                                const firstLine = group.lignes[0]
+                                if (firstLine) setBulkAvailability({ ligneId: firstLine.id, userId, plannedDate })
+                              }}
+                            />
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ) : null}
@@ -530,6 +688,8 @@ export default function OrdreMissionFichePage() {
                     const draft = ligneDrafts[ligne.id]
                     if (!draft) return null
                     const ligneDirty = Object.keys(ligneUpdateBody(ligne)).length > 0
+                    const quantityValue = Number(draft.quantite)
+                    const quantityValid = draft.quantite !== '' && Number.isFinite(quantityValue) && quantityValue > 0
                     const isSavingThisLine = saveLigneMut.isPending && saveLigneMut.variables?.ligne.id === ligne.id
                     return (
                       <tr key={ligne.id} className={group.jalon ? 'om-lignes-table__task--nested' : undefined}>
@@ -551,15 +711,32 @@ export default function OrdreMissionFichePage() {
                             '—'
                           )}
                         </td>
-                        <td>{ordreMissionLigneQuantite(ligne, bcLignesById)}</td>
+                        <td>
+                          {isLab ? (
+                            <input
+                              type="number"
+                              min="0.001"
+                              step="any"
+                              value={draft.quantite}
+                              onChange={(event) => updateLigneDraft(ligne.id, { quantite: event.target.value })}
+                              disabled={saveMut.isPending || isSavingThisLine}
+                              className="om-lignes-table__qty-input"
+                              aria-label={`Quantité pour ${ligne.libelle}`}
+                            />
+                          ) : ordreMissionLigneQuantite(ligne, bcLignesById)}
+                        </td>
                         <td>
                           <select
                             value={draft.assigned_user_id ?? ''}
-                            onFocus={() => setAvailabilityLigneId(ligne.id)}
+                            onFocus={() => {
+                              setBulkAvailability(null)
+                              setAvailabilityLigneId(ligne.id)
+                            }}
                             onChange={(e) => {
                               updateLigneDraft(ligne.id, {
                                 assigned_user_id: e.target.value ? Number(e.target.value) : null,
                               })
+                              setBulkAvailability(null)
                               setAvailabilityLigneId(ligne.id)
                             }}
                             disabled={saveMut.isPending || isSavingThisLine}
@@ -582,7 +759,10 @@ export default function OrdreMissionFichePage() {
                           <input
                             type="date"
                             value={draft.date_prevue}
-                            onFocus={() => setAvailabilityLigneId(ligne.id)}
+                            onFocus={() => {
+                              setBulkAvailability(null)
+                              setAvailabilityLigneId(ligne.id)
+                            }}
                             onChange={(e) => updateLigneDraft(ligne.id, { date_prevue: e.target.value })}
                             disabled={saveMut.isPending || isSavingThisLine}
                             style={{ fontSize: '0.82rem' }}
@@ -608,7 +788,7 @@ export default function OrdreMissionFichePage() {
                               <button
                                 type="button"
                                 className="btn btn-primary btn-sm"
-                                disabled={!ligneDirty || saveLigneMut.isPending || deleteLigneMut.isPending}
+                                disabled={!ligneDirty || !quantityValid || saveLigneMut.isPending || deleteLigneMut.isPending}
                                 onClick={() => saveLigneMut.mutate({ ligne })}
                               >
                                 {isSavingThisLine ? 'Validation…' : 'Valider'}
@@ -641,13 +821,19 @@ export default function OrdreMissionFichePage() {
         </p>
       ) : null}
 
-      {availabilityLigne && availabilityDraft?.assigned_user_id && availabilityUser ? (
+      {saveGroupMut.isError ? (
+        <p className="error" style={{ margin: '-0.35rem 0 1rem' }}>
+          {(saveGroupMut.error as Error).message}
+        </p>
+      ) : null}
+
+      {availabilityLigne && availabilityUserId && availabilityUser ? (
         <OmAvailabilityPanel
-          key={`${availabilityLigne.id}-${availabilityDraft.assigned_user_id}`}
-          userId={availabilityDraft.assigned_user_id}
+          key={`${availabilityLigne.id}-${availabilityUserId}`}
+          userId={availabilityUserId}
           userName={availabilityUser.name}
           equipment={availabilityLigne.equipment}
-          plannedDate={availabilityDraft.date_prevue}
+          plannedDate={availabilityDate}
         />
       ) : null}
 

@@ -454,6 +454,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('ordres-mission/{ordre_mission}', [OrdreMissionController::class, 'update']);
     Route::delete('ordres-mission/{ordre_mission}', [OrdreMissionController::class, 'destroy']);
     Route::post('ordres-mission/{ordre_mission}/lignes', [OrdreMissionController::class, 'storeLigne']);
+    Route::put('ordres-mission/{ordre_mission}/lignes', [OrdreMissionController::class, 'updateLignes']);
     Route::put('ordres-mission/{ordre_mission}/lignes/{ligne}', [OrdreMissionController::class, 'updateLigne']);
     Route::delete('ordres-mission/{ordre_mission}/lignes/{ligne}', [OrdreMissionController::class, 'destroyLigne']);
     Route::get('ordres-mission/{ordre_mission}/frais', [OrdreMissionController::class, 'fraisIndex']);

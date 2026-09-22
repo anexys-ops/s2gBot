@@ -66,5 +66,5 @@ export function ordreMissionLigneQuantite(
   bcLignesById: ReadonlyMap<number, BonCommandeLigne>,
 ): string | number {
   const sourceId = Number(ligne.bon_commande_ligne_id ?? 0)
-  return bcLignesById.get(sourceId)?.quantite ?? ligne.quantite
+  return ligne.quantite ?? bcLignesById.get(sourceId)?.quantite ?? 0
 }

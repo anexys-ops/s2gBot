@@ -12,6 +12,7 @@ use App\Models\Dossier;
 use App\Models\MissionTask;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
+use App\Models\PlanningHuman;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,11 +34,48 @@ class MissionTaskTerrainBoardTest extends TestCase
             ->assertJsonPath('statut', OrdreMission::STATUT_EN_COURS);
 
         $this->assertSame(1, MissionTask::query()->count());
+        $this->assertNotNull($om->fresh()->date_debut);
 
         $this->actingAs($lab, 'sanctum')
             ->getJson('/api/mission-tasks/terrain?active_only=1')
             ->assertOk()
             ->assertJsonCount(1);
+    }
+
+    public function test_validating_an_om_line_syncs_task_planning_and_bc_quantity(): void
+    {
+        [$om, $lab] = $this->seedTechnicienOm();
+        $ligne = $om->lignes()->firstOrFail();
+        $technicien = User::factory()->create(['role' => User::ROLE_LAB_TECHNICIAN]);
+        $ligne->bonCommandeLigne()->update(['quantite' => 4]);
+
+        $this->actingAs($lab, 'sanctum')
+            ->putJson("/api/ordres-mission/{$om->id}/lignes/{$ligne->id}", [
+                'assigned_user_id' => $technicien->id,
+                'date_prevue' => '2026-09-24',
+                'statut' => 'en_cours',
+            ])
+            ->assertOk()
+            ->assertJsonPath('assigned_user_id', $technicien->id)
+            ->assertJsonPath('statut', 'en_cours');
+
+        $task = MissionTask::query()->where('ordre_mission_ligne_id', $ligne->id)->firstOrFail();
+        $this->assertSame(MissionTask::STATUT_IN_PROGRESS, $task->statut);
+        $this->assertSame(OrdreMission::STATUT_EN_COURS, $om->fresh()->statut);
+        $this->assertDatabaseHas('planning_humans', [
+            'mission_task_id' => $task->id,
+            'user_id' => $technicien->id,
+            'date_debut' => '2026-09-24 00:00:00',
+            'date_fin' => '2026-09-24 00:00:00',
+        ]);
+
+        $this->actingAs($lab, 'sanctum')
+            ->getJson("/api/ordres-mission/{$om->id}")
+            ->assertOk()
+            ->assertJsonPath('lignes.0.quantite', 4);
+
+        $this->assertSame(4.0, (float) $ligne->fresh()->quantite);
+        $this->assertSame(1, PlanningHuman::query()->where('mission_task_id', $task->id)->count());
     }
 
     public function test_terrain_board_active_only_excludes_brouillon_om(): void

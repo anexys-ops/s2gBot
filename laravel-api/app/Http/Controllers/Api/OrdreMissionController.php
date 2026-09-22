@@ -10,6 +10,8 @@ use App\Models\ExpenseLine;
 use App\Models\MissionTask;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
+use App\Models\PlanningEquipment;
+use App\Models\PlanningHuman;
 use App\Services\ExpenseReportService;
 use App\Services\OrdreMissionFromBonCommandeService;
 use App\Support\AgencyAccess;
@@ -31,7 +33,7 @@ class OrdreMissionController extends Controller
         'lignes.equipment:id,name,code',
         'lignes.articleAction',
         'lignes.article:id,code,libelle',
-        'lignes.bonCommandeLigne:id,libelle,technicien_id,date_debut_prevue,date_fin_prevue',
+        'lignes.bonCommandeLigne:id,libelle,quantite,ref_article_id,technicien_id,date_debut_prevue,date_fin_prevue',
     ];
 
     public function __construct(
@@ -70,12 +72,22 @@ class OrdreMissionController extends Controller
 
     public function show(OrdreMission $ordreMission): JsonResponse
     {
-        if (in_array($ordreMission->type, ['technicien', 'ingenieur'], true)) {
-            OrdreMissionLigne::query()
-                ->where('ordre_mission_id', $ordreMission->id)
-                ->whereDoesntHave('missionTasks')
-                ->each(fn (OrdreMissionLigne $ligne) => $ligne->ensureTaskExists());
-        }
+        OrdreMissionLigne::query()
+            ->with('bonCommandeLigne:id,quantite')
+            ->where('ordre_mission_id', $ordreMission->id)
+            ->each(function (OrdreMissionLigne $ligne) use ($ordreMission) {
+                if ($ligne->bonCommandeLigne
+                    && abs((float) $ligne->quantite - (float) $ligne->bonCommandeLigne->quantite) > 0.0001
+                ) {
+                    $ligne->updateQuietly(['quantite' => $ligne->bonCommandeLigne->quantite]);
+                }
+
+                if (in_array($ordreMission->type, ['technicien', 'ingenieur'], true)
+                    && ! $ligne->missionTasks()->exists()
+                ) {
+                    $ligne->ensureTaskExists();
+                }
+            });
 
         return response()->json(
             $ordreMission->load(self::WITH)
@@ -131,6 +143,14 @@ class OrdreMissionController extends Controller
             'notes'               => 'nullable|string',
             'lab_centre_group_id' => 'sometimes|nullable|integer|exists:lab_centre_groups,id',
         ]);
+
+        if (($validated['statut'] ?? null) === OrdreMission::STATUT_EN_COURS && ! $ordreMission->date_debut) {
+            $validated['date_debut'] = now();
+        }
+        if (($validated['statut'] ?? null) === OrdreMission::STATUT_TERMINE) {
+            $validated['date_debut'] ??= $ordreMission->date_debut ?? now();
+            $validated['date_fin'] ??= $ordreMission->date_fin ?? now();
+        }
 
         $ordreMission->update($validated);
         $ordreMission->syncMissionTasksFromLignes();
@@ -235,7 +255,10 @@ class OrdreMissionController extends Controller
 
         $ligne->update($validated);
         $ligne->refresh();
-        $ligne->ensureTaskExists();
+        $task = $ligne->ensureTaskExists();
+        $this->syncTaskStatusFromLigne($ligne, $task);
+        $this->syncPlanningFromLigne($ligne, $task);
+        $this->syncOrdreMissionStatusFromLignes($ordreMission);
 
         return response()->json($ligne->fresh()->load(['assignedUser:id,name', 'equipment:id,name,code']));
     }
@@ -263,6 +286,95 @@ class OrdreMissionController extends Controller
             OrdreMission::TYPE_INGENIEUR => 'ingenieur',
             default => 'technicien',
         };
+    }
+
+    private function syncTaskStatusFromLigne(OrdreMissionLigne $ligne, MissionTask $task): void
+    {
+        $statut = match ($ligne->statut) {
+            'en_cours' => MissionTask::STATUT_IN_PROGRESS,
+            'realise' => MissionTask::STATUT_DONE,
+            'annule' => MissionTask::STATUT_REJECTED,
+            default => MissionTask::STATUT_TODO,
+        };
+
+        $updates = ['statut' => $statut];
+        if ($statut === MissionTask::STATUT_IN_PROGRESS && ! $task->started_at) {
+            $updates['started_at'] = now();
+        }
+        if ($statut === MissionTask::STATUT_DONE && ! $task->completed_at) {
+            $updates['completed_at'] = now();
+        }
+        $task->update($updates);
+    }
+
+    private function syncPlanningFromLigne(OrdreMissionLigne $ligne, MissionTask $task): void
+    {
+        $date = $ligne->date_prevue?->format('Y-m-d');
+
+        if ($ligne->assigned_user_id && $date) {
+            PlanningHuman::query()->updateOrCreate(
+                ['mission_task_id' => $task->id],
+                [
+                    'user_id' => $ligne->assigned_user_id,
+                    'date_debut' => $date,
+                    'date_fin' => $date,
+                    'type_evenement' => 'tache',
+                    'notes' => $ligne->libelle,
+                ]
+            );
+        } else {
+            PlanningHuman::query()->where('mission_task_id', $task->id)->delete();
+        }
+
+        if ($ligne->equipment_id && $date) {
+            PlanningEquipment::query()->updateOrCreate(
+                ['mission_task_id' => $task->id],
+                [
+                    'equipment_id' => $ligne->equipment_id,
+                    'user_id' => $ligne->assigned_user_id,
+                    'date_debut' => $date,
+                    'date_fin' => $date,
+                    'type_evenement' => 'utilisation',
+                    'notes' => $ligne->libelle,
+                ]
+            );
+        } else {
+            PlanningEquipment::query()->where('mission_task_id', $task->id)->delete();
+        }
+    }
+
+    private function syncOrdreMissionStatusFromLignes(OrdreMission $ordreMission): void
+    {
+        $lignes = $ordreMission->lignes()->get();
+        if ($lignes->isEmpty()) {
+            return;
+        }
+
+        $now = now();
+        if ($lignes->every(fn (OrdreMissionLigne $item) => $item->statut === 'annule')) {
+            $ordreMission->update(['statut' => OrdreMission::STATUT_ANNULE]);
+            return;
+        }
+        if ($lignes->every(fn (OrdreMissionLigne $item) => in_array($item->statut, ['realise', 'annule'], true))) {
+            $ordreMission->update([
+                'statut' => OrdreMission::STATUT_TERMINE,
+                'date_debut' => $ordreMission->date_debut ?? $now,
+                'date_fin' => $ordreMission->date_fin ?? $now,
+            ]);
+            return;
+        }
+        if ($lignes->contains(fn (OrdreMissionLigne $item) => $item->statut === 'en_cours')) {
+            $ordreMission->update([
+                'statut' => OrdreMission::STATUT_EN_COURS,
+                'date_debut' => $ordreMission->date_debut ?? $now,
+            ]);
+            return;
+        }
+        if ($ordreMission->statut === OrdreMission::STATUT_BROUILLON
+            && $lignes->contains(fn (OrdreMissionLigne $item) => $item->assigned_user_id && $item->date_prevue)
+        ) {
+            $ordreMission->update(['statut' => OrdreMission::STATUT_PLANIFIE]);
+        }
     }
 
     public function planning(Request $request): JsonResponse

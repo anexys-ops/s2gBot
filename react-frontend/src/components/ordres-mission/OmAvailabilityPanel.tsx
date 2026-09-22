@@ -17,7 +17,12 @@ type Props = {
   plannedDate?: string
 }
 
-type CalendarEvent = { key: string; label: string; tone: 'busy' | 'unavailable' | 'current' }
+type CalendarEvent = {
+  key: string
+  label: string
+  tone: 'busy' | 'unavailable' | 'current'
+  countsAsTask?: boolean
+}
 
 function toYmd(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -111,6 +116,7 @@ export default function OmAvailabilityPanel({ userId, userName, equipment, plann
         key: `human-${slot.id}`,
         label: slot.notes || slot.type_evenement,
         tone: 'busy',
+        countsAsTask: slot.type_evenement === 'tache',
       })
     }
     for (const block of personnelBlocks as StockPersonnel[]) {
@@ -149,7 +155,12 @@ export default function OmAvailabilityPanel({ userId, userName, equipment, plann
     return byDate
   }, [equipmentAffectations, equipmentBlocks, equipmentSlots])
 
-  const renderCalendar = (events: Map<string, CalendarEvent[]>, loading: boolean, ariaLabel: string) => (
+  const renderCalendar = (
+    events: Map<string, CalendarEvent[]>,
+    loading: boolean,
+    ariaLabel: string,
+    showTaskCount = false,
+  ) => (
     <div className="om-availability__calendar" aria-label={ariaLabel}>
       <div className="om-availability__weekdays" aria-hidden="true">
         {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((day) => <span key={day}>{day}</span>)}
@@ -157,14 +168,20 @@ export default function OmAvailabilityPanel({ userId, userName, equipment, plann
       <div className="om-availability__days">
         {grid.days.map((date) => {
           const dayEvents = events.get(date) ?? []
+          const taskCount = showTaskCount ? dayEvents.filter((event) => event.countsAsTask).length : 0
           const isPlanned = dateOnly(plannedDate) === date
           return (
             <div
               key={date}
-              className={`om-availability__day${date.startsWith(month) ? '' : ' om-availability__day--outside'}${isPlanned ? ' om-availability__day--planned' : ''}`}
+              className={`om-availability__day${date.startsWith(month) ? '' : ' om-availability__day--outside'}${isPlanned ? ' om-availability__day--planned' : ''}${taskCount > 0 ? ' om-availability__day--task-load' : ''}`}
               title={dayEvents.map((event) => event.label).join(' · ')}
             >
               <span>{Number(date.slice(8, 10))}</span>
+              {taskCount > 0 ? (
+                <strong className="om-availability__task-count">
+                  {taskCount} {taskCount > 1 ? 'tâches' : 'tâche'}
+                </strong>
+              ) : null}
               <div className="om-availability__events">
                 {isPlanned ? <i className="om-availability__event om-availability__event--current" title="Date prévue" /> : null}
                 {dayEvents.slice(0, 3).map((event) => (
@@ -196,7 +213,7 @@ export default function OmAvailabilityPanel({ userId, userName, equipment, plann
       <div className="om-availability__grids">
         <div>
           <h3>Technicien — {userName}</h3>
-          {renderCalendar(humanEvents, humanLoading || personnelLoading, `Calendrier de ${userName}`)}
+          {renderCalendar(humanEvents, humanLoading || personnelLoading, `Calendrier de ${userName}`, true)}
         </div>
         <div>
           <h3>Matériel — {equipment ? [equipment.code, equipment.name].filter(Boolean).join(' — ') : 'aucun matériel affecté'}</h3>
@@ -207,7 +224,8 @@ export default function OmAvailabilityPanel({ userId, userName, equipment, plann
       </div>
       <div className="om-availability__legend">
         <span><i className="om-availability__event om-availability__event--current" /> Date prévue</span>
-        <span><i className="om-availability__event om-availability__event--busy" /> Occupé / affecté</span>
+        <span><i className="om-availability__event om-availability__event--task-load" /> Nombre de tâches du technicien</span>
+        <span><i className="om-availability__event om-availability__event--busy" /> Matériel occupé / affecté</span>
         <span><i className="om-availability__event om-availability__event--unavailable" /> Indisponible</span>
       </div>
     </section>

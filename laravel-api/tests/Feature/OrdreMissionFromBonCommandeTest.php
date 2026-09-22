@@ -14,6 +14,7 @@ use App\Models\JalonProduct;
 use App\Models\MissionTask;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
+use App\Models\PlanningHuman;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,6 +59,58 @@ class OrdreMissionFromBonCommandeTest extends TestCase
         $this->assertSame($tech->id, $ligne->assigned_user_id);
         $this->assertNull($ligne->article_action_id);
         $this->assertSame(1, MissionTask::query()->count());
+    }
+
+    public function test_bulk_update_applies_jalon_values_and_syncs_planning_in_one_request(): void
+    {
+        [$bc, $lab, $tech] = $this->seedBcWithTechnicienAction();
+
+        $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")
+            ->assertCreated();
+
+        $ordreMission = OrdreMission::query()->firstOrFail();
+        $firstLine = $ordreMission->lignes()->firstOrFail();
+        $secondLine = OrdreMissionLigne::query()->create([
+            'ordre_mission_id' => $ordreMission->id,
+            'bon_commande_ligne_id' => $firstLine->bon_commande_ligne_id,
+            'ref_article_id' => $firstLine->ref_article_id,
+            'article_action_id' => $firstLine->article_action_id,
+            'libelle' => 'Deuxième tâche du jalon',
+            'quantite' => 1,
+            'statut' => 'a_faire',
+            'ordre' => 2,
+        ]);
+
+        $response = $this->actingAs($lab, 'sanctum')->putJson(
+            "/api/ordres-mission/{$ordreMission->id}/lignes",
+            [
+                'lignes' => [
+                    [
+                        'id' => $firstLine->id,
+                        'quantite' => 4,
+                        'assigned_user_id' => $tech->id,
+                        'date_prevue' => '2026-03-18',
+                        'statut' => 'en_cours',
+                    ],
+                    [
+                        'id' => $secondLine->id,
+                        'quantite' => 4,
+                        'assigned_user_id' => $tech->id,
+                        'date_prevue' => '2026-03-18',
+                        'statut' => 'en_cours',
+                    ],
+                ],
+            ],
+        );
+
+        $response->assertOk()->assertJsonCount(2);
+        $this->assertSame(2, OrdreMissionLigne::query()->where('quantite', 4)->count());
+        $this->assertSame(2, PlanningHuman::query()->where('user_id', $tech->id)->whereDate('date_debut', '2026-03-18')->count());
+        $this->assertDatabaseHas('ordres_mission', [
+            'id' => $ordreMission->id,
+            'statut' => OrdreMission::STATUT_EN_COURS,
+        ]);
     }
 
     public function test_generate_rejects_brouillon_bc(): void

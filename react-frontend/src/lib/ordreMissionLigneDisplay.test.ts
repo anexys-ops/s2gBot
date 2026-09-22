@@ -44,8 +44,8 @@ describe('buildOrdreMissionLigneGroups', () => {
     expect(groups).toEqual([{ key: 'standalone', jalon: null, lignes: [expect.objectContaining({ id: 9 })] }])
   })
 
-  it('lit la quantité actuelle du bon de commande', () => {
+  it('conserve la quantité modifiable de la ligne de mission', () => {
     const ligne = omLine(1, 101, 0)
-    expect(ordreMissionLigneQuantite(ligne, new Map([[101, bcLine(101, 11, 7)]]))).toBe(7)
+    expect(ordreMissionLigneQuantite(ligne, new Map([[101, bcLine(101, 11, 7)]]))).toBe(1)
   })
 })

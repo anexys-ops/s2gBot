@@ -3435,6 +3435,11 @@ export const ordresMissionApi = {
     api<OrdreMissionLigne>(`/ordres-mission/${omId}/lignes`, { method: 'POST', body: JSON.stringify(body) }),
   updateLigne: (omId: number, ligneId: number, body: Partial<OrdreMissionLigne>) =>
     api<OrdreMissionLigne>(`/ordres-mission/${omId}/lignes/${ligneId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  updateLignes: (omId: number, lignes: Array<Partial<OrdreMissionLigne> & { id: number }>) =>
+    api<OrdreMissionLigne[]>(`/ordres-mission/${omId}/lignes`, {
+      method: 'PUT',
+      body: JSON.stringify({ lignes }),
+    }),
   deleteLigne: (omId: number, ligneId: number) =>
     api<void>(`/ordres-mission/${omId}/lignes/${ligneId}`, { method: 'DELETE' }),
   planning: (params?: { type?: string; from?: string; to?: string }) => {

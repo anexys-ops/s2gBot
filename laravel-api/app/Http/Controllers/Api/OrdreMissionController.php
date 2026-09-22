@@ -17,6 +17,7 @@ use App\Services\OrdreMissionFromBonCommandeService;
 use App\Support\AgencyAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class OrdreMissionController extends Controller
 {
@@ -72,22 +73,12 @@ class OrdreMissionController extends Controller
 
     public function show(OrdreMission $ordreMission): JsonResponse
     {
-        OrdreMissionLigne::query()
-            ->with('bonCommandeLigne:id,quantite')
-            ->where('ordre_mission_id', $ordreMission->id)
-            ->each(function (OrdreMissionLigne $ligne) use ($ordreMission) {
-                if ($ligne->bonCommandeLigne
-                    && abs((float) $ligne->quantite - (float) $ligne->bonCommandeLigne->quantite) > 0.0001
-                ) {
-                    $ligne->updateQuietly(['quantite' => $ligne->bonCommandeLigne->quantite]);
-                }
-
-                if (in_array($ordreMission->type, ['technicien', 'ingenieur'], true)
-                    && ! $ligne->missionTasks()->exists()
-                ) {
-                    $ligne->ensureTaskExists();
-                }
-            });
+        if (in_array($ordreMission->type, ['technicien', 'ingenieur'], true)) {
+            OrdreMissionLigne::query()
+                ->where('ordre_mission_id', $ordreMission->id)
+                ->whereDoesntHave('missionTasks')
+                ->each(fn (OrdreMissionLigne $ligne) => $ligne->ensureTaskExists());
+        }
 
         return response()->json(
             $ordreMission->load(self::WITH)
@@ -244,6 +235,7 @@ class OrdreMissionController extends Controller
         abort_if($ligne->ordre_mission_id !== $ordreMission->id, 404);
 
         $validated = $request->validate([
+            'quantite'           => 'sometimes|numeric|min:0.001',
             'statut'              => 'sometimes|in:a_faire,en_cours,realise,annule',
             'assigned_user_id'    => 'nullable|exists:users,id',
             'equipment_id'        => 'nullable|exists:equipments,id',
@@ -261,6 +253,56 @@ class OrdreMissionController extends Controller
         $this->syncOrdreMissionStatusFromLignes($ordreMission);
 
         return response()->json($ligne->fresh()->load(['assignedUser:id,name', 'equipment:id,name,code']));
+    }
+
+    public function updateLignes(Request $request, OrdreMission $ordreMission): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $validated = $request->validate([
+            'lignes' => 'required|array|min:1',
+            'lignes.*.id' => 'required|integer|distinct',
+            'lignes.*.quantite' => 'sometimes|numeric|min:0.001',
+            'lignes.*.statut' => 'sometimes|in:a_faire,en_cours,realise,annule',
+            'lignes.*.assigned_user_id' => 'sometimes|nullable|exists:users,id',
+            'lignes.*.equipment_id' => 'sometimes|nullable|exists:equipments,id',
+            'lignes.*.date_prevue' => 'sometimes|nullable|date',
+            'lignes.*.date_realisation' => 'sometimes|nullable|date',
+            'lignes.*.duree_reelle_heures' => 'sometimes|nullable|integer|min:0',
+            'lignes.*.notes' => 'sometimes|nullable|string',
+        ]);
+
+        $payloads = collect($validated['lignes'])->keyBy(fn (array $item) => (int) $item['id']);
+        $lignes = $ordreMission->lignes()
+            ->whereIn('id', $payloads->keys())
+            ->get()
+            ->keyBy('id');
+
+        abort_if($lignes->count() !== $payloads->count(), 404);
+
+        DB::transaction(function () use ($ordreMission, $payloads, $lignes) {
+            foreach ($payloads as $ligneId => $payload) {
+                /** @var OrdreMissionLigne $ligne */
+                $ligne = $lignes->get($ligneId);
+                $ligne->update(collect($payload)->except('id')->all());
+                $ligne->refresh();
+                $task = $ligne->ensureTaskExists();
+                $this->syncTaskStatusFromLigne($ligne, $task);
+                $this->syncPlanningFromLigne($ligne, $task);
+            }
+
+            $this->syncOrdreMissionStatusFromLignes($ordreMission);
+        });
+
+        return response()->json(
+            $ordreMission->lignes()
+                ->whereIn('id', $payloads->keys())
+                ->with(['assignedUser:id,name', 'equipment:id,name,code'])
+                ->orderBy('ordre')
+                ->get()
+        );
     }
 
     public function destroyLigne(Request $request, OrdreMission $ordreMission, OrdreMissionLigne $ligne): JsonResponse

@@ -3273,7 +3273,7 @@ export interface OrdreMissionLigne {
   article_action_id?: number | null
   libelle: string
   quantite: number
-  statut: 'a_faire' | 'en_cours' | 'realise' | 'annule'
+  statut: 'planifie' | 'en_cours' | 'freeze' | 'annule' | 'attente_validation' | 'cloture' | 'a_faire' | 'realise'
   assigned_user_id?: number | null
   equipment_id?: number | null
   date_prevue?: string | null
@@ -3312,6 +3312,7 @@ export interface OrdreMission {
     numero: string
     quote_id?: number | null
     quote?: { id: number; number: string } | null
+    lignes?: BonCommandeLigne[]
     dossier?: { id: number; reference: string; titre?: string | null } | null
   } | null
   /** Sérialisation Laravel (snake_case) */
@@ -3511,7 +3512,15 @@ export interface MissionTask {
   validated_at?: string | null
   validated_by?: number | null
   notes?: string | null
+  pv_numbers?: string[] | null
+  quantity_unit?: 'echantillon' | 'point' | null
+  quantity_count?: number | null
+  reception_generated_at?: string | null
+  ordered_quantity?: number
+  received_quantity?: number
+  remaining_quantity?: number
   is_conform?: boolean | null
+  jalon_context?: { id: string; label: string; code?: string | null } | null
   assignedUser?: { id: number; name: string; email?: string }
   ordreMissionLigne?: OrdreMissionLigne & {
     ordreMission?: OrdreMission
@@ -3649,6 +3658,12 @@ export const missionTasksApi = {
   get: async (id: number) => normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}`)),
   update: async (id: number, body: Partial<MissionTask>) =>
     normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}`, { method: 'PUT', body: JSON.stringify(body) })),
+  closeReception: async (id: number, body: { pv_numbers: string[]; quantity_unit: 'echantillon' | 'point'; quantity_count: number }) => {
+    const result = await api<{ task: MissionTaskApiRaw; samples_created: number; remaining_quantity: number }>(`/mission-tasks/${id}/close-reception`, { method: 'POST', body: JSON.stringify(body) })
+    return { ...result, task: normalizeMissionTask(result.task) }
+  },
+  duplicate: async (id: number) =>
+    normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}/duplicate`, { method: 'POST' })),
   submitMeasures: async (id: number, measures: Array<{ measure_config_id: number; value?: string; value_numeric?: number; attachment_path?: string }>) =>
     normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}/measures`, { method: 'POST', body: JSON.stringify({ measures }) })),
   validate: async (id: number, body: { is_conform: boolean; value_final?: number; conclusion?: string; observations?: string; rapport_path?: string }) =>

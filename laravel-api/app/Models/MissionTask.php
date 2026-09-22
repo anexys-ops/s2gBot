@@ -46,6 +46,10 @@ class MissionTask extends Model
         'validated_at',
         'validated_by',
         'notes',
+        'pv_numbers',
+        'quantity_unit',
+        'quantity_count',
+        'reception_generated_at',
         'is_conform',
     ];
 
@@ -55,6 +59,9 @@ class MissionTask extends Model
         'started_at'     => 'datetime',
         'completed_at'   => 'datetime',
         'validated_at'   => 'datetime',
+        'pv_numbers'      => 'array',
+        'quantity_count'  => 'integer',
+        'reception_generated_at' => 'datetime',
         'is_conform'     => 'boolean',
     ];
 

@@ -179,7 +179,7 @@ class LabReceptionService
             return 0;
         }
 
-        $maxPerLine = 50;
+        $maxPerLine = max(0, (int) floor((float) $ligne->quantite));
         $counts = $this->sampleCountsByLine([$ligne->id]);
         $total = $counts[$ligne->id]['total'] ?? 0;
 

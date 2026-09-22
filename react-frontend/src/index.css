@@ -11765,6 +11765,69 @@ a.catalogue-tree__link-article:hover {
   grid-column: 1 / -1;
 }
 
+.mission-task-modal__unit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 2.4rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.45rem;
+  background: var(--color-surface-2);
+}
+
+.mission-task-modal__unit small {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.mission-task-modal__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  min-height: 2.4rem;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.45rem;
+  background: var(--color-surface-2);
+}
+
+.mission-task-modal__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.mission-task-modal__badge button {
+  display: grid;
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  place-items: center;
+}
+
+.mission-task-modal__badge button:hover,
+.mission-task-modal__badge button:focus-visible {
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.mission-task-modal__pv-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+}
+
 .mission-task-modal__actions {
   display: flex;
   flex-wrap: wrap;

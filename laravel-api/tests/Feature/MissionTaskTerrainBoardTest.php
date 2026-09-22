@@ -124,6 +124,7 @@ class MissionTaskTerrainBoardTest extends TestCase
             ->getJson('/api/mission-tasks/terrain')
             ->assertOk()
             ->assertJsonCount(1)
+            ->assertJsonPath('0.ordre_mission_ligne.article.unite', 'unité')
             ->assertJsonPath('0.jalon_context.label', 'Jalon synchronisé');
     }
 
@@ -135,7 +136,7 @@ class MissionTaskTerrainBoardTest extends TestCase
 
         $payload = [
             'pv_numbers' => ['PV-2026-0042'],
-            'quantity_unit' => 'point',
+            'quantity_unit' => 'unité',
             'quantity_count' => 1,
         ];
 
@@ -153,6 +154,7 @@ class MissionTaskTerrainBoardTest extends TestCase
             'status' => Sample::STATUS_RECEPTIONNE,
         ]);
         $this->assertSame(['PV-2026-0042'], $task->fresh()->pv_numbers);
+        $this->assertSame('unité', $task->fresh()->quantity_unit);
         $this->assertSame('cloture', $ligne->fresh()->statut);
         $this->assertSame(OrdreMission::STATUT_TERMINE, $om->fresh()->statut);
 
@@ -234,6 +236,7 @@ class MissionTaskTerrainBoardTest extends TestCase
             'actif' => true,
             'prix_unitaire_ht' => 100,
             'tva_rate' => 20,
+            'unite' => 'unité',
         ]);
         ArticleAction::query()->create([
             'ref_article_id' => $article->id,

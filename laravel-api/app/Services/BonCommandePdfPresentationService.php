@@ -3,14 +3,29 @@
 namespace App\Services;
 
 use App\Models\BonCommande;
+use App\Models\BonCommandeLigne;
 use App\Models\Client;
 use App\Models\ClientContact;
 use App\Models\Dossier;
 use App\Models\DossierContact;
 use App\Models\User;
+use Illuminate\Support\Collection;
 
 class BonCommandePdfPresentationService
 {
+    /** @var list<string> */
+    private const DETAIL_SKIP = [
+        'description commerciale',
+        'description technique',
+        '..',
+        '…',
+        '-',
+        '—',
+        'n/a',
+        'na',
+        'null',
+    ];
+
     /** @var list<array{key: string, label: string, patterns: list<string>}> */
     private const PRESTATION_TYPES = [
         ['key' => 'etude_geotechniques', 'label' => 'Étude Géotechniques', 'patterns' => ['géotechn', 'geotechn', 'geo sol', 'forage', 'sondage']],
@@ -22,6 +37,127 @@ class BonCommandePdfPresentationService
         ['key' => 'etudes_geophysique', 'label' => 'Études Géophysique', 'patterns' => ['géophys', 'geophys', 'sismique', 'radar']],
         ['key' => 'recherche_innovation', 'label' => 'Recherche et Innovation', 'patterns' => ['innovation', 'recherche', 'r&d']],
     ];
+
+    /**
+     * Construit les lignes du BC avec la même hiérarchie jalon / détail que le devis source.
+     * Les quantités et montants viennent toujours des lignes courantes du bon de commande.
+     *
+     * @param  array<string, mixed>|null  $layoutConfig
+     * @return list<array<string, mixed>>
+     */
+    public function buildItemRows(BonCommande $bonCommande, ?array $layoutConfig = null): array
+    {
+        $bonCommande->loadMissing(['quote', 'lignes.article']);
+
+        $linesCfg = is_array($layoutConfig['lines'] ?? null) ? $layoutConfig['lines'] : [];
+        $hideAllPrices = ($linesCfg['show_prices'] ?? true) === false;
+        $meta = is_array($bonCommande->quote?->meta) ? $bonCommande->quote->meta : [];
+        $jalons = is_array($meta['devis_jalons'] ?? null) ? $meta['devis_jalons'] : [];
+        $parcours = is_array($meta['devis_parcours'] ?? null) ? $meta['devis_parcours'] : [];
+        $documentForfait = ($meta['mode_devis'] ?? '') === 'forfait';
+
+        /** @var Collection<int, BonCommandeLigne> $lines */
+        $lines = $bonCommande->lignes
+            ->sortBy(fn (BonCommandeLigne $line) => [(int) ($line->ordre ?? 0), (int) $line->id])
+            ->values();
+
+        $jalonById = [];
+        $childRefIds = [];
+        $forfaitLineByJalonId = [];
+        $claimedForfaitLineIds = [];
+        foreach ($jalons as $jalon) {
+            if (! is_array($jalon)) {
+                continue;
+            }
+            $id = $jalon['id'] ?? null;
+            if (is_string($id) && $id !== '') {
+                $jalonById[$id] = $jalon;
+                $expectedLabel = trim('Prestation forfaitaire — '.trim((string) ($jalon['libelle'] ?? '')), " —");
+                foreach ($lines as $line) {
+                    if (isset($claimedForfaitLineIds[$line->id])) {
+                        continue;
+                    }
+                    if (trim((string) $line->libelle) === $expectedLabel) {
+                        $forfaitLineByJalonId[$id] = $line;
+                        $claimedForfaitLineIds[$line->id] = true;
+                        break;
+                    }
+                }
+            }
+            foreach ($jalon['product_ref_article_ids'] ?? [] as $refId) {
+                $childRefIds[(int) $refId] = true;
+            }
+        }
+
+        $rows = [];
+        $seenLineIds = [];
+
+        $emitJalon = function (array $jalon) use (
+            &$rows,
+            &$seenLineIds,
+            $lines,
+            $forfaitLineByJalonId,
+            $documentForfait,
+            $hideAllPrices,
+        ): void {
+            $jalonId = (string) ($jalon['id'] ?? '');
+            $forfaitLine = $forfaitLineByJalonId[$jalonId] ?? null;
+            $jalonForfait = $documentForfait || (($jalon['mode'] ?? '') === 'forfait') || $forfaitLine !== null;
+            $rows[] = $this->formatJalonHeaderRow($jalon);
+
+            if ($forfaitLine instanceof BonCommandeLigne) {
+                $rows[] = $this->formatProductRow($forfaitLine, true, $hideAllPrices, false, true);
+                $seenLineIds[$forfaitLine->id] = true;
+            }
+
+            foreach ($jalon['product_ref_article_ids'] ?? [] as $refId) {
+                $line = $this->findLineByRefId($lines, (int) $refId, $seenLineIds);
+                if (! $line) {
+                    continue;
+                }
+                $rows[] = $this->formatProductRow($line, true, $hideAllPrices || $jalonForfait, $jalonForfait);
+                $seenLineIds[$line->id] = true;
+            }
+        };
+
+        if ($parcours !== []) {
+            foreach ($parcours as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+                if (($item['kind'] ?? null) === 'jalon') {
+                    $jalon = $jalonById[$item['id'] ?? ''] ?? null;
+                    if (is_array($jalon)) {
+                        $emitJalon($jalon);
+                    }
+                    continue;
+                }
+                if (($item['kind'] ?? null) === 'ligne') {
+                    $line = $this->nextStandaloneLine($lines, $seenLineIds, $childRefIds, $claimedForfaitLineIds);
+                    if ($line) {
+                        $rows[] = $this->formatProductRow($line, false, $hideAllPrices || $documentForfait, $documentForfait);
+                        $seenLineIds[$line->id] = true;
+                    }
+                }
+            }
+        } else {
+            foreach ($jalons as $jalon) {
+                if (is_array($jalon)) {
+                    $emitJalon($jalon);
+                }
+            }
+        }
+
+        foreach ($lines as $line) {
+            if (isset($seenLineIds[$line->id])) {
+                continue;
+            }
+            $rows[] = $this->formatProductRow($line, false, $hideAllPrices || $documentForfait, $documentForfait);
+            $seenLineIds[$line->id] = true;
+        }
+
+        return $rows;
+    }
 
     /**
      * @return array<string, mixed>
@@ -421,6 +557,118 @@ class BonCommandePdfPresentationService
         }
 
         return trim((string) $user->name) ?: null;
+    }
+
+    /** @param array<string, mixed> $jalon */
+    private function formatJalonHeaderRow(array $jalon): array
+    {
+        return [
+            'type' => 'jalon_header',
+            'label' => trim((string) ($jalon['libelle'] ?? '')),
+            'code' => trim((string) ($jalon['s2g_code'] ?? '')) ?: null,
+        ];
+    }
+
+    private function formatProductRow(
+        BonCommandeLigne $line,
+        bool $nested,
+        bool $hidePrices,
+        bool $hideQuantity,
+        bool $forfaitTotal = false,
+    ): array {
+        $article = $line->article;
+        $unite = trim((string) ($article?->unite ?? '')) ?: 'U';
+        $code = trim((string) ($article?->code ?? $article?->s2g_code ?? '')) ?: null;
+
+        return [
+            'type' => $forfaitTotal ? 'forfait_total' : 'product',
+            'nested' => $nested,
+            'code' => $code,
+            'label' => $forfaitTotal ? 'Prestation forfaitaire' : trim((string) $line->libelle),
+            'unite' => $forfaitTotal ? ($unite !== 'U' ? $unite : 'F') : ($hideQuantity ? '' : $unite),
+            'qte' => $hideQuantity ? null : $this->quantityForPdf((float) $line->quantite),
+            'pu' => $hidePrices ? null : (float) $line->prix_unitaire_ht,
+            'pt' => $hidePrices ? null : (float) $line->montant_ht,
+            'details' => $forfaitTotal ? [] : $this->detailLinesFor(
+                (string) $line->libelle,
+                $article?->description_commerciale ?? $article?->description ?? null,
+            ),
+        ];
+    }
+
+    private function quantityForPdf(float $quantity): int|float
+    {
+        return abs($quantity - round($quantity)) < 0.0001 ? (int) round($quantity) : $quantity;
+    }
+
+    /**
+     * @param  Collection<int, BonCommandeLigne>  $lines
+     * @param  array<int, true>  $seenLineIds
+     */
+    private function findLineByRefId(Collection $lines, int $refId, array $seenLineIds): ?BonCommandeLigne
+    {
+        foreach ($lines as $line) {
+            if (! isset($seenLineIds[$line->id]) && (int) $line->ref_article_id === $refId) {
+                return $line;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  Collection<int, BonCommandeLigne>  $lines
+     * @param  array<int, true>  $seenLineIds
+     * @param  array<int, true>  $childRefIds
+     * @param  array<int, true>  $claimedForfaitLineIds
+     */
+    private function nextStandaloneLine(
+        Collection $lines,
+        array $seenLineIds,
+        array $childRefIds,
+        array $claimedForfaitLineIds,
+    ): ?BonCommandeLigne {
+        foreach ($lines as $line) {
+            if (isset($seenLineIds[$line->id]) || isset($claimedForfaitLineIds[$line->id])) {
+                continue;
+            }
+            $refId = (int) ($line->ref_article_id ?? 0);
+            if ($refId > 0 && isset($childRefIds[$refId])) {
+                continue;
+            }
+
+            return $line;
+        }
+
+        return null;
+    }
+
+    /** @return list<string> */
+    private function detailLinesFor(string $mainLabel, ?string $extraDescription): array
+    {
+        if (! $extraDescription) {
+            return [];
+        }
+
+        $details = [];
+        $main = mb_strtolower(trim($mainLabel));
+        foreach (preg_split('/\r?\n/', $extraDescription) ?: [] as $part) {
+            $part = trim($part);
+            if ($part === '') {
+                continue;
+            }
+            $normalized = mb_strtolower(trim($part, " \t\n\r\0\x0B.-"));
+            if ($normalized === $main || in_array($normalized, self::DETAIL_SKIP, true)) {
+                continue;
+            }
+            if (str_starts_with($normalized, 'description commerciale')
+                || str_starts_with($normalized, 'description technique')) {
+                continue;
+            }
+            $details[] = $part;
+        }
+
+        return array_values(array_unique($details));
     }
 
     public function bonCommandeStatutLabel(string $statut): string

@@ -44,6 +44,7 @@ class BonCommandePdfGenerator
                     'lignes.article.famille',
                 ]);
             }
+            $itemRows = $this->presentation->buildItemRows($bonCommande, $layoutConfig);
 
             $html = view($view, [
                 'bonCommande' => $bonCommande,
@@ -52,6 +53,7 @@ class BonCommandePdfGenerator
                 'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
                 'currencyLabel' => \App\Support\MoneyFormat::currencyLabel($bonCommande->quote?->currency_code),
                 'pdfContext' => $isDossierRecap ? $this->presentation->buildContext($bonCommande) : [],
+                'itemRows' => $itemRows,
             ])->render();
 
             $pdf = Pdf::loadHTML($html);

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\BonCommande;
 use App\Support\AppBranding;
+use App\Support\MoneyFormat;
 use App\Support\PdfTemplateResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -11,6 +12,7 @@ class BonCommandePdfGenerator
 {
     public function __construct(
         private BonCommandePdfPresentationService $presentation,
+        private BonCommandeLineDisplayService $lineDisplay,
         private CommercialPdfCache $pdfCache,
     ) {}
 
@@ -21,7 +23,7 @@ class BonCommandePdfGenerator
     {
         $template = PdfTemplateResolver::resolve('purchase_order', $requestTemplateId, null);
         $cacheKey = $this->pdfCache->keyForDocument(
-            'purchase_order',
+            'purchase_order_v2',
             (int) $bonCommande->id,
             $template?->id,
             $bonCommande->updated_at?->getTimestamp() ?? 0,
@@ -34,6 +36,7 @@ class BonCommandePdfGenerator
             $isDossierRecap = $view === 'pdf.purchase_order_dossier_recap';
 
             $bonCommande->loadMissing(['client', 'dossier', 'quote', 'lignes.article']);
+            $quoteMeta = is_array($bonCommande->quote?->meta) ? $bonCommande->quote->meta : [];
             if ($isDossierRecap) {
                 $bonCommande->loadMissing([
                     'clientContact',
@@ -50,7 +53,8 @@ class BonCommandePdfGenerator
                 'template' => $template,
                 'layoutConfig' => $layoutConfig,
                 'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
-                'currencyLabel' => \App\Support\MoneyFormat::currencyLabel($bonCommande->quote?->currency_code),
+                'currencyLabel' => MoneyFormat::currencyLabel($bonCommande->quote?->currency_code),
+                'displayRows' => $this->lineDisplay->build($bonCommande->lignes, $quoteMeta),
                 'pdfContext' => $isDossierRecap ? $this->presentation->buildContext($bonCommande) : [],
             ])->render();
 

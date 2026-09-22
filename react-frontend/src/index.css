@@ -10228,9 +10228,12 @@ a.catalogue-tree__link-article:hover {
   width: 4.5rem;
   flex: 0 0 auto;
 }
-.bc-jalon-qty-mass__apply {
+.bc-jalon-qty-mass__hint {
   white-space: nowrap;
   flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 .bc-lignes-table__col-money {
   width: 8rem;

@@ -1090,13 +1090,14 @@ export const labCentreGroupsApi = {
 }
 
 export const bonsCommandeApi = {
-  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string; planning?: boolean }) => {
+  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string; planning?: boolean; unassignedPlanning?: boolean }) => {
     const q = new URLSearchParams()
     if (params?.dossier_id) q.set('dossier_id', String(params.dossier_id))
     if (params?.client_id) q.set('client_id', String(params.client_id))
     if (params?.statut) q.set('statut', params.statut)
     if (params?.search) q.set('search', params.search)
     if (params?.planning) q.set('planning', '1')
+    if (params?.unassignedPlanning) q.set('planning_unassigned', '1')
     const s = q.toString()
     return api<BonCommande[]>(`/v1/bons-commande${s ? `?${s}` : ''}`)
   },

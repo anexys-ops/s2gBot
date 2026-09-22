@@ -76,10 +76,24 @@ class MaterielAffectationController extends Controller
 
     public function update(Request $request, Equipment $equipment, MaterielAffectation $affectation): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $request->user()->isLab()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
         $this->assertBelongsToEquipment($affectation, $equipment);
+
+        if (! $request->user()->isLabAdmin()) {
+            $isAssignedTechnician = (int) $affectation->user_id === (int) $request->user()->id;
+            $isReturnConfirmation = $request->filled('date_retour_effective')
+                && empty(array_diff(array_keys($request->all()), [
+                    'date_retour_effective',
+                    'etat_retour',
+                    'observations',
+                ]));
+
+            if (! $isAssignedTechnician || ! $isReturnConfirmation) {
+                return response()->json(['message' => 'Non autorisé'], 403);
+            }
+        }
 
         $affectation->update($this->validatedPayload($request, true));
 

@@ -178,12 +178,12 @@ export default function AppNavigation() {
         id: 'planification',
         label: 'Planification',
         items: filterItems([
-          ...(canOdm ? [{ to: '/ordres-mission', label: 'Ordres de mission' }] : []),
-          { to: '/labo/taches', label: 'Tâches laboratoire', module: 'laboratoire' },
-          { to: '/labo/planning', label: 'Planning laboratoire', module: 'laboratoire' },
-          { to: '/materiel/planning', label: 'Planning matériel', module: 'catalogue' },
+          ...(canOdm ? [{ to: '/ordres-mission', label: 'Ordres de missions' }] : []),
           { to: '/terrain/planning', label: 'Planning terrain', module: 'terrain' },
           { to: '/terrain/taches', label: 'Tâches terrain', module: 'terrain' },
+          { to: '/labo/planning', label: 'Planning laboratoire', module: 'laboratoire' },
+          { to: '/labo/taches', label: 'Tâches laboratoire', module: 'laboratoire' },
+          { to: '/materiel/planning', label: 'Planning matériel', module: 'catalogue' },
         ]),
       },
       {
@@ -215,6 +215,7 @@ export default function AppNavigation() {
         module: 'catalogue',
         items: filterItems([
           { to: '/materiel/equipements', label: 'Équipements', module: 'catalogue' },
+          { to: '/materiel/planning', label: 'Planning matériel', module: 'catalogue' },
           { to: '/materiel/stocks', label: 'Stocks', module: 'catalogue' },
         ]),
       },

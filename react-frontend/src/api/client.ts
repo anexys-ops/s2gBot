@@ -1493,6 +1493,7 @@ export interface EquipmentRow {
   maintenance_plans?: EquipmentMaintenancePlanRow[]
   affectations?: MaterielAffectationRow[]
   planning_slots?: PlanningEquipmentSlot[]
+  article_requirements?: ArticleEquipmentRequirement[]
 }
 
 export const equipmentsApi = {
@@ -3261,6 +3262,7 @@ export interface ArticleEquipmentRequirement {
   quantite: number
   notes?: string | null
   equipment?: { id: number; name: string; code?: string; type?: string }
+  article?: Pick<RefArticleRow, 'id' | 'code' | 'libelle' | 'kind' | 'actif'>
 }
 
 export interface OrdreMissionLigne {

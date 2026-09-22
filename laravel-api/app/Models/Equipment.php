@@ -70,6 +70,16 @@ class Equipment extends Model
         return $this->belongsToMany(TestType::class, 'equipment_test_type')->withTimestamps();
     }
 
+    /**
+     * Essais et produits du catalogue qui utilisent ce matériel.
+     * La liaison reste stockée dans article_equipment_requirements,
+     * quel que soit le côté depuis lequel elle est modifiée.
+     */
+    public function articleRequirements(): HasMany
+    {
+        return $this->hasMany(ArticleEquipmentRequirement::class, 'equipment_id');
+    }
+
     public function attachments(): MorphMany
     {
         return $this->morphMany(Attachment::class, 'attachable');

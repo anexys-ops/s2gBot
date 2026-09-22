@@ -42,15 +42,14 @@ class MissionTaskTerrainBoardTest extends TestCase
             ->assertJsonCount(1);
     }
 
-    public function test_validating_an_om_line_syncs_task_planning_and_bc_quantity(): void
+    public function test_validating_an_om_line_syncs_task_planning_and_keeps_selected_quantity(): void
     {
         [$om, $lab] = $this->seedTechnicienOm();
         $ligne = $om->lignes()->firstOrFail();
         $technicien = User::factory()->create(['role' => User::ROLE_LAB_TECHNICIAN]);
-        $ligne->bonCommandeLigne()->update(['quantite' => 4]);
-
         $this->actingAs($lab, 'sanctum')
             ->putJson("/api/ordres-mission/{$om->id}/lignes/{$ligne->id}", [
+                'quantite' => 4,
                 'assigned_user_id' => $technicien->id,
                 'date_prevue' => '2026-09-24',
                 'statut' => 'en_cours',

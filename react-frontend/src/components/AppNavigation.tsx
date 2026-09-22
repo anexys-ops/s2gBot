@@ -25,6 +25,7 @@ type MenuGroupId =
   | 'commercial'
   | 'terrain'
   | 'laboratoire'
+  | 'materiel'
   | 'ingenierie'
   | 'rapport-bc'
   | 'catalogue'
@@ -68,8 +69,11 @@ function isIngenerieActive(pathname: string): boolean {
 
 function isCatalogueActive(pathname: string): boolean {
   if (pathname === '/catalogue' || pathname.startsWith('/catalogue/')) return true
-  if (pathname.startsWith('/materiel')) return true
   return false
+}
+
+function isMaterielActive(pathname: string): boolean {
+  return pathname.startsWith('/materiel')
 }
 
 function isConfigurationActive(pathname: string): boolean {
@@ -94,6 +98,8 @@ function isGroupActive(id: MenuGroupId, pathname: string): boolean {
       return isTerrainActive(pathname)
     case 'laboratoire':
       return isLaboratoireActive(pathname)
+    case 'materiel':
+      return isMaterielActive(pathname)
     case 'ingenierie':
       return isIngenerieActive(pathname)
     case 'rapport-bc':
@@ -190,6 +196,16 @@ export default function AppNavigation() {
         ]),
       },
       {
+        id: 'materiel',
+        label: 'Matériel',
+        module: 'catalogue',
+        items: filterItems([
+          { to: '/materiel/equipements', label: 'Équipements', module: 'catalogue' },
+          { to: '/materiel/planning', label: 'Planning', module: 'catalogue' },
+          { to: '/materiel/stocks', label: 'Stocks', module: 'catalogue' },
+        ]),
+      },
+      {
         id: 'ingenierie',
         label: 'Ingénierie',
         module: 'ingenierie',
@@ -238,7 +254,6 @@ export default function AppNavigation() {
       })
     return filterItems([
       { to: '/catalogue', label: 'Articles & essais', module: 'catalogue' as StaffModuleKey },
-      { to: '/materiel/equipements', label: 'Matériel / Équipements', module: 'catalogue' as StaffModuleKey },
       { to: '/labo/fiches', label: 'Fiches techniques', module: 'laboratoire' as StaffModuleKey },
     ])
   }, [user])

@@ -409,6 +409,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('mission-tasks', [MissionTaskController::class, 'index']);
     Route::get('mission-tasks/{task}', [MissionTaskController::class, 'show']);
     Route::put('mission-tasks/{task}', [MissionTaskController::class, 'update']);
+    Route::post('mission-tasks/{task}/close-reception', [MissionTaskController::class, 'closeReception']);
+    Route::post('mission-tasks/{task}/duplicate', [MissionTaskController::class, 'duplicate']);
     Route::post('mission-tasks/{task}/measures', [MissionTaskController::class, 'storeMeasures']);
     Route::post('mission-tasks/{task}/validate', [MissionTaskController::class, 'validate']);
     Route::delete('mission-tasks/{task}', [MissionTaskController::class, 'destroy']);

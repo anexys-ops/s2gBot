@@ -11634,3 +11634,148 @@ a.catalogue-tree__link-article:hover {
     padding-bottom: 0.15rem;
   }
 }
+
+/* Listes unifiées des tâches laboratoire, terrain et ingénierie */
+.mission-task-list__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+}
+
+.mission-task-list__filter {
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.mission-task-list__filter strong {
+  margin-left: 0.3rem;
+}
+
+.mission-task-list__filter.is-active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.mission-task-list__table-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.mission-task-list__table {
+  width: 100%;
+  min-width: 58rem;
+}
+
+.mission-task-list__row {
+  cursor: pointer;
+}
+
+.mission-task-list__row:hover,
+.mission-task-list__row:focus-visible {
+  background: var(--color-surface-2);
+  outline: none;
+}
+
+.mission-task-list__sub {
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+}
+
+.mission-task-list__jalon {
+  margin-bottom: 0.2rem;
+  color: var(--color-primary);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.mission-task-list__task {
+  font-weight: 600;
+}
+
+.mission-task-list__status,
+.mission-task-list__delay {
+  display: inline-block;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mission-task-list__delay--late {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.mission-task-list__delay--ok {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.mission-task-list__hint {
+  margin-top: 0.75rem;
+  font-size: 0.82rem;
+}
+
+.mission-task-modal__jalon {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.8rem;
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-surface-2);
+  font-weight: 700;
+}
+
+.mission-task-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.mission-task-modal__grid label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.mission-task-modal__grid input,
+.mission-task-modal__grid select,
+.mission-task-modal__grid textarea {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.45rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.mission-task-modal__pv {
+  grid-column: 1 / -1;
+}
+
+.mission-task-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 700px) {
+  .mission-task-modal__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mission-task-modal__pv {
+    grid-column: auto;
+  }
+}

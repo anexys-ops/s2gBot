@@ -24,7 +24,7 @@ type AttenduFilter = 'all' | 'pending' | 'complete'
 
 const STATUS_TABS: { key: string; label: string; color: string; bg: string }[] = [
   { key: 'en_transit', label: 'En transit', color: '#d97706', bg: '#fef3c7' },
-  { key: 'receptionne', label: 'Réceptionné', color: '#3b82f6', bg: '#dbeafe' },
+  { key: 'receptionne', label: 'En attente d’impression', color: '#3b82f6', bg: '#dbeafe' },
   { key: 'imprime', label: 'Imprimé', color: '#0891b2', bg: '#cffafe' },
   { key: 'stocke', label: 'Stocké', color: '#059669', bg: '#d1fae5' },
   { key: 'en_essai', label: 'En essai', color: '#7c3aed', bg: '#ede9fe' },
@@ -698,7 +698,7 @@ function LineSamplesHistory({
 
   const statusLabel = (status: string) => {
     if (status === 'annule') return 'Annulé'
-    if (status === 'receptionne') return 'Réceptionné'
+    if (status === 'receptionne') return 'En attente d’impression'
     if (status === 'en_transit') return 'En transit'
     return status
   }

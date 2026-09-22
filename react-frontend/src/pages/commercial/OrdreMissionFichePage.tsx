@@ -9,7 +9,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { adminUsersApi, bonsCommandeApi, ordresMissionApi, type OrdreMission, type OrdreMissionLigne, type User } from '../../api/client'
+import { adminUsersApi, bonsCommandeApi, equipmentsApi, ordresMissionApi, type EquipmentRow, type OrdreMission, type OrdreMissionLigne, type User } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import OmExpensePanel from '../../components/ordres-mission/OmExpensePanel'
 import OmLigneAddPanel from '../../components/ordres-mission/OmLigneAddPanel'
@@ -19,7 +19,7 @@ import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/S
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import CentreGroupField from '../../components/centres/CentreGroupField'
 import { useAuth } from '../../contexts/AuthContext'
-import { dateInputFromApi, formatAppDate } from '../../lib/appLocale'
+import { dateInputFromApi } from '../../lib/appLocale'
 import {
   ordreMissionBonCommande,
   ordreMissionDossier,
@@ -40,17 +40,28 @@ const TYPE_META: Record<string, { label: string; color: string }> = {
 }
 
 const STATUTS = ['brouillon', 'planifie', 'en_cours', 'termine', 'annule'] as const
-const STATUTS_LIGNE = ['a_faire', 'en_cours', 'realise', 'annule'] as const
+const STATUTS_LIGNE = [
+  { value: 'planifie', label: 'Planifié' },
+  { value: 'en_cours', label: 'En cours' },
+  { value: 'freeze', label: 'Freeze' },
+  { value: 'annule', label: 'Annulé' },
+  { value: 'attente_validation', label: 'Attente validation' },
+  { value: 'cloture', label: 'Clôturé' },
+] as const
 
 type OmDraft = {
   statut: OrdreMission['statut']
   responsable_id: number | null
   lab_centre_group_id: number | null
+  date_prevue: string
+  notes: string
 }
 
 type LigneDraft = {
+  libelle: string
   quantite: string
   assigned_user_id: number | null
+  equipment_id: number | null
   date_prevue: string
   statut: OrdreMissionLigne['statut']
 }
@@ -68,8 +79,10 @@ function buildDraftsFromOm(om: OrdreMission): { omDraft: OmDraft; ligneDrafts: R
   const ligneDrafts: Record<number, LigneDraft> = {}
   for (const ligne of om.lignes ?? []) {
     ligneDrafts[ligne.id] = {
+      libelle: ligne.libelle,
       quantite: String(ligne.quantite ?? ''),
       assigned_user_id: ligne.assigned_user_id ?? null,
+      equipment_id: ligne.equipment_id ?? null,
       date_prevue: dateInputFromApi(ligne.date_prevue),
       statut: ligne.statut,
     }
@@ -79,6 +92,8 @@ function buildDraftsFromOm(om: OrdreMission): { omDraft: OmDraft; ligneDrafts: R
       statut: om.statut,
       responsable_id: om.responsable_id ?? null,
       lab_centre_group_id: om.lab_centre_group_id ?? null,
+      date_prevue: dateInputFromApi(om.date_prevue),
+      notes: om.notes ?? '',
     },
     ligneDrafts,
   }
@@ -87,11 +102,15 @@ function buildDraftsFromOm(om: OrdreMission): { omDraft: OmDraft; ligneDrafts: R
 function computeIsDirty(om: OrdreMission, omDraft: OmDraft, ligneDrafts: Record<number, LigneDraft>): boolean {
   if (omDraft.responsable_id !== (om.responsable_id ?? null)) return true
   if (omDraft.lab_centre_group_id !== (om.lab_centre_group_id ?? null)) return true
+  if (omDraft.date_prevue !== dateInputFromApi(om.date_prevue)) return true
+  if (omDraft.notes !== (om.notes ?? '')) return true
   for (const ligne of om.lignes ?? []) {
     const draft = ligneDrafts[ligne.id]
     if (!draft) continue
+    if (draft.libelle !== ligne.libelle) return true
     if (Number(draft.quantite) !== Number(ligne.quantite)) return true
     if (draft.assigned_user_id !== (ligne.assigned_user_id ?? null)) return true
+    if (draft.equipment_id !== (ligne.equipment_id ?? null)) return true
     if (draft.date_prevue !== dateInputFromApi(ligne.date_prevue)) return true
     if (draft.statut !== ligne.statut) return true
   }
@@ -173,7 +192,7 @@ function JalonBulkControls({
           disabled={pending}
         >
           <option value="">Ne pas modifier</option>
-          {STATUTS_LIGNE.map((item) => <option key={item} value={item}>{item.replace('_', ' ')}</option>)}
+          {STATUTS_LIGNE.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select>
       </label>
       <button
@@ -255,6 +274,13 @@ export default function OrdreMissionFichePage() {
   })
   const users: User[] = Array.isArray(usersRaw) ? usersRaw : (usersRaw?.data ?? [])
 
+  const { data: equipmentsRaw } = useQuery({
+    queryKey: ['equipments', 'om-selector'],
+    queryFn: () => equipmentsApi.list(),
+    staleTime: 120_000,
+  })
+  const equipments: EquipmentRow[] = equipmentsRaw ?? []
+
   const saveMut = useMutation({
     mutationFn: async () => {
       if (!om || !omDraft) return
@@ -265,6 +291,10 @@ export default function OrdreMissionFichePage() {
       if (omDraft.lab_centre_group_id !== (om.lab_centre_group_id ?? null)) {
         omBody.lab_centre_group_id = omDraft.lab_centre_group_id
       }
+      if (omDraft.date_prevue !== dateInputFromApi(om.date_prevue)) {
+        omBody.date_prevue = omDraft.date_prevue || null
+      }
+      if (omDraft.notes !== (om.notes ?? '')) omBody.notes = omDraft.notes || null
       if (Object.keys(omBody).length > 0) {
         await ordresMissionApi.update(omId, omBody)
       }
@@ -273,10 +303,12 @@ export default function OrdreMissionFichePage() {
         const draft = ligneDrafts[ligne.id]
         if (!draft) continue
         const body: Partial<OrdreMissionLigne> = {}
+        if (draft.libelle !== ligne.libelle) body.libelle = draft.libelle
         if (Number(draft.quantite) !== Number(ligne.quantite)) body.quantite = Number(draft.quantite)
         if (draft.assigned_user_id !== (ligne.assigned_user_id ?? null)) {
           body.assigned_user_id = draft.assigned_user_id
         }
+        if (draft.equipment_id !== (ligne.equipment_id ?? null)) body.equipment_id = draft.equipment_id
         if (draft.date_prevue !== dateInputFromApi(ligne.date_prevue)) {
           body.date_prevue = draft.date_prevue || null
         }
@@ -288,7 +320,7 @@ export default function OrdreMissionFichePage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
       void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
-      void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+      void qc.invalidateQueries({ queryKey: ['mission-tasks-list'] })
     },
   })
 
@@ -301,7 +333,7 @@ export default function OrdreMissionFichePage() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
-      void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+      void qc.invalidateQueries({ queryKey: ['mission-tasks-list'] })
     },
     onError: (_error, _statut, context) => {
       if (context?.previousStatut) {
@@ -328,8 +360,10 @@ export default function OrdreMissionFichePage() {
     const draft = ligneDrafts[ligne.id]
     if (!draft) return {}
     const body: Partial<OrdreMissionLigne> = {}
+    if (draft.libelle !== ligne.libelle) body.libelle = draft.libelle
     if (Number(draft.quantite) !== Number(ligne.quantite)) body.quantite = Number(draft.quantite)
     if (draft.assigned_user_id !== (ligne.assigned_user_id ?? null)) body.assigned_user_id = draft.assigned_user_id
+    if (draft.equipment_id !== (ligne.equipment_id ?? null)) body.equipment_id = draft.equipment_id
     if (draft.date_prevue !== dateInputFromApi(ligne.date_prevue)) body.date_prevue = draft.date_prevue || null
     if (draft.statut !== ligne.statut) body.statut = draft.statut
     return body
@@ -341,7 +375,7 @@ export default function OrdreMissionFichePage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
       void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
-      void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+      void qc.invalidateQueries({ queryKey: ['mission-tasks-list'] })
       void qc.invalidateQueries({ queryKey: ['om-availability'] })
     },
   })
@@ -355,7 +389,7 @@ export default function OrdreMissionFichePage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
       void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
-      void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+      void qc.invalidateQueries({ queryKey: ['mission-tasks-list'] })
       void qc.invalidateQueries({ queryKey: ['om-availability'] })
     },
   })
@@ -365,7 +399,7 @@ export default function OrdreMissionFichePage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
       void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
-      void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+      void qc.invalidateQueries({ queryKey: ['mission-tasks-list'] })
       setDeleteLigneTarget(null)
     },
   })
@@ -563,7 +597,12 @@ export default function OrdreMissionFichePage() {
           <div className="bc-fiche__summary-item">
             <span className="bc-fiche__summary-label">Date prévue</span>
             <span className="bc-fiche__summary-value">
-              {om.date_prevue ? formatAppDate(om.date_prevue) : '—'}
+              <input
+                type="date"
+                value={omDraft.date_prevue}
+                onChange={(event) => setOmDraft((current) => current ? { ...current, date_prevue: event.target.value } : current)}
+                disabled={saveMut.isPending}
+              />
             </span>
           </div>
           <div className="bc-fiche__summary-item">
@@ -591,7 +630,16 @@ export default function OrdreMissionFichePage() {
             </span>
           </div>
         </div>
-        {om.notes ? <p className="om-fiche__notes">{om.notes}</p> : null}
+        <label className="om-fiche__notes">
+          <span className="bc-fiche__summary-label">Notes</span>
+          <textarea
+            rows={2}
+            value={omDraft.notes}
+            onChange={(event) => setOmDraft((current) => current ? { ...current, notes: event.target.value } : current)}
+            disabled={saveMut.isPending}
+            style={{ width: '100%', marginTop: '0.25rem' }}
+          />
+        </label>
         {isLab ? (
           <div style={{ marginTop: '0.75rem', maxWidth: 320 }}>
             <CentreGroupField
@@ -634,7 +682,7 @@ export default function OrdreMissionFichePage() {
               onCreated={() => {
                 void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
                 void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
-                void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+                void qc.invalidateQueries({ queryKey: ['mission-tasks-list'] })
               }}
             />
           </div>
@@ -694,7 +742,16 @@ export default function OrdreMissionFichePage() {
                     return (
                       <tr key={ligne.id} className={group.jalon ? 'om-lignes-table__task--nested' : undefined}>
                         <td>
-                          <div>{ligne.libelle}</div>
+                          {isLab ? (
+                            <input
+                              type="text"
+                              value={draft.libelle}
+                              onChange={(event) => updateLigneDraft(ligne.id, { libelle: event.target.value })}
+                              disabled={saveMut.isPending || isSavingThisLine}
+                              aria-label={`Libellé pour ${ligne.libelle}`}
+                              style={{ minWidth: 180 }}
+                            />
+                          ) : <div>{ligne.libelle}</div>}
                           {ligne.articleAction && <small className="text-muted">{ligne.articleAction.duree_heures}h estimé</small>}
                         </td>
                         <td className="om-ligne-article-cell">
@@ -747,13 +804,27 @@ export default function OrdreMissionFichePage() {
                           </select>
                         </td>
                         <td>
-                          {ligne.equipment ? (
+                          {isLab ? (
+                            <select
+                              value={draft.equipment_id ?? ''}
+                              onChange={(event) => updateLigneDraft(ligne.id, {
+                                equipment_id: event.target.value ? Number(event.target.value) : null,
+                              })}
+                              disabled={saveMut.isPending || isSavingThisLine}
+                              style={{ fontSize: '0.82rem', minWidth: 140 }}
+                            >
+                              <option value="">— Aucun —</option>
+                              {equipments.map((equipment) => (
+                                <option key={equipment.id} value={equipment.id}>
+                                  {[equipment.code, equipment.name].filter(Boolean).join(' — ')}
+                                </option>
+                              ))}
+                            </select>
+                          ) : ligne.equipment ? (
                             <Link to={`/materiel/equipements/${ligne.equipment.id}`} className="link-inline">
                               {[ligne.equipment.code, ligne.equipment.name].filter(Boolean).join(' — ')}
                             </Link>
-                          ) : (
-                            '—'
-                          )}
+                          ) : '—'}
                         </td>
                         <td>
                           <input
@@ -779,7 +850,9 @@ export default function OrdreMissionFichePage() {
                             disabled={saveMut.isPending || isSavingThisLine}
                             style={{ fontSize: '0.82rem' }}
                           >
-                            {STATUTS_LIGNE.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+                            {STATUTS_LIGNE.map((status) => (
+                              <option key={status.value} value={status.value}>{status.label}</option>
+                            ))}
                           </select>
                         </td>
                         {isLab ? (

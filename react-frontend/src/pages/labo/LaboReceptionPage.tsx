@@ -100,7 +100,7 @@ export default function LaboReceptionPage() {
   const [search, setSearch] = useState('')
   const [foldSearch, setFoldSearch] = useState('')
   const [attenduFilter, setAttenduFilter] = useState<AttenduFilter>('pending')
-  const [selectedTab, setSelectedTab] = useState('receptionne')
+  const [selectedTab, setSelectedTab] = useState('en_transit')
   const [receptionMode, setReceptionMode] = useState<ReceptionMode | null>(null)
   const [labelData, setLabelData] = useState<SampleLabelData | null>(null)
   const [labelQueue, setLabelQueue] = useState<SampleLabelData[]>([])
@@ -201,10 +201,11 @@ export default function LaboReceptionPage() {
       ]}
       moduleBarLabel="Laboratoire — Réception"
       title="Réception Laboratoire"
-      subtitle="Lignes de BC confirmés prêtes pour la réception terrain"
+      subtitle="Étiquettes préparées par les tâches technicien et réceptions attendues"
     >
       <p className="text-muted" style={{ marginBottom: '1.25rem', maxWidth: 720, lineHeight: 1.5 }}>
-        Réceptionnez les échantillons depuis les lignes de bon de commande (issues des devis signés).
+        Les tâches technicien alimentent automatiquement les étiquettes en attente. Réceptionnez ensuite les
+        échantillons depuis la tâche ou la ligne du bon de commande.
         Chaque réception génère un numéro FOLD, un numéro transco (code-barres) et une étiquette QR (A6 ou A5).
       </p>
 
@@ -266,6 +267,7 @@ export default function LaboReceptionPage() {
                   <th>Produit / Essai</th>
                   <th className="data-table__code">BC</th>
                   <th className="data-table__reference">Chantier / Dossier</th>
+                  <th>Tâche / Étiquettes</th>
                   <th>Technicien</th>
                   <th className="data-table__num">Réception</th>
                   <th>Actions</th>
@@ -274,7 +276,7 @@ export default function LaboReceptionPage() {
               <tbody>
                 {filteredAttendus.length === 0 && (
                   <tr>
-                    <td colSpan={6} style={{ padding: '1.5rem', textAlign: 'center', color: '#6b7280' }}>
+                    <td colSpan={7} style={{ padding: '1.5rem', textAlign: 'center', color: '#6b7280' }}>
                       Aucun produit en attente de réception.
                     </td>
                   </tr>
@@ -309,7 +311,23 @@ export default function LaboReceptionPage() {
                           </div>
                         )}
                       </td>
-                      <td style={{ fontSize: '0.88rem' }}>{row.technicien?.name ?? '—'}</td>
+                      <td>
+                        {(row.tasks ?? []).length > 0 ? row.tasks.map((task) => (
+                          <div key={task.id} style={{ marginBottom: '0.25rem' }}>
+                            <Link to={`/terrain/taches?task=${task.id}`} className="link-inline">
+                              {task.unique_number ?? `Tâche ${task.id}`}
+                            </Link>
+                            <div style={{ fontSize: '0.78rem', color: '#d97706', fontWeight: 600 }}>
+                              {task.pending_labels > 0
+                                ? `${task.pending_labels} étiquette${task.pending_labels === 1 ? '' : 's'} en attente`
+                                : 'Réception traitée'}
+                            </div>
+                          </div>
+                        )) : <span className="text-muted">Non générée</span>}
+                      </td>
+                      <td style={{ fontSize: '0.88rem' }}>
+                        {row.tasks?.[0]?.assigned_user?.name ?? row.technicien?.name ?? '—'}
+                      </td>
                       <td className="data-table__num">
                         <ProgressCell row={row} />
                       </td>
@@ -336,7 +354,7 @@ export default function LaboReceptionPage() {
                     </tr>
                     {expandedLineId === row.id && (
                       <tr>
-                        <td colSpan={6} style={{ background: '#f9fafb', padding: '0.75rem 1rem' }}>
+                        <td colSpan={7} style={{ background: '#f9fafb', padding: '0.75rem 1rem' }}>
                           <LineSamplesHistory
                             lineId={row.id}
                             onPrintLabel={(id) => void openLabel(id)}
@@ -473,6 +491,14 @@ export default function LaboReceptionPage() {
                         <div>{sample.product?.libelle ?? sample.bon_commande_ligne?.libelle ?? '—'}</div>
                         {sample.product?.code && (
                           <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>[{sample.product.code}]</div>
+                        )}
+                        {sample.task && (
+                          <div style={{ fontSize: '0.78rem', marginTop: 2 }}>
+                            Tâche :{' '}
+                            <Link to={`/terrain/taches?task=${sample.task.id}`} className="link-inline">
+                              {sample.task.unique_number ?? `Tâche ${sample.task.id}`}
+                            </Link>
+                          </div>
                         )}
                       </td>
                       <td style={{ fontSize: '0.85rem' }}>

@@ -151,12 +151,29 @@ class MissionTaskTerrainBoardTest extends TestCase
             'task_id' => $task->id,
             'mission_order_id' => $om->id,
             'bon_commande_ligne_id' => $ligne->bon_commande_ligne_id,
-            'status' => Sample::STATUS_RECEPTIONNE,
+            'status' => Sample::STATUS_EN_TRANSIT,
+            'received_at' => null,
         ]);
+        $this->assertNotNull(Sample::query()->where('task_id', $task->id)->value('prepared_by_task_at'));
         $this->assertSame(['PV-2026-0042'], $task->fresh()->pv_numbers);
         $this->assertSame('unité', $task->fresh()->quantity_unit);
         $this->assertSame('cloture', $ligne->fresh()->statut);
         $this->assertSame(OrdreMission::STATUT_TERMINE, $om->fresh()->statut);
+
+        $attendus = $this->actingAs($lab, 'sanctum')
+            ->getJson('/api/v1/lab/reception/attendus')
+            ->assertOk();
+        $row = collect($attendus->json('data'))->firstWhere('id', $ligne->bon_commande_ligne_id);
+        $this->assertSame(1, $row['quantite_en_transit']);
+        $this->assertFalse($row['reception_complete']);
+        $this->assertSame($task->unique_number, $row['tasks'][0]['unique_number']);
+        $this->assertSame(1, $row['tasks'][0]['quantity_count']);
+        $this->assertSame(1, $row['tasks'][0]['pending_labels']);
+
+        $this->actingAs($lab, 'sanctum')
+            ->getJson('/api/v1/samples?status=en_transit')
+            ->assertOk()
+            ->assertJsonPath('data.0.task.unique_number', $task->unique_number);
 
         $this->actingAs($lab, 'sanctum')
             ->postJson("/api/mission-tasks/{$task->id}/close-reception", $payload)

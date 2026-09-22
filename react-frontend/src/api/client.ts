@@ -1863,6 +1863,17 @@ export type LabReceptionAttendu = {
   quantite_recue: number
   quantite_manquante: number
   reception_complete: boolean
+  tasks: Array<{
+    id: number
+    unique_number?: string | null
+    statut: string
+    quantity_count?: number | null
+    quantity_unit?: string | null
+    pending_labels: number
+    pv_numbers?: string[] | null
+    assigned_user?: { id: number; name: string } | null
+    reception_generated_at?: string | null
+  }>
   article?: { id: number; code: string; libelle: string } | null
   technicien?: { id: number; name: string } | null
   bon_commande?: { id: number; numero: string; statut: string; date_commande?: string | null } | null
@@ -1885,6 +1896,7 @@ export type LabReceptionAttendusResponse = {
 
 export type ReceptionSample = {
   id: number
+  task_id?: number | null
   fold_number?: string | null
   transco_number?: string | null
   reception_index?: number | null
@@ -1910,6 +1922,14 @@ export type ReceptionSample = {
   product?: { id: number; code: string; libelle: string } | null
   collected_by?: { id: number; name: string } | null
   received_by?: { id: number; name: string } | null
+  task?: {
+    id: number
+    unique_number?: string | null
+    statut: string
+    quantity_count?: number | null
+    quantity_unit?: string | null
+    pv_numbers?: string[] | null
+  } | null
   cancelled_by?: { id: number; name: string } | null
   bon_commande_ligne?: {
     id: number

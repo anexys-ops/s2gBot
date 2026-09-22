@@ -24,8 +24,14 @@ class BonCommandeController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $unassignedPlanning = $request->boolean('planning_unassigned');
+        $relations = ['dossier', 'client', 'clientContact', 'quote'];
+        $relations['lignes'] = $unassignedPlanning
+            ? fn ($query) => $query->whereDoesntHave('planningAffectations')->orderBy('ordre')->orderBy('id')
+            : fn ($query) => $query->orderBy('ordre')->orderBy('id');
+
         $q = BonCommande::query()
-            ->with(['dossier', 'client', 'clientContact', 'lignes', 'quote'])
+            ->with($relations)
             ->withCount(['bonsLivraison', 'invoices'])
             ->orderByDesc('date_commande')
             ->orderByDesc('id');
@@ -40,6 +46,10 @@ class BonCommandeController extends Controller
         }
         if ($request->boolean('planning')) {
             $q->planifiable();
+        }
+        if ($unassignedPlanning) {
+            $q->planifiable()
+                ->whereHas('lignes', fn ($query) => $query->whereDoesntHave('planningAffectations'));
         }
         if ($search = trim((string) $request->query('search', ''))) {
             $like = '%'.$search.'%';

@@ -821,6 +821,25 @@ class BonCommandeWorkflowTest extends TestCase
         $numeros = collect($list->json())->pluck('numero')->all();
         $this->assertContains($bc['numero'], $numeros);
         $this->assertNotContains('BCC-2099-ANNULE', $numeros);
+
+        $unassigned = $this->actingAs($lab, 'sanctum')
+            ->getJson('/api/v1/bons-commande?planning=1&planning_unassigned=1');
+        $unassigned->assertOk()->assertJsonCount(1)->assertJsonCount(1, '0.lignes');
+        $this->assertSame($bc['numero'], $unassigned->json('0.numero'));
+
+        $tech = User::factory()->create(['role' => User::ROLE_LAB_TECHNICIAN]);
+        BcLignePlanningAffectation::query()->create([
+            'bon_commande_ligne_id' => $bc['lignes'][0]['id'],
+            'user_id' => $tech->id,
+            'date_debut' => '2026-03-01',
+            'date_fin' => '2026-03-01',
+            'created_by' => $lab->id,
+        ]);
+
+        $this->actingAs($lab, 'sanctum')
+            ->getJson('/api/v1/bons-commande?planning=1&planning_unassigned=1')
+            ->assertOk()
+            ->assertJsonCount(0);
     }
 
     public function test_planning_terrain_store_accepts_brouillon_bc_line(): void

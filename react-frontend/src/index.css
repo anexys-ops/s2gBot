@@ -1180,6 +1180,114 @@ button.link-inline.invoice-number-btn {
   background: #fffbeb;
 }
 
+.terrain-planning__print-title {
+  display: none;
+}
+
+.terrain-planning__filters {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.terrain-planning__period-modes,
+.terrain-planning__filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.55rem;
+}
+
+.terrain-planning__filter-row label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--color-text-muted, #64748b);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.terrain-planning__filter-row select {
+  min-width: 15rem;
+}
+
+.terrain-planning__week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.terrain-planning__day-card {
+  min-width: 0;
+  padding: 0.5rem;
+  font-size: 0.76rem;
+}
+
+.terrain-planning__day-title {
+  margin-bottom: 0.4rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--color-border, #d8dee8);
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.terrain-planning__day-event {
+  display: grid;
+  gap: 0.1rem;
+  margin-bottom: 0.45rem;
+  line-height: 1.25;
+}
+
+@media (max-width: 920px) {
+  .terrain-planning__week-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media print {
+  .terrain-planning .module-shell__bar,
+  .terrain-planning .module-shell__breadcrumb,
+  .terrain-planning .module-shell__header,
+  .terrain-planning__unassigned,
+  .terrain-planning__actions,
+  .terrain-planning .no-print {
+    display: none !important;
+  }
+
+  .terrain-planning__print-title {
+    display: block;
+    margin-bottom: 1rem;
+  }
+
+  .terrain-planning__print-title h1,
+  .terrain-planning__print-title p {
+    margin: 0 0 0.25rem;
+  }
+
+  .terrain-planning .module-shell__body,
+  .terrain-planning .module-shell__content {
+    padding: 0;
+  }
+
+  .terrain-planning__week-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.2rem;
+  }
+
+  .terrain-planning__day-card {
+    padding: 0.3rem;
+    border: 1px solid #cbd5e1;
+    box-shadow: none;
+  }
+
+  .terrain-planning__print-area a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .terrain-planning__print-area .table-wrap {
+    overflow: visible;
+  }
+}
+
 .swagger-ui-host {
   min-height: 68vh;
   padding: 0 !important;

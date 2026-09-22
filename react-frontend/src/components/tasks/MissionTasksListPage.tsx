@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { missionTasksApi, planningTerrainApi, type MissionTask } from '../../api/client'
 import ModuleEntityShell from '../module/ModuleEntityShell'
@@ -155,7 +155,7 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
     }),
     onSuccess: async (result) => {
       await refresh()
-      setMessage(`${result.samples_created || task.quantity_count || 0} étiquette(s) préparée(s), en attente d’impression dans la réception laboratoire.`)
+      setMessage(`${result.samples_created || task.quantity_count || 0} étiquette(s) transmise(s), en attente de réception au laboratoire.`)
     },
   })
 
@@ -251,6 +251,7 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
 
 export default function MissionTasksListPage({ context }: { context: MissionTasksContext }) {
   const meta = CONTEXT_META[context]
+  const [searchParams, setSearchParams] = useSearchParams()
   const [statusFilter, setStatusFilter] = useState('')
   const [selectedTask, setSelectedTask] = useState<MissionTask | null>(null)
 
@@ -261,6 +262,21 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
       : missionTasksApi.terrainBoard({ type: meta.type }),
     staleTime: 30_000,
   })
+
+  useEffect(() => {
+    const requestedTaskId = Number(searchParams.get('task'))
+    if (!requestedTaskId || selectedTask?.id === requestedTaskId) return
+    const requestedTask = tasks.find((task) => task.id === requestedTaskId)
+    if (requestedTask) setSelectedTask(requestedTask)
+  }, [searchParams, selectedTask, tasks])
+
+  const closeTaskModal = () => {
+    setSelectedTask(null)
+    if (!searchParams.has('task')) return
+    const next = new URLSearchParams(searchParams)
+    next.delete('task')
+    setSearchParams(next, { replace: true })
+  }
 
   const counts = useMemo(() => {
     const result: Record<string, number> = {}
@@ -382,7 +398,7 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
       <p className="text-muted mission-task-list__hint">
         Cliquez sur une ligne pour modifier la tâche, saisir les PV et préparer les étiquettes de réception.
       </p>
-      {selectedTask ? <TaskEditModal key={selectedTask.id} task={selectedTask} context={context} onClose={() => setSelectedTask(null)} /> : null}
+      {selectedTask ? <TaskEditModal key={selectedTask.id} task={selectedTask} context={context} onClose={closeTaskModal} /> : null}
     </ModuleEntityShell>
   )
 }

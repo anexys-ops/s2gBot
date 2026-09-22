@@ -30,7 +30,7 @@ class SampleReceptionController extends Controller
     private const REL = [
         'dossier:id,reference,titre',
         'missionOrder:id,unique_number,numero,type',
-        'task:id,unique_number,statut',
+        'task:id,unique_number,statut,quantity_count,quantity_unit,pv_numbers',
         'product:id,libelle,code',
         'bonCommandeLigne:id,libelle,bon_commande_id',
         'bonCommandeLigne.bonCommande:id,numero,client_id,dossier_id',

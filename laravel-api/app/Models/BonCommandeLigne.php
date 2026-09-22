@@ -76,4 +76,9 @@ class BonCommandeLigne extends Model
     {
         return $this->hasMany(Sample::class, 'bon_commande_ligne_id');
     }
+
+    public function ordreMissionLignes(): HasMany
+    {
+        return $this->hasMany(OrdreMissionLigne::class, 'bon_commande_ligne_id');
+    }
 }

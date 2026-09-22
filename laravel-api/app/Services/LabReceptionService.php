@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
+use App\Models\MissionTask;
 use App\Models\Sample;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -29,7 +30,11 @@ class LabReceptionService
     public function eligibleLinesQuery(): Builder
     {
         return BonCommandeLigne::query()
-            ->whereNotNull('technicien_id')
+            ->where(function (Builder $q) {
+                $q->whereNotNull('technicien_id')
+                    ->orWhereHas('ordreMissionLignes.missionTasks', fn (Builder $task) => $task
+                        ->whereNotNull('reception_generated_at'));
+            })
             ->whereHas('bonCommande', function (Builder $q) {
                 $q->whereIn('statut', self::BC_STATUTS_ELIGIBLES);
             })
@@ -64,6 +69,10 @@ class LabReceptionService
                         ->orWhere('titre', 'like', $like))
                     ->orWhereHas('bonCommande.dossier.site', fn (Builder $s) => $s->where('name', 'like', $like))
                     ->orWhereHas('technicien', fn (Builder $t) => $t->where('name', 'like', $like))
+                    ->orWhereHas('ordreMissionLignes.missionTasks', fn (Builder $task) => $task
+                        ->where('unique_number', 'like', $like))
+                    ->orWhereHas('ordreMissionLignes.missionTasks.assignedUser', fn (Builder $user) => $user
+                        ->where('name', 'like', $like))
                     ->orWhereHas('article', fn (Builder $a) => $a
                         ->where('code', 'like', $like)
                         ->orWhere('libelle', 'like', $like));
@@ -73,8 +82,26 @@ class LabReceptionService
         $lignes = $q->orderByDesc('id')->get();
         $lineIds = $lignes->pluck('id')->all();
         $counts = $this->sampleCountsByLine($lineIds);
+        $tasks = MissionTask::query()
+            ->whereNotNull('reception_generated_at')
+            ->whereHas('ordreMissionLigne', fn (Builder $taskLine) => $taskLine
+                ->whereIn('bon_commande_ligne_id', $lineIds))
+            ->with([
+                'ordreMissionLigne:id,bon_commande_ligne_id',
+                'assignedUser:id,name',
+            ])
+            ->orderByDesc('reception_generated_at')
+            ->get();
+        $pendingByTask = Sample::query()
+            ->selectRaw('task_id, COUNT(*) as cnt')
+            ->whereIn('task_id', $tasks->pluck('id'))
+            ->where('status', Sample::STATUS_EN_TRANSIT)
+            ->groupBy('task_id')
+            ->pluck('cnt', 'task_id');
+        $tasksByLine = $tasks
+            ->groupBy(fn (MissionTask $task) => $task->ordreMissionLigne?->bon_commande_ligne_id);
 
-        return $lignes->map(function (BonCommandeLigne $ligne) use ($counts) {
+        return $lignes->map(function (BonCommandeLigne $ligne) use ($counts, $tasksByLine, $pendingByTask) {
             $bc = $ligne->bonCommande;
             $dossier = $bc?->dossier;
             $c = $counts[$ligne->id] ?? ['en_transit' => 0, 'recu' => 0, 'total' => 0];
@@ -87,7 +114,21 @@ class LabReceptionService
                 'quantite_en_transit' => $c['en_transit'],
                 'quantite_recue' => $c['recu'],
                 'quantite_manquante' => max(0, $attendu - $c['total']),
-                'reception_complete' => $attendu > 0 && $c['total'] >= $attendu,
+                'reception_complete' => $attendu > 0 && $c['recu'] >= $attendu,
+                'tasks' => $tasksByLine->get($ligne->id, collect())->map(fn (MissionTask $task) => [
+                    'id' => $task->id,
+                    'unique_number' => $task->unique_number,
+                    'statut' => $task->statut,
+                    'quantity_count' => $task->quantity_count,
+                    'quantity_unit' => $task->quantity_unit,
+                    'pending_labels' => (int) ($pendingByTask[$task->id] ?? 0),
+                    'pv_numbers' => $task->pv_numbers ?? [],
+                    'assigned_user' => $task->assignedUser ? [
+                        'id' => $task->assignedUser->id,
+                        'name' => $task->assignedUser->name,
+                    ] : null,
+                    'reception_generated_at' => $task->reception_generated_at?->toIso8601String(),
+                ])->values()->all(),
                 'article' => $ligne->article ? [
                     'id' => $ligne->article->id,
                     'code' => $ligne->article->code,
@@ -160,7 +201,10 @@ class LabReceptionService
     {
         $ligne->loadMissing(['bonCommande.dossier']);
 
-        if (! $ligne->technicien_id) {
+        $hasPreparedTask = $ligne->ordreMissionLignes()
+            ->whereHas('missionTasks', fn (Builder $task) => $task->whereNotNull('reception_generated_at'))
+            ->exists();
+        if (! $ligne->technicien_id && ! $hasPreparedTask) {
             return false;
         }
 

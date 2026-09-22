@@ -64,6 +64,7 @@ class Sample extends Model
         'dossier_id',
         'mission_order_id',
         'task_id',
+        'prepared_by_task_at',
         'product_id',
         'bon_commande_ligne_id',
         'description',
@@ -90,6 +91,7 @@ class Sample extends Model
     {
         return [
             'received_at'    => 'datetime',
+            'prepared_by_task_at' => 'datetime',
             'collected_at'   => 'datetime',
             'cancelled_at'   => 'datetime',
             'depth_top_m'    => 'decimal:3',

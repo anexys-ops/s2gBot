@@ -310,20 +310,31 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
         <button
           type="button"
           className={`mission-task-list__filter${statusFilter === '' ? ' is-active' : ''}`}
+          aria-pressed={statusFilter === ''}
           onClick={() => setStatusFilter('')}
         >
           Tous <strong>{tasks.length}</strong>
         </button>
-        {TASK_FILTERS.map((filter) => (
-          <button
-            key={filter.key}
-            type="button"
-            className={`mission-task-list__filter${statusFilter === filter.key ? ' is-active' : ''}`}
-            onClick={() => setStatusFilter(statusFilter === filter.key ? '' : filter.key)}
-          >
-            {filter.label} <strong>{counts[filter.key] ?? 0}</strong>
-          </button>
-        ))}
+        {TASK_FILTERS.map((filter) => {
+          const selected = statusFilter === filter.key
+          const color = getTaskStatutMeta(filter.key)
+          return (
+            <button
+              key={filter.key}
+              type="button"
+              className={`mission-task-list__filter${selected ? ' is-active' : ''}`}
+              aria-pressed={selected}
+              style={{
+                borderColor: color.color,
+                background: selected ? color.color : color.bg,
+                color: selected ? '#fff' : color.color,
+              }}
+              onClick={() => setStatusFilter(selected ? '' : filter.key)}
+            >
+              {filter.label} <strong>{counts[filter.key] ?? 0}</strong>
+            </button>
+          )
+        })}
       </section>
 
       {isLoading ? <p className="text-muted">Chargement…</p> : null}

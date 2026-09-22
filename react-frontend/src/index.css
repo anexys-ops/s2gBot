@@ -11675,6 +11675,11 @@ a.catalogue-tree__link-article:hover {
   color: #fff;
 }
 
+.mission-task-list__filter:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
 .mission-task-list__table-card {
   padding: 0;
   overflow: hidden;

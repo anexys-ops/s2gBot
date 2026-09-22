@@ -11,13 +11,13 @@ export interface TaskStatutMeta {
 }
 
 export const TASK_STATUT_META: Record<string, TaskStatutMeta> = {
-  todo:        { label: 'Planifié',   color: '#6b7280', bg: '#f3f4f6' },
-  in_progress: { label: 'En cours',  color: '#f59e0b', bg: '#fef3c7' },
-  paused:      { label: 'En cours',  color: '#f59e0b', bg: '#fef3c7' },
-  frozen:      { label: 'Freeze',    color: '#0ea5e9', bg: '#e0f2fe' },
-  done:        { label: 'Attente validation', color: '#3b82f6', bg: '#dbeafe' },
+  todo:        { label: 'Planifié',   color: '#3b82f6', bg: '#dbeafe' },
+  in_progress: { label: 'En cours',  color: '#d97706', bg: '#fef3c7' },
+  paused:      { label: 'En cours',  color: '#d97706', bg: '#fef3c7' },
+  frozen:      { label: 'Freeze',    color: '#0891b2', bg: '#cffafe' },
+  done:        { label: 'Attente validation', color: '#7c3aed', bg: '#ede9fe' },
   validated:   { label: 'Clôturé',   color: '#10b981', bg: '#d1fae5' },
-  rejected:    { label: 'Annulé',    color: '#ef4444', bg: '#fee2e2' },
+  rejected:    { label: 'Annulé',    color: '#6b7280', bg: '#f3f4f6' },
 }
 
 export const TASK_FILTERS = [

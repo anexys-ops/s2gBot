@@ -33,13 +33,8 @@ class MaterielAffectationController extends Controller
 
         if (! empty($validated['from'])) {
             $q->where(function ($sub) use ($validated) {
-                $sub->whereDate('date_retour_prevue', '>=', $validated['from'])
-                    ->orWhereDate('date_retour_effective', '>=', $validated['from'])
-                    ->orWhere(function ($inner) use ($validated) {
-                        $inner->whereNull('date_retour_prevue')
-                            ->whereNull('date_retour_effective')
-                            ->whereDate('date_debut', '>=', $validated['from']);
-                    });
+                $sub->whereNull('date_retour_effective')
+                    ->orWhereDate('date_retour_effective', '>=', $validated['from']);
             });
         }
 

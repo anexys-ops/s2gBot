@@ -5,6 +5,7 @@ export const DOCUMENT_PDF_TYPE_LABELS: Record<string, string> = {
   purchase_order: 'Bon de commande',
   delivery_note: 'Bon de livraison',
   expense_report: 'Note de frais',
+  terrain_planning: 'Planning terrain',
 }
 
 export function documentPdfTypeLabel(documentType: string): string {
@@ -12,7 +13,7 @@ export function documentPdfTypeLabel(documentType: string): string {
 }
 
 /** Type API pour POST /pdf/generate */
-export type PdfGenerateType = 'quote' | 'invoice' | 'report' | 'purchase_order' | 'delivery_note' | 'expense_report'
+export type PdfGenerateType = 'quote' | 'invoice' | 'report' | 'purchase_order' | 'delivery_note' | 'expense_report' | 'terrain_planning'
 
 export function pdfGenerateTypeLabel(type: PdfGenerateType): string {
   return documentPdfTypeLabel(type)

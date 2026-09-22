@@ -1152,6 +1152,26 @@ export const planningTerrainApi = {
     if (params.user_id) q.set('user_id', String(params.user_id))
     return api<PlanningTerrainAffectationRow[]>(`/v1/planning-terrain?${q.toString()}`)
   },
+  fetchPdf: async (params: { from: string; to: string; user_id?: number; template_id?: number }) => {
+    const token = getToken()
+    const res = await fetch(`${API_BASE}/v1/planning-terrain/pdf`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/pdf,*/*',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(params),
+    })
+    if (res.status === 401) {
+      handleApiUnauthorized('/v1/planning-terrain/pdf', Boolean(token))
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || 'Erreur lors de la génération du planning PDF')
+    }
+    return res.blob()
+  },
   create: (body: {
     bon_commande_ligne_id: number
     user_id: number

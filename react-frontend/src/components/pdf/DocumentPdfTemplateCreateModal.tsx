@@ -18,6 +18,7 @@ const BLADE_LABELS: Record<string, string> = {
   'pdf.purchase_order_dossier_recap': 'BC — Récap dossier',
   'pdf.delivery_note': 'Bon de livraison',
   'pdf.expense_report': 'Note de frais',
+  'pdf.terrain_planning': 'Programme terrain',
   'reports.order': 'Rapport commande',
   'pdf.examples.synthese': 'Rapport — synthèse',
   'pdf.examples.granulometrie': 'Rapport — granulométrie',

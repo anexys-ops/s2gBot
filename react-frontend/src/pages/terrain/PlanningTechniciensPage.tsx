@@ -7,6 +7,7 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 import { dateInputFromApi, toLocalDateInput } from '../../lib/appLocale'
 import { formatTechnicienOption } from '../../lib/userRolePresentation'
+import TerrainPlanningPdfModal from '../../components/pdf/TerrainPlanningPdfModal'
 
 type PeriodMode = 'jour' | 'semaine' | 'periode'
 
@@ -67,6 +68,7 @@ export default function PlanningTechniciensPage() {
   const [unposDebutMap, setUnposDebutMap] = useState<Record<number, string>>({})
   const [unposFinMap, setUnposFinMap] = useState<Record<number, string>>({})
   const [unposNotesMap, setUnposNotesMap] = useState<Record<number, string>>({})
+  const [pdfOpen, setPdfOpen] = useState(false)
 
   const { data: affectations, isLoading, error } = useQuery({
     queryKey: ['planning-terrain', from, to, userFilter],
@@ -308,7 +310,11 @@ export default function PlanningTechniciensPage() {
               ))}
             </select>
           </label>
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => window.print()}>Imprimer</button>
+          {lab ? (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setPdfOpen(true)}>
+              Générer le PDF
+            </button>
+          ) : null}
         </div>
       </section>
 
@@ -394,6 +400,15 @@ export default function PlanningTechniciensPage() {
       <p className="text-muted no-print" style={{ marginTop: '1.5rem' }}>
         Navigation <Link to="/terrain">Chantier</Link> — les périodes par produit se saisissent sur la fiche d’un <Link to="/bons-commande">bon de commande</Link>.
       </p>
+      {pdfOpen ? (
+        <TerrainPlanningPdfModal
+          from={from}
+          to={to}
+          userId={userFilter === '' ? undefined : userFilter}
+          technicianLabel={printTechnicianLabel}
+          onClose={() => setPdfOpen(false)}
+        />
+      ) : null}
     </ModuleEntityShell>
   )
 }

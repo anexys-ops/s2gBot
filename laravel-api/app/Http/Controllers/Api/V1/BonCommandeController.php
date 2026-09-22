@@ -7,6 +7,7 @@ use App\Models\BcLignePlanningAffectation;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
 use App\Models\Quote;
+use App\Services\BonCommandeTotalsService;
 use App\Services\BonLivraisonDeliveryService;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\CommercialDocumentWorkflowService;
@@ -20,6 +21,7 @@ class BonCommandeController extends Controller
     public function __construct(
         private readonly CommercialDocumentWorkflowService $workflow,
         private readonly BonLivraisonDeliveryService $delivery,
+        private readonly BonCommandeTotalsService $totals,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -79,6 +81,7 @@ class BonCommandeController extends Controller
         if (! AgencyAccess::userMayAccessBonCommande($request->user(), $bonCommande)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
+        $this->totals->synchronize($bonCommande);
         $bonCommande->load([
             'lignes.planningAffectations.user',
             'lignes.technicien',
@@ -242,20 +245,7 @@ class BonCommandeController extends Controller
 
     private function recalculateBonCommandeTotals(BonCommande $bonCommande): void
     {
-        $bonCommande->load(['lignes', 'client']);
-        $rows = [];
-        foreach ($bonCommande->lignes as $l) {
-            $rows[] = [
-                'ht' => (float) $l->montant_ht,
-                'tva_rate' => (float) $l->tva_rate,
-            ];
-        }
-        $caAnnuelTvaRegime = $bonCommande->client?->usesCaAnnuelTvaRegime() ?? false;
-        $totals = CommercialDocumentTotalsService::computeTotals($rows, 0, 0, 0, 0, 0, 20, $caAnnuelTvaRegime);
-        $bonCommande->update([
-            'montant_ht' => $totals['amount_ht'],
-            'montant_ttc' => $totals['amount_ttc'],
-        ]);
+        $this->totals->synchronize($bonCommande);
     }
 
     private function formatQtyLabel(float $qty): string

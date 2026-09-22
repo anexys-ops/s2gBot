@@ -13,6 +13,7 @@ class BonCommandePdfGenerator
     public function __construct(
         private BonCommandePdfPresentationService $presentation,
         private BonCommandeLineDisplayService $lineDisplay,
+        private BonCommandeTotalsService $totals,
         private CommercialPdfCache $pdfCache,
     ) {}
 
@@ -21,6 +22,7 @@ class BonCommandePdfGenerator
      */
     public function generate(BonCommande $bonCommande, ?int $requestTemplateId = null): array
     {
+        $this->totals->synchronize($bonCommande);
         $template = PdfTemplateResolver::resolve('purchase_order', $requestTemplateId, null);
         $cacheKey = $this->pdfCache->keyForDocument(
             'purchase_order_v2',

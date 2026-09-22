@@ -17,6 +17,7 @@ import {
   filterForfaitBcLigneIds,
   filterForfaitBcLignes,
   isForfaitBcJalon,
+  isNonBillableForfaitBcLigne,
   resolveDevisDisplayMeta,
   resolveQuantiteDevis,
 } from '../../lib/bcLigneDisplay'
@@ -306,6 +307,7 @@ export default function BonCommandeFichePage() {
     let ht = 0
     let tva = 0
     for (const l of bc.lignes) {
+      if (isNonBillableForfaitBcLigne(l, devisDisplayMeta)) continue
       const rawQty = qtyEdits[l.id]
       const rawPrix = prixEdits[l.id]
       const qty =
@@ -326,7 +328,7 @@ export default function BonCommandeFichePage() {
       tva: Math.round(tva * 100) / 100,
       ttc: Math.round((ht + tva) * 100) / 100,
     }
-  }, [bc?.lignes, qtyEdits, prixEdits])
+  }, [bc?.lignes, devisDisplayMeta, qtyEdits, prixEdits])
   const bls = bc?.bons_livraison ?? []
   const statutBadge = useMemo(
     () => (bc ? bonCommandeStatutBadgeProps(bc.statut) : null),

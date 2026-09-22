@@ -1651,6 +1651,7 @@ export const equipmentsApi = {
       date_debut: string
       date_retour_prevue: string | null
       date_retour_effective: string | null
+      etat_retour: 'bon' | 'usage' | 'degrade' | null
       observations: string | null
     }>,
   ) =>

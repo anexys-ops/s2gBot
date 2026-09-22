@@ -163,6 +163,47 @@ class EquipmentMaintenanceAndAffectationTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_assigned_technician_can_confirm_equipment_return_only(): void
+    {
+        $technician = User::factory()->create([
+            'role' => User::ROLE_LAB_TECHNICIAN,
+            'client_id' => null,
+            'site_id' => null,
+        ]);
+        $otherTechnician = User::factory()->create([
+            'role' => User::ROLE_LAB_TECHNICIAN,
+            'client_id' => null,
+            'site_id' => null,
+        ]);
+        $equipment = $this->createEquipment('EQ-RETURN-'.uniqid());
+        $affectation = MaterielAffectation::create([
+            'equipment_id' => $equipment->id,
+            'user_id' => $technician->id,
+            'date_debut' => now()->subDay()->toDateString(),
+        ]);
+
+        $this->actingAs($otherTechnician, 'sanctum')
+            ->patchJson("/api/equipments/{$equipment->id}/affectations/{$affectation->id}", [
+                'date_retour_effective' => now()->toDateString(),
+                'etat_retour' => 'bon',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($technician, 'sanctum')
+            ->patchJson("/api/equipments/{$equipment->id}/affectations/{$affectation->id}", [
+                'date_retour_effective' => now()->toDateString(),
+                'etat_retour' => 'bon',
+            ])
+            ->assertOk()
+            ->assertJsonPath('etat_retour', 'bon');
+
+        $this->assertDatabaseHas('materiel_affectations', [
+            'id' => $affectation->id,
+            'date_retour_effective' => now()->startOfDay()->toDateTimeString(),
+            'etat_retour' => 'bon',
+        ]);
+    }
+
     public function test_maintenance_plan_due_dates_expand_in_range(): void
     {
         $plan = EquipmentMaintenancePlan::make([

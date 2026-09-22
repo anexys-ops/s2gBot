@@ -3,11 +3,15 @@
 namespace Tests\Unit;
 
 use App\Models\BonCommande;
+use App\Models\BonCommandeLigne;
+use App\Models\Catalogue\Article;
+use App\Models\Catalogue\FamilleArticle;
 use App\Models\Client;
 use App\Models\ClientContact;
 use App\Models\Dossier;
 use App\Models\DossierContact;
 use App\Models\Site;
+use App\Models\Quote;
 use App\Models\User;
 use App\Services\BonCommandePdfPresentationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -158,5 +162,94 @@ class BonCommandePdfPresentationTest extends TestCase
         $this->assertTrue(collect($ctx['prestation_types'])->firstWhere('key', 'etude_geotechniques')['checked']);
         $this->assertTrue($ctx['documents']['plans']);
         $this->assertSame('Plans architecte', $ctx['documents']['autres']);
+    }
+
+    public function test_build_item_rows_groups_bc_lines_by_quote_jalon_and_uses_bc_quantities(): void
+    {
+        $client = Client::query()->create(['name' => 'Client PDF jalons']);
+        $user = User::factory()->create(['role' => User::ROLE_LAB_ADMIN]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-BC-PDF',
+            'titre' => 'Dossier PDF BC',
+            'client_id' => $client->id,
+            'statut' => Dossier::STATUT_EN_COURS,
+            'date_debut' => '2026-09-01',
+            'created_by' => $user->id,
+        ]);
+        $famille = FamilleArticle::query()->create([
+            'code' => 'FAM-BC-PDF',
+            'libelle' => 'Famille PDF BC',
+            'actif' => true,
+        ]);
+        $article = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
+            'code' => 'BET-01',
+            'libelle' => 'Essai béton',
+            'description_commerciale' => "Essai béton\nPrélèvement sur chantier\nRapport détaillé",
+            'unite' => 'U',
+            'kind' => Article::KIND_PRODUCT,
+            'actif' => true,
+        ]);
+        $quote = Quote::query()->create([
+            'number' => 'DEV-BC-PDF',
+            'client_id' => $client->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-09-01',
+            'amount_ht' => 750,
+            'amount_ttc' => 900,
+            'status' => Quote::STATUS_SIGNED,
+            'meta' => [
+                'devis_jalons' => [[
+                    'id' => 'j-beton',
+                    'libelle' => 'Contrôle de béton',
+                    's2g_code' => 'CB',
+                    'mode' => 'forfait',
+                    'product_ref_article_ids' => [$article->id],
+                ]],
+                'devis_parcours' => [['kind' => 'jalon', 'id' => 'j-beton']],
+            ],
+        ]);
+        $bc = BonCommande::query()->create([
+            'numero' => 'BCC-PDF-001',
+            'quote_id' => $quote->id,
+            'dossier_id' => $dossier->id,
+            'client_id' => $client->id,
+            'statut' => BonCommande::STATUT_CONFIRME,
+            'date_commande' => '2026-09-02',
+            'montant_ht' => 750,
+            'montant_ttc' => 900,
+            'created_by' => $user->id,
+        ]);
+        BonCommandeLigne::query()->create([
+            'bon_commande_id' => $bc->id,
+            'libelle' => 'Prestation forfaitaire — Contrôle de béton',
+            'ordre' => 0,
+            'quantite' => 3,
+            'prix_unitaire_ht' => 250,
+            'tva_rate' => 20,
+            'montant_ht' => 750,
+        ]);
+        BonCommandeLigne::query()->create([
+            'bon_commande_id' => $bc->id,
+            'ref_article_id' => $article->id,
+            'libelle' => 'Essai béton',
+            'ordre' => 1,
+            'quantite' => 3,
+            'prix_unitaire_ht' => 0,
+            'tva_rate' => 20,
+            'montant_ht' => 0,
+        ]);
+
+        $rows = app(BonCommandePdfPresentationService::class)->buildItemRows($bc->fresh());
+
+        $this->assertSame(['jalon_header', 'forfait_total', 'product'], array_column($rows, 'type'));
+        $this->assertSame('Contrôle de béton', $rows[0]['label']);
+        $this->assertSame(3, $rows[1]['qte']);
+        $this->assertSame(250.0, $rows[1]['pu']);
+        $this->assertSame(750.0, $rows[1]['pt']);
+        $this->assertTrue($rows[2]['nested']);
+        $this->assertNull($rows[2]['qte']);
+        $this->assertNull($rows[2]['pu']);
+        $this->assertSame(['Prélèvement sur chantier', 'Rapport détaillé'], $rows[2]['details']);
     }
 }

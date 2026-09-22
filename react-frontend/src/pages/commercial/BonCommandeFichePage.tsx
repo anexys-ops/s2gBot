@@ -272,9 +272,12 @@ export default function BonCommandeFichePage() {
     [bc?.lignes],
   )
 
-  function applyJalonMassQty(jalonId: string, ligneIds: number[]) {
+  function applyJalonMassQty(jalonId: string, ligneIds: number[], forfaitLigneId?: number) {
     const editableIds = filterForfaitBcLigneIds(ligneIds, ligneById, devisDisplayMeta)
-    const lignes = editableIds
+    const targetIds = forfaitLigneId == null
+      ? editableIds
+      : [forfaitLigneId, ...editableIds]
+    const lignes = targetIds
       .map((id) => ligneById.get(id))
       .filter((l): l is BonCommandeLigne => l != null)
     applyMassQtyToLignes(
@@ -676,7 +679,7 @@ export default function BonCommandeFichePage() {
                                       onChange={(value) =>
                                         setJalonMassQty((prev) => ({ ...prev, [row.jalonId]: value }))
                                       }
-                                      onApply={() => applyJalonMassQty(row.jalonId, row.ligneIds)}
+                                      onApply={() => applyJalonMassQty(row.jalonId, row.ligneIds, row.forfaitLigne?.id)}
                                     />
                                   </div>
                                 ) : null}

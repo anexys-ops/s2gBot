@@ -6,6 +6,8 @@ use App\Models\Equipment;
 use App\Models\EquipmentMaintenancePlan;
 use App\Models\MaterielAffectation;
 use App\Models\User;
+use App\Models\Catalogue\Article;
+use Database\Seeders\S2gCatalogueSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -249,5 +251,34 @@ class EquipmentMaintenanceAndAffectationTest extends TestCase
             ->assertJsonPath('id', $equipment->id)
             ->assertJsonCount(1, 'maintenance_plans')
             ->assertJsonCount(1, 'planning_slots');
+    }
+
+    public function test_equipment_show_exposes_catalogue_links_created_from_article_side(): void
+    {
+        $this->seed(S2gCatalogueSeeder::class);
+
+        $admin = User::factory()->labAdmin()->create();
+        $equipment = $this->createEquipment('EQ-CATALOGUE-'.uniqid());
+        $article = Article::query()->where('kind', Article::KIND_PRODUCT)->firstOrFail();
+
+        $requirementId = (int) $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/articles/{$article->id}/equipment-requirements", [
+                'equipment_id' => $equipment->id,
+                'quantite' => 1,
+            ])
+            ->assertCreated()
+            ->json('id');
+
+        $this->getJson("/api/equipments/{$equipment->id}")
+            ->assertOk()
+            ->assertJsonPath('article_requirements.0.id', $requirementId)
+            ->assertJsonPath('article_requirements.0.ref_article_id', $article->id)
+            ->assertJsonPath('article_requirements.0.equipment_id', $equipment->id)
+            ->assertJsonPath('article_requirements.0.article.id', $article->id);
+
+        $this->deleteJson("/api/articles/{$article->id}/equipment-requirements/{$requirementId}")
+            ->assertNoContent();
+
+        $this->assertDatabaseMissing('article_equipment_requirements', ['id' => $requirementId]);
     }
 }

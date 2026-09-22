@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { equipmentsApi, type EquipmentRow } from '../../api/client'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  articleActionsApi,
+  catalogueApi,
+  equipmentsApi,
+  type ArticleEquipmentRequirement,
+  type EquipmentRow,
+} from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import StatusBadge, { equipementStatutBadgeProps } from '../../components/ds/StatusBadge'
 import EquipmentSuiviTab from '../../components/materiel/EquipmentSuiviTab'
@@ -49,7 +55,112 @@ function latestIntervention(eq: EquipmentRow) {
   return [...cals].sort((a, b) => String(b.calibration_date).localeCompare(String(a.calibration_date)))[0]
 }
 
-function EquipmentOverview({ eq }: { eq: EquipmentRow }) {
+function EquipmentCatalogueLinks({ eq, isAdmin }: { eq: EquipmentRow; isAdmin: boolean }) {
+  const queryClient = useQueryClient()
+  const [articleId, setArticleId] = useState('')
+  const [search, setSearch] = useState('')
+  const requirements = eq.article_requirements ?? []
+  const linkedIds = new Set(requirements.map((requirement) => requirement.ref_article_id))
+
+  const { data: catalogueArticles = [], isLoading } = useQuery({
+    queryKey: ['catalogue-articles', 'equipment-links'],
+    queryFn: () => catalogueApi.articles(),
+    enabled: isAdmin,
+  })
+
+  const choices = catalogueArticles.filter((article) => {
+    if (!article.actif || linkedIds.has(article.id)) return false
+    if (article.kind !== 'jalon' && article.kind !== 'product') return false
+    const term = search.trim().toLowerCase()
+    return !term || `${article.code} ${article.libelle}`.toLowerCase().includes(term)
+  })
+
+  const addMutation = useMutation({
+    mutationFn: () => articleActionsApi.equipmentAdd(Number(articleId), { equipment_id: eq.id, quantite: 1 }),
+    onSuccess: () => {
+      setArticleId('')
+      void queryClient.invalidateQueries({ queryKey: ['equipment', eq.id] })
+    },
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: (requirement: ArticleEquipmentRequirement) =>
+      articleActionsApi.equipmentRemove(requirement.ref_article_id, requirement.id),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['equipment', eq.id] }),
+  })
+
+  return (
+    <section className="card equipment-fiche__section">
+      <div className="equipment-create-form__types-head">
+        <h2 className="equipment-fiche__section-title">Essais et produits du catalogue</h2>
+        <span className="badge">{requirements.length} lié{requirements.length !== 1 ? 's' : ''}</span>
+      </div>
+      <p className="text-muted equipment-fiche__empty">
+        Ces liaisons utilisent la même table que l’affectation du matériel depuis la fiche produit.
+      </p>
+
+      {requirements.length > 0 ? (
+        <div className="table-wrap">
+          <table className="data-table data-table--compact">
+            <thead><tr><th>Code</th><th>Libellé</th><th>Type</th>{isAdmin ? <th>Action</th> : null}</tr></thead>
+            <tbody>
+              {requirements.map((requirement) => (
+                <tr key={requirement.id}>
+                  <td><code className="code-badge">{requirement.article?.code ?? `#${requirement.ref_article_id}`}</code></td>
+                  <td>{requirement.article?.libelle ?? 'Article du catalogue'}</td>
+                  <td>{requirement.article?.kind === 'product' ? 'Produit' : 'Essai / jalon'}</td>
+                  {isAdmin ? (
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm btn-danger-outline"
+                        disabled={removeMutation.isPending}
+                        onClick={() => removeMutation.mutate(requirement)}
+                      >
+                        Retirer
+                      </button>
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-muted equipment-fiche__empty">Aucun essai ou produit du catalogue associé.</p>
+      )}
+
+      {isAdmin ? (
+        <div className="catalogue-article-new-form__grid equipment-catalogue-links__add">
+          <label className="catalogue-article-new-form__col-4">
+            Rechercher dans tout le catalogue
+            <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Code ou libellé…" />
+          </label>
+          <label className="catalogue-article-new-form__col-6">
+            Essai ou produit
+            <select value={articleId} onChange={(event) => setArticleId(event.target.value)} disabled={isLoading}>
+              <option value="">— Choisir dans le catalogue —</option>
+              {choices.map((article) => (
+                <option key={article.id} value={article.id}>
+                  {article.code} — {article.libelle} ({article.kind === 'product' ? 'Produit' : 'Essai / jalon'})
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="catalogue-article-new-form__col-2 crud-actions">
+            <button type="button" className="btn btn-primary btn-sm" disabled={!articleId || addMutation.isPending} onClick={() => addMutation.mutate()}>
+              Ajouter
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {addMutation.isError ? <p className="error">{(addMutation.error as Error).message}</p> : null}
+      {removeMutation.isError ? <p className="error">{(removeMutation.error as Error).message}</p> : null}
+    </section>
+  )
+}
+
+function EquipmentOverview({ eq, isAdmin }: { eq: EquipmentRow; isAdmin: boolean }) {
   const st = equipementStatutBadgeProps(eq.status)
   const nextPlan = nextMaintenancePlan(eq)
   const activeAffect = currentAffectation(eq)
@@ -140,6 +251,8 @@ function EquipmentOverview({ eq }: { eq: EquipmentRow }) {
           <p className="text-muted equipment-fiche__empty">Aucun type d&apos;essai associé.</p>
         )}
       </section>
+
+      <EquipmentCatalogueLinks eq={eq} isAdmin={isAdmin} />
     </div>
   )
 }
@@ -253,7 +366,7 @@ export default function EquipmentDetailPage() {
         ))}
       </div>
 
-      {tab === 'overview' && <EquipmentOverview eq={eq} />}
+      {tab === 'overview' && <EquipmentOverview eq={eq} isAdmin={isAdmin} />}
       {tab === 'suivi' && (
         <EquipmentSuiviTab equipment={eq} equipmentId={equipmentId} isAdmin={isAdmin} />
       )}

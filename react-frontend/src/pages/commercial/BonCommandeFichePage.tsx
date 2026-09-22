@@ -66,12 +66,10 @@ function applyMassQtyToLignes(
 type BcJalonQtyMassProps = {
   jalonLabel: string
   value: string
-  lineCount: number
   onChange: (value: string) => void
-  onApply: () => void
 }
 
-function BcJalonQtyMass({ jalonLabel, value, lineCount, onChange, onApply }: BcJalonQtyMassProps) {
+function BcJalonQtyMass({ jalonLabel, value, onChange }: BcJalonQtyMassProps) {
   return (
     <div className="bc-jalon-qty-mass">
       <label className="bc-jalon-qty-mass__field">
@@ -87,14 +85,7 @@ function BcJalonQtyMass({ jalonLabel, value, lineCount, onChange, onApply }: BcJ
           aria-label={`Quantité en masse pour le jalon ${jalonLabel}`}
         />
       </label>
-      <button
-        type="button"
-        className="btn btn-secondary btn-sm bc-jalon-qty-mass__apply"
-        disabled={!value.trim() || lineCount === 0}
-        onClick={onApply}
-      >
-        Appliquer ({lineCount})
-      </button>
+      <span className="bc-jalon-qty-mass__hint">Jalon et lignes</span>
     </div>
   )
 }
@@ -272,7 +263,7 @@ export default function BonCommandeFichePage() {
     [bc?.lignes],
   )
 
-  function applyJalonMassQty(jalonId: string, ligneIds: number[], forfaitLigneId?: number) {
+  function applyJalonMassQty(rawMassQty: string, ligneIds: number[], forfaitLigneId?: number) {
     const editableIds = filterForfaitBcLigneIds(ligneIds, ligneById, devisDisplayMeta)
     const targetIds = forfaitLigneId == null
       ? editableIds
@@ -282,7 +273,7 @@ export default function BonCommandeFichePage() {
       .filter((l): l is BonCommandeLigne => l != null)
     applyMassQtyToLignes(
       lignes,
-      jalonMassQty[jalonId] ?? '',
+      rawMassQty,
       setQtyEdits,
       () => setPlanningToast({ message: 'Quantité en masse invalide.', variant: 'error' }),
       () => mutQuantites.reset(),
@@ -675,11 +666,10 @@ export default function BonCommandeFichePage() {
                                     <BcJalonQtyMass
                                       jalonLabel={row.label}
                                       value={jalonMassQty[row.jalonId] ?? ''}
-                                      lineCount={editableJalonIds.length}
-                                      onChange={(value) =>
+                                      onChange={(value) => {
                                         setJalonMassQty((prev) => ({ ...prev, [row.jalonId]: value }))
-                                      }
-                                      onApply={() => applyJalonMassQty(row.jalonId, row.ligneIds, row.forfaitLigne?.id)}
+                                        applyJalonMassQty(value, row.ligneIds, row.forfaitLigne?.id)
+                                      }}
                                     />
                                   </div>
                                 ) : null}

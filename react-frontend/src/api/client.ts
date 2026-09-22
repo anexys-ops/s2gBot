@@ -968,6 +968,10 @@ export type BonCommande = {
   tva_rate: string | number
   notes?: string | null
   lignes?: BonCommandeLigne[]
+  planning_terrain_groups?: Array<{
+    jalon: { id: string; code?: string | null; label: string }
+    lignes: BonCommandeLigne[]
+  }>
   client?: { id: number; name: string }
   clientContact?: ClientContactRow
   dossier?: DossierRow

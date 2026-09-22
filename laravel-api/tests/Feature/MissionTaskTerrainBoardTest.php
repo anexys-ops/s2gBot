@@ -65,8 +65,8 @@ class MissionTaskTerrainBoardTest extends TestCase
         $this->assertDatabaseHas('planning_humans', [
             'mission_task_id' => $task->id,
             'user_id' => $technicien->id,
-            'date_debut' => '2026-09-24',
-            'date_fin' => '2026-09-24',
+            'date_debut' => '2026-09-24 00:00:00',
+            'date_fin' => '2026-09-24 00:00:00',
         ]);
 
         $this->actingAs($lab, 'sanctum')

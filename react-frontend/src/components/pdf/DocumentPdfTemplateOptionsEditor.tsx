@@ -26,10 +26,46 @@ function setMeta<K extends keyof PdfLayoutConfigForm['meta']>(
 
 export default function DocumentPdfTemplateOptionsEditor({ form, setForm, disabled, documentType }: Props) {
   const isReport = documentType === 'report'
-  const showCommercialOptions = !isReport
+  const isTerrainPlanning = documentType === 'terrain_planning'
+  const showCommercialOptions = !isReport && !isTerrainPlanning
 
   return (
     <>
+      {isTerrainPlanning ? (
+        <section className="pdf-layout-editor__section">
+          <h3 className="pdf-layout-editor__h">En-tête du programme</h3>
+          <label className="pdf-layout-editor__check">
+            <input
+              type="checkbox"
+              checked={form.header.show_logo}
+              onChange={(e) => setForm((current) => ({
+                ...current,
+                header: { ...current.header, show_logo: e.target.checked },
+              }))}
+              disabled={disabled}
+            />
+            Afficher le logo
+          </label>
+          <div className="form-group" style={{ marginTop: '0.75rem' }}>
+            <label htmlFor="planning-pdf-subtitle">Sous-titre optionnel</label>
+            <input
+              id="planning-pdf-subtitle"
+              className="input"
+              value={form.header.subtitle}
+              onChange={(e) => setForm((current) => ({
+                ...current,
+                header: { ...current.header, subtitle: e.target.value },
+              }))}
+              disabled={disabled}
+              placeholder="Ex. Direction des opérations terrain"
+            />
+          </div>
+          <p className="pdf-layout-editor__hint">
+            Le programme contient le technicien, les dates, le client, le bon de commande, la tâche, la quantité et les notes.
+          </p>
+        </section>
+      ) : null}
+
       {showCommercialOptions ? (
         <section className="pdf-layout-editor__section">
           <h3 className="pdf-layout-editor__h">En-tête document</h3>

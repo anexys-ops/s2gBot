@@ -15,6 +15,7 @@ class PdfTemplateResolver
         'delivery_note',
         'expense_report',
         'rapport_bc',
+        'terrain_planning',
     ];
 
     public static function resolve(string $documentType, ?int $requestTemplateId, ?int $modelTemplateId = null): ?DocumentPdfTemplate
@@ -61,6 +62,7 @@ class PdfTemplateResolver
             'delivery_note' => ['pdf.delivery_note'],
             'expense_report' => ['pdf.expense_report'],
             'rapport_bc' => ['pdf.rapport_bc'],
+            'terrain_planning' => ['pdf.terrain_planning'],
             default => [],
         };
     }

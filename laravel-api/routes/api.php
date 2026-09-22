@@ -158,6 +158,7 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('role:responsable')
             ->whereNumber('bonCommande');
         Route::get('planning-terrain/techniciens', [PlanningTerrainController::class, 'techniciens']);
+        Route::post('planning-terrain/pdf', [PlanningTerrainController::class, 'pdf']);
         Route::get('planning-terrain', [PlanningTerrainController::class, 'index']);
         Route::post('planning-terrain', [PlanningTerrainController::class, 'store']);
         Route::put('planning-terrain/{bcLignePlanningAffectation}', [PlanningTerrainController::class, 'update'])

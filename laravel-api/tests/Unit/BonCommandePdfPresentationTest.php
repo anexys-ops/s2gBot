@@ -168,10 +168,12 @@ class BonCommandePdfPresentationTest extends TestCase
     {
         $client = Client::query()->create(['name' => 'Client PDF jalons']);
         $user = User::factory()->create(['role' => User::ROLE_LAB_ADMIN]);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Chantier PDF BC']);
         $dossier = Dossier::query()->create([
             'reference' => 'DOS-BC-PDF',
             'titre' => 'Dossier PDF BC',
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'statut' => Dossier::STATUT_EN_COURS,
             'date_debut' => '2026-09-01',
             'created_by' => $user->id,

@@ -152,7 +152,7 @@ class TestTypeController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
         $data = $request->validate([
-            'assignments' => 'required|array',
+            'assignments' => 'present|array',
             'assignments.*.article_id' => 'required|integer|distinct|exists:ref_articles,id',
             'assignments.*.article_action_id' => 'nullable|integer|exists:article_actions,id',
         ]);

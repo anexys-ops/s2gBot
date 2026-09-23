@@ -830,6 +830,10 @@ export const catalogueApi = {
   },
   article: (id: number) =>
     api<RefArticleRow | { data: RefArticleRow }>(`/v1/catalogue/articles/${id}`).then(unwrapCatalogueArticle),
+  syncArticleTestTypes: (id: number, assignments: Array<{ test_type_id: number; article_action_id: number | null }>) =>
+    api<RefArticleRow | { data: RefArticleRow }>(`/v1/catalogue/articles/${id}/test-types`, {
+      method: 'PUT', body: JSON.stringify({ assignments }),
+    }).then(unwrapCatalogueArticle),
   createArticle: (body: RefArticleCreateInput) =>
     api<RefArticleRow | { data: RefArticleRow }>('/v1/catalogue/articles', {
       method: 'POST',

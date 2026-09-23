@@ -107,6 +107,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('catalogue/articles', [ArticleController::class, 'store']);
         Route::put('catalogue/articles/{article}', [ArticleController::class, 'update'])
             ->whereNumber('article');
+        Route::put('catalogue/articles/{article}/test-types', [ArticleController::class, 'syncTestTypes'])
+            ->whereNumber('article');
         Route::delete('catalogue/articles/{article}', [ArticleController::class, 'destroy'])
             ->whereNumber('article');
         Route::put('catalogue/articles/{article}/lab-visibility', [ArticleController::class, 'syncLabVisibility'])

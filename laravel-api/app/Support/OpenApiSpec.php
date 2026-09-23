@@ -171,6 +171,10 @@ class OpenApiSpec
             '/test-types/{testType}/products' => [
                 'put' => ['tags' => ['Labo'], 'summary' => 'Affecter le formulaire aux produits et actions', 'parameters' => [self::pathId('testType')], 'responses' => ['200' => ['description' => 'Affectations mises à jour']]],
             ],
+            '/v1/catalogue/articles/{article}/test-types' => [
+                'put' => ['tags' => ['Référentiels'], 'summary' => 'Affecter les essais et formulaires à un produit',
+                    'parameters' => [self::pathId('article')], 'responses' => ['200' => ['description' => 'Essais du produit mis à jour']]],
+            ],
             '/samples/{sample}/results' => [
                 'post' => ['tags' => ['Labo'], 'summary' => 'Saisir résultat d’essai', 'parameters' => [self::pathId('sample')], 'responses' => ['201' => ['description' => 'OK']]],
             ],

@@ -6,12 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Catalogue\ArticleResource;
 use App\Models\Agency;
 use App\Models\Catalogue\Article;
+use App\Models\ArticleAction;
+use App\Models\TestType;
 use App\Services\Catalogue\ArticleS2gRelationService;
 use App\Support\AgencyAccess;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ArticleController extends Controller
 {
@@ -233,6 +236,38 @@ class ArticleController extends Controller
         $article->delete();
 
         return response()->json(null, 204);
+    }
+
+    /** Affecte les formulaires d'essai à ce produit sans toucher aux autres produits. */
+    public function syncTestTypes(Request $request, Article $article): JsonResponse
+    {
+        $this->authorize('update', $article);
+        if (! $article->isProduct()) {
+            throw ValidationException::withMessages(['article' => 'Les essais ne peuvent être associés qu’à un produit.']);
+        }
+
+        $data = $request->validate([
+            'assignments' => 'present|array',
+            'assignments.*.test_type_id' => 'required|integer|distinct|exists:test_types,id',
+            'assignments.*.article_action_id' => 'nullable|integer|exists:article_actions,id',
+        ]);
+        $sync = [];
+        foreach ($data['assignments'] as $assignment) {
+            $type = TestType::query()->findOrFail($assignment['test_type_id']);
+            if (empty($type->form_fields)) {
+                throw ValidationException::withMessages(['assignments' => 'Le type « '.$type->name.' » ne possède pas de formulaire.']);
+            }
+            $actionId = $assignment['article_action_id'] ?? null;
+            if ($actionId && ! ArticleAction::query()->whereKey($actionId)->where('ref_article_id', $article->id)->exists()) {
+                throw ValidationException::withMessages(['assignments' => 'Cette action n’appartient pas au produit.']);
+            }
+            $sync[$type->id] = ['article_action_id' => $actionId];
+        }
+
+        $article->testTypes()->sync($sync);
+        $article->load(['testTypes' => fn ($query) => $query->select('test_types.id', 'name', 'norm')]);
+
+        return (new ArticleResource($article))->response();
     }
 
     /**

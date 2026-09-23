@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ArticleAgencyVisibilityPanel from '../../components/Catalogue/ArticleAgencyVisibilityPanel'
 import ArticleActionsPanel from '../../components/Catalogue/ArticleActionsPanel'
+import ArticleTestTypesPanel from '../../components/Catalogue/ArticleTestTypesPanel'
 import ArticleCompositionEditor from '../../components/Catalogue/ArticleCompositionEditor'
 import JalonProductsPanel from '../../components/Catalogue/JalonProductsPanel'
 import ProductJalonsPanel from '../../components/Catalogue/ProductJalonsPanel'
@@ -24,7 +25,7 @@ const TAB_DEFS: { id: ArticleTab; label: string; labOnly?: boolean }[] = [
   { id: 'descriptions', label: 'Descriptions' },
   { id: 'tables', label: 'Tables' },
   { id: 'composition', label: 'Composition' },
-  { id: 'actions', label: 'Actions & matériel', labOnly: true },
+  { id: 'actions', label: 'Actions, matériel & essais', labOnly: true },
   { id: 'extrafields', label: 'Champs personnalisés', labOnly: true },
 ]
 
@@ -280,11 +281,7 @@ export default function ArticleFichePage() {
       {tab === 'composition' && <ArticleCompositionEditor articleId={articleId} canEdit={isLab && isEditing} />}
       {tab === 'actions' && isLab && (
         <>
-          {article.kind === 'product' ? <section className="card" style={{ marginBottom: '1rem', padding: '1rem' }}>
-            <h2>Formulaires d’essai associés</h2>
-            {article.test_types?.length ? <ul>{article.test_types.map((type) => <li key={type.id}>{type.name}{type.norm ? ` — ${type.norm}` : ''}{type.article_action_id ? ' (action ciblée)' : ' (toutes les actions)'}</li>)}</ul> : <p>Aucun formulaire affecté.</p>}
-            <Link to="/catalogue/essais">Gérer les types d’essais et formulaires</Link>
-          </section> : null}
+          {article.kind === 'product' ? <ArticleTestTypesPanel article={article} canEdit={isAdmin} /> : null}
           <ArticleActionsPanel article={article} canEdit={isEditing && user?.role === 'lab_admin'} />
         </>
       )}

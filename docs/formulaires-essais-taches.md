@@ -2,6 +2,8 @@
 
 Le module [Types d’essais](/catalogue/essais) permet de créer un type d’essai, de définir ses champs de formulaire puis de l’affecter à un ou plusieurs **produits** du catalogue. Une affectation peut viser toutes les actions du produit ou une action précise (`article_action_id`). Les tâches terrain, laboratoire et ingénierie issues de ce produit héritent du même formulaire réutilisable.
 
+Le menu principal **Essais → Types d’essais et formulaires** ouvre ce module. Sur la fiche d’un produit, l’onglet **Actions, matériel & essais** permet à un administrateur laboratoire d’ajouter les essais nécessaires et de cibler une action. L’enregistrement sur une fiche produit ne modifie pas les affectations des autres produits.
+
 Champs pris en charge : `number`, `text`, `date`, `select`, `boolean`, `photo`. Chaque champ a une clé stable (`key`), un libellé, un caractère obligatoire et éventuellement une unité ou des choix. Les paramètres d’essai historiques destinés aux résultats d’échantillons restent distincts des champs de ce formulaire de tâche.
 
 ## Cycle de vie
@@ -20,6 +22,7 @@ Base : `https://s2g.apps-dev.fr/api`, avec `Authorization: Bearer <token>` et `A
 | `GET` | `/test-types` | Types d’essais et produits liés |
 | `POST` / `PUT` | `/test-types` / `/test-types/{id}` | Créer ou modifier le type et `form_fields` |
 | `PUT` | `/test-types/{id}/products` | Synchroniser les affectations `{assignments:[{article_id,article_action_id?}]}` |
+| `PUT` | `/v1/catalogue/articles/{article}/test-types` | Synchroniser les essais d’un seul produit `{assignments:[{test_type_id,article_action_id?}]}` |
 | `GET` | `/mobile/task-forms/tasks/{task}` | Formulaires disponibles, réponses et statuts |
 | `PUT` | `/mobile/task-forms/tasks/{task}/types/{testType}` | Enregistrer `{answers:{"valeur":12.5}}` en brouillon |
 | `POST` | `/mobile/task-forms/tasks/{task}/types/{testType}/photos` | Joindre un `multipart/form-data` avec `field_key` et `photo` |

@@ -26,6 +26,7 @@ type MenuGroupId =
   | 'planification'
   | 'terrain'
   | 'laboratoire'
+  | 'essais'
   | 'materiel'
   | 'ingenierie'
   | 'catalogue'
@@ -111,6 +112,8 @@ function isGroupActive(id: MenuGroupId, pathname: string): boolean {
       return isTerrainActive(pathname)
     case 'laboratoire':
       return isLaboratoireActive(pathname)
+    case 'essais':
+      return pathname.startsWith('/catalogue/essais')
     case 'materiel':
       return isMaterielActive(pathname)
     case 'ingenierie':
@@ -212,6 +215,14 @@ export default function AppNavigation() {
         ]),
       },
       {
+        id: 'essais',
+        label: 'Essais',
+        items: filterItems([
+          { to: '/catalogue/essais', label: 'Types d’essais et formulaires' },
+          { to: '/graphiques-essais', label: 'Graphiques d’essais', module: 'laboratoire' },
+        ]),
+      },
+      {
         id: 'ingenierie',
         label: 'Ingénierie',
         module: 'ingenierie',
@@ -247,6 +258,7 @@ export default function AppNavigation() {
     ]
 
     return allGroups.filter((group) => {
+      if (group.id === 'essais') return canAccessStaffModule(user, 'catalogue') || canAccessStaffModule(user, 'laboratoire')
       if (group.id === 'commercial' && !canCommercial && !canDossiers) return false
       if (group.module && !canAccessStaffModule(user, group.module) && group.id !== 'commercial') return false
       if (group.id === 'commercial' && (canCommercial || canDossiers)) return group.items.length > 0
@@ -263,6 +275,7 @@ export default function AppNavigation() {
       })
     return filterItems([
       { to: '/catalogue', label: 'Articles & essais', module: 'catalogue' as StaffModuleKey },
+      { to: '/catalogue/essais', label: 'Types d’essais et formulaires' },
       { to: '/labo/fiches', label: 'Fiches techniques', module: 'laboratoire' as StaffModuleKey },
     ])
   }, [user])

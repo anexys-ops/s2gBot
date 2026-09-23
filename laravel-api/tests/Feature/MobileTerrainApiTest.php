@@ -170,6 +170,38 @@ class MobileTerrainApiTest extends TestCase
         $this->getJson('/api/mobile/terrain/tasks')->assertOk()->assertJsonCount(1);
     }
 
+    public function test_article_can_assign_its_own_essais_without_changing_another_product(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_LAB_ADMIN]);
+        $family = FamilleArticle::query()->create(['code' => 'FORM-PROD', 'libelle' => 'Produits', 'ordre' => 1, 'actif' => true]);
+        $first = Article::query()->create([
+            'ref_famille_article_id' => $family->id, 'code' => 'FORM-1', 'libelle' => 'Produit 1',
+            'kind' => Article::KIND_PRODUCT, 'prix_unitaire_ht' => 0, 'tva_rate' => 20, 'actif' => true,
+        ]);
+        $second = Article::query()->create([
+            'ref_famille_article_id' => $family->id, 'code' => 'FORM-2', 'libelle' => 'Produit 2',
+            'kind' => Article::KIND_PRODUCT, 'prix_unitaire_ht' => 0, 'tva_rate' => 20, 'actif' => true,
+        ]);
+        $action = ArticleAction::query()->create(['ref_article_id' => $first->id, 'type' => 'technicien', 'libelle' => 'Relevé', 'ordre' => 1]);
+        $otherAction = ArticleAction::query()->create(['ref_article_id' => $second->id, 'type' => 'labo', 'libelle' => 'Autre', 'ordre' => 1]);
+        $type = TestType::query()->create([
+            'name' => 'Fiche de relevé', 'unit_price' => 0,
+            'form_fields' => [['key' => 'mesure', 'label' => 'Mesure', 'type' => 'number', 'required' => true]],
+        ]);
+        $type->articles()->sync([$second->id => ['article_action_id' => null]]);
+        $url = '/api/v1/catalogue/articles/'.$first->id.'/test-types';
+
+        $this->actingAs($admin, 'sanctum')->putJson($url, [
+            'assignments' => [['test_type_id' => $type->id, 'article_action_id' => $otherAction->id]],
+        ])->assertUnprocessable();
+        $this->putJson($url, [
+            'assignments' => [['test_type_id' => $type->id, 'article_action_id' => $action->id]],
+        ])->assertOk()->assertJsonPath('data.test_types.0.article_action_id', $action->id);
+        $this->assertDatabaseHas('article_test_type', ['ref_article_id' => $second->id, 'test_type_id' => $type->id]);
+        $this->putJson($url, ['assignments' => []])->assertOk()->assertJsonCount(0, 'data.test_types');
+        $this->assertDatabaseHas('article_test_type', ['ref_article_id' => $second->id, 'test_type_id' => $type->id]);
+    }
+
     private function seedMission(): array
     {
         $client = Client::query()->create(['name' => 'Client mobile', 'phone' => '+212600000000']);

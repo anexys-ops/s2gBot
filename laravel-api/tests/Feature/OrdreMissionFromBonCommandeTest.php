@@ -221,7 +221,7 @@ class OrdreMissionFromBonCommandeTest extends TestCase
             'bon_commande_id' => $bc->id,
             'ref_article_id' => $jalon->id,
             'libelle' => $jalon->libelle,
-            'quantite' => 1,
+            'quantite' => 6,
             'prix_unitaire_ht' => 500,
             'tva_rate' => 20,
             'montant_ht' => 500,
@@ -235,6 +235,7 @@ class OrdreMissionFromBonCommandeTest extends TestCase
         $res->assertJsonPath('0.type', OrdreMission::TYPE_TECHNICIEN);
         $this->assertSame(2, OrdreMissionLigne::query()->count());
         $this->assertSame(2, MissionTask::query()->count());
+        $this->assertSame(0, OrdreMissionLigne::query()->where('quantite', '!=', 1)->count());
         $this->assertDatabaseHas('ordre_mission_lignes', [
             'ref_article_id' => $productA->id,
             'article_action_id' => null,
@@ -243,6 +244,10 @@ class OrdreMissionFromBonCommandeTest extends TestCase
             'ref_article_id' => $productB->id,
             'article_action_id' => $actionB->id,
         ]);
+        $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")
+            ->assertOk();
+        $this->assertSame(2, OrdreMissionLigne::query()->count());
     }
 
     public function test_generate_from_jalon_bc_routes_labo_product_to_labo_om_only(): void
@@ -511,6 +516,8 @@ class OrdreMissionFromBonCommandeTest extends TestCase
             ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")
             ->assertCreated()->assertJsonCount(4);
         $this->assertSame(4, OrdreMission::query()->count());
+        $this->assertSame(6, OrdreMissionLigne::query()->count());
+        $this->assertSame(0, OrdreMissionLigne::query()->where('quantite', '!=', 1)->count());
         foreach ($firstIds as $id) {
             $this->assertDatabaseHas('ordres_mission', ['id' => $id, 'deleted_at' => null]);
         }
@@ -562,7 +569,7 @@ class OrdreMissionFromBonCommandeTest extends TestCase
         $this->assertDatabaseHas('mission_tasks', ['id' => $task->id, 'statut' => MissionTask::STATUT_VALIDATED]);
         $this->assertDatabaseHas('ordre_mission_lignes', ['id' => $task->ordre_mission_ligne_id, 'statut' => 'cloture']);
         $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-commande/{$bc->id}")
-            ->assertJsonPath('avancement_om.statut', 'cloture')
+            ->assertJsonPath('avancement_om.statut', 'a_replanifier')
             ->assertJsonPath('avancement_om.cloturees', 1);
     }
 

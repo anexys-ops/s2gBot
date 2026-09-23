@@ -131,9 +131,7 @@ function JalonBulkControls({
   onApply: (patch: BulkLignePatch) => void
   onPreview: (userId: number, plannedDate: string) => void
 }) {
-  const [quantite, setQuantite] = useState(
-    String(group.jalon?.quantite ?? group.lignes[0]?.quantite ?? ''),
-  )
+  const [quantite, setQuantite] = useState('1')
   const [assignedUserId, setAssignedUserId] = useState<number | ''>('')
   const [plannedDate, setPlannedDate] = useState('')
   const [statut, setStatut] = useState<OrdreMissionLigne['statut'] | ''>('')

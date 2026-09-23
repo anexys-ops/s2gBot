@@ -116,8 +116,9 @@ class OrdreMissionFromBonCommandeService
     }
 
     /**
-     * A BC product can produce several actions per profile. Count already planned
-     * quantities per action, so repeating the request only creates the remainder.
+     * Each catalogue child entry is one task, even when the parent BC jalon has
+     * a larger quantity. Standalone BC lines use their own quantity as the
+     * number of unit tasks. Existing tasks consume that allocation.
      *
      * @param Collection<int, array{ligne: BonCommandeLigne, action: ArticleAction|null}> $entries
      * @param Collection<int, OrdreMission> $existing
@@ -130,10 +131,17 @@ class OrdreMissionFromBonCommandeService
             $action?->ref_article_id ?? $ligne->ref_article_id ?? 0,
             $action?->id ?? 0,
         ]);
+        $unitsForEntry = static function (BonCommandeLigne $ligne, ?ArticleAction $action): float {
+            if ($ligne->article?->isJalon() && $action?->ref_article_id !== $ligne->ref_article_id) {
+                return 1;
+            }
+
+            return max(0, (float) $ligne->quantite);
+        };
         $remaining = [];
         foreach ($entries as $entry) {
             $id = $key($entry['ligne'], $entry['action']);
-            $remaining[$id] = ($remaining[$id] ?? 0) + max(0, (float) $entry['ligne']->quantite);
+            $remaining[$id] = ($remaining[$id] ?? 0) + $unitsForEntry($entry['ligne'], $entry['action']);
         }
         foreach ($existing as $om) {
             foreach ($om->lignes as $omLigne) {
@@ -148,13 +156,20 @@ class OrdreMissionFromBonCommandeService
             }
         }
 
-        return $entries->map(function (array $entry) use (&$remaining, $key): ?array {
+        return $entries->flatMap(function (array $entry) use (&$remaining, $key, $unitsForEntry): array {
             $id = $key($entry['ligne'], $entry['action']);
-            $quantity = min(max(0, (float) $entry['ligne']->quantite), $remaining[$id]);
+            $quantity = min($unitsForEntry($entry['ligne'], $entry['action']), max(0, $remaining[$id]));
             $remaining[$id] -= $quantity;
 
-            return $quantity > 0 ? [...$entry, 'quantite' => $quantity] : null;
-        })->filter()->values();
+            $tasks = [];
+            while ($quantity > 0.000001) {
+                $unit = min(1, $quantity);
+                $tasks[] = [...$entry, 'quantite' => $unit];
+                $quantity -= $unit;
+            }
+
+            return $tasks;
+        })->values();
     }
 
     /**

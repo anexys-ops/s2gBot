@@ -135,7 +135,7 @@ class MissionTaskController extends Controller
             'quantity_count' => 'required|integer|min:1',
         ]);
 
-        $result = DB::transaction(function () use ($id, $data, $request) {
+        $result = DB::transaction(function () use ($id, $data) {
             $task = MissionTask::query()->lockForUpdate()->with([
                 'ordreMissionLigne.ordreMission',
                 'ordreMissionLigne.bonCommandeLigne',
@@ -162,10 +162,10 @@ class MissionTaskController extends Controller
                 'pv_numbers' => array_values($data['pv_numbers']),
                 'quantity_unit' => $data['quantity_unit'],
                 'quantity_count' => (int) $data['quantity_count'],
-                'statut' => MissionTask::STATUT_VALIDATED,
+                'statut' => $task->statut === MissionTask::STATUT_VALIDATED
+                    ? MissionTask::STATUT_VALIDATED
+                    : MissionTask::STATUT_DONE,
                 'completed_at' => $task->completed_at ?? now(),
-                'validated_at' => now(),
-                'validated_by' => $request->user()?->id,
                 'reception_generated_at' => $task->reception_generated_at ?? now(),
             ]);
             $this->syncOrdreMissionFromTask($task);
@@ -565,6 +565,7 @@ class MissionTaskController extends Controller
             'statut' => match ($task->statut) {
                 MissionTask::STATUT_IN_PROGRESS, MissionTask::STATUT_PAUSED => 'en_cours',
                 MissionTask::STATUT_FROZEN => 'freeze',
+                MissionTask::STATUT_RESCHEDULED => 'replanifie',
                 MissionTask::STATUT_DONE => 'attente_validation',
                 MissionTask::STATUT_VALIDATED => 'cloture',
                 MissionTask::STATUT_REJECTED => 'annule',
@@ -635,18 +636,18 @@ class MissionTaskController extends Controller
             ]);
             return;
         }
-        if ($lignes->contains(fn (OrdreMissionLigne $ligne) => in_array($ligne->statut, ['en_cours', 'freeze', 'attente_validation'], true))) {
+        if ($lignes->contains(fn (OrdreMissionLigne $ligne) => in_array($ligne->statut, ['en_cours', 'freeze', 'attente_validation', 'cloture'], true))) {
             $ordreMission->update([
                 'statut' => OrdreMission::STATUT_EN_COURS,
                 'date_debut' => $ordreMission->date_debut ?? now(),
             ]);
             return;
         }
-        if ($ordreMission->statut === OrdreMission::STATUT_BROUILLON
-            && $lignes->contains(fn (OrdreMissionLigne $ligne) => $ligne->assigned_user_id && $ligne->date_prevue)
-        ) {
-            $ordreMission->update(['statut' => OrdreMission::STATUT_PLANIFIE]);
-        }
+        $active = $lignes->reject(fn (OrdreMissionLigne $ligne) => $ligne->statut === 'annule');
+        $ordreMission->update(['statut' => $active->isNotEmpty()
+            && $active->every(fn (OrdreMissionLigne $ligne) => $ligne->assigned_user_id && $ligne->date_prevue)
+            ? OrdreMission::STATUT_PLANIFIE
+            : OrdreMission::STATUT_BROUILLON]);
     }
 
     private function withJalonContext($tasks)

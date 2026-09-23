@@ -16,6 +16,7 @@ class MissionTask extends Model
     const STATUT_IN_PROGRESS = 'in_progress';
     const STATUT_PAUSED      = 'paused';
     const STATUT_FROZEN      = 'frozen';
+    const STATUT_RESCHEDULED = 'rescheduled';
     const STATUT_DONE        = 'done';
     const STATUT_VALIDATED   = 'validated';
     const STATUT_REJECTED    = 'rejected';
@@ -28,6 +29,7 @@ class MissionTask extends Model
             self::STATUT_IN_PROGRESS,
             self::STATUT_PAUSED,
             self::STATUT_FROZEN,
+            self::STATUT_RESCHEDULED,
             self::STATUT_DONE,
             self::STATUT_VALIDATED,
             self::STATUT_REJECTED,

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { missionTasksApi, planningTerrainApi, type MissionTask } from '../../api/client'
+import { missionTasksApi, planningTerrainApi, taskTestFormsApi, type MissionTask } from '../../api/client'
+import { useAuth } from '../../contexts/AuthContext'
 import ModuleEntityShell from '../module/ModuleEntityShell'
 import Modal from '../Modal'
 import { TASK_FILTERS, getTaskStatutMeta } from '../../lib/missionTaskStatuts'
@@ -159,6 +160,7 @@ function DelayCell({ task }: { task: MissionTask }) {
 }
 
 function TaskEditModal({ task, context, onClose }: { task: MissionTask; context: MissionTasksContext; onClose: () => void }) {
+  const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const om = task.ordreMissionLigne?.ordreMission
@@ -170,6 +172,32 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
   const quantityUnit = taskQuantityUnit(task, context)
   const [quantityCount, setQuantityCount] = useState(String(task.quantity_count ?? Math.min(1, task.remaining_quantity ?? 1)))
   const [message, setMessage] = useState('')
+  const [correctionNotes, setCorrectionNotes] = useState<Record<number, string>>({})
+
+  const { data: taskForms } = useQuery({
+    queryKey: ['task-test-forms', task.id],
+    queryFn: () => taskTestFormsApi.list(task.id),
+  })
+  const review = useMutation({
+    mutationFn: ({ typeId, decision, correctionNote }: { typeId: number; decision: 'validate' | 'correction'; correctionNote?: string }) =>
+      taskTestFormsApi.review(task.id, typeId, decision, correctionNote),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['task-test-forms', task.id] })
+      await queryClient.invalidateQueries({ queryKey: ['mission-tasks-list', context] })
+      setMessage('Formulaire mis à jour.')
+    },
+  })
+
+  const openFormPhoto = async (photoId: number) => {
+    try {
+      const blob = await taskTestFormsApi.photo(photoId)
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank', 'noopener,noreferrer')
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (error) {
+      setMessage((error as Error).message)
+    }
+  }
 
   const addPvNumbers = () => {
     const next = normalizePvNumbers([...pvNumbers, pvDraft])
@@ -286,6 +314,21 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
           <span className="text-muted">{pvCount} numéro{pvCount !== 1 ? 's' : ''} de PV saisi{pvCount !== 1 ? 's' : ''}</span>
         </label>
       </div>
+      {taskForms?.forms?.length ? <section className="card" style={{ padding: '1rem', marginTop: '1rem' }}>
+        <h3>Formulaires d’essai liés à cette tâche</h3>
+        {taskForms.forms.map((form) => <div key={form.test_type.id} style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem', marginTop: '0.75rem' }}>
+          <strong>{form.test_type.name}</strong> · {form.submission?.status ?? 'À remplir'}
+          {form.submission?.correction_note ? <p>Correction demandée : {form.submission.correction_note}</p> : null}
+          {form.submission ? <dl>{form.form_fields.filter((field) => field.type !== 'photo').map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{String(form.submission?.answers?.[field.key] ?? '—')}{field.unit ? ` ${field.unit}` : ''}</dd></div>)}</dl> : null}
+          {form.submission?.photos?.map((photo) => <button key={photo.id} type="button" className="btn btn-secondary btn-sm" onClick={() => void openFormPhoto(photo.id)}>Voir la photo : {photo.original_name}</button>)}
+          {(user?.role === 'lab_admin' || user?.role === 'responsable') && user?.id !== task.assigned_user_id && form.submission?.status === 'submitted' ? <div className="crud-actions">
+            <input placeholder="Motif de correction" value={correctionNotes[form.test_type.id] ?? ''} onChange={(event) => setCorrectionNotes((current) => ({ ...current, [form.test_type.id]: event.target.value }))} />
+            <button type="button" className="btn btn-secondary btn-sm" disabled={review.isPending || !(correctionNotes[form.test_type.id] ?? '').trim()} onClick={() => review.mutate({ typeId: form.test_type.id, decision: 'correction', correctionNote: correctionNotes[form.test_type.id] })}>Demander correction</button>
+            <button type="button" className="btn btn-primary btn-sm" disabled={review.isPending} onClick={() => review.mutate({ typeId: form.test_type.id, decision: 'validate' })}>Valider le formulaire</button>
+          </div> : null}
+        </div>)}
+        {review.isError ? <p className="error">{(review.error as Error).message}</p> : null}
+      </section> : null}
       {message ? <p className="success">{message}</p> : null}
       {error ? <p className="error">{(error as Error).message}</p> : null}
       <div className="mission-task-modal__actions">

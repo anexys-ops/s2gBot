@@ -2,7 +2,7 @@
 
 Base de production : `https://s2g.apps-dev.fr/api`. Toutes les routes ci-dessous exigent `Authorization: Bearer <token Sanctum>` et `Accept: application/json`. Le login existant est `POST /api/login` ; fournir un `device_name` stable par appareil. Les dates sont au format `YYYY-MM-DD` et les montants en DH.
 
-Ces routes sont **personnelles** : elles renvoient uniquement les tâches terrain ou ingénierie affectées à l'utilisateur du jeton. Ne pas envoyer de `user_id` dans les filtres. Les routes administratives `/api/mission-tasks`, `/api/v1/planning-terrain` et `/api/expense-reports` ne sont pas le contrat de l'application mobile.
+Ces routes sont **personnelles** : elles renvoient uniquement les tâches terrain, laboratoire ou ingénierie affectées à l'utilisateur du jeton. Ne pas envoyer de `user_id` dans les filtres. Les routes administratives `/api/mission-tasks`, `/api/v1/planning-terrain` et `/api/expense-reports` ne sont pas le contrat de l'application mobile. Pour les formulaires de ces tâches, voir [Formulaires d’essai reliés aux tâches](formulaires-essais-taches.md).
 
 ## Agenda et tâches
 

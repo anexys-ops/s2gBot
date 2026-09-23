@@ -61,6 +61,10 @@ class ArticleResource extends JsonResource
                 });
             }),
             'parametres_essai' => $this->whenLoaded('parametresEssai', fn () => $this->parametresEssai),
+            'test_types' => $this->whenLoaded('testTypes', fn () => $this->testTypes->map(fn ($type) => [
+                'id' => $type->id, 'name' => $type->name, 'norm' => $type->norm,
+                'article_action_id' => $type->pivot?->article_action_id,
+            ])),
             'resultats' => $this->whenLoaded('resultats', fn () => $this->resultats),
             'qualification_tags' => $this->whenLoaded('qualificationTags', fn () => $this->qualificationTags->map(fn ($tag) => [
                 'id' => $tag->id,

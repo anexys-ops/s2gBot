@@ -59,6 +59,7 @@ function RootLayoutNav() {
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="order/[id]" options={{ title: 'Commande' }} />
+        <Stack.Screen name="task/[id]" options={{ title: 'Tâche et formulaires' }} />
       </Stack>
     </ThemeProvider>
   );

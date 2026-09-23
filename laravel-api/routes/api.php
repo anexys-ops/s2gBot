@@ -51,6 +51,7 @@ use App\Http\Controllers\Api\MailTemplateController;
 use App\Http\Controllers\Api\MissionController;
 use App\Http\Controllers\Api\Mobile\MobileDossierController;
 use App\Http\Controllers\Api\Mobile\MobileTerrainController;
+use App\Http\Controllers\Api\Mobile\TaskTestFormController;
 use App\Http\Controllers\Api\ModuleSettingController;
 use App\Http\Controllers\Api\NonConformityController;
 use App\Http\Controllers\Api\OpenApiController;
@@ -267,6 +268,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('lithology-layers/{lithology_layer}', [LithologyLayerController::class, 'update']);
     Route::delete('lithology-layers/{lithology_layer}', [LithologyLayerController::class, 'destroy']);
     Route::apiResource('test-types', TestTypeController::class);
+    Route::put('test-types/{testType}/products', [TestTypeController::class, 'syncProducts']);
     Route::get('equipments-maintenance-plans/due', [EquipmentMaintenancePlanController::class, 'dueInRange']);
     Route::get('materiel/affectations', [MaterielAffectationController::class, 'indexAll']);
     Route::apiResource('equipments', EquipmentController::class);
@@ -492,6 +494,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('expense-reports', [MobileTerrainController::class, 'storeExpense']);
         Route::post('expense-reports/{expenseReport}/lines', [MobileTerrainController::class, 'storeExpenseLine'])->whereNumber('expenseReport');
         Route::post('expense-reports/{expenseReport}/submit', [MobileTerrainController::class, 'submitExpense'])->whereNumber('expenseReport');
+    });
+
+    Route::prefix('mobile/task-forms')->group(function () {
+        Route::get('tasks/{task}', [TaskTestFormController::class, 'index'])->whereNumber('task');
+        Route::put('tasks/{task}/types/{testType}', [TaskTestFormController::class, 'save'])->whereNumber('task')->whereNumber('testType');
+        Route::post('tasks/{task}/types/{testType}/submit', [TaskTestFormController::class, 'submit'])->whereNumber('task')->whereNumber('testType');
+        Route::post('tasks/{task}/types/{testType}/review', [TaskTestFormController::class, 'review'])->whereNumber('task')->whereNumber('testType');
+        Route::post('tasks/{task}/types/{testType}/photos', [TaskTestFormController::class, 'uploadPhoto'])->whereNumber('task')->whereNumber('testType');
+        Route::get('photos/{photo}', [TaskTestFormController::class, 'downloadPhoto'])->whereNumber('photo');
+        Route::delete('photos/{photo}', [TaskTestFormController::class, 'deletePhoto'])->whereNumber('photo');
     });
 
     // App mobile laboratoire / terrain — dossiers (mesures + photos)

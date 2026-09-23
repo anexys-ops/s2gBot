@@ -162,6 +162,14 @@ class OpenApiSpec
             ],
             '/test-types' => [
                 'get' => ['tags' => ['Labo'], 'summary' => 'Types d’essais', 'responses' => ['200' => ['description' => 'OK']]],
+                'post' => ['tags' => ['Labo'], 'summary' => 'Créer un type d’essai et son formulaire', 'responses' => ['201' => ['description' => 'Créé']]],
+            ],
+            '/test-types/{testType}' => [
+                'get' => ['tags' => ['Labo'], 'summary' => 'Détail du type d’essai', 'parameters' => [self::pathId('testType')], 'responses' => ['200' => ['description' => 'OK']]],
+                'put' => ['tags' => ['Labo'], 'summary' => 'Modifier le type d’essai et son formulaire', 'parameters' => [self::pathId('testType')], 'responses' => ['200' => ['description' => 'OK']]],
+            ],
+            '/test-types/{testType}/products' => [
+                'put' => ['tags' => ['Labo'], 'summary' => 'Affecter le formulaire aux produits et actions', 'parameters' => [self::pathId('testType')], 'responses' => ['200' => ['description' => 'Affectations mises à jour']]],
             ],
             '/samples/{sample}/results' => [
                 'post' => ['tags' => ['Labo'], 'summary' => 'Saisir résultat d’essai', 'parameters' => [self::pathId('sample')], 'responses' => ['201' => ['description' => 'OK']]],
@@ -250,6 +258,32 @@ class OpenApiSpec
             '/mobile/terrain/expense-reports/{expenseReport}/submit' => [
                 'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Soumettre ma note de frais',
                     'parameters' => [self::pathId('expenseReport')], 'responses' => ['200' => ['description' => 'Note soumise']]],
+            ],
+            '/mobile/task-forms/tasks/{task}' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Formulaires affectés à une tâche',
+                    'parameters' => [self::pathId('task')], 'responses' => ['200' => ['description' => 'Formulaires et soumissions']]],
+            ],
+            '/mobile/task-forms/tasks/{task}/types/{testType}' => [
+                'put' => ['tags' => ['Terrain mobile'], 'summary' => 'Enregistrer un brouillon de formulaire',
+                    'parameters' => [self::pathId('task'), self::pathId('testType')], 'responses' => ['200' => ['description' => 'Brouillon']]],
+            ],
+            '/mobile/task-forms/tasks/{task}/types/{testType}/photos' => [
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Joindre une photo au formulaire',
+                    'parameters' => [self::pathId('task'), self::pathId('testType')], 'responses' => ['201' => ['description' => 'Photo enregistrée']]],
+            ],
+            '/mobile/task-forms/tasks/{task}/types/{testType}/submit' => [
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Soumettre le formulaire',
+                    'parameters' => [self::pathId('task'), self::pathId('testType')], 'responses' => ['200' => ['description' => 'Soumis']]],
+            ],
+            '/mobile/task-forms/tasks/{task}/types/{testType}/review' => [
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Valider ou demander une correction',
+                    'parameters' => [self::pathId('task'), self::pathId('testType')], 'responses' => ['200' => ['description' => 'Décision enregistrée']]],
+            ],
+            '/mobile/task-forms/photos/{photo}' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Télécharger une photo du formulaire',
+                    'parameters' => [self::pathId('photo')], 'responses' => ['200' => ['description' => 'Image']]],
+                'delete' => ['tags' => ['Terrain mobile'], 'summary' => 'Retirer une photo du brouillon',
+                    'parameters' => [self::pathId('photo')], 'responses' => ['204' => ['description' => 'Supprimée']]],
             ],
             '/mobile/dossiers/{kind}/{id}/measure-forms' => [
                 'get' => [

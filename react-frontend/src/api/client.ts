@@ -735,6 +735,7 @@ export interface RefArticleRow {
   article_lie?: { id: number; code: string; libelle: string } | null
   famille_packages?: RefFamillePackageRow[]
   parametres_essai?: RefParametreEssaiRow[]
+  test_types?: Array<{ id: number; name: string; norm?: string | null; article_action_id?: number | null }>
   resultats?: RefResultatRow[]
   qualification_tags?: RefQualificationTagRow[]
   jalon_products?: RefArticleJalonProductRow[]
@@ -1826,6 +1827,7 @@ export const testTypesApi = {
     unit_price: number
     thresholds?: Record<string, number>
     params?: TestTypeParamInput[]
+    form_fields?: TestTypeFormField[]
   }) => api<TestType>('/test-types', { method: 'POST', body: JSON.stringify(body) }),
   update: (
     id: number,
@@ -1836,9 +1838,12 @@ export const testTypesApi = {
       unit_price?: number
       thresholds?: Record<string, number>
       params?: TestTypeParamInput[]
+      form_fields?: TestTypeFormField[]
     },
   ) => api<TestType>(`/test-types/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/test-types/${id}`, { method: 'DELETE' }),
+  syncProducts: (id: number, assignments: Array<{ article_id: number; article_action_id?: number | null }>) =>
+    api<TestType>(`/test-types/${id}/products`, { method: 'PUT', body: JSON.stringify({ assignments }) }),
 }
 
 export const ordersApi = {
@@ -3135,6 +3140,42 @@ export interface TestType {
   unit_price: number
   thresholds?: Record<string, number>
   params?: TestTypeParam[]
+  form_fields?: TestTypeFormField[]
+  articles?: Array<{ id: number; code: string; libelle: string; pivot?: { article_action_id: number | null } }>
+}
+
+export interface TestTypeFormField {
+  key: string
+  label: string
+  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'photo'
+  required: boolean
+  unit?: string
+  options?: string[]
+}
+
+export interface TaskTestFormSummary {
+  test_type: { id: number; name: string; norm?: string | null }
+  form_fields: TestTypeFormField[]
+  submission: null | {
+    id: number
+    status: 'draft' | 'submitted' | 'correction_requested' | 'validated'
+    answers: Record<string, string | number | boolean | null>
+    correction_note?: string | null
+    photos?: Array<{ id: number; field_key: string; original_name: string }>
+  }
+}
+
+export const taskTestFormsApi = {
+  list: (taskId: number) => api<{ task_id: number; forms: TaskTestFormSummary[] }>(`/mobile/task-forms/tasks/${taskId}`),
+  review: (taskId: number, typeId: number, decision: 'validate' | 'correction', correction_note?: string) =>
+    api(`/mobile/task-forms/tasks/${taskId}/types/${typeId}/review`, { method: 'POST', body: JSON.stringify({ decision, correction_note }) }),
+  photo: async (photoId: number): Promise<Blob> => {
+    const response = await fetch(`/api/mobile/task-forms/photos/${photoId}`, {
+      headers: { Authorization: `Bearer ${getToken() ?? ''}`, Accept: 'image/*' },
+    })
+    if (!response.ok) throw new Error('Photo indisponible')
+    return response.blob()
+  },
 }
 
 export interface OrderItem {

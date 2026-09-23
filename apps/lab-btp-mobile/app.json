@@ -2,7 +2,7 @@
   "expo": {
     "name": "lab-btp-mobile",
     "slug": "lab-btp-mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "labbtpmobile",
@@ -33,7 +33,11 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      ["expo-image-picker", {
+        "cameraPermission": "Autoriser l'appareil photo pour joindre des images aux formulaires de tâche.",
+        "photosPermission": "Autoriser l'accès aux photos pour les joindre aux formulaires de tâche."
+      }]
     ],
     "experiments": {
       "typedRoutes": true

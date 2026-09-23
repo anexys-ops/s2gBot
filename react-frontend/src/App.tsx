@@ -8,6 +8,7 @@ import DossierDevisTab from './pages/dossiers/tabs/DossierDevisTab'
 import DossierDocumentsTab from './pages/dossiers/tabs/DossierDocumentsTab'
 import DossierExtrafieldsTab from './pages/dossiers/tabs/DossierExtrafieldsTab'
 import CatalogueListePage from './pages/catalogue/CatalogueListePage'
+import Catalog from './pages/Catalog'
 import ArticleFichePage from './pages/catalogue/ArticleFichePage'
 import DossierNewPage from './pages/dossiers/DossierNewPage'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -274,6 +275,7 @@ function AppRoutes() {
         <Route path="rapport-bc" element={<RapportBCListPage />} />
         <Route path="rapport-bc/:id" element={<RapportBCDetailPage />} />
         <Route path="catalogue" element={<CatalogueListePage />} />
+        <Route path="catalogue/essais" element={<Catalog />} />
         <Route path="catalogue/services" element={<CommercialCatalogPage />} />
         <Route path="catalogue/articles/:id" element={<ArticleFichePage />} />
         <Route path="dossiers/new" element={<DossierNewPage />} />
@@ -337,7 +339,7 @@ function AppRoutes() {
           <Route path="equipements/:id" element={<BackOfficeEquipementDetailRedirect />} />
           <Route index element={<Navigate to="/catalogue" replace />} />
           <Route element={<BackOfficeLayout />}>
-            <Route path="catalogue-essais" element={<Navigate to="/catalogue" replace />} />
+            <Route path="catalogue-essais" element={<Navigate to="/catalogue/essais" replace />} />
             <Route path="catalogue-btp" element={<Navigate to="/catalogue" replace />} />
             <Route path="catalogue-commercial" element={<Navigate to="/catalogue" replace />} />
             <Route path="offres" element={<CommercialCatalogPage />} />

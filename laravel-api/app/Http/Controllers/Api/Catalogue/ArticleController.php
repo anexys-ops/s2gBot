@@ -128,6 +128,7 @@ class ArticleController extends Controller
         }
 
         if ($article->isProduct()) {
+            $loads['testTypes'] = fn ($q) => $q->select('test_types.id', 'name', 'norm');
             $loads['productJalonLinks'] = fn ($jp) => $jp->with([
                 'jalon:id,code,libelle,famille_label,kind,actif',
             ]);
@@ -156,6 +157,7 @@ class ArticleController extends Controller
         }
 
         if ($article->isProduct()) {
+            $loads['testTypes'] = fn ($q) => $q->select('test_types.id', 'name', 'norm');
             $loads['productJalonLinks'] = fn ($jp) => $jp->with([
                 'jalon:id,code,libelle,famille_label,kind,actif',
             ]);
@@ -214,6 +216,7 @@ class ArticleController extends Controller
         }
 
         if ($fresh->isProduct()) {
+            $loads['testTypes'] = fn ($q) => $q->select('test_types.id', 'name', 'norm');
             $loads['productJalonLinks'] = fn ($jp) => $jp->with([
                 'jalon:id,code,libelle,famille_label,kind,actif',
             ]);

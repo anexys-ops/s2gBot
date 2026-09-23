@@ -111,6 +111,11 @@ class MissionTask extends Model
         return $this->hasMany(PlanningEquipment::class, 'mission_task_id');
     }
 
+    public function testForms(): HasMany
+    {
+        return $this->hasMany(TaskTestForm::class);
+    }
+
     /**
      * Recalcule is_conform à partir des mesures enregistrées.
      */

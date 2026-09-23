@@ -26,7 +26,7 @@ function networkFailureHint(): string {
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = await getStoredToken();
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     Accept: 'application/json',
     ...(options.headers as Record<string, string>),
   };
@@ -82,5 +82,56 @@ export const clientsApi = {
     if (params?.search) q.set('search', params.search);
     const s = q.toString();
     return api<Client[]>(`/clients${s ? `?${s}` : ''}`);
+  },
+};
+
+export type MobileTask = {
+  id: number;
+  numero: string;
+  statut: string;
+  planned_date: string | null;
+  libelle: string | null;
+  ordre_mission: { id: number; numero: string; type: string } | null;
+  client: { name: string; phone?: string | null } | null;
+  site: { name: string; address?: string | null } | null;
+};
+
+export type FormField = {
+  key: string;
+  label: string;
+  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'photo';
+  required: boolean;
+  unit?: string;
+  options?: string[];
+};
+
+export type TaskForm = {
+  test_type: { id: number; name: string; norm?: string | null };
+  form_fields: FormField[];
+  submission: null | {
+    id: number;
+    updated_at?: string;
+    status: 'draft' | 'submitted' | 'correction_requested' | 'validated';
+    answers: Record<string, string | number | boolean | null>;
+    correction_note?: string | null;
+    photos?: Array<{ id: number; field_key: string; original_name: string }>;
+  };
+};
+
+export const mobileTasksApi = {
+  list: () => api<MobileTask[]>('/mobile/terrain/tasks'),
+  get: (id: number) => api<MobileTask>(`/mobile/terrain/tasks/${id}`),
+  forms: (id: number) => api<{ task_id: number; forms: TaskForm[] }>(`/mobile/task-forms/tasks/${id}`),
+  saveForm: (taskId: number, typeId: number, answers: Record<string, unknown>) =>
+    api(`/mobile/task-forms/tasks/${taskId}/types/${typeId}`, { method: 'PUT', body: JSON.stringify({ answers }) }),
+  submitForm: (taskId: number, typeId: number) =>
+    api(`/mobile/task-forms/tasks/${taskId}/types/${typeId}/submit`, { method: 'POST' }),
+  reviewForm: (taskId: number, typeId: number, decision: 'validate' | 'correction', correction_note?: string) =>
+    api(`/mobile/task-forms/tasks/${taskId}/types/${typeId}/review`, { method: 'POST', body: JSON.stringify({ decision, correction_note }) }),
+  uploadPhoto: (taskId: number, typeId: number, fieldKey: string, uri: string, name?: string, mimeType?: string) => {
+    const data = new FormData();
+    data.append('field_key', fieldKey);
+    data.append('photo', { uri, name: name ?? `photo-${Date.now()}.jpg`, type: mimeType ?? 'image/jpeg' } as unknown as Blob);
+    return api(`/mobile/task-forms/tasks/${taskId}/types/${typeId}/photos`, { method: 'POST', body: data });
   },
 };

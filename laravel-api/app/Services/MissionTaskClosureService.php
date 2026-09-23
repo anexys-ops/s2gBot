@@ -9,6 +9,8 @@ use App\Models\Sample;
 
 class MissionTaskClosureService
 {
+    public function __construct(private readonly TaskFormAssignmentService $formAssignments) {}
+
     public function afterSampleReceived(Sample $sample, ?int $validatedBy): void
     {
         if (! $sample->task_id) {
@@ -37,6 +39,10 @@ class MissionTaskClosureService
 
     public function validate(MissionTask $task, ?int $validatedBy): void
     {
+        if ($this->formAssignments->hasPendingForms($task)) {
+            return;
+        }
+
         if ($task->statut !== MissionTask::STATUT_VALIDATED) {
             $task->update([
                 'statut' => MissionTask::STATUT_VALIDATED,

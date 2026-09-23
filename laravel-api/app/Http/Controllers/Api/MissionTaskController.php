@@ -14,6 +14,7 @@ use App\Models\Sample;
 use App\Models\Sequence;
 use App\Models\TaskMeasure;
 use App\Models\TaskResult;
+use App\Services\TaskFormAssignmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,8 @@ use Illuminate\Validation\ValidationException;
 
 class MissionTaskController extends Controller
 {
+    public function __construct(private readonly TaskFormAssignmentService $formAssignments) {}
+
     private function optionalQueryString(Request $request, string $key): ?string
     {
         if (! $request->filled($key)) {
@@ -89,6 +92,8 @@ class MissionTaskController extends Controller
             'measures.measureConfig',
             'measures.createdBy:id,name',
             'result.validatedBy:id,name',
+            'testForms.testType:id,name,norm',
+            'testForms.photos',
         ])->findOrFail($id);
 
         return response()->json($task);
@@ -108,6 +113,10 @@ class MissionTaskController extends Controller
             'started_at'       => 'nullable|date',
             'completed_at'     => 'nullable|date',
         ]);
+
+        if (($data['statut'] ?? null) === MissionTask::STATUT_VALIDATED && $this->formAssignments->hasPendingForms($task)) {
+            throw ValidationException::withMessages(['statut' => 'Les formulaires affectés à cette tâche doivent être validés avant sa clôture.']);
+        }
 
         // Auto-timestamps sur changements de statut
         if (isset($data['statut'])) {
@@ -276,6 +285,9 @@ class MissionTaskController extends Controller
     public function validate(Request $request, int $id): JsonResponse
     {
         $task = MissionTask::findOrFail($id);
+        if ($this->formAssignments->hasPendingForms($task)) {
+            throw ValidationException::withMessages(['task' => 'Les formulaires affectés à cette tâche doivent être validés avant sa clôture.']);
+        }
 
         $data = $request->validate([
             'is_conform'   => 'required|boolean',

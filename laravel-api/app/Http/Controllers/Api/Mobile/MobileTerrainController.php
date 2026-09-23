@@ -215,7 +215,7 @@ class MobileTerrainController extends Controller
     {
         return MissionTask::query()->where('assigned_user_id', $userId)
             ->whereHas('ordreMissionLigne.ordreMission', fn (Builder $q) => $q
-                ->whereIn('type', [OrdreMission::TYPE_TECHNICIEN, OrdreMission::TYPE_INGENIEUR])
+                ->whereIn('type', [OrdreMission::TYPE_TECHNICIEN, OrdreMission::TYPE_INGENIEUR, OrdreMission::TYPE_LABO])
                 ->where('statut', '!=', OrdreMission::STATUT_ANNULE))
             ->with([
                 'ordreMissionLigne.ordreMission.client:id,name',

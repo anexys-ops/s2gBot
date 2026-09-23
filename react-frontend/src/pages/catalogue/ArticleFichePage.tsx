@@ -279,7 +279,14 @@ export default function ArticleFichePage() {
       {!isEditing && tab === 'tables' && <FicheArticle article={article} section="tables" showBackLink={false} />}
       {tab === 'composition' && <ArticleCompositionEditor articleId={articleId} canEdit={isLab && isEditing} />}
       {tab === 'actions' && isLab && (
-        <ArticleActionsPanel article={article} canEdit={isEditing && user?.role === 'lab_admin'} />
+        <>
+          {article.kind === 'product' ? <section className="card" style={{ marginBottom: '1rem', padding: '1rem' }}>
+            <h2>Formulaires d’essai associés</h2>
+            {article.test_types?.length ? <ul>{article.test_types.map((type) => <li key={type.id}>{type.name}{type.norm ? ` — ${type.norm}` : ''}{type.article_action_id ? ' (action ciblée)' : ' (toutes les actions)'}</li>)}</ul> : <p>Aucun formulaire affecté.</p>}
+            <Link to="/catalogue/essais">Gérer les types d’essais et formulaires</Link>
+          </section> : null}
+          <ArticleActionsPanel article={article} canEdit={isEditing && user?.role === 'lab_admin'} />
+        </>
       )}
       {tab === 'extrafields' && isLab && (
         <>

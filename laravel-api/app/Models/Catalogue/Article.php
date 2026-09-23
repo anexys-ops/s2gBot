@@ -133,6 +133,12 @@ class Article extends Model
         return $this->hasMany(ArticleAction::class, 'ref_article_id')->orderBy('ordre');
     }
 
+    public function testTypes(): BelongsToMany
+    {
+        return $this->belongsToMany(\App\Models\TestType::class, 'article_test_type', 'ref_article_id', 'test_type_id')
+            ->withPivot('article_action_id')->withTimestamps();
+    }
+
     public function equipmentRequirements(): HasMany
     {
         return $this->hasMany(ArticleEquipmentRequirement::class, 'ref_article_id');

@@ -17,6 +17,7 @@ class TestType extends Model
         'unit',
         'unit_price',
         'thresholds',
+        'form_fields',
     ];
 
     protected function casts(): array
@@ -24,6 +25,7 @@ class TestType extends Model
         return [
             'unit_price' => 'decimal:2',
             'thresholds' => 'array',
+            'form_fields' => 'array',
         ];
     }
 
@@ -40,5 +42,16 @@ class TestType extends Model
     public function equipments(): BelongsToMany
     {
         return $this->belongsToMany(Equipment::class, 'equipment_test_type')->withTimestamps();
+    }
+
+    public function articles(): BelongsToMany
+    {
+        return $this->belongsToMany(\App\Models\Catalogue\Article::class, 'article_test_type', 'test_type_id', 'ref_article_id')
+            ->withPivot('article_action_id')->withTimestamps();
+    }
+
+    public function taskForms(): HasMany
+    {
+        return $this->hasMany(TaskTestForm::class);
     }
 }

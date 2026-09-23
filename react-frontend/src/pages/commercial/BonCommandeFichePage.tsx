@@ -474,10 +474,12 @@ export default function BonCommandeFichePage() {
               <StatusBadge variant={statutBadge.variant} size="sm">{statutBadge.label}</StatusBadge>
             )
           ) : null}
-          {bc.avancement_om && bc.avancement_om.total > 0 ? (
+          {bc.avancement_om ? (
             <span className={`bc-fiche__om-progress bc-fiche__om-progress--${bc.avancement_om.statut}`}>
               OM : {omProgressLabels[bc.avancement_om.statut] ?? bc.avancement_om.statut}
-              {' · '}{bc.avancement_om.cloturees}/{bc.avancement_om.total} tâches clôturées
+              {bc.avancement_om.total > 0
+                ? ` · ${bc.avancement_om.cloturees}/${bc.avancement_om.total} tâches clôturées`
+                : ' · aucune tâche créée'}
             </span>
           ) : null}
           {bc.client?.name ? (

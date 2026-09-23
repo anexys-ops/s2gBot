@@ -107,6 +107,7 @@ class OrdreMissionController extends Controller
             ], 422);
         }
 
+        $existingIds = OrdreMission::query()->where('bon_commande_id', $bonCommande->id)->pluck('id')->all();
         $orders = $this->generator->generate($bonCommande, $request->user());
 
         if ($orders === []) {
@@ -116,7 +117,9 @@ class OrdreMissionController extends Controller
             ], 422);
         }
 
-        return response()->json($orders, 201);
+        $hasNewOrder = collect($orders)->contains(fn (OrdreMission $order) => ! in_array($order->id, $existingIds, true));
+
+        return response()->json($orders, $hasNewOrder ? 201 : 200);
     }
 
     public function update(Request $request, OrdreMission $ordreMission): JsonResponse

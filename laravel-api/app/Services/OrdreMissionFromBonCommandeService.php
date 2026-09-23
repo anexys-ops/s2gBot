@@ -43,12 +43,22 @@ class OrdreMissionFromBonCommandeService
         ]);
 
         return DB::transaction(function () use ($bc, $actor) {
-            $this->purgeExistingForBonCommande($bc);
-
-            $created = [];
+            // Serialize concurrent clicks for the same BC before checking covered quantities.
+            BonCommande::query()->whereKey($bc->id)->lockForUpdate()->firstOrFail();
+            $orders = [];
 
             foreach ([OrdreMission::TYPE_LABO, OrdreMission::TYPE_TECHNICIEN, OrdreMission::TYPE_INGENIEUR] as $type) {
-                $entries = $this->collectEntriesForType($bc, $type);
+                $existing = OrdreMission::query()
+                    ->where('bon_commande_id', $bc->id)
+                    ->where('type', $type)
+                    ->where('statut', '!=', OrdreMission::STATUT_ANNULE)
+                    ->with('lignes')
+                    ->get();
+                foreach ($existing as $om) {
+                    $orders[] = $om->load(self::WITH);
+                }
+
+                $entries = $this->remainingEntries($this->collectEntriesForType($bc, $type), $existing);
                 if ($entries->isEmpty()) {
                     continue;
                 }
@@ -79,7 +89,7 @@ class OrdreMissionFromBonCommandeService
                         'ref_article_id' => $action?->ref_article_id ?? $ligne->ref_article_id,
                         'article_action_id' => $action?->id,
                         'libelle' => $action?->libelle ?? $ligne->libelle,
-                        'quantite' => $ligne->quantite,
+                        'quantite' => $entry['quantite'],
                         'statut' => 'a_faire',
                         'assigned_user_id' => $ligne->technicien_id,
                         'date_prevue' => $ligne->date_debut_prevue,
@@ -98,19 +108,53 @@ class OrdreMissionFromBonCommandeService
                     }
                 }
 
-                $created[] = $om->load(self::WITH);
+                $orders[] = $om->load(self::WITH);
             }
 
-            return $created;
+            return $orders;
         });
     }
 
-    private function purgeExistingForBonCommande(BonCommande $bc): void
+    /**
+     * A BC product can produce several actions per profile. Count already planned
+     * quantities per action, so repeating the request only creates the remainder.
+     *
+     * @param Collection<int, array{ligne: BonCommandeLigne, action: ArticleAction|null}> $entries
+     * @param Collection<int, OrdreMission> $existing
+     * @return Collection<int, array{ligne: BonCommandeLigne, action: ArticleAction|null, quantite: float}>
+     */
+    private function remainingEntries(Collection $entries, Collection $existing): Collection
     {
-        $existing = OrdreMission::query()->where('bon_commande_id', $bc->id)->get();
-        foreach ($existing as $om) {
-            $om->delete();
+        $key = static fn (BonCommandeLigne $ligne, ?ArticleAction $action): string => implode(':', [
+            $ligne->id,
+            $action?->ref_article_id ?? $ligne->ref_article_id ?? 0,
+            $action?->id ?? 0,
+        ]);
+        $remaining = [];
+        foreach ($entries as $entry) {
+            $id = $key($entry['ligne'], $entry['action']);
+            $remaining[$id] = ($remaining[$id] ?? 0) + max(0, (float) $entry['ligne']->quantite);
         }
+        foreach ($existing as $om) {
+            foreach ($om->lignes as $omLigne) {
+                $id = implode(':', [
+                    $omLigne->bon_commande_ligne_id,
+                    $omLigne->ref_article_id ?? 0,
+                    $omLigne->article_action_id ?? 0,
+                ]);
+                if (isset($remaining[$id])) {
+                    $remaining[$id] -= max(0, (float) $omLigne->quantite);
+                }
+            }
+        }
+
+        return $entries->map(function (array $entry) use (&$remaining, $key): ?array {
+            $id = $key($entry['ligne'], $entry['action']);
+            $quantity = min(max(0, (float) $entry['ligne']->quantite), $remaining[$id]);
+            $remaining[$id] -= $quantity;
+
+            return $quantity > 0 ? [...$entry, 'quantite' => $quantity] : null;
+        })->filter()->values();
     }
 
     /**
@@ -179,6 +223,15 @@ class OrdreMissionFromBonCommandeService
         $direct = $article->actions->where('type', $type)->values();
         if ($direct->isNotEmpty()) {
             return $direct;
+        }
+
+        // Some catalogue products own their technician/engineer/lab sections directly.
+        // A section assignment is a task even when no explicit ArticleAction exists.
+        if ($article->isProduct()) {
+            $article->loadMissing('sectionProducts.productArticle.actions');
+            if ($article->sectionProducts->isNotEmpty()) {
+                return $this->collectProductActionsForJalon($article, $type);
+            }
         }
 
         if ($this->articleTriggersOm($article, $type)) {
@@ -320,10 +373,8 @@ class OrdreMissionFromBonCommandeService
                 continue;
             }
 
-            if ($this->articleTriggersOm($product, $type)) {
-                for ($i = 0; $i < $quantite; $i++) {
-                    $actions->push($this->syntheticAction($product, $type));
-                }
+            for ($i = 0; $i < $quantite; $i++) {
+                $actions->push($this->syntheticAction($product, $type));
             }
         }
 

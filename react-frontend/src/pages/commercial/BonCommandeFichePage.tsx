@@ -104,7 +104,7 @@ export default function BonCommandeFichePage() {
   const [centreGroupId, setCentreGroupId] = useState<number | undefined>(undefined)
   const [qtyEdits, setQtyEdits] = useState<Record<number, string>>({})
   const [prixEdits, setPrixEdits] = useState<Record<number, string>>({})
-  const [confirmAction, setConfirmAction] = useState<'confirmer' | 'bl' | null>(null)
+  const [confirmAction, setConfirmAction] = useState<'confirmer' | null>(null)
   const [planningToast, setPlanningToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
   const [jalonMassQty, setJalonMassQty] = useState<Record<string, string>>({})
 
@@ -230,24 +230,16 @@ export default function BonCommandeFichePage() {
     },
   })
 
-  const mutBl = useMutation({
-    mutationFn: () => bonsCommandeApi.transformerBl(bcId),
-    onSuccess: (bl) => {
-      setConfirmAction(null)
-      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
-      if (bl?.id) navigate(`/bons-livraison/${bl.id}`)
-    },
-  })
-
   const mutGenerateOm = useMutation({
     mutationFn: () => ordresMissionApi.generateFromBC(bcId),
     onSuccess: (created) => {
       setPlanningToast({
-        message: `${created.length} ordre(s) de mission généré(s) — visible(s) dans OdM terrain, tâches et planning.`,
+        message: `${created.length} ordre(s) de mission disponible(s). Les quantités déjà couvertes ne sont pas recréées.`,
         variant: 'success',
       })
       void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
       void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
     },
     onError: (err) => {
       setPlanningToast({
@@ -378,7 +370,6 @@ export default function BonCommandeFichePage() {
 
   const isAdmin = user?.role === 'lab_admin'
   const canConfirmer = lab && bc.statut === 'brouillon'
-  const canGenerateBl = lab && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
   const canGenerateOm = lab && isAdmin && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
   const hasBonLivraison = (bc.bons_livraison?.length ?? 0) > 0
   const canEditQuantites = lab && forfaitLignes.length > 0 && bc.statut !== 'annule'
@@ -489,16 +480,6 @@ export default function BonCommandeFichePage() {
                 Confirmer le BC
               </button>
             ) : null}
-            {canGenerateBl ? (
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setConfirmAction('bl')}
-                disabled={mutBl.isPending}
-              >
-                Générer un BL
-              </button>
-            ) : null}
             {canGenerateOm ? (
               <button
                 type="button"
@@ -509,7 +490,7 @@ export default function BonCommandeFichePage() {
                 }}
                 disabled={mutGenerateOm.isPending}
               >
-                {mutGenerateOm.isPending ? 'Génération OdM…' : 'Générer OdM terrain'}
+                {mutGenerateOm.isPending ? 'Génération OdM…' : 'Générer les OdM'}
               </button>
             ) : null}
             {canGenerateOm ? (
@@ -663,6 +644,12 @@ export default function BonCommandeFichePage() {
                                   </>
                                 ) : null}
                                 {row.label}
+                                {fl?.om_quantites && Object.entries(fl.om_quantites).map(([type, covered]) => (
+                                  <span key={type} className="bc-lignes-table__om-badge">
+                                    OM {type === 'technicien' ? 'terrain' : type === 'ingenieur' ? 'ingénieur' : 'labo'} :{' '}
+                                    {formatQuantity(covered)}/{formatQuantity(fl.quantite)}
+                                  </span>
+                                ))}
                                 {showJalonMassQty ? (
                                   <div style={{ marginTop: '0.4rem' }}>
                                     <BcJalonQtyMass
@@ -745,7 +732,15 @@ export default function BonCommandeFichePage() {
                             key={row.key}
                             className={row.nested ? 'bc-lignes-table__product--nested' : undefined}
                           >
-                            <td>{l.libelle}</td>
+                            <td>
+                              {l.libelle}
+                              {l.om_quantites && Object.entries(l.om_quantites).map(([type, covered]) => (
+                                <span key={type} className="bc-lignes-table__om-badge">
+                                  OM {type === 'technicien' ? 'terrain' : type === 'ingenieur' ? 'ingénieur' : 'labo'} :{' '}
+                                  {formatQuantity(covered)}/{formatQuantity(l.quantite)}
+                                </span>
+                              ))}
+                            </td>
                             <td className="data-table__num bc-lignes-table__qty-cell">
                               {canEditQty ? (
                                 <input
@@ -925,14 +920,6 @@ export default function BonCommandeFichePage() {
                     )
                   })}
                 </ul>
-                {mutBl.data?.id ? (
-                  <p className="text-muted bc-fiche__bl-created">
-                    Dernier BL créé :{' '}
-                    <Link to={`/bons-livraison/${mutBl.data.id}`} className="link-inline">
-                      {mutBl.data.numero}
-                    </Link>
-                  </p>
-                ) : null}
               </section>
             ) : null}
 
@@ -971,24 +958,6 @@ export default function BonCommandeFichePage() {
           onConfirm={() => mutConfirmer.mutate()}
           onCancel={() => {
             if (!mutConfirmer.isPending) setConfirmAction(null)
-          }}
-        />
-      ) : null}
-
-      {confirmAction === 'bl' ? (
-        <ConfirmDialog
-          title="Générer un bon de livraison"
-          message={
-            <>
-              Créer un bon de livraison (BLC) à partir du BC <strong>{bc.numero}</strong> ?
-            </>
-          }
-          confirmLabel="Générer le BL"
-          loading={mutBl.isPending}
-          error={mutBl.isError ? (mutBl.error as Error).message : null}
-          onConfirm={() => mutBl.mutate()}
-          onCancel={() => {
-            if (!mutBl.isPending) setConfirmAction(null)
           }}
         />
       ) : null}

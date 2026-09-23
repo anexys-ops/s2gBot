@@ -10129,7 +10129,7 @@ a.catalogue-tree__link-article:hover {
 .bc-lignes-table--qty-edit {
   table-layout: fixed;
   width: 100%;
-  max-width: 100%;
+  min-width: 40rem;
 }
 .bc-lignes-table--qty-edit .bc-lignes-table__col-libelle {
   width: auto;
@@ -10139,7 +10139,22 @@ a.catalogue-tree__link-article:hover {
   width: 5.5rem;
 }
 .bc-lignes-table--qty-edit .bc-lignes-table__col-money {
-  width: 7.5rem;
+  width: 7rem;
+}
+.bc-lignes-table--qty-edit .bc-lignes-table__col-tva {
+  width: 4rem;
+}
+.bc-lignes-table__om-badge {
+  display: block;
+  width: fit-content;
+  margin-top: 0.2rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.3rem;
+  background: #edf0f3;
+  color: #425466;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  font-weight: 600;
 }
 .bc-lignes-table__qty-cell {
   vertical-align: middle;

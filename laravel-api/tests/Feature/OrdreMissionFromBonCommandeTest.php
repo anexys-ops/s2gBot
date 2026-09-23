@@ -467,6 +467,58 @@ class OrdreMissionFromBonCommandeTest extends TestCase
         $this->assertSame(1, MissionTask::query()->count());
     }
 
+    public function test_product_sections_create_engineer_and_technician_tasks_only_for_remaining_bc_quantity(): void
+    {
+        [$bc, $lab] = $this->seedBcWithTechnicienAction(withAction: false);
+        $line = $bc->lignes()->firstOrFail();
+        $article = Article::query()->findOrFail($line->ref_article_id);
+        $article->update(['kind' => Article::KIND_PRODUCT]);
+        foreach ([ArticleSectionProduct::SECTION_TECHNICIEN, ArticleSectionProduct::SECTION_INGENIEUR] as $type) {
+            ArticleSectionProduct::query()->create([
+                'ref_article_id' => $article->id,
+                'product_article_id' => $article->id,
+                'section_type' => $type,
+                'ordre' => 1,
+                'quantite' => 1,
+            ]);
+        }
+
+        $first = $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission");
+        $first->assertCreated()->assertJsonCount(2);
+        $this->assertEqualsCanonicalizing(
+            [OrdreMission::TYPE_TECHNICIEN, OrdreMission::TYPE_INGENIEUR],
+            OrdreMission::query()->pluck('type')->all(),
+        );
+        $firstIds = OrdreMission::query()->pluck('id')->all();
+
+        $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")
+            ->assertOk()->assertJsonCount(2);
+        $this->assertSame(2, OrdreMission::query()->count());
+        $this->assertSame(2, MissionTask::query()->count());
+
+        $line->update(['quantite' => 3]);
+        $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")
+            ->assertCreated()->assertJsonCount(4);
+        $this->assertSame(4, OrdreMission::query()->count());
+        foreach ($firstIds as $id) {
+            $this->assertDatabaseHas('ordres_mission', ['id' => $id, 'deleted_at' => null]);
+        }
+        foreach ([OrdreMission::TYPE_TECHNICIEN, OrdreMission::TYPE_INGENIEUR] as $type) {
+            $this->assertSame(3.0, (float) OrdreMissionLigne::query()
+                ->whereHas('ordreMission', fn ($query) => $query->where('type', $type))
+                ->sum('quantite'));
+        }
+
+        $this->actingAs($lab, 'sanctum')
+            ->getJson("/api/v1/bons-commande/{$bc->id}")
+            ->assertOk()
+            ->assertJsonPath('lignes.0.om_quantites.technicien', 3)
+            ->assertJsonPath('lignes.0.om_quantites.ingenieur', 3);
+    }
+
     /**
      * @return array{0: BonCommande, 1: User, 2?: User}
      */

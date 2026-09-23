@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\BcLignePlanningAffectation;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
+use App\Models\OrdreMission;
+use App\Models\OrdreMissionLigne;
 use App\Models\Quote;
 use App\Services\BonCommandeTotalsService;
 use App\Services\BonLivraisonDeliveryService;
@@ -101,6 +103,31 @@ class BonCommandeController extends Controller
             'quote',
             'bonsLivraison.lignes',
         ]);
+
+        $covered = [];
+        $omLines = OrdreMissionLigne::query()
+            ->whereIn('bon_commande_ligne_id', $bonCommande->lignes->pluck('id'))
+            ->whereHas('ordreMission', fn ($query) => $query
+                ->where('bon_commande_id', $bonCommande->id)
+                ->where('statut', '!=', OrdreMission::STATUT_ANNULE))
+            ->with('ordreMission:id,type')
+            ->get();
+        foreach ($omLines as $omLine) {
+            $type = $omLine->ordreMission?->type;
+            if (! $type) {
+                continue;
+            }
+            $definition = ($omLine->ref_article_id ?? 0).':'.($omLine->article_action_id ?? 0);
+            $covered[$omLine->bon_commande_ligne_id][$type][$definition] =
+                ($covered[$omLine->bon_commande_ligne_id][$type][$definition] ?? 0) + (float) $omLine->quantite;
+        }
+        foreach ($bonCommande->lignes as $ligne) {
+            $quantities = [];
+            foreach ($covered[$ligne->id] ?? [] as $type => $definitions) {
+                $quantities[$type] = min((float) $ligne->quantite, min($definitions));
+            }
+            $ligne->setAttribute('om_quantites', $quantities);
+        }
 
         return response()->json($bonCommande);
     }

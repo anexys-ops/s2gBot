@@ -949,6 +949,7 @@ export type BonCommandeLigne = {
   notes_ligne?: string | null
   technicien?: { id: number; name: string } | null
   planning_affectations?: BcLignePlanningAffectation[]
+  om_quantites?: Partial<Record<'technicien' | 'ingenieur' | 'labo', number>>
 }
 
 export type BonCommande = {

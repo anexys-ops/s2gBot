@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   bonsCommandeApi,
@@ -37,6 +37,8 @@ type Props = {
   hasBonLivraison?: boolean
   /** Afficher la barre de boutons (défaut true). */
   showHeader?: boolean
+  hideStatusButton?: boolean
+  beforeDangerActions?: ReactNode
   onDeleted?: () => void
   onDuplicated?: (newId: number) => void
   onStatusChanged?: () => void
@@ -54,6 +56,8 @@ export default function CommercialDocumentActions({
   invoiceForEmail = null,
   hasBonLivraison = false,
   showHeader = true,
+  hideStatusButton = false,
+  beforeDangerActions,
   onDeleted,
   onDuplicated,
   onStatusChanged,
@@ -282,11 +286,12 @@ export default function CommercialDocumentActions({
               Envoyer par mail
             </button>
           ) : null}
-          {capabilities.canChangeStatus ? (
+          {capabilities.canChangeStatus && !hideStatusButton ? (
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setStatusOpen(true)}>
               Changer le statut
             </button>
           ) : null}
+          {beforeDangerActions}
           {capabilities.canCancel ? (
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCancelOpen(true)}>
               Annuler

@@ -176,7 +176,7 @@ class OrdreMissionController extends Controller
             'article_action_id' => 'nullable|exists:article_actions,id',
             'assigned_user_id' => 'nullable|exists:users,id',
             'date_prevue' => 'nullable|date',
-            'statut' => 'sometimes|in:planifie,en_cours,freeze,annule,attente_validation,cloture,a_faire,realise',
+            'statut' => 'sometimes|in:planifie,replanifie,en_cours,freeze,annule,attente_validation,cloture,a_faire,realise',
         ]);
 
         $libelle = trim((string) ($validated['libelle'] ?? ''));
@@ -240,7 +240,7 @@ class OrdreMissionController extends Controller
         $validated = $request->validate([
             'libelle'             => 'sometimes|required|string|max:500',
             'quantite'           => 'sometimes|numeric|min:0.001',
-            'statut'              => 'sometimes|in:planifie,en_cours,freeze,annule,attente_validation,cloture,a_faire,realise',
+            'statut'              => 'sometimes|in:planifie,replanifie,en_cours,freeze,annule,attente_validation,cloture,a_faire,realise',
             'assigned_user_id'    => 'nullable|exists:users,id',
             'equipment_id'        => 'nullable|exists:equipments,id',
             'date_prevue'         => 'nullable|date',
@@ -270,7 +270,7 @@ class OrdreMissionController extends Controller
             'lignes.*.id' => 'required|integer|distinct',
             'lignes.*.libelle' => 'sometimes|required|string|max:500',
             'lignes.*.quantite' => 'sometimes|numeric|min:0.001',
-            'lignes.*.statut' => 'sometimes|in:planifie,en_cours,freeze,annule,attente_validation,cloture,a_faire,realise',
+            'lignes.*.statut' => 'sometimes|in:planifie,replanifie,en_cours,freeze,annule,attente_validation,cloture,a_faire,realise',
             'lignes.*.assigned_user_id' => 'sometimes|nullable|exists:users,id',
             'lignes.*.equipment_id' => 'sometimes|nullable|exists:equipments,id',
             'lignes.*.date_prevue' => 'sometimes|nullable|date',
@@ -340,6 +340,7 @@ class OrdreMissionController extends Controller
         $statut = match ($ligne->statut) {
             'en_cours' => MissionTask::STATUT_IN_PROGRESS,
             'freeze' => MissionTask::STATUT_FROZEN,
+            'replanifie' => MissionTask::STATUT_RESCHEDULED,
             'attente_validation', 'realise' => MissionTask::STATUT_DONE,
             'cloture' => MissionTask::STATUT_VALIDATED,
             'annule' => MissionTask::STATUT_REJECTED,
@@ -412,18 +413,18 @@ class OrdreMissionController extends Controller
             ]);
             return;
         }
-        if ($lignes->contains(fn (OrdreMissionLigne $item) => in_array($item->statut, ['en_cours', 'freeze', 'attente_validation'], true))) {
+        if ($lignes->contains(fn (OrdreMissionLigne $item) => in_array($item->statut, ['en_cours', 'freeze', 'attente_validation', 'cloture'], true))) {
             $ordreMission->update([
                 'statut' => OrdreMission::STATUT_EN_COURS,
                 'date_debut' => $ordreMission->date_debut ?? $now,
             ]);
             return;
         }
-        if ($ordreMission->statut === OrdreMission::STATUT_BROUILLON
-            && $lignes->contains(fn (OrdreMissionLigne $item) => $item->assigned_user_id && $item->date_prevue)
-        ) {
-            $ordreMission->update(['statut' => OrdreMission::STATUT_PLANIFIE]);
-        }
+        $active = $lignes->reject(fn (OrdreMissionLigne $item) => $item->statut === 'annule');
+        $ordreMission->update(['statut' => $active->isNotEmpty()
+            && $active->every(fn (OrdreMissionLigne $item) => $item->assigned_user_id && $item->date_prevue)
+            ? OrdreMission::STATUT_PLANIFIE
+            : OrdreMission::STATUT_BROUILLON]);
     }
 
     public function planning(Request $request): JsonResponse

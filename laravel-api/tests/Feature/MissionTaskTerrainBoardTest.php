@@ -104,6 +104,19 @@ class MissionTaskTerrainBoardTest extends TestCase
         $this->assertSame(OrdreMission::STATUT_EN_COURS, $om->fresh()->statut);
 
         $this->actingAs($lab, 'sanctum')
+            ->putJson("/api/mission-tasks/{$task->id}", [
+                'planned_date' => '2026-09-27',
+                'statut' => MissionTask::STATUT_RESCHEDULED,
+            ])
+            ->assertOk()
+            ->assertJsonPath('statut', MissionTask::STATUT_RESCHEDULED);
+        $this->assertSame('replanifie', $ligne->fresh()->statut);
+        $this->assertSame(OrdreMission::STATUT_PLANIFIE, $om->fresh()->statut);
+        $this->actingAs($lab, 'sanctum')
+            ->getJson("/api/v1/bons-commande/{$om->bon_commande_id}")
+            ->assertJsonPath('avancement_om.statut', 'replanifie');
+
+        $this->actingAs($lab, 'sanctum')
             ->putJson("/api/mission-tasks/{$task->id}", ['statut' => MissionTask::STATUT_REJECTED])
             ->assertOk();
 
@@ -145,7 +158,7 @@ class MissionTaskTerrainBoardTest extends TestCase
             ->assertOk()
             ->assertJsonPath('samples_created', 1)
             ->assertJsonPath('remaining_quantity', 0)
-            ->assertJsonPath('task.statut', MissionTask::STATUT_VALIDATED);
+            ->assertJsonPath('task.statut', MissionTask::STATUT_DONE);
 
         $this->assertDatabaseHas('samples', [
             'task_id' => $task->id,
@@ -157,8 +170,8 @@ class MissionTaskTerrainBoardTest extends TestCase
         $this->assertNotNull(Sample::query()->where('task_id', $task->id)->value('prepared_by_task_at'));
         $this->assertSame(['PV-2026-0042'], $task->fresh()->pv_numbers);
         $this->assertSame('unité', $task->fresh()->quantity_unit);
-        $this->assertSame('cloture', $ligne->fresh()->statut);
-        $this->assertSame(OrdreMission::STATUT_TERMINE, $om->fresh()->statut);
+        $this->assertSame('attente_validation', $ligne->fresh()->statut);
+        $this->assertSame(OrdreMission::STATUT_EN_COURS, $om->fresh()->statut);
 
         $attendus = $this->actingAs($lab, 'sanctum')
             ->getJson('/api/v1/lab/reception/attendus')
@@ -181,6 +194,14 @@ class MissionTaskTerrainBoardTest extends TestCase
             ->assertJsonPath('samples_created', 0);
 
         $this->assertSame(1, Sample::query()->where('task_id', $task->id)->count());
+
+        $sample = Sample::query()->where('task_id', $task->id)->firstOrFail();
+        $this->actingAs($lab, 'sanctum')
+            ->patchJson("/api/v1/samples/{$sample->id}/receive", ['condition_state' => 'bon'])
+            ->assertOk();
+        $this->assertSame(MissionTask::STATUT_VALIDATED, $task->fresh()->statut);
+        $this->assertSame('cloture', $ligne->fresh()->statut);
+        $this->assertSame(OrdreMission::STATUT_TERMINE, $om->fresh()->statut);
     }
 
     public function test_a_follow_up_task_can_be_added_for_the_remaining_bc_quantity(): void

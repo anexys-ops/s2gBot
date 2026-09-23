@@ -10,6 +10,7 @@ use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
 use App\Models\Quote;
 use App\Services\BonCommandeTotalsService;
+use App\Services\BonCommandeMissionProgressService;
 use App\Services\BonLivraisonDeliveryService;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\CommercialDocumentWorkflowService;
@@ -25,6 +26,7 @@ class BonCommandeController extends Controller
         private readonly CommercialDocumentWorkflowService $workflow,
         private readonly BonLivraisonDeliveryService $delivery,
         private readonly BonCommandeTotalsService $totals,
+        private readonly BonCommandeMissionProgressService $missionProgress,
         private readonly TerrainPlanningBcLinesService $terrainPlanningLines,
     ) {}
 
@@ -128,6 +130,7 @@ class BonCommandeController extends Controller
             }
             $ligne->setAttribute('om_quantites', $quantities);
         }
+        $bonCommande->setAttribute('avancement_om', $this->missionProgress->forBonCommande($bonCommande));
 
         return response()->json($bonCommande);
     }

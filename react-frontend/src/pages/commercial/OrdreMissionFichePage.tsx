@@ -42,6 +42,7 @@ const TYPE_META: Record<string, { label: string; color: string }> = {
 const STATUTS = ['brouillon', 'planifie', 'en_cours', 'termine', 'annule'] as const
 const STATUTS_LIGNE = [
   { value: 'planifie', label: 'Planifié' },
+  { value: 'replanifie', label: 'Replanifié' },
   { value: 'en_cours', label: 'En cours' },
   { value: 'freeze', label: 'Freeze' },
   { value: 'annule', label: 'Annulé' },

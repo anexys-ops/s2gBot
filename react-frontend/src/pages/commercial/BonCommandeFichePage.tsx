@@ -3,7 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { bonsCommandeApi, ordresMissionApi, type BonCommandeLigne } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import StatusChangeModal from '../../components/StatusChangeModal'
 import CommercialDocumentActions from '../../components/crm/CommercialDocumentActions'
+import { commercialDocumentStatusOptions } from '../../lib/commercialDocumentActionConfig'
 import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
 import StatusBadge, { bonCommandeStatutBadgeProps, bonLivraisonStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
@@ -23,6 +25,16 @@ import {
 } from '../../lib/bcLigneDisplay'
 import { formatAppDate, formatMoney, formatQuantity, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
+const omProgressLabels: Record<string, string> = {
+  a_planifier: 'À planifier',
+  planifie: 'Planifié',
+  a_replanifier: 'À replanifier',
+  replanifie: 'Replanifié',
+  en_cours: 'En cours',
+  freeze: 'Freeze',
+  attente_validation: 'Attente validation',
+  cloture: 'Clôturé',
+}
 
 function qtyInputFromApi(q: string | number | null | undefined): string {
   if (q == null || q === '') return '0'
@@ -105,6 +117,7 @@ export default function BonCommandeFichePage() {
   const [qtyEdits, setQtyEdits] = useState<Record<number, string>>({})
   const [prixEdits, setPrixEdits] = useState<Record<number, string>>({})
   const [confirmAction, setConfirmAction] = useState<'confirmer' | null>(null)
+  const [statusOpen, setStatusOpen] = useState(false)
   const [planningToast, setPlanningToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
   const [jalonMassQty, setJalonMassQty] = useState<Record<string, string>>({})
 
@@ -227,6 +240,35 @@ export default function BonCommandeFichePage() {
         message: toastErrorMessage(err, "Échec de l'enregistrement des lignes."),
         variant: 'error',
       })
+    },
+  })
+
+  const mutSaveBc = useMutation({
+    mutationFn: async () => {
+      await mutQuantites.mutateAsync({ qty: qtyEdits, prix: prixEdits })
+      return bonsCommandeApi.update(bcId, {
+        notes,
+        contact_id: contactId,
+        lab_centre_group_id: centreGroupId ?? null,
+        statut: bc?.statut === 'confirme' ? 'en_cours' : bc?.statut,
+      })
+    },
+    onSuccess: () => {
+      setPlanningToast({ message: 'Bon de commande enregistré — statut En cours.', variant: 'success' })
+      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+    },
+    onError: (err) => {
+      setPlanningToast({ message: toastErrorMessage(err, "Échec de l'enregistrement du bon de commande."), variant: 'error' })
+    },
+  })
+
+  const mutStatus = useMutation({
+    mutationFn: (statut: string) => bonsCommandeApi.update(bcId, { statut }),
+    onSuccess: () => {
+      setStatusOpen(false)
+      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
     },
   })
 
@@ -370,6 +412,7 @@ export default function BonCommandeFichePage() {
 
   const isAdmin = user?.role === 'lab_admin'
   const canConfirmer = lab && bc.statut === 'brouillon'
+  const canSaveBc = lab && (bc.statut === 'confirme' || bc.statut === 'en_cours')
   const canGenerateOm = lab && isAdmin && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
   const hasBonLivraison = (bc.bons_livraison?.length ?? 0) > 0
   const canEditQuantites = lab && forfaitLignes.length > 0 && bc.statut !== 'annule'
@@ -417,9 +460,25 @@ export default function BonCommandeFichePage() {
       subtitle={
         <span className="bc-fiche__subtitle">
           {statutBadge ? (
-            <StatusBadge variant={statutBadge.variant} size="sm">
-              {statutBadge.label}
-            </StatusBadge>
+            lab && bc.statut !== 'annule' ? (
+              <button
+                type="button"
+                className="bc-fiche__status-trigger"
+                onClick={() => setStatusOpen(true)}
+                aria-label={`Modifier le statut du bon de commande : ${statutBadge.label}`}
+                title="Modifier le statut"
+              >
+                <StatusBadge variant={statutBadge.variant} size="sm">{statutBadge.label}</StatusBadge>
+              </button>
+            ) : (
+              <StatusBadge variant={statutBadge.variant} size="sm">{statutBadge.label}</StatusBadge>
+            )
+          ) : null}
+          {bc.avancement_om && bc.avancement_om.total > 0 ? (
+            <span className={`bc-fiche__om-progress bc-fiche__om-progress--${bc.avancement_om.statut}`}>
+              OM : {omProgressLabels[bc.avancement_om.statut] ?? bc.avancement_om.statut}
+              {' · '}{bc.avancement_om.cloturees}/{bc.avancement_om.total} tâches clôturées
+            </span>
           ) : null}
           {bc.client?.name ? (
             <Link to={`/clients/${bc.client_id}`} className="link-inline">
@@ -462,6 +521,45 @@ export default function BonCommandeFichePage() {
               isLab={lab}
               isAdmin={isAdmin}
               hasBonLivraison={hasBonLivraison}
+              hideStatusButton
+              beforeDangerActions={
+                <>
+                  {canConfirmer ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => setConfirmAction('confirmer')}
+                      disabled={mutConfirmer.isPending}
+                    >
+                      Confirmer le BC
+                    </button>
+                  ) : null}
+                  {canSaveBc ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm bc-fiche__save-btn"
+                      onClick={() => mutSaveBc.mutate()}
+                      disabled={mutSaveBc.isPending || mutQuantites.isPending}
+                    >
+                      {mutSaveBc.isPending ? 'Enregistrement…' : 'Enregistrer'}
+                    </button>
+                  ) : null}
+                  {canGenerateOm ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setPlanningToast(null)
+                        mutGenerateOm.mutate()
+                      }}
+                      disabled={mutGenerateOm.isPending || mutSaveBc.isPending || qtyDirty}
+                      title={qtyDirty ? "Enregistrer les quantités avant de générer les OM" : undefined}
+                    >
+                      {mutGenerateOm.isPending ? 'Génération OdM…' : 'Générer tous les OM possibles'}
+                    </button>
+                  ) : null}
+                </>
+              }
               onDeleted={() => navigate('/bons-commande')}
               onStatusChanged={() => {
                 void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
@@ -470,34 +568,6 @@ export default function BonCommandeFichePage() {
                 void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
               }}
             />
-            {canConfirmer ? (
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => setConfirmAction('confirmer')}
-                disabled={mutConfirmer.isPending}
-              >
-                Confirmer le BC
-              </button>
-            ) : null}
-            {canGenerateOm ? (
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  setPlanningToast(null)
-                  mutGenerateOm.mutate()
-                }}
-                disabled={mutGenerateOm.isPending}
-              >
-                {mutGenerateOm.isPending ? 'Génération OdM…' : 'Générer les OdM'}
-              </button>
-            ) : null}
-            {canGenerateOm ? (
-              <Link to={`/ordres-mission?bon_commande_id=${bc.id}`} className="btn btn-secondary btn-sm">
-                Voir OdM
-              </Link>
-            ) : null}
           </div>
         ) : null
       }
@@ -942,6 +1012,18 @@ export default function BonCommandeFichePage() {
           </aside>
         </div>
       </div>
+
+      {statusOpen ? (
+        <StatusChangeModal
+          title={`Statut — ${bc.numero}`}
+          initialValue={bc.statut}
+          options={commercialDocumentStatusOptions('bon_commande')}
+          isPending={mutStatus.isPending}
+          error={mutStatus.isError ? (mutStatus.error as Error).message : null}
+          onClose={() => setStatusOpen(false)}
+          onSave={(next) => mutStatus.mutate(next)}
+        />
+      ) : null}
 
       {confirmAction === 'confirmer' ? (
         <ConfirmDialog

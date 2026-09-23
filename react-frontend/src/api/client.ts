@@ -969,6 +969,7 @@ export type BonCommande = {
   tva_rate: string | number
   notes?: string | null
   lignes?: BonCommandeLigne[]
+  avancement_om?: { statut: string; total: number; cloturees: number; planifiees: number }
   planning_terrain_groups?: Array<{
     jalon: { id: string; code?: string | null; label: string }
     lignes: BonCommandeLigne[]
@@ -3318,7 +3319,7 @@ export interface OrdreMissionLigne {
   article_action_id?: number | null
   libelle: string
   quantite: number
-  statut: 'planifie' | 'en_cours' | 'freeze' | 'annule' | 'attente_validation' | 'cloture' | 'a_faire' | 'realise'
+  statut: 'planifie' | 'replanifie' | 'en_cours' | 'freeze' | 'annule' | 'attente_validation' | 'cloture' | 'a_faire' | 'realise'
   assigned_user_id?: number | null
   equipment_id?: number | null
   date_prevue?: string | null
@@ -3549,7 +3550,7 @@ export interface MissionTask {
   unique_number?: string
   ordre_mission_ligne_id: number
   assigned_user_id?: number | null
-  statut: 'todo' | 'in_progress' | 'paused' | 'frozen' | 'done' | 'validated' | 'rejected'
+  statut: 'todo' | 'in_progress' | 'paused' | 'frozen' | 'rescheduled' | 'done' | 'validated' | 'rejected'
   planned_date?: string | null
   due_date?: string | null
   started_at?: string | null

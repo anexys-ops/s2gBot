@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ArticleAction;
 use App\Models\ArticleSectionProduct;
+use App\Models\Agency;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
 use App\Models\Catalogue\Article;
@@ -11,11 +12,17 @@ use App\Models\Catalogue\FamilleArticle;
 use App\Models\Client;
 use App\Models\Dossier;
 use App\Models\JalonProduct;
+use App\Models\LabReport;
+use App\Models\LabReportSection;
 use App\Models\MissionTask;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
 use App\Models\PlanningHuman;
+use App\Models\Sample;
 use App\Models\Site;
+use App\Models\TestType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -471,6 +478,7 @@ class OrdreMissionFromBonCommandeTest extends TestCase
     {
         [$bc, $lab] = $this->seedBcWithTechnicienAction(withAction: false);
         $line = $bc->lignes()->firstOrFail();
+        $line->update(['date_debut_prevue' => now()->addDay()->toDateString()]);
         $article = Article::query()->findOrFail($line->ref_article_id);
         $article->update(['kind' => Article::KIND_PRODUCT]);
         foreach ([ArticleSectionProduct::SECTION_TECHNICIEN, ArticleSectionProduct::SECTION_INGENIEUR] as $type) {
@@ -500,6 +508,9 @@ class OrdreMissionFromBonCommandeTest extends TestCase
 
         $line->update(['quantite' => 3]);
         $this->actingAs($lab, 'sanctum')
+            ->getJson("/api/v1/bons-commande/{$bc->id}")
+            ->assertJsonPath('avancement_om.statut', 'a_planifier');
+        $this->actingAs($lab, 'sanctum')
             ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")
             ->assertCreated()->assertJsonCount(4);
         $this->assertSame(4, OrdreMission::query()->count());
@@ -517,6 +528,108 @@ class OrdreMissionFromBonCommandeTest extends TestCase
             ->assertOk()
             ->assertJsonPath('lignes.0.om_quantites.technicien', 3)
             ->assertJsonPath('lignes.0.om_quantites.ingenieur', 3);
+    }
+
+    public function test_reception_closes_technician_task_only_after_its_label_is_received(): void
+    {
+        [$bc, $lab] = $this->seedBcWithTechnicienAction();
+        $bc->lignes()->firstOrFail()->update(['quantite' => 2]);
+        $this->seedLegacyOrderItem($bc);
+        $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")
+            ->assertCreated();
+        $task = MissionTask::query()->firstOrFail();
+
+        $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/mission-tasks/{$task->id}/close-reception", [
+                'pv_numbers' => ['PV-001'],
+                'quantity_unit' => 'point',
+                'quantity_count' => 2,
+            ])->assertOk();
+
+        $this->assertDatabaseHas('mission_tasks', ['id' => $task->id, 'statut' => MissionTask::STATUT_DONE]);
+        $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-commande/{$bc->id}")
+            ->assertJsonPath('avancement_om.statut', 'attente_validation')
+            ->assertJsonPath('avancement_om.cloturees', 0);
+
+        $samples = Sample::query()->where('task_id', $task->id)->orderBy('id')->get();
+        $this->assertCount(2, $samples);
+        $this->actingAs($lab, 'sanctum')
+            ->patchJson("/api/v1/samples/{$samples[0]->id}/receive", ['condition_state' => 'bon'])
+            ->assertOk();
+        $this->assertSame(MissionTask::STATUT_DONE, $task->fresh()->statut);
+        $this->actingAs($lab, 'sanctum')
+            ->patchJson("/api/v1/samples/{$samples[1]->id}/receive", ['condition_state' => 'bon'])
+            ->assertOk();
+
+        $this->assertDatabaseHas('mission_tasks', ['id' => $task->id, 'statut' => MissionTask::STATUT_VALIDATED]);
+        $this->assertDatabaseHas('ordre_mission_lignes', ['id' => $task->ordre_mission_ligne_id, 'statut' => 'cloture']);
+        $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-commande/{$bc->id}")
+            ->assertJsonPath('avancement_om.statut', 'cloture')
+            ->assertJsonPath('avancement_om.cloturees', 1);
+    }
+
+    public function test_validated_report_closes_only_its_linked_task(): void
+    {
+        [$bc, $lab] = $this->seedBcWithTechnicienAction();
+        $orderItemId = $this->seedLegacyOrderItem($bc);
+        $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")
+            ->assertCreated();
+        $task = MissionTask::query()->firstOrFail();
+        $sample = Sample::query()->create([
+            'order_item_id' => $orderItemId,
+            'reference' => 'ECH-RAPPORT-001',
+            'task_id' => $task->id,
+            'bon_commande_ligne_id' => $bc->lignes()->firstOrFail()->id,
+            'status' => Sample::STATUS_RECEPTIONNE,
+        ]);
+        $report = LabReport::query()->create([
+            'number' => 'RPT-ODM-001',
+            'bc_id' => $bc->id,
+            'title' => 'Rapport lié à la tâche',
+            'status' => 'brouillon',
+        ]);
+        LabReportSection::query()->create([
+            'report_id' => $report->id,
+            'sample_id' => $sample->id,
+            'ordre' => 1,
+        ]);
+
+        $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/lab-reports/{$report->id}/transition", ['status' => 'en_validation'])
+            ->assertOk();
+        $this->assertSame(MissionTask::STATUT_TODO, $task->fresh()->statut);
+        $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/lab-reports/{$report->id}/transition", ['status' => 'valide'])
+            ->assertOk();
+
+        $this->assertDatabaseHas('mission_tasks', ['id' => $task->id, 'statut' => MissionTask::STATUT_VALIDATED]);
+        $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-commande/{$bc->id}")
+            ->assertJsonPath('avancement_om.statut', 'cloture');
+    }
+
+    private function seedLegacyOrderItem(BonCommande $bc): int
+    {
+        $agency = Agency::query()->create([
+            'client_id' => $bc->client_id,
+            'name' => 'Agence test OM',
+            'is_headquarters' => true,
+        ]);
+        $testType = TestType::query()->create(['name' => 'Essai OM', 'unit_price' => 10]);
+        $order = Order::query()->create([
+            'reference' => 'ORD-ODM-'.$bc->id,
+            'client_id' => $bc->client_id,
+            'agency_id' => $agency->id,
+            'status' => Order::STATUS_IN_PROGRESS,
+            'order_date' => now()->toDateString(),
+        ]);
+
+        return (int) OrderItem::query()->create([
+            'order_id' => $order->id,
+            'test_type_id' => $testType->id,
+            'quantity' => 1,
+        ])->id;
     }
 
     /**

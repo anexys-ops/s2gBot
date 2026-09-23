@@ -9834,6 +9834,55 @@ a.catalogue-tree__link-article:hover {
   gap: 0.5rem 0.85rem;
   align-items: center;
 }
+.bc-fiche__status-trigger {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.bc-fiche__status-trigger:hover {
+  opacity: 0.8;
+}
+.bc-fiche__status-trigger:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+  border-radius: 0.4rem;
+}
+.bc-fiche__om-progress {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.4rem;
+  background: #edf2f7;
+  color: #334155;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.bc-fiche__om-progress--cloture {
+  background: #dcfce7;
+  color: #166534;
+}
+.bc-fiche__om-progress--freeze,
+.bc-fiche__om-progress--a_replanifier {
+  background: #fef3c7;
+  color: #92400e;
+}
+.bc-fiche__om-progress--en_cours,
+.bc-fiche__om-progress--attente_validation {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.bc-fiche__save-btn.btn {
+  background: #087f63;
+  border-color: #087f63;
+  color: #fff;
+}
+.bc-fiche__save-btn.btn:hover:not(:disabled) {
+  background: #066b53;
+  border-color: #066b53;
+}
 .bc-fiche__header-actions,
 .commercial-doc-actions {
   display: flex;

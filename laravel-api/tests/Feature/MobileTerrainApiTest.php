@@ -115,6 +115,56 @@ class MobileTerrainApiTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('statut');
     }
 
+    public function test_mobile_task_notes_remain_editable_after_completion_and_cancellation(): void
+    {
+        [$user, $other, $om] = $this->seedMission();
+        $task = $this->taskFor($om, $user, 'Compte rendu terrain');
+        $url = '/api/mobile/terrain/tasks/'.$task->id.'/notes';
+
+        $this->actingAs($other, 'sanctum')->patchJson($url, ['notes' => 'Intrusion'])->assertForbidden();
+        $this->actingAs($user, 'sanctum')->patchJson($url, ['notes' => 'Mesures effectuées'])
+            ->assertOk()->assertJsonPath('notes', 'Mesures effectuées')
+            ->assertJsonPath('client.name', 'Client mobile');
+        $task->update(['statut' => 'done']);
+        $this->patchJson($url, ['notes' => 'Mesures corrigées'])
+            ->assertOk()->assertJsonPath('notes', 'Mesures corrigées');
+        $task->update(['statut' => 'rejected']);
+        $this->patchJson($url, ['notes' => null])->assertOk()->assertJsonPath('notes', null);
+        $task->update(['statut' => 'validated']);
+        $this->patchJson($url, ['notes' => 'Note finale'])->assertOk()->assertJsonPath('notes', 'Note finale');
+        $this->patchJson($url, [])->assertUnprocessable()->assertJsonValidationErrors('notes');
+    }
+
+    public function test_mobile_pv_numbers_are_free_text_unique_and_frozen_after_reception(): void
+    {
+        [$user, $other, $om] = $this->seedMission();
+        $task = $this->taskFor($om, $user, 'Prélèvement terrain');
+        $url = '/api/mobile/terrain/tasks/'.$task->id.'/pv-numbers';
+
+        $this->actingAs($other, 'sanctum')->getJson($url)->assertForbidden();
+        $this->actingAs($user, 'sanctum')->getJson($url)
+            ->assertOk()->assertJsonPath('pv_numbers', [])->assertJsonPath('count', 0)
+            ->assertJsonPath('editable', true);
+        $this->postJson($url, ['pv_number' => ' PV-001 '])
+            ->assertOk()->assertJsonPath('pv_numbers', ['PV-001'])->assertJsonPath('count', 1);
+        $this->postJson($url, ['pv_number' => 'pv-001'])->assertOk()->assertJsonPath('count', 1);
+        $this->postJson($url, ['pv_number' => 'PV-002'])->assertOk()->assertJsonPath('count', 2);
+        $this->postJson($url, ['pv_number' => 'PV-003,PV-004'])
+            ->assertUnprocessable()->assertJsonValidationErrors('pv_number');
+        $this->deleteJson($url, ['pv_number' => 'pv-001'])
+            ->assertOk()->assertJsonPath('pv_numbers', ['PV-002'])->assertJsonPath('count', 1);
+        $this->getJson('/api/mobile/terrain/tasks/'.$task->id)
+            ->assertOk()->assertJsonPath('pv_numbers', ['PV-002']);
+        $this->assertDatabaseMissing('samples', ['task_id' => $task->id]);
+        $task->update(['reception_generated_at' => now()]);
+        $this->getJson($url)->assertOk()->assertJsonPath('editable', false);
+        $this->postJson($url, ['pv_number' => 'PV-003'])
+            ->assertUnprocessable()->assertJsonValidationErrors('pv_number');
+        $this->deleteJson($url, ['pv_number' => 'PV-002'])
+            ->assertUnprocessable()->assertJsonValidationErrors('pv_number');
+        $this->actingAs($other, 'sanctum')->postJson($url, ['pv_number' => 'PV-003'])->assertForbidden();
+    }
+
     public function test_mobile_expense_reports_are_limited_to_assigned_missions_and_owner(): void
     {
         [$user, $other, $om] = $this->seedMission();

@@ -13,6 +13,10 @@ Ces routes sont **personnelles** : elles renvoient uniquement les tâches terrai
 | GET | `/mobile/terrain/tasks?from=2026-09-21&to=2026-09-27&statut=todo` | Filtrer par période et statut |
 | GET | `/mobile/terrain/tasks/{id}` | Fiche tâche, client, chantier, dossier et matériel |
 | PATCH | `/mobile/terrain/tasks/{id}/status` | Démarrer, mettre en pause, terminer ou annuler ma tâche |
+| PATCH | `/mobile/terrain/tasks/{id}/notes` | Modifier la note de ma tâche à tout moment |
+| GET | `/mobile/terrain/tasks/{id}/pv-numbers` | Lire les numéros de PV de ma tâche |
+| POST | `/mobile/terrain/tasks/{id}/pv-numbers` | Ajouter un numéro de PV |
+| DELETE | `/mobile/terrain/tasks/{id}/pv-numbers` | Retirer un numéro de PV |
 
 `calendar` renvoie trois tableaux : `tasks`, `events`, `equipment_movements`. Les tâches sont prises dans l'OM ; les événements sont les entrées personnelles du planning sans tâche liée. Une ancienne affectation directe du BC figure dans `events` avec `source_type: "terrain_bc"`, son libellé et son contexte BC/client/dossier. Le calendrier ne duplique pas les événements de planning rattachés aux tâches. Un mouvement fournit `a_recuperer_le` et `a_deposer_le` ; la date de dépôt effective remplace la date prévue lorsqu'elle existe.
 
@@ -58,6 +62,14 @@ Une seule route : `PATCH /mobile/terrain/tasks/{id}/status` avec `Content-Type: 
 | `rejected` | Annuler | `todo`, `in_progress`, `paused`, `rescheduled` |
 
 Une tâche `frozen`, `done`, `validated` ou `rejected` ne peut pas être relancée depuis cette route. `done` n'est pas une validation définitive : la validation du rapport ou des formulaires d'essai reste nécessaire pour passer à `validated`. Le motif d'annulation est conservé dans `cancellation_reason`. Le serveur fixe `started_at` et `completed_at` lors du premier démarrage et de la fin, et synchronise la ligne d'OM, l'OM et le planning. La réponse `200` est la même fiche complète que `GET /mobile/terrain/tasks/{id}`, avec client, site, dossier et matériel actualisés. Une transition interdite renvoie `422` avec `errors.statut` ; un motif manquant ou invalide renvoie `422` avec `errors.motif`. Une tâche non affectée au compte renvoie `403`.
+
+### Note permanente et numéros de PV
+
+La note se modifie indépendamment du statut avec `PATCH /mobile/terrain/tasks/{id}/notes` et `{ "notes": "Observations du technicien" }`. Envoyer `{ "notes": null }` pour la vider. Elle peut être corrigée même après `done`, `rejected` ou `validated`. La réponse `200` est la fiche complète de la tâche ; `notes` est également présent dans les listes et dans `GET /tasks/{id}`.
+
+Les PV sont des **numéros saisis librement sur la tâche**, stockés dans `MissionTask.pv_numbers` comme sur le BO. Ils ne sont pas les numéros FOLD des échantillons et ne sont pas vérifiés contre un registre de PV existants. `GET /mobile/terrain/tasks/{id}/pv-numbers` renvoie par exemple `{ "pv_numbers": ["PV-001"], "count": 1, "editable": true }`. Les méthodes `POST` et `DELETE` sur cette même URL prennent `{ "pv_number": "PV-002" }` et renvoient la même structure mise à jour. Chaque numéro comporte au plus 100 caractères, sans virgule, point-virgule ni saut de ligne ; les espaces extérieurs sont retirés. Un ajout répété est sans effet et la comparaison ignore la casse. La liste est aussi fournie dans la fiche `GET /tasks/{id}`.
+
+Une fois `reception_generated_at` renseigné par la génération des étiquettes sur le BO, `editable` vaut `false` et les ajouts/retraits renvoient `422` avec `errors.pv_number`. Cela garde les PV de la tâche cohérents avec les échantillons déjà créés. Ajouter un PV via ces routes ne crée pas d'échantillon et ne clôture pas la tâche. Les routes de note et de PV ne concernent que les tâches affectées au compte connecté (`403` sinon).
 
 ## Notes de frais
 

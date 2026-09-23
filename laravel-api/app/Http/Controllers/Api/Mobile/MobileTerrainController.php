@@ -182,6 +182,90 @@ class MobileTerrainController extends Controller
         return $this->task($request, $task->fresh());
     }
 
+    public function updateTaskNotes(Request $request, MissionTask $task): JsonResponse
+    {
+        $data = $request->validate(['notes' => 'present|nullable|string|max:5000']);
+        $this->assertOwnTask($request, $task);
+        $task->update(['notes' => $data['notes']]);
+
+        return $this->task($request, $task->fresh());
+    }
+
+    public function taskPvNumbers(Request $request, MissionTask $task): JsonResponse
+    {
+        $this->assertOwnTask($request, $task);
+
+        return response()->json($this->pvNumbersPayload($task));
+    }
+
+    public function addTaskPvNumber(Request $request, MissionTask $task): JsonResponse
+    {
+        $data = $this->validatePvNumber($request);
+
+        return DB::transaction(function () use ($request, $task, $data) {
+            $locked = MissionTask::query()->lockForUpdate()->findOrFail($task->id);
+            $this->assertOwnTask($request, $locked);
+            $this->assertPvNumbersEditable($locked);
+            $numbers = $locked->pv_numbers ?? [];
+            $number = $data['pv_number'];
+            if (! collect($numbers)->contains(fn (string $existing) => mb_strtolower($existing) === mb_strtolower($number))) {
+                $numbers[] = $number;
+                $locked->update(['pv_numbers' => $numbers]);
+            }
+
+            return response()->json($this->pvNumbersPayload($locked->fresh()));
+        });
+    }
+
+    public function removeTaskPvNumber(Request $request, MissionTask $task): JsonResponse
+    {
+        $data = $this->validatePvNumber($request);
+
+        return DB::transaction(function () use ($request, $task, $data) {
+            $locked = MissionTask::query()->lockForUpdate()->findOrFail($task->id);
+            $this->assertOwnTask($request, $locked);
+            $this->assertPvNumbersEditable($locked);
+            $numbers = array_values(array_filter($locked->pv_numbers ?? [],
+                fn (string $existing) => mb_strtolower($existing) !== mb_strtolower($data['pv_number'])));
+            $locked->update(['pv_numbers' => $numbers]);
+
+            return response()->json($this->pvNumbersPayload($locked->fresh()));
+        });
+    }
+
+    private function assertOwnTask(Request $request, MissionTask $task): void
+    {
+        abort_unless($this->ownTasks($request->user()->id)->whereKey($task->id)->exists(), 403);
+    }
+
+    private function validatePvNumber(Request $request): array
+    {
+        if (is_string($request->input('pv_number'))) {
+            $request->merge(['pv_number' => trim($request->input('pv_number'))]);
+        }
+
+        return $request->validate([
+            'pv_number' => ['required', 'string', 'max:100', 'not_regex:/[,;\r\n]/'],
+        ]);
+    }
+
+    private function assertPvNumbersEditable(MissionTask $task): void
+    {
+        if ($task->reception_generated_at) {
+            throw ValidationException::withMessages([
+                'pv_number' => 'Les numéros de PV sont figés après la génération des étiquettes.',
+            ]);
+        }
+    }
+
+    private function pvNumbersPayload(MissionTask $task): array
+    {
+        $numbers = $task->pv_numbers ?? [];
+
+        return ['pv_numbers' => $numbers, 'count' => count($numbers),
+            'editable' => $task->reception_generated_at === null];
+    }
+
     public function expenses(Request $request): JsonResponse
     {
         return response()->json(ExpenseReport::query()->with(['lines', 'ordreMission:id,numero'])
@@ -352,6 +436,8 @@ class MobileTerrainController extends Controller
             'started_at' => $task->started_at?->toIso8601String(),
             'completed_at' => $task->completed_at?->toIso8601String(),
             'notes' => $task->notes,
+            'pv_numbers' => $task->pv_numbers ?? [],
+            'reception_generated_at' => $task->reception_generated_at?->toIso8601String(),
             'cancellation_reason' => $task->cancellation_reason,
             'libelle' => $line?->libelle,
             'quantite' => $line?->quantite,

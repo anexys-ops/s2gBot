@@ -260,6 +260,22 @@ class OpenApiSpec
                         '403' => ['description' => 'Tâche non affectée au compte'],
                         '422' => ['description' => 'Transition interdite ou motif manquant']]],
             ],
+            '/mobile/terrain/tasks/{task}/notes' => [
+                'patch' => ['tags' => ['Terrain mobile'], 'summary' => 'Modifier ma note de tâche, quel que soit son statut',
+                    'parameters' => [self::pathId('task')],
+                    'responses' => ['200' => ['description' => 'Fiche tâche mise à jour']]],
+            ],
+            '/mobile/terrain/tasks/{task}/pv-numbers' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Lister les numéros de PV de ma tâche',
+                    'parameters' => [self::pathId('task')],
+                    'responses' => ['200' => ['description' => 'pv_numbers, count, editable']]],
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Ajouter un numéro de PV libre à ma tâche',
+                    'parameters' => [self::pathId('task')],
+                    'responses' => ['200' => ['description' => 'Liste mise à jour']]],
+                'delete' => ['tags' => ['Terrain mobile'], 'summary' => 'Retirer un numéro de PV de ma tâche',
+                    'parameters' => [self::pathId('task')],
+                    'responses' => ['200' => ['description' => 'Liste mise à jour']]],
+            ],
             '/mobile/terrain/expense-options' => [
                 'get' => ['tags' => ['Terrain mobile'], 'summary' => 'OM éligibles et référentiels de notes de frais',
                     'responses' => ['200' => ['description' => 'Options']]],

@@ -263,9 +263,21 @@ class OpenApiSpec
                 'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Créer un brouillon de note de frais',
                     'responses' => ['201' => ['description' => 'Brouillon créé']]],
             ],
+            '/mobile/terrain/expense-reports/standalone' => [
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Créer ma note de frais sans ordre de mission',
+                    'responses' => ['201' => ['description' => 'Brouillon sans OM créé']]],
+            ],
             '/mobile/terrain/expense-reports/{expenseReport}/lines' => [
                 'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Ajouter une dépense à mon brouillon',
                     'parameters' => [self::pathId('expenseReport')], 'responses' => ['201' => ['description' => 'Ligne créée']]],
+            ],
+            '/mobile/terrain/expense-reports/{expenseReport}/lines/{line}/photo' => [
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Joindre une photo à ma ligne de frais en brouillon',
+                    'parameters' => [self::pathId('expenseReport'), self::pathId('line')],
+                    'responses' => ['200' => ['description' => 'Photo enregistrée']]],
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Télécharger la photo de ma ligne de frais',
+                    'parameters' => [self::pathId('expenseReport'), self::pathId('line')],
+                    'responses' => ['200' => ['description' => 'Photo']]],
             ],
             '/mobile/terrain/expense-reports/{expenseReport}/submit' => [
                 'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Soumettre ma note de frais',

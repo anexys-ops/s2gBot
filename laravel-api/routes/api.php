@@ -496,7 +496,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('expense-options', [MobileTerrainController::class, 'expenseOptions']);
         Route::get('expense-reports', [MobileTerrainController::class, 'expenses']);
         Route::post('expense-reports', [MobileTerrainController::class, 'storeExpense']);
+        Route::post('expense-reports/standalone', [MobileTerrainController::class, 'storeStandaloneExpense']);
         Route::post('expense-reports/{expenseReport}/lines', [MobileTerrainController::class, 'storeExpenseLine'])->whereNumber('expenseReport');
+        Route::post('expense-reports/{expenseReport}/lines/{line}/photo', [MobileTerrainController::class, 'uploadExpenseLinePhoto'])->whereNumber('expenseReport')->whereNumber('line');
+        Route::get('expense-reports/{expenseReport}/lines/{line}/photo', [MobileTerrainController::class, 'downloadExpenseLinePhoto'])->whereNumber('expenseReport')->whereNumber('line');
         Route::post('expense-reports/{expenseReport}/submit', [MobileTerrainController::class, 'submitExpense'])->whereNumber('expenseReport');
     });
 

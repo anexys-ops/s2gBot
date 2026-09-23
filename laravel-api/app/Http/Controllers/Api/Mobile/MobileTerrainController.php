@@ -15,7 +15,9 @@ use App\Services\ExpenseReportService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MobileTerrainController extends Controller
 {
@@ -168,6 +170,24 @@ class MobileTerrainController extends Controller
         return response()->json($report->load('lines'), 201);
     }
 
+    public function storeStandaloneExpense(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'notes' => 'nullable|string|max:2000',
+            'ordre_mission_id' => 'prohibited',
+            'user_id' => 'prohibited',
+        ]);
+        $report = ExpenseReport::query()->create([
+            'notes' => $data['notes'] ?? null,
+            'ordre_mission_id' => null,
+            'user_id' => $request->user()->id,
+            'created_by' => $request->user()->id,
+            'statut' => ExpenseReport::STATUT_BROUILLON,
+        ]);
+
+        return response()->json($report->load('lines'), 201);
+    }
+
     public function storeExpenseLine(Request $request, ExpenseReport $expenseReport, ExpenseReportService $service): JsonResponse
     {
         abort_unless($expenseReport->user_id === $request->user()->id, 403);
@@ -209,6 +229,43 @@ class MobileTerrainController extends Controller
         $expenseReport->update(['statut' => ExpenseReport::STATUT_SOUMIS]);
 
         return response()->json($expenseReport->fresh('lines'));
+    }
+
+    public function uploadExpenseLinePhoto(Request $request, ExpenseReport $expenseReport, ExpenseLine $line): JsonResponse
+    {
+        $this->assertOwnExpenseLine($request, $expenseReport, $line);
+        abort_unless($expenseReport->statut === ExpenseReport::STATUT_BROUILLON, 422);
+        $data = $request->validate([
+            'photo' => 'required|file|mimes:jpg,jpeg,png,webp|max:10240',
+        ]);
+
+        $path = $data['photo']->store("expense-receipts/{$expenseReport->id}/{$line->id}", 'local');
+        $oldPath = $line->receipt_path;
+        $line->update([
+            'receipt_path' => $path,
+            'receipt_filename' => $data['photo']->getClientOriginalName(),
+        ]);
+        if ($oldPath && $oldPath !== $path) {
+            Storage::disk('local')->delete($oldPath);
+        }
+
+        return response()->json($line->fresh(), 200);
+    }
+
+    public function downloadExpenseLinePhoto(Request $request, ExpenseReport $expenseReport, ExpenseLine $line): StreamedResponse|JsonResponse
+    {
+        $this->assertOwnExpenseLine($request, $expenseReport, $line);
+        if (! $line->receipt_path || ! Storage::disk('local')->exists($line->receipt_path)) {
+            return response()->json(['message' => 'Photo absente'], 404);
+        }
+
+        return Storage::disk('local')->download($line->receipt_path, $line->receipt_filename ?? 'photo');
+    }
+
+    private function assertOwnExpenseLine(Request $request, ExpenseReport $expenseReport, ExpenseLine $line): void
+    {
+        abort_unless($expenseReport->user_id === $request->user()->id, 403);
+        abort_unless($line->expense_report_id === $expenseReport->id && $line->user_id === $request->user()->id, 404);
     }
 
     private function ownTasks(int $userId): Builder

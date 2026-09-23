@@ -97,6 +97,43 @@ class MobileTerrainApiTest extends TestCase
             ->assertOk()->assertJsonPath('statut', ExpenseReport::STATUT_SOUMIS);
     }
 
+    public function test_mobile_standalone_expense_and_line_photo_are_private(): void
+    {
+        Storage::fake('local');
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        $this->actingAs($user, 'sanctum');
+
+        $this->postJson('/api/mobile/terrain/expense-reports/standalone', ['ordre_mission_id' => 1])
+            ->assertUnprocessable();
+        $reportId = $this->postJson('/api/mobile/terrain/expense-reports/standalone', [
+            'notes' => 'Déplacement hors mission',
+        ])->assertCreated()->assertJsonPath('ordre_mission_id', null)
+            ->assertJsonPath('user_id', $user->id)->json('id');
+        $lineId = $this->postJson("/api/mobile/terrain/expense-reports/{$reportId}/lines", [
+            'category' => 'Parking', 'date' => '2026-09-23', 'amount' => 20,
+        ])->assertCreated()->json('id');
+        $photoUrl = "/api/mobile/terrain/expense-reports/{$reportId}/lines/{$lineId}/photo";
+        $this->post($photoUrl, ['photo' => UploadedFile::fake()->image('ticket.jpg')], [
+            'Accept' => 'application/json',
+        ])->assertOk()->assertJsonPath('receipt_filename', 'ticket.jpg');
+        $path = \App\Models\ExpenseLine::findOrFail($lineId)->receipt_path;
+        Storage::disk('local')->assertExists($path);
+        $this->get($photoUrl)->assertOk();
+
+        $this->actingAs($other, 'sanctum')->get($photoUrl)->assertForbidden();
+        $this->post($photoUrl, ['photo' => UploadedFile::fake()->image('autre.jpg')], [
+            'Accept' => 'application/json',
+        ])->assertForbidden();
+
+        $this->actingAs($user, 'sanctum')->postJson("/api/mobile/terrain/expense-reports/{$reportId}/submit")
+            ->assertOk();
+        $this->post($photoUrl, ['photo' => UploadedFile::fake()->image('nouveau.jpg')], [
+            'Accept' => 'application/json',
+        ])->assertUnprocessable();
+        Storage::disk('local')->assertExists($path);
+    }
+
     public function test_product_form_can_be_corrected_and_closes_task_only_after_review(): void
     {
         Storage::fake('local');

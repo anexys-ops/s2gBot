@@ -48,7 +48,10 @@ Statuts possibles des tâches : `todo`, `in_progress`, `paused`, `frozen`, `resc
 | GET | `/mobile/terrain/expense-options` | OM éligibles assignés, catégories, moyens de paiement, barème utilisateur |
 | GET | `/mobile/terrain/expense-reports` | Mes notes de frais et leurs lignes |
 | POST | `/mobile/terrain/expense-reports` | Créer un brouillon sur un OM assigné |
+| POST | `/mobile/terrain/expense-reports/standalone` | Créer un brouillon sans OM |
 | POST | `/mobile/terrain/expense-reports/{id}/lines` | Ajouter une dépense à mon brouillon |
+| POST | `/mobile/terrain/expense-reports/{id}/lines/{lineId}/photo` | Joindre ou remplacer une photo (multipart) |
+| GET | `/mobile/terrain/expense-reports/{id}/lines/{lineId}/photo` | Télécharger ma photo |
 | POST | `/mobile/terrain/expense-reports/{id}/submit` | Soumettre ma note après ajout d'au moins une ligne |
 
 Créer le brouillon :
@@ -56,6 +59,8 @@ Créer le brouillon :
 ```json
 { "ordre_mission_id": 33, "notes": "Déplacement chantier du 23 septembre" }
 ```
+
+Pour une note **sans OM**, appeler `POST /mobile/terrain/expense-reports/standalone` avec `{ "notes": "Déplacement hors mission" }` ou `{}`. Ne pas envoyer `ordre_mission_id` ni `user_id`. Le serveur crée un brouillon dont `ordre_mission_id` vaut `null` et fixe `user_id` au compte connecté.
 
 Ajouter une ligne :
 
@@ -73,6 +78,8 @@ Ajouter une ligne :
 
 Si `distance_km` est fourni sans `amount`, le serveur calcule le montant avec le barème kilométrique de l'utilisateur ; `taux_km` peut être fourni. Pour `Repas`, le forfait utilisateur s'applique si le montant est absent ou nul. Les catégories autorisées sont `Essence`, `Hotel`, `Voyage`, `Repas`, `Peage`, `Parking`, `Divers`. Les moyens de paiement sont `especes`, `cb`, `virement`, `cheque`, `autre`. Le serveur fixe toujours `user_id` au compte connecté. Une ligne ne peut être ajoutée qu'à son propre brouillon. Après soumission, la note passe à `soumis` et n'est plus modifiable par ces routes.
 
+Après la création d'une ligne, envoyer la photo en `multipart/form-data` avec le champ **`photo`** à `POST /mobile/terrain/expense-reports/{id}/lines/{lineId}/photo`. Types acceptés : JPEG, PNG, WebP ; taille maximale : 10 Mio. La réponse `200` contient la ligne avec `receipt_path` et `receipt_filename`. Une nouvelle photo remplace l'ancienne. La lecture par `GET` exige le même jeton utilisateur et renvoie le fichier. L'upload est réservé aux brouillons et à leurs propres lignes.
+
 ## Réponses et erreurs
 
 - `200` pour les lectures et la soumission ; `201` pour la création de brouillon ou de ligne.
@@ -80,4 +87,4 @@ Si `distance_km` est fourni sans `amount`, le serveur calcule le montant avec le
 - `422` pour des paramètres invalides, une note non brouillon ou une soumission sans ligne. Les erreurs de validation Laravel sont renvoyées dans `message` et `errors`.
 - Les identifiants (`id`) sont numériques ; une relation absente vaut `null`, un groupe vide vaut `[]`.
 
-Le matériel est affiché à titre informatif dans cette première étape. La confirmation physique de récupération/dépôt et l'envoi des justificatifs photo demandent un flux distinct ; les routes ci-dessus ne les enregistrent pas.
+Le matériel est affiché à titre informatif dans cette première étape. La confirmation physique de récupération/dépôt demande un flux distinct.

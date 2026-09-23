@@ -10,6 +10,13 @@ import { formatTechnicienOption } from '../../lib/userRolePresentation'
 import TerrainPlanningPdfModal from '../../components/pdf/TerrainPlanningPdfModal'
 
 type PeriodMode = 'jour' | 'semaine' | 'periode'
+type PlanningContext = 'terrain' | 'labo' | 'ingenieur'
+
+const CONTEXT_META: Record<PlanningContext, { title: string; module: string; parent: string; parentTo: string; assignee: string; allAssignees: string }> = {
+  terrain: { title: 'Planning techniciens', module: 'Chantier', parent: 'Chantier', parentTo: '/terrain', assignee: 'Technicien', allAssignees: 'Tous les techniciens' },
+  labo: { title: 'Planning laboratoire', module: 'Laboratoire', parent: 'Laboratoire', parentTo: '/labo', assignee: 'Agent labo', allAssignees: 'Tous les agents labo' },
+  ingenieur: { title: 'Planning ingénieur', module: 'Ingénierie', parent: 'Ingénierie', parentTo: '/ingenierie', assignee: 'Ingénieur', allAssignees: 'Tous les ingénieurs' },
+}
 
 function toYmd(date: Date) {
   return toLocalDateInput(date)
@@ -54,7 +61,9 @@ function formatBcPlanningOption(bc: BonCommande): string {
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
 
-export default function PlanningTechniciensPage() {
+export default function PlanningTechniciensPage({ context = 'terrain' }: { context?: PlanningContext }) {
+  const meta = CONTEXT_META[context]
+  const isTerrain = context === 'terrain'
   const { user } = useAuth()
   const lab = isLab(user?.role)
   const qc = useQueryClient()
@@ -71,34 +80,36 @@ export default function PlanningTechniciensPage() {
   const [pdfOpen, setPdfOpen] = useState(false)
 
   const { data: affectations, isLoading, error } = useQuery({
-    queryKey: ['planning-terrain', from, to, userFilter],
+    queryKey: ['planning-terrain', context, from, to, userFilter],
     queryFn: () => planningTerrainApi.list({
       from,
       to,
       user_id: userFilter === '' ? undefined : userFilter,
+      context,
     }),
   })
 
   const { data: assignedWithoutDate = [] } = useQuery({
-    queryKey: ['planning-terrain', 'undated', userFilter],
+    queryKey: ['planning-terrain', context, 'undated', userFilter],
     queryFn: () => planningTerrainApi.list({
       from,
       to,
       user_id: userFilter === '' ? undefined : userFilter,
       undated: true,
+      context,
     }),
   })
 
   const { data: techniciens } = useQuery({
-    queryKey: ['planning-terrain', 'techniciens'],
-    queryFn: () => planningTerrainApi.techniciens(),
+    queryKey: ['planning-terrain', context, 'techniciens'],
+    queryFn: () => planningTerrainApi.techniciens(context),
     enabled: lab,
   })
 
   const { data: unassignedBcs } = useQuery({
     queryKey: ['bons-commande', 'planning', 'unassigned'],
     queryFn: () => bonsCommandeApi.list({ planning: true, unassignedPlanning: true }),
-    enabled: lab,
+    enabled: lab && isTerrain,
   })
 
   const selectedBc = useMemo(
@@ -162,7 +173,7 @@ export default function PlanningTechniciensPage() {
   })
 
   const selectedTechnician = (techniciens ?? []).find((item) => item.id === userFilter)
-  const printTechnicianLabel = selectedTechnician ? formatTechnicienOption(selectedTechnician) : 'Tous les techniciens'
+  const printTechnicianLabel = selectedTechnician ? formatTechnicienOption(selectedTechnician) : meta.allAssignees
   const printPeriodLabel = from === to ? from : `${from} au ${to}`
 
   function selectDay() {
@@ -193,14 +204,14 @@ export default function PlanningTechniciensPage() {
       shellClassName="module-shell--crm terrain-planning"
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'Chantier', to: '/terrain' },
+        { label: meta.parent, to: meta.parentTo },
         { label: 'Planning' },
       ]}
-      moduleBarLabel="Chantier"
-      title="Planning techniciens"
-      subtitle="Planning et aperçu hebdomadaire filtrables par période et par technicien."
+      moduleBarLabel={meta.module}
+      title={meta.title}
+      subtitle={`Planning et aperçu hebdomadaire filtrables par période et par ${meta.assignee.toLocaleLowerCase('fr')}.`}
     >
-      {lab ? (
+      {lab && isTerrain ? (
         <section className="card terrain-planning__unassigned" style={{ marginBottom: '1.5rem' }}>
           <h2 className="h2" style={{ fontSize: '1.05rem', marginBottom: '0.75rem' }}>Bons de commande non affectés</h2>
           <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>
@@ -314,7 +325,7 @@ export default function PlanningTechniciensPage() {
       ) : null}
 
       <div className="terrain-planning__print-title">
-        <h1>Planning techniciens</h1>
+        <h1>{meta.title}</h1>
         <p>{printTechnicianLabel} — {printPeriodLabel}</p>
       </div>
 
@@ -340,9 +351,9 @@ export default function PlanningTechniciensPage() {
             />
           </label>
           <label>
-            Technicien
+            {meta.assignee}
             <select value={userFilter} onChange={(event) => setUserFilter(event.target.value ? Number(event.target.value) : '')}>
-              <option value="">Tous les techniciens</option>
+              <option value="">{meta.allAssignees}</option>
               {(techniciens ?? []).map((item) => (
                 <option key={item.id} value={item.id}>{formatTechnicienOption(item)}</option>
               ))}
@@ -364,7 +375,7 @@ export default function PlanningTechniciensPage() {
           <section style={{ marginBottom: '1.5rem' }} aria-label="Aperçu semaine calendrier">
             <h2 className="h2" style={{ fontSize: '1rem', marginBottom: '0.35rem' }}>Aperçu semaine</h2>
             <p className="text-muted no-print" style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-              Semaine contenant la date de début, avec le même filtre technicien que le tableau.
+              Semaine contenant la date de début, avec le même filtre de personnel que le tableau.
             </p>
             <div className="terrain-planning__week-grid">
               {weekDaysFrom(from).map((day) => {
@@ -379,7 +390,7 @@ export default function PlanningTechniciensPage() {
                       const bc = item.bon_commande_ligne?.bon_commande
                       return (
                         <div key={item.id} className="terrain-planning__day-event">
-                          <strong>{item.user?.name ?? `Utilisateur #${item.user_id}`}</strong>
+                          <strong>{item.user?.name ?? (item.user_id ? `Utilisateur #${item.user_id}` : 'Non assigné')}</strong>
                           {bc ? <Link to={`/bons-commande/${bc.id}`} className="link-inline">{bc.numero}</Link> : null}
                           {item.ordre_mission_id ? <Link to={`/ordres-mission/${item.ordre_mission_id}`} className="link-inline">{item.ordre_mission_numero} — {item.bon_commande_ligne?.libelle}</Link> : null}
                         </div>
@@ -395,7 +406,7 @@ export default function PlanningTechniciensPage() {
             <table className="data-table data-table--compact" style={{ width: '100%' }}>
               <thead>
                 <tr>
-                  <th>Période</th><th>Technicien</th><th>BC / ligne</th><th>Client / dossier</th>
+                  <th>Période</th><th>{meta.assignee}</th><th>BC / tâche</th><th>Client / dossier</th>
                   {lab ? <th className="terrain-planning__actions">Actions</th> : null}
                 </tr>
               </thead>
@@ -409,13 +420,13 @@ export default function PlanningTechniciensPage() {
                   return (
                     <tr key={item.id}>
                       <td>{dateInputFromApi(item.date_debut)} → {dateInputFromApi(item.date_fin)}</td>
-                      <td>{item.user?.name ?? `Utilisateur #${item.user_id}`}</td>
+                      <td>{item.user?.name ?? (item.user_id ? `Utilisateur #${item.user_id}` : 'Non assigné')}</td>
                       <td>
                           {bc ? <><Link to={`/bons-commande/${bc.id}`} className="link-inline">{bc.numero}</Link>{ligne?.libelle ? ` — ${ligne.libelle}` : ''}</> : '—'}
                           {item.ordre_mission_id ? <> · <Link to={`/ordres-mission/${item.ordre_mission_id}`} className="link-inline">{item.ordre_mission_numero}</Link></> : null}
                       </td>
                       <td>
-                        {bc ? <>{bc.client?.name ?? '—'} / <Link to={`/dossiers/${bc.dossier_id}/bc-bl`} className="link-inline">Dossier #{bc.dossier_id}</Link></> : '—'}
+                        {bc || item.dossier_id ? <>{item.client_name ?? bc?.client?.name ?? '—'} / <Link to={`/dossiers/${item.dossier_id ?? bc?.dossier_id}/bc-bl`} className="link-inline">{item.dossier_reference ?? `Dossier #${item.dossier_id ?? bc?.dossier_id}`}</Link></> : (item.client_name ?? '—')}
                       </td>
                       {lab ? (
                         <td className="terrain-planning__actions">
@@ -441,14 +452,14 @@ export default function PlanningTechniciensPage() {
 
       {assignedWithoutDate.length > 0 ? (
         <section className="card no-print" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
-          <h2 className="h2" style={{ fontSize: '1rem' }}>Tâches terrain affectées sans date ({assignedWithoutDate.length})</h2>
-          <p className="text-muted">Ces tâches sont attribuées à un technicien mais ne peuvent pas apparaître dans le calendrier avant la saisie d’une date prévue dans l’OM.</p>
+          <h2 className="h2" style={{ fontSize: '1rem' }}>{isTerrain ? 'Tâches terrain affectées sans date' : 'Tâches à planifier'} ({assignedWithoutDate.length})</h2>
+          <p className="text-muted">Ces tâches ne peuvent pas apparaître dans le calendrier avant la saisie d’un responsable et d’une date prévue dans l’OM.</p>
           <div className="table-wrap">
             <table className="data-table data-table--compact">
-              <thead><tr><th>Technicien</th><th>BC</th><th>Tâche</th><th>Ordre de mission</th></tr></thead>
+              <thead><tr><th>{meta.assignee}</th><th>BC</th><th>Tâche</th><th>Ordre de mission</th></tr></thead>
               <tbody>{assignedWithoutDate.map((item) => (
                 <tr key={item.id}>
-                  <td>{item.user?.name ?? `Utilisateur #${item.user_id}`}</td>
+                  <td>{item.user?.name ?? (item.user_id ? `Utilisateur #${item.user_id}` : 'Non assigné')}</td>
                   <td>{item.bon_commande_ligne?.bon_commande ? <Link to={`/bons-commande/${item.bon_commande_ligne.bon_commande.id}`}>{item.bon_commande_ligne.bon_commande.numero}</Link> : '—'}</td>
                   <td>{item.bon_commande_ligne?.libelle ?? '—'}</td>
                   <td>{item.ordre_mission_id ? <Link to={`/ordres-mission/${item.ordre_mission_id}`}>{item.ordre_mission_numero}</Link> : '—'}</td>
@@ -460,7 +471,7 @@ export default function PlanningTechniciensPage() {
       ) : null}
 
       <p className="text-muted no-print" style={{ marginTop: '1.5rem' }}>
-        Navigation <Link to="/terrain">Chantier</Link> — les périodes par produit se saisissent sur la fiche d’un <Link to="/bons-commande">bon de commande</Link>.
+        Navigation <Link to={meta.parentTo}>{meta.parent}</Link> — les affectations se modifient dans l’ordre de mission.
       </p>
       {pdfOpen ? (
         <TerrainPlanningPdfModal
@@ -468,6 +479,7 @@ export default function PlanningTechniciensPage() {
           to={to}
           userId={userFilter === '' ? undefined : userFilter}
           technicianLabel={printTechnicianLabel}
+          context={context}
           onClose={() => setPdfOpen(false)}
         />
       ) : null}

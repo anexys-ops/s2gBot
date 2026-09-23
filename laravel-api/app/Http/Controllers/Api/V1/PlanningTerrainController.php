@@ -7,6 +7,7 @@ use App\Models\BcLignePlanningAffectation;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
 use App\Models\MissionTask;
+use App\Models\OrdreMission;
 use App\Models\User;
 use App\Services\TerrainPlanningBcLinesService;
 use App\Services\TerrainPlanningMissionTasksService;
@@ -32,6 +33,7 @@ class PlanningTerrainController extends Controller
             'from' => 'required|date',
             'to' => 'required|date|after_or_equal:from',
             'user_id' => 'sometimes|nullable|integer|exists:users,id',
+            'context' => 'sometimes|in:terrain,labo,ingenieur',
             'template_id' => [
                 'sometimes',
                 'nullable',
@@ -47,6 +49,7 @@ class PlanningTerrainController extends Controller
             (string) $validated['to'],
             ! empty($validated['user_id']) ? (int) $validated['user_id'] : null,
             ! empty($validated['template_id']) ? (int) $validated['template_id'] : null,
+            $this->missionTypeForContext($validated['context'] ?? 'terrain'),
         );
 
         return response()->streamDownload(
@@ -98,14 +101,22 @@ class PlanningTerrainController extends Controller
             'to' => 'required|date|after_or_equal:from',
             'user_id' => 'sometimes|nullable|integer|exists:users,id',
             'undated' => 'sometimes|boolean',
+            'context' => 'sometimes|in:terrain,labo,ingenieur',
         ]);
 
         $from = $validated['from'];
         $to = $validated['to'];
         $selectedUserId = ! empty($validated['user_id']) ? (int) $validated['user_id'] : null;
+        $type = $this->missionTypeForContext($validated['context'] ?? 'terrain');
 
         if (! empty($validated['undated'])) {
-            return response()->json($missionTasks->undated($selectedUserId, $user)
+            return response()->json($missionTasks->undated($selectedUserId, $user, $type)
+                ->map(fn (MissionTask $task) => $this->missionPlanningRow($task))
+                ->values());
+        }
+
+        if ($type !== OrdreMission::TYPE_TECHNICIEN) {
+            return response()->json($missionTasks->scheduled($from, $to, $selectedUserId, $user, $type)
                 ->map(fn (MissionTask $task) => $this->missionPlanningRow($task))
                 ->values());
         }
@@ -142,6 +153,15 @@ class PlanningTerrainController extends Controller
         return response()->json($rows);
     }
 
+    private function missionTypeForContext(string $context): string
+    {
+        return match ($context) {
+            'labo' => OrdreMission::TYPE_LABO,
+            'ingenieur' => OrdreMission::TYPE_INGENIEUR,
+            default => OrdreMission::TYPE_TECHNICIEN,
+        };
+    }
+
     /** @return array<string, mixed> */
     private function missionPlanningRow(MissionTask $task): array
     {
@@ -155,6 +175,10 @@ class PlanningTerrainController extends Controller
             'mission_task_id' => $task->id,
             'ordre_mission_id' => $om?->id,
             'ordre_mission_numero' => $om?->numero,
+            'client_name' => $om?->client?->name ?? $bc?->client?->name,
+            'dossier_id' => $om?->dossier_id ?? $bc?->dossier_id,
+            'dossier_reference' => $om?->dossier?->reference,
+            'site_name' => $om?->site?->name,
             'user_id' => $task->assigned_user_id,
             'user' => $task->assignedUser,
             'date_debut' => $task->planned_date?->format('Y-m-d'),

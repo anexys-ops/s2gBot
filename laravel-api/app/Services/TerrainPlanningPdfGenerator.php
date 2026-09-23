@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\BcLignePlanningAffectation;
 use App\Models\MissionTask;
+use App\Models\OrdreMission;
 use App\Support\AppBranding;
 use App\Support\PdfTemplateResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -21,6 +22,7 @@ class TerrainPlanningPdfGenerator
         string $to,
         ?int $userId = null,
         ?int $requestTemplateId = null,
+        string $type = OrdreMission::TYPE_TECHNICIEN,
     ): array {
         $template = PdfTemplateResolver::resolve('terrain_planning', $requestTemplateId, null);
         $layoutConfig = PdfTemplateResolver::layoutConfig($template);
@@ -38,12 +40,12 @@ class TerrainPlanningPdfGenerator
             $query->where('user_id', $userId);
         }
 
-        $affectations = $query
-            ->orderBy('date_debut')
-            ->orderBy('user_id')
-            ->orderBy('id')
-            ->get()
-            ->concat($this->missionTasks->scheduled($from, $to, $userId))
+        $legacy = $type === OrdreMission::TYPE_TECHNICIEN
+            ? $query->orderBy('date_debut')->orderBy('user_id')->orderBy('id')->get()
+            : collect();
+
+        $affectations = $legacy
+            ->concat($this->missionTasks->scheduled($from, $to, $userId, null, $type))
             ->sortBy(fn ($row) => $row instanceof MissionTask
                 ? $row->planned_date?->format('Y-m-d')
                 : $row->date_debut?->format('Y-m-d'))
@@ -51,6 +53,12 @@ class TerrainPlanningPdfGenerator
 
         $isDaily = $from === $to;
         $title = $isDaily ? 'Programme journalier' : 'Programme hebdomadaire';
+        $contextLabel = match ($type) {
+            OrdreMission::TYPE_LABO => 'laboratoire',
+            OrdreMission::TYPE_INGENIEUR => 'ingénierie',
+            default => 'terrain',
+        };
+        $title .= ' — '.$contextLabel;
         $periodLabel = $isDaily
             ? $this->formatDate($from)
             : 'Du '.$this->formatDate($from).' au '.$this->formatDate($to);
@@ -70,7 +78,8 @@ class TerrainPlanningPdfGenerator
 
         $suffix = $isDaily ? $from : $from.'_'.$to;
 
-        return [$pdf->output(), 'programme-terrain-'.$suffix.'.pdf'];
+        $filenameContext = $type === OrdreMission::TYPE_INGENIEUR ? 'ingenierie' : ($type === OrdreMission::TYPE_LABO ? 'laboratoire' : 'terrain');
+        return [$pdf->output(), 'programme-'.$filenameContext.'-'.$suffix.'.pdf'];
     }
 
     private function formatDate(string $value): string

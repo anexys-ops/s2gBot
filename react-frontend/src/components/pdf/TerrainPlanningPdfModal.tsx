@@ -8,10 +8,11 @@ type Props = {
   to: string
   userId?: number
   technicianLabel: string
+  context?: 'terrain' | 'labo' | 'ingenieur'
   onClose: () => void
 }
 
-export default function TerrainPlanningPdfModal({ from, to, userId, technicianLabel, onClose }: Props) {
+export default function TerrainPlanningPdfModal({ from, to, userId, technicianLabel, context = 'terrain', onClose }: Props) {
   const [templateId, setTemplateId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -25,7 +26,8 @@ export default function TerrainPlanningPdfModal({ from, to, userId, technicianLa
   const templates = data?.data ?? []
   const selectedId = templateId ?? templates.find((item) => item.is_default)?.id ?? templates[0]?.id ?? null
   const title = from === to ? 'Programme journalier' : 'Programme hebdomadaire'
-  const filename = `programme-terrain-${from === to ? from : `${from}_${to}`}.pdf`
+  const filenameContext = context === 'labo' ? 'laboratoire' : context === 'ingenieur' ? 'ingenierie' : 'terrain'
+  const filename = `programme-${filenameContext}-${from === to ? from : `${from}_${to}`}.pdf`
 
   const clearPreview = useCallback(() => {
     setPreviewUrl((current) => {
@@ -46,6 +48,7 @@ export default function TerrainPlanningPdfModal({ from, to, userId, technicianLa
         to,
         user_id: userId,
         template_id: selectedId,
+        context,
       })
       setPreviewBlob(blob)
       setPreviewUrl(URL.createObjectURL(blob))
@@ -54,7 +57,7 @@ export default function TerrainPlanningPdfModal({ from, to, userId, technicianLa
     } finally {
       setLoading(false)
     }
-  }, [clearPreview, from, selectedId, to, userId])
+  }, [clearPreview, context, from, selectedId, to, userId])
 
   useEffect(() => {
     if (!isLoading && selectedId != null) void loadPreview()
@@ -85,7 +88,7 @@ export default function TerrainPlanningPdfModal({ from, to, userId, technicianLa
             </select>
           )}
         </div>
-        {templates.length === 0 && !isLoading ? <p className="error">Aucun modèle de planning terrain actif.</p> : null}
+        {templates.length === 0 && !isLoading ? <p className="error">Aucun modèle de planning actif.</p> : null}
         {error ? <p className="error">{error}</p> : null}
         <div className="pdf-preview-modal__viewer">
           {loading ? <p className="pdf-preview-modal__loading text-muted">Génération du PDF en cours…</p> : null}

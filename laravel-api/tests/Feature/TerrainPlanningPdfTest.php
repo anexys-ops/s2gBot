@@ -7,6 +7,8 @@ use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
 use App\Models\Client;
 use App\Models\Dossier;
+use App\Models\OrdreMission;
+use App\Models\OrdreMissionLigne;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -56,6 +58,61 @@ class TerrainPlanningPdfTest extends TestCase
             'from' => '2026-09-22',
             'to' => '2026-09-28',
         ])->assertForbidden();
+    }
+
+    public function test_planning_context_separates_laboratory_engineering_and_terrain_tasks(): void
+    {
+        [$lab, $technician, $line] = $this->seedPlanningRow();
+        $laboratoryTask = $this->seedMissionTask($line, $lab, $technician, OrdreMission::TYPE_LABO, 'OM-L-TEST', '2026-09-22');
+        $engineeringTask = $this->seedMissionTask($line, $lab, $technician, OrdreMission::TYPE_INGENIEUR, 'OM-I-TEST', '2026-09-22');
+        $pendingTask = $this->seedMissionTask($line, $lab, null, OrdreMission::TYPE_LABO, 'OM-L-PENDING', null);
+
+        $query = '?from=2026-09-22&to=2026-09-28';
+        $this->actingAs($lab, 'sanctum')
+            ->getJson('/api/v1/planning-terrain'.$query.'&context=labo')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.mission_task_id', $laboratoryTask->id)
+            ->assertJsonPath('0.client_name', 'Client planning PDF')
+            ->assertJsonPath('0.dossier_reference', 'DOS-PLANNING-PDF');
+        $this->getJson('/api/v1/planning-terrain'.$query.'&context=ingenieur')
+            ->assertOk()->assertJsonCount(1)->assertJsonPath('0.mission_task_id', $engineeringTask->id);
+        $this->getJson('/api/v1/planning-terrain'.$query)
+            ->assertOk()->assertJsonCount(0);
+        $this->getJson('/api/v1/planning-terrain'.$query.'&context=labo&undated=1')
+            ->assertOk()->assertJsonCount(1)->assertJsonPath('0.mission_task_id', $pendingTask->id);
+
+        $this->postJson('/api/v1/planning-terrain/pdf', [
+            'from' => '2026-09-22',
+            'to' => '2026-09-22',
+            'context' => 'ingenieur',
+        ])->assertOk()->assertHeader('content-disposition', 'attachment; filename=programme-ingenierie-2026-09-22.pdf');
+    }
+
+    private function seedMissionTask(BonCommandeLigne $bcLine, User $creator, ?User $assignee, string $type, string $numero, ?string $date): \App\Models\MissionTask
+    {
+        $bc = $bcLine->bonCommande;
+        $om = OrdreMission::query()->create([
+            'numero' => $numero,
+            'bon_commande_id' => $bc->id,
+            'dossier_id' => $bc->dossier_id,
+            'client_id' => $bc->client_id,
+            'site_id' => $bc->dossier->site_id,
+            'type' => $type,
+            'statut' => OrdreMission::STATUT_PLANIFIE,
+            'created_by' => $creator->id,
+        ]);
+        $omLine = OrdreMissionLigne::query()->create([
+            'ordre_mission_id' => $om->id,
+            'bon_commande_ligne_id' => $bcLine->id,
+            'libelle' => 'Contrôle de compacité',
+            'quantite' => 1,
+            'assigned_user_id' => $assignee?->id,
+            'date_prevue' => $date,
+            'ordre' => 1,
+        ]);
+
+        return $omLine->ensureTaskExists();
     }
 
     /** @return array{User, User, BonCommandeLigne} */

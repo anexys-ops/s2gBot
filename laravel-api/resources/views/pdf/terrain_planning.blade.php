@@ -76,7 +76,7 @@
                     @if($show('show_start_date'))<td class="date">{{ $startDate?->format('d/m/Y') ?? '—' }}</td>@endif
                     @if($show('show_end_date'))<td class="date">{{ $endDate?->format('d/m/Y') ?? '—' }}</td>@endif
                     @if($show('show_technician'))<td><strong>{{ $technician?->name ?? '—' }}</strong></td>@endif
-                    @if($show('show_client'))<td>{{ $order?->client?->name ?? '—' }}</td>@endif
+                    @if($show('show_client'))<td>{{ $order?->client?->name ?? ($isMissionTask ? $line?->ordreMission?->client?->name : null) ?? '—' }}</td>@endif
                     @if($show('show_order'))<td>{{ $order?->numero ?? '—' }}</td>@endif
                     @if($show('show_task'))<td>{{ $line?->libelle ?? '—' }}</td>@endif
                     @if($show('show_quantity'))<td class="qty">{{ $line ? $formatQty($line->quantite) : '—' }}</td>@endif

@@ -1136,6 +1136,10 @@ export type PlanningTerrainAffectationRow = BcLignePlanningAffectation & {
   mission_task_id?: number
   ordre_mission_id?: number | null
   ordre_mission_numero?: string | null
+  client_name?: string | null
+  dossier_id?: number | null
+  dossier_reference?: string | null
+  site_name?: string | null
   statut?: string
   date_debut: string
   date_fin: string
@@ -1159,15 +1163,16 @@ import type { TechnicienOption } from '../lib/userRolePresentation'
 export const planningTerrainApi = {
   techniciens: (context: 'terrain' | 'labo' | 'ingenieur' = 'terrain') =>
     api<TechnicienOption[]>(`/v1/planning-terrain/techniciens?context=${context}`),
-  list: (params: { from: string; to: string; user_id?: number; undated?: boolean }) => {
+  list: (params: { from: string; to: string; user_id?: number; undated?: boolean; context?: 'terrain' | 'labo' | 'ingenieur' }) => {
     const q = new URLSearchParams()
     q.set('from', params.from)
     q.set('to', params.to)
     if (params.user_id) q.set('user_id', String(params.user_id))
     if (params.undated) q.set('undated', '1')
+    if (params.context) q.set('context', params.context)
     return api<PlanningTerrainAffectationRow[]>(`/v1/planning-terrain?${q.toString()}`)
   },
-  fetchPdf: async (params: { from: string; to: string; user_id?: number; template_id?: number }) => {
+  fetchPdf: async (params: { from: string; to: string; user_id?: number; template_id?: number; context?: 'terrain' | 'labo' | 'ingenieur' }) => {
     const token = getToken()
     const res = await fetch(`${API_BASE}/v1/planning-terrain/pdf`, {
       method: 'POST',

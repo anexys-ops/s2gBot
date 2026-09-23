@@ -18,6 +18,7 @@ class TestType extends Model
         'unit_price',
         'thresholds',
         'form_fields',
+        'context',
     ];
 
     protected function casts(): array

@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { articleActionsApi, catalogueApi, testTypesApi, type TestType, type TestTypeFormField } from '../api/client'
+import { articleActionsApi, catalogueApi, formOptionListsApi, testTypesApi, type TestType, type TestTypeFormField } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import PageBackNav from '../components/PageBackNav'
 import Modal from '../components/Modal'
@@ -10,20 +11,19 @@ import { sumNumeric } from '../lib/listTableTotals'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import { formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
+import TestFormFieldsEditor from '../components/Catalogue/TestFormFieldsEditor'
 
 type ParamRow = { id?: number; name: string; unit: string; expected_type: string }
 type ProductAssignment = { article_id: number; article_action_id: number | null; label: string }
 
-const blankField = (): TestTypeFormField => ({ key: '', label: '', type: 'text', required: false, unit: '', options: [] })
-
-function ProductActionSelect({ assignment, onChange }: { assignment: ProductAssignment; onChange: (id: number | null) => void }) {
+function ProductActionSelect({ assignment, context, onChange }: { assignment: ProductAssignment; context: 'terrain' | 'ingenieur' | 'labo'; onChange: (id: number | null) => void }) {
   const { data: actions = [] } = useQuery({
     queryKey: ['article-actions', assignment.article_id],
     queryFn: () => articleActionsApi.list(assignment.article_id),
   })
   return <select value={assignment.article_action_id ?? ''} onChange={(event) => onChange(event.target.value ? Number(event.target.value) : null)}>
     <option value="">Toutes les actions du produit</option>
-    {actions.map((action) => <option key={action.id} value={action.id}>{action.libelle} ({action.type})</option>)}
+    {actions.filter((action) => action.type === (context === 'terrain' ? 'technicien' : context)).map((action) => <option key={action.id} value={action.id}>{action.libelle} ({action.type})</option>)}
   </select>
 }
 
@@ -39,6 +39,7 @@ function normalizeParamPayload(rows: ParamRow[]) {
 }
 
 export default function Catalog() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   const canManageCatalog = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const queryClient = useQueryClient()
@@ -49,16 +50,19 @@ export default function Catalog() {
     norm: '',
     unit: '',
     unit_price: 0,
+    context: 'terrain' as 'terrain' | 'ingenieur' | 'labo',
   })
   const [paramRows, setParamRows] = useState<ParamRow[]>([{ name: '', unit: '', expected_type: 'numeric' }])
-  const [formFields, setFormFields] = useState<TestTypeFormField[]>([blankField()])
+  const [formFields, setFormFields] = useState<TestTypeFormField[]>([])
   const [assignments, setAssignments] = useState<ProductAssignment[]>([])
   const [productSearch, setProductSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
+  const [contextFilter, setContextFilter] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const { visible, toggle } = usePersistedColumnVisibility('catalog-test-types', {
     name: true,
     norm: true,
+    context: true,
     unit: true,
     price: true,
     params: true,
@@ -70,6 +74,7 @@ export default function Catalog() {
     queryKey: ['test-types'],
     queryFn: () => testTypesApi.list(),
   })
+  const { data: optionLists = [] } = useQuery({ queryKey: ['form-option-lists'], queryFn: formOptionListsApi.list })
   const { data: products = [] } = useQuery({
     queryKey: ['test-type-products', productSearch],
     queryFn: () => catalogueApi.articles({ kind: 'product', q: productSearch }),
@@ -83,10 +88,11 @@ export default function Catalog() {
         norm: form.norm || undefined,
         unit: form.unit || undefined,
         unit_price: form.unit_price,
+        context: form.context,
         params: normalizeParamPayload(paramRows),
         form_fields: formFields.filter((field) => field.key.trim() && field.label.trim()).map((field) => ({ ...field, key: field.key.trim(), label: field.label.trim() })),
+        assignments: assignments.map(({ article_id, article_action_id }) => ({ article_id, article_action_id })),
       })
-      if (assignments.length) await testTypesApi.syncProducts(created.id, assignments.map(({ article_id, article_action_id }) => ({ article_id, article_action_id })))
       return created
     },
     onSuccess: () => {
@@ -102,6 +108,7 @@ export default function Catalog() {
         norm: form.norm || undefined,
         unit: form.unit || undefined,
         unit_price: form.unit_price,
+        context: form.context,
         params: normalizeParamPayload(paramRows),
         form_fields: formFields.filter((field) => field.key.trim() && field.label.trim()).map((field) => ({ ...field, key: field.key.trim(), label: field.label.trim() })),
       })
@@ -122,17 +129,18 @@ export default function Catalog() {
   const list = Array.isArray(types) ? types : []
   const needle = debouncedSearch.trim().toLowerCase()
   const filtered = useMemo(() => {
-    if (!needle) return list
+    if (!needle && !contextFilter) return list
     return list.filter(
       (t) =>
-        t.name.toLowerCase().includes(needle) ||
-        (t.norm ?? '').toLowerCase().includes(needle) ||
-        (t.unit ?? '').toLowerCase().includes(needle) ||
-        (t.params?.some((p) => p.name.toLowerCase().includes(needle)) ?? false) ||
-        (t.form_fields?.some((field) => field.label.toLowerCase().includes(needle)) ?? false) ||
-        (t.articles?.some((article) => article.libelle.toLowerCase().includes(needle) || article.code.toLowerCase().includes(needle)) ?? false),
+        (!contextFilter || t.context === contextFilter) && (!needle || (
+          t.name.toLowerCase().includes(needle) ||
+          (t.norm ?? '').toLowerCase().includes(needle) ||
+          (t.unit ?? '').toLowerCase().includes(needle) ||
+          (t.params?.some((p) => p.name.toLowerCase().includes(needle)) ?? false) ||
+          (t.form_fields?.some((field) => field.label.toLowerCase().includes(needle)) ?? false) ||
+          (t.articles?.some((article) => article.libelle.toLowerCase().includes(needle) || article.code.toLowerCase().includes(needle)) ?? false))),
     )
-  }, [list, needle])
+  }, [list, needle, contextFilter])
 
   const priceTotal = useMemo(
     () => sumNumeric(filtered, (t) => t.unit_price),
@@ -140,20 +148,25 @@ export default function Catalog() {
   )
 
   const closeModal = () => {
+    if (searchParams.has('edit')) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('edit')
+      setSearchParams(next, { replace: true })
+    }
     setModal(null)
     setEditingId(null)
-    setForm({ name: '', norm: '', unit: '', unit_price: 0 })
+    setForm({ name: '', norm: '', unit: '', unit_price: 0, context: 'terrain' })
     setParamRows([{ name: '', unit: '', expected_type: 'numeric' }])
-    setFormFields([blankField()])
+    setFormFields([])
     setAssignments([])
     setProductSearch('')
   }
 
   const openCreate = () => {
     setEditingId(null)
-    setForm({ name: '', norm: '', unit: '', unit_price: 0 })
+    setForm({ name: '', norm: '', unit: '', unit_price: 0, context: 'terrain' })
     setParamRows([{ name: '', unit: '', expected_type: 'numeric' }])
-    setFormFields([blankField()])
+    setFormFields([])
     setAssignments([])
     setModal('create')
   }
@@ -165,6 +178,7 @@ export default function Catalog() {
       norm: t.norm ?? '',
       unit: t.unit ?? '',
       unit_price: Number(t.unit_price),
+      context: t.context ?? 'labo',
     })
     setParamRows(
       t.params && t.params.length > 0
@@ -176,7 +190,7 @@ export default function Catalog() {
           }))
         : [{ name: '', unit: '', expected_type: 'numeric' }],
     )
-    setFormFields(t.form_fields?.length ? t.form_fields : [blankField()])
+    setFormFields(t.form_fields ?? [])
     setAssignments((t.articles ?? []).map((article) => ({
       article_id: article.id,
       article_action_id: article.pivot?.article_action_id ?? null,
@@ -185,9 +199,17 @@ export default function Catalog() {
     setModal('edit')
   }
 
+  useEffect(() => {
+    const requestedId = Number(searchParams.get('edit'))
+    if (!requestedId || !types || modal !== null) return
+    const type = types.find((item) => item.id === requestedId)
+    if (type) openEdit(type)
+  }, [types, searchParams, modal])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name.trim()) return
+    if (formFields.length === 0) { window.alert('Ajoutez au moins un champ au formulaire.'); return }
     if (modal === 'create') createMut.mutate()
     else if (modal === 'edit') updateMut.mutate()
   }
@@ -213,6 +235,7 @@ export default function Catalog() {
         searchPlaceholder="Nom, norme, paramètre…"
         columns={[
           { id: 'name', label: 'Nom' },
+          { id: 'context', label: 'Domaine' },
           { id: 'norm', label: 'Norme' },
           { id: 'unit', label: 'Unité' },
           { id: 'price', label: 'Tarif' },
@@ -223,6 +246,11 @@ export default function Catalog() {
         visibleColumns={visible}
         onToggleColumn={toggle}
       />
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>Domaine
+        <select value={contextFilter} onChange={(event) => setContextFilter(event.target.value)}>
+          <option value="">Tous les essais</option><option value="terrain">Terrain</option><option value="ingenieur">Ingénierie</option><option value="labo">Laboratoire</option>
+        </select>
+      </label>
       <div className="card dossier-tab-panel dossier-tab-panel--table">
         <ListTablePanelHeader title="Types d'essai" count={filtered.length} />
         <div className="table-wrap">
@@ -230,6 +258,7 @@ export default function Catalog() {
           <thead>
             <tr>
               {visible.name !== false && <th>Nom</th>}
+              {visible.context !== false && <th>Domaine</th>}
               {visible.norm !== false && <th>Norme</th>}
               {visible.unit !== false && <th>Unité</th>}
               {visible.price !== false && <th>Tarif unitaire ({MONEY_UNIT_LABEL})</th>}
@@ -242,6 +271,7 @@ export default function Catalog() {
             {filtered.map((t) => (
               <tr key={t.id}>
                 {visible.name !== false && <td>{t.name}</td>}
+                {visible.context !== false && <td>{t.context === 'terrain' ? 'Terrain' : t.context === 'ingenieur' ? 'Ingénierie' : t.context === 'labo' ? 'Laboratoire' : 'Historique (tous)'}</td>}
                 {visible.norm !== false && <td>{t.norm ?? '-'}</td>}
                 {visible.unit !== false && <td>{t.unit ?? '-'}</td>}
                 {visible.price !== false && <td className="data-table__num">{formatMoney(Number(t.unit_price))}</td>}
@@ -271,6 +301,7 @@ export default function Catalog() {
           <ListTableFootRow
             columns={[
               { id: 'name', kind: 'text' },
+              { id: 'context', kind: 'text' },
               { id: 'norm', kind: 'text' },
               { id: 'unit', kind: 'text' },
               { id: 'price', kind: 'money' },
@@ -301,6 +332,14 @@ export default function Catalog() {
             <div className="form-group">
               <label>Nom *</label>
               <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
+            </div>
+            <div className="form-group">
+              <label>Domaine de l’essai *</label>
+              <select value={form.context} onChange={(e) => setForm((f) => ({ ...f, context: e.target.value as typeof f.context }))}>
+                <option value="terrain">Terrain</option>
+                <option value="ingenieur">Ingénierie</option>
+                <option value="labo">Laboratoire</option>
+              </select>
             </div>
             <div className="form-group">
               <label>Norme</label>
@@ -380,20 +419,7 @@ export default function Catalog() {
             >
               + Paramètre
             </button>
-            <h3>Formulaire de la tâche</h3>
-            <p className="text-muted">Les champs sont enregistrés avec la tâche lors de la première saisie. Leur modification ultérieure ne change pas un formulaire déjà commencé.</p>
-            {formFields.map((field, i) => <div key={i} className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr auto', gap: '0.5rem', alignItems: 'end' }}>
-              <label>Clé<input value={field.key} placeholder="ex. resistance" onChange={(e) => setFormFields((rows) => rows.map((row, j) => j === i ? { ...row, key: e.target.value } : row))} /></label>
-              <label>Libellé<input value={field.label} placeholder="ex. Résistance mesurée" onChange={(e) => setFormFields((rows) => rows.map((row, j) => j === i ? { ...row, label: e.target.value } : row))} /></label>
-              <label>Type<select value={field.type} onChange={(e) => setFormFields((rows) => rows.map((row, j) => j === i ? { ...row, type: e.target.value as TestTypeFormField['type'] } : row))}>
-                <option value="number">Nombre</option><option value="text">Texte</option><option value="date">Date</option><option value="select">Choix</option><option value="boolean">Oui / non</option><option value="photo">Photo</option>
-              </select></label>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setFormFields((rows) => rows.filter((_, j) => j !== i))}>×</button>
-              <label>Unité<input value={field.unit ?? ''} onChange={(e) => setFormFields((rows) => rows.map((row, j) => j === i ? { ...row, unit: e.target.value } : row))} /></label>
-              {field.type === 'select' ? <label>Choix (séparés par ;)<input value={(field.options ?? []).join('; ')} onChange={(e) => setFormFields((rows) => rows.map((row, j) => j === i ? { ...row, options: e.target.value.split(';').map((v) => v.trim()).filter(Boolean) } : row))} /></label> : null}
-              <label><input type="checkbox" checked={field.required} onChange={(e) => setFormFields((rows) => rows.map((row, j) => j === i ? { ...row, required: e.target.checked } : row))} /> Obligatoire</label>
-            </div>)}
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setFormFields((rows) => [...rows, blankField()])}>+ Champ</button>
+            <TestFormFieldsEditor fields={formFields} onChange={setFormFields} lists={optionLists} />
             <h3>Produits et actions concernés</h3>
             <input value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder="Rechercher un produit (2 caractères minimum)" />
             {productSearch.length >= 2 ? <select value="" onChange={(e) => {
@@ -402,7 +428,7 @@ export default function Catalog() {
             }}><option value="">— Ajouter un produit —</option>{products.filter((item) => !assignments.some((a) => a.article_id === item.id)).map((item) => <option key={item.id} value={item.id}>{item.code} — {item.libelle}</option>)}</select> : null}
             {assignments.map((assignment) => <div key={assignment.article_id} className="form-group" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <span>{assignment.label}</span>
-              <ProductActionSelect assignment={assignment} onChange={(article_action_id) => setAssignments((rows) => rows.map((row) => row.article_id === assignment.article_id ? { ...row, article_action_id } : row))} />
+              <ProductActionSelect assignment={assignment} context={form.context} onChange={(article_action_id) => setAssignments((rows) => rows.map((row) => row.article_id === assignment.article_id ? { ...row, article_action_id } : row))} />
               <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAssignments((rows) => rows.filter((row) => row.article_id !== assignment.article_id))}>Retirer</button>
             </div>)}
             {(createMut.isError || updateMut.isError) && (

@@ -1832,6 +1832,8 @@ export const testTypesApi = {
     thresholds?: Record<string, number>
     params?: TestTypeParamInput[]
     form_fields?: TestTypeFormField[]
+    context?: 'terrain' | 'ingenieur' | 'labo'
+    assignments?: Array<{ article_id: number; article_action_id?: number | null }>
   }) => api<TestType>('/test-types', { method: 'POST', body: JSON.stringify(body) }),
   update: (
     id: number,
@@ -1843,6 +1845,7 @@ export const testTypesApi = {
       thresholds?: Record<string, number>
       params?: TestTypeParamInput[]
       form_fields?: TestTypeFormField[]
+      context?: 'terrain' | 'ingenieur' | 'labo'
     },
   ) => api<TestType>(`/test-types/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/test-types/${id}`, { method: 'DELETE' }),
@@ -3145,16 +3148,33 @@ export interface TestType {
   thresholds?: Record<string, number>
   params?: TestTypeParam[]
   form_fields?: TestTypeFormField[]
+  context?: 'terrain' | 'ingenieur' | 'labo' | null
   articles?: Array<{ id: number; code: string; libelle: string; pivot?: { article_action_id: number | null } }>
 }
 
 export interface TestTypeFormField {
   key: string
   label: string
-  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'photo'
+  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'photo' | 'checkboxes' | 'table' | 'formula'
   required: boolean
   unit?: string
   options?: string[]
+  list_id?: number | null
+  formula?: string
+  columns?: TestTypeFormColumn[]
+}
+
+export interface TestTypeFormColumn extends Omit<TestTypeFormField, 'columns' | 'type'> {
+  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'formula'
+}
+
+export interface FormOptionList { id: number; name: string; options: string[] }
+
+export const formOptionListsApi = {
+  list: () => api<FormOptionList[]>('/form-option-lists'),
+  create: (body: { name: string; options: string[] }) => api<FormOptionList>('/form-option-lists', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: number, body: { name: string; options: string[] }) => api<FormOptionList>(`/form-option-lists/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api<void>(`/form-option-lists/${id}`, { method: 'DELETE' }),
 }
 
 export interface TaskTestFormSummary {
@@ -3163,7 +3183,7 @@ export interface TaskTestFormSummary {
   submission: null | {
     id: number
     status: 'draft' | 'submitted' | 'correction_requested' | 'validated'
-    answers: Record<string, string | number | boolean | null>
+    answers: Record<string, unknown>
     correction_note?: string | null
     photos?: Array<{ id: number; field_key: string; original_name: string }>
   }

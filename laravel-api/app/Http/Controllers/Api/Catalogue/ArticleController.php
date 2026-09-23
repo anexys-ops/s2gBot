@@ -258,7 +258,11 @@ class ArticleController extends Controller
                 throw ValidationException::withMessages(['assignments' => 'Le type « '.$type->name.' » ne possède pas de formulaire.']);
             }
             $actionId = $assignment['article_action_id'] ?? null;
-            if ($actionId && ! ArticleAction::query()->whereKey($actionId)->where('ref_article_id', $article->id)->exists()) {
+            $expectedActionType = match ($type->context) {
+                'terrain' => 'technicien', 'ingenieur' => 'ingenieur', 'labo' => 'labo', default => null,
+            };
+            if ($actionId && ! ArticleAction::query()->whereKey($actionId)->where('ref_article_id', $article->id)
+                ->when($expectedActionType, fn ($query) => $query->where('type', $expectedActionType))->exists()) {
                 throw ValidationException::withMessages(['assignments' => 'Cette action n’appartient pas au produit.']);
             }
             $sync[$type->id] = ['article_action_id' => $actionId];

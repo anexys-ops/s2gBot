@@ -52,6 +52,7 @@ use App\Http\Controllers\Api\MissionController;
 use App\Http\Controllers\Api\Mobile\MobileDossierController;
 use App\Http\Controllers\Api\Mobile\MobileTerrainController;
 use App\Http\Controllers\Api\Mobile\TaskTestFormController;
+use App\Http\Controllers\Api\FormOptionListController;
 use App\Http\Controllers\Api\ModuleSettingController;
 use App\Http\Controllers\Api\NonConformityController;
 use App\Http\Controllers\Api\OpenApiController;
@@ -270,6 +271,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('lithology-layers/{lithology_layer}', [LithologyLayerController::class, 'update']);
     Route::delete('lithology-layers/{lithology_layer}', [LithologyLayerController::class, 'destroy']);
     Route::apiResource('test-types', TestTypeController::class);
+    Route::apiResource('form-option-lists', FormOptionListController::class)->except(['show']);
     Route::put('test-types/{testType}/products', [TestTypeController::class, 'syncProducts']);
     Route::get('equipments-maintenance-plans/due', [EquipmentMaintenancePlanController::class, 'dueInRange']);
     Route::get('materiel/affectations', [MaterielAffectationController::class, 'indexAll']);

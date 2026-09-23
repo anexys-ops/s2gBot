@@ -99,10 +99,12 @@ export type MobileTask = {
 export type FormField = {
   key: string;
   label: string;
-  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'photo';
+  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'photo' | 'checkboxes' | 'table' | 'formula';
   required: boolean;
   unit?: string;
   options?: string[];
+  formula?: string;
+  columns?: Array<Omit<FormField, 'columns' | 'type'> & { type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'formula' }>;
 };
 
 export type TaskForm = {
@@ -112,7 +114,7 @@ export type TaskForm = {
     id: number;
     updated_at?: string;
     status: 'draft' | 'submitted' | 'correction_requested' | 'validated';
-    answers: Record<string, string | number | boolean | null>;
+    answers: Record<string, unknown>;
     correction_note?: string | null;
     photos?: Array<{ id: number; field_key: string; original_name: string }>;
   };

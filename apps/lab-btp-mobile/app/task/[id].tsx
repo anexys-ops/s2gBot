@@ -9,8 +9,21 @@ import { useAuth } from '@/lib/auth';
 import { API_BASE } from '@/lib/config';
 import { getStoredToken } from '@/lib/tokenStorage';
 
+function AnswerInput({ field, value, editable, onChange }: { field: FormField; value: unknown; editable: boolean; onChange: (value: unknown) => void }) {
+  if (field.type === 'formula') return <Text style={styles.muted}>{value == null ? 'Calculé à l’enregistrement' : String(value)}{field.unit ? ` ${field.unit}` : ''}</Text>;
+  if (field.type === 'boolean') return <Switch disabled={!editable} value={value === true} onValueChange={onChange} />;
+  if (field.type === 'select') return <View style={styles.options}>{(field.options ?? []).map((option) => <Pressable key={option} disabled={!editable} style={[styles.option, value === option && styles.optionSelected]} onPress={() => onChange(option)}><Text>{option}</Text></Pressable>)}</View>;
+  if (field.type === 'checkboxes') return <View style={styles.options}>{(field.options ?? []).map((option) => {
+    const selected = Array.isArray(value) && value.includes(option);
+    return <Pressable key={option} disabled={!editable} style={[styles.option, selected && styles.optionSelected]} onPress={() => onChange(selected ? (value as string[]).filter((item) => item !== option) : [...(Array.isArray(value) ? value : []), option])}><Text>{selected ? '☑ ' : '☐ '}{option}</Text></Pressable>;
+  })}</View>;
+  return <TextInput style={styles.input} editable={editable} value={value == null ? '' : String(value)}
+    placeholder={field.type === 'date' ? 'AAAA-MM-JJ' : field.label} keyboardType={field.type === 'number' ? 'decimal-pad' : 'default'}
+    onChangeText={(text) => onChange(field.type === 'number' ? text.replace(',', '.') : text)} />;
+}
+
 function FormCard({ taskId, form, canReview, onChanged }: { taskId: number; form: TaskForm; canReview: boolean; onChanged: () => void }) {
-  const [answers, setAnswers] = useState<Record<string, string | number | boolean | null>>(form.submission?.answers ?? {});
+  const [answers, setAnswers] = useState<Record<string, unknown>>(form.submission?.answers ?? {});
   const [correctionNote, setCorrectionNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -47,6 +60,10 @@ function FormCard({ taskId, form, canReview, onChanged }: { taskId: number; form
     }, 'Photo enregistrée sur la tâche.');
   }
 
+  function updateTable(fieldKey: string, rows: Record<string, unknown>[]) {
+    setAnswers((current) => ({ ...current, [fieldKey]: rows }));
+  }
+
   return <View style={styles.card}>
     <Text style={styles.formTitle}>{form.test_type.name}</Text>
     {form.test_type.norm ? <Text style={styles.muted}>Norme : {form.test_type.norm}</Text> : null}
@@ -60,16 +77,17 @@ function FormCard({ taskId, form, canReview, onChanged }: { taskId: number; form
           {token ? <Image style={styles.photo} source={{ uri: `${API_BASE}/mobile/task-forms/photos/${photo.id}`, headers: { Authorization: `Bearer ${token}`, Accept: 'image/*' } }} /> : null}
         </View>)}
         {editable ? <Pressable style={styles.secondaryButton} disabled={busy} onPress={() => void addPhoto(field)}><Text>Prendre une photo</Text></Pressable> : null}
-      </> : field.type === 'boolean' ? <Switch disabled={!editable} value={answers[field.key] === true} onValueChange={(value) => setAnswers((current) => ({ ...current, [field.key]: value }))} />
-        : field.type === 'select' ? <View style={styles.options}>{(field.options ?? []).map((option) => <Pressable key={option} disabled={!editable} style={[styles.option, answers[field.key] === option && styles.optionSelected]} onPress={() => setAnswers((current) => ({ ...current, [field.key]: option }))}><Text>{option}</Text></Pressable>)}</View>
-          : <TextInput
-            style={styles.input}
-            editable={editable}
-            value={answers[field.key] == null ? '' : String(answers[field.key])}
-            placeholder={field.type === 'date' ? 'AAAA-MM-JJ' : field.label}
-            keyboardType={field.type === 'number' ? 'decimal-pad' : 'default'}
-            onChangeText={(value) => setAnswers((current) => ({ ...current, [field.key]: field.type === 'number' ? value.replace(',', '.') : value }))}
-          />}
+      </> : field.type === 'table' ? <View>
+        {(Array.isArray(answers[field.key]) ? answers[field.key] as Record<string, unknown>[] : []).map((row, rowIndex, allRows) => <View key={rowIndex} style={styles.tableRow}>
+          <Text style={styles.muted}>Ligne {rowIndex + 1}</Text>
+          {(field.columns ?? []).map((column) => <View key={column.key} style={styles.field}>
+            <Text style={styles.label}>{column.label}{column.required ? ' *' : ''}</Text>
+            <AnswerInput field={column} value={row[column.key]} editable={editable} onChange={(value) => updateTable(field.key, allRows.map((item, index) => index === rowIndex ? { ...item, [column.key]: value } : item))} />
+          </View>)}
+          {editable ? <Pressable style={styles.secondaryButton} disabled={busy} onPress={() => updateTable(field.key, allRows.filter((_, index) => index !== rowIndex))}><Text>Retirer la ligne</Text></Pressable> : null}
+        </View>)}
+        {editable ? <Pressable style={styles.secondaryButton} disabled={busy} onPress={() => updateTable(field.key, [...(Array.isArray(answers[field.key]) ? answers[field.key] as Record<string, unknown>[] : []), {}])}><Text>+ Ajouter une ligne</Text></Pressable> : null}
+      </View> : <AnswerInput field={field} value={answers[field.key]} editable={editable} onChange={(value) => setAnswers((current) => ({ ...current, [field.key]: value }))} />}
     </View>)}
     {editable ? <View style={styles.actions}>
       <Pressable style={styles.secondaryButton} disabled={busy} onPress={() => void run(() => mobileTasksApi.saveForm(taskId, form.test_type.id, answers), 'Brouillon enregistré.')}><Text>Enregistrer</Text></Pressable>
@@ -126,4 +144,5 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 8, marginTop: 16, flexWrap: 'wrap' }, secondaryButton: { padding: 10, borderRadius: 8, backgroundColor: '#e2e8f0' }, primaryButton: { padding: 10, borderRadius: 8, backgroundColor: '#b45309' }, primaryText: { color: '#fff', fontWeight: '700' },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, option: { padding: 8, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8 }, optionSelected: { backgroundColor: '#fed7aa' },
   photo: { width: '100%', height: 180, borderRadius: 8, marginTop: 4 },
+  tableRow: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 10, marginBottom: 8 },
 });

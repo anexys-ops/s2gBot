@@ -171,6 +171,14 @@ class OpenApiSpec
             '/test-types/{testType}/products' => [
                 'put' => ['tags' => ['Labo'], 'summary' => 'Affecter le formulaire aux produits et actions', 'parameters' => [self::pathId('testType')], 'responses' => ['200' => ['description' => 'Affectations mises à jour']]],
             ],
+            '/form-option-lists' => [
+                'get' => ['tags' => ['Référentiels'], 'summary' => 'Listes de choix communes aux formulaires', 'responses' => ['200' => ['description' => 'Listes']]],
+                'post' => ['tags' => ['Référentiels'], 'summary' => 'Créer une liste de choix commune', 'responses' => ['201' => ['description' => 'Créée']]],
+            ],
+            '/form-option-lists/{formOptionList}' => [
+                'put' => ['tags' => ['Référentiels'], 'summary' => 'Modifier une liste de choix', 'parameters' => [self::pathId('formOptionList')], 'responses' => ['200' => ['description' => 'Modifiée']]],
+                'delete' => ['tags' => ['Référentiels'], 'summary' => 'Supprimer une liste inutilisée', 'parameters' => [self::pathId('formOptionList')], 'responses' => ['204' => ['description' => 'Supprimée']]],
+            ],
             '/v1/catalogue/articles/{article}/test-types' => [
                 'put' => ['tags' => ['Référentiels'], 'summary' => 'Affecter les essais et formulaires à un produit',
                     'parameters' => [self::pathId('article')], 'responses' => ['200' => ['description' => 'Essais du produit mis à jour']]],

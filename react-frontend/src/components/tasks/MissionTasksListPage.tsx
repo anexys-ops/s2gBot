@@ -319,7 +319,14 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
         {taskForms.forms.map((form) => <div key={form.test_type.id} style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem', marginTop: '0.75rem' }}>
           <strong>{form.test_type.name}</strong> · {form.submission?.status ?? 'À remplir'}
           {form.submission?.correction_note ? <p>Correction demandée : {form.submission.correction_note}</p> : null}
-          {form.submission ? <dl>{form.form_fields.filter((field) => field.type !== 'photo').map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{String(form.submission?.answers?.[field.key] ?? '—')}{field.unit ? ` ${field.unit}` : ''}</dd></div>)}</dl> : null}
+          {form.submission ? <dl>{form.form_fields.filter((field) => field.type !== 'photo').map((field) => {
+            const value = form.submission?.answers?.[field.key]
+            return <div key={field.key}><dt>{field.label}</dt><dd>
+              {field.type === 'table' && Array.isArray(value) ? <div className="table-wrap"><table className="data-table data-table--compact"><thead><tr>{field.columns?.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead><tbody>
+                {value.map((row: Record<string, unknown>, index: number) => <tr key={index}>{field.columns?.map((column) => <td key={column.key}>{String(row[column.key] ?? '—')}</td>)}</tr>)}
+              </tbody></table></div> : Array.isArray(value) ? value.join(', ') : String(value ?? '—')}{field.unit ? ` ${field.unit}` : ''}
+            </dd></div>
+          })}</dl> : null}
           {form.submission?.photos?.map((photo) => <button key={photo.id} type="button" className="btn btn-secondary btn-sm" onClick={() => void openFormPhoto(photo.id)}>Voir la photo : {photo.original_name}</button>)}
           {(user?.role === 'lab_admin' || user?.role === 'responsable') && user?.id !== task.assigned_user_id && form.submission?.status === 'submitted' ? <div className="crud-actions">
             <input placeholder="Motif de correction" value={correctionNotes[form.test_type.id] ?? ''} onChange={(event) => setCorrectionNotes((current) => ({ ...current, [form.test_type.id]: event.target.value }))} />

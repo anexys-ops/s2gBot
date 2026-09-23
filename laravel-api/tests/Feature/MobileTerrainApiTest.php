@@ -202,6 +202,70 @@ class MobileTerrainApiTest extends TestCase
         $this->assertDatabaseHas('article_test_type', ['ref_article_id' => $second->id, 'test_type_id' => $type->id]);
     }
 
+    public function test_dynamic_terrain_form_calculates_table_and_keeps_shared_list_snapshot(): void
+    {
+        [$user, , $om] = $this->seedMission();
+        $admin = User::factory()->create(['role' => User::ROLE_LAB_ADMIN]);
+        $family = FamilleArticle::query()->create(['code' => 'DYN', 'libelle' => 'Dynamique', 'ordre' => 1, 'actif' => true]);
+        $product = Article::query()->create([
+            'ref_famille_article_id' => $family->id, 'code' => 'DYN-1', 'libelle' => 'Produit dynamique',
+            'kind' => Article::KIND_PRODUCT, 'prix_unitaire_ht' => 0, 'tva_rate' => 20, 'actif' => true,
+        ]);
+        $task = $this->taskFor($om, $user, 'Mesure terrain');
+        $task->ordreMissionLigne->update(['ref_article_id' => $product->id]);
+        $list = $this->actingAs($admin, 'sanctum')->postJson('/api/form-option-lists', [
+            'name' => 'État du sol', 'options' => ['Sec', 'Humide'],
+        ])->assertCreated()->json();
+        $fields = [
+            ['key' => 'longueur', 'label' => 'Longueur', 'type' => 'number', 'required' => true],
+            ['key' => 'largeur', 'label' => 'Largeur', 'type' => 'number', 'required' => true],
+            ['key' => 'surface', 'label' => 'Surface', 'type' => 'formula', 'formula' => 'longueur * largeur', 'required' => true],
+            ['key' => 'etat', 'label' => 'État', 'type' => 'select', 'list_id' => $list['id'], 'required' => true],
+            ['key' => 'observations', 'label' => 'Observations', 'type' => 'table', 'required' => true, 'columns' => [
+                ['key' => 'nombre', 'label' => 'Nombre', 'type' => 'number', 'required' => true],
+                ['key' => 'prix', 'label' => 'Prix', 'type' => 'number', 'required' => true],
+                ['key' => 'total', 'label' => 'Total', 'type' => 'formula', 'formula' => 'nombre * prix', 'required' => true],
+            ]],
+            ['key' => 'defauts', 'label' => 'Défauts', 'type' => 'checkboxes', 'options' => ['Fissure', 'Humidité'], 'required' => false],
+        ];
+        $typeId = $this->postJson('/api/test-types', [
+            'name' => 'Contrôle terrain dynamique', 'context' => 'terrain', 'unit_price' => 0, 'form_fields' => $fields,
+        ])->assertCreated()->json('id');
+        $this->postJson('/api/test-types', [
+            'name' => 'Formule invalide', 'context' => 'terrain', 'unit_price' => 0,
+            'form_fields' => [['key' => 'total', 'label' => 'Total', 'type' => 'formula', 'formula' => 'champ_inconnu * 2', 'required' => true]],
+        ])->assertUnprocessable();
+        $wrongAction = ArticleAction::query()->create(['ref_article_id' => $product->id, 'type' => 'labo', 'libelle' => 'Action labo', 'ordre' => 1]);
+        $this->postJson('/api/test-types', [
+            'name' => 'Création annulée', 'context' => 'terrain', 'unit_price' => 0,
+            'form_fields' => [['key' => 'note', 'label' => 'Note', 'type' => 'text', 'required' => false]],
+            'assignments' => [['article_id' => $product->id, 'article_action_id' => $wrongAction->id]],
+        ])->assertUnprocessable();
+        $this->assertDatabaseMissing('test_types', ['name' => 'Création annulée']);
+        $labTypeId = $this->postJson('/api/test-types', [
+            'name' => 'Essai réservé au laboratoire', 'context' => 'labo', 'unit_price' => 0,
+            'form_fields' => [['key' => 'note', 'label' => 'Note', 'type' => 'text', 'required' => false]],
+        ])->assertCreated()->json('id');
+        $this->putJson('/api/v1/catalogue/articles/'.$product->id.'/test-types', [
+            'assignments' => [['test_type_id' => $typeId], ['test_type_id' => $labTypeId]],
+        ])->assertOk();
+        $url = '/api/mobile/task-forms/tasks/'.$task->id.'/types/'.$typeId;
+        $this->actingAs($user, 'sanctum')->getJson('/api/mobile/task-forms/tasks/'.$task->id)
+            ->assertOk()->assertJsonCount(1, 'forms')->assertJsonPath('forms.0.form_fields.3.options.0', 'Sec');
+        $this->putJson($url, ['answers' => [
+            'longueur' => 4, 'largeur' => 3, 'surface' => 999, 'etat' => 'Humide',
+            'observations' => [['nombre' => 2, 'prix' => 5, 'total' => 999]],
+            'defauts' => ['Fissure'],
+        ]])->assertOk()->assertJsonPath('answers.surface', 12)->assertJsonPath('answers.observations.0.total', 10);
+        $this->actingAs($admin, 'sanctum')->putJson('/api/form-option-lists/'.$list['id'], [
+            'options' => ['Sec', 'Mouillé'],
+        ])->assertOk();
+        $this->deleteJson('/api/form-option-lists/'.$list['id'])->assertUnprocessable();
+        $this->actingAs($user, 'sanctum')->getJson('/api/mobile/task-forms/tasks/'.$task->id)
+            ->assertOk()->assertJsonPath('forms.0.form_fields.3.options.1', 'Humide');
+        $this->postJson($url.'/submit')->assertOk()->assertJsonPath('status', 'submitted');
+    }
+
     private function seedMission(): array
     {
         $client = Client::query()->create(['name' => 'Client mobile', 'phone' => '+212600000000']);

@@ -10,6 +10,7 @@ use App\Models\TestType;
 use App\Models\User;
 use App\Services\MissionTaskClosureService;
 use App\Services\TaskFormAssignmentService;
+use App\Services\DynamicTestFormService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +20,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TaskTestFormController extends Controller
 {
-    public function __construct(private readonly TaskFormAssignmentService $assignments) {}
+    public function __construct(
+        private readonly TaskFormAssignmentService $assignments,
+        private readonly DynamicTestFormService $dynamicForms,
+    ) {}
 
     public function index(Request $request, MissionTask $task): JsonResponse
     {
@@ -30,7 +34,7 @@ class TaskTestFormController extends Controller
             'task_id' => $task->id,
             'forms' => $this->availableTypes($task)->map(fn (TestType $type) => [
                 'test_type' => $type->only(['id', 'name', 'norm']),
-                'form_fields' => $forms->get($type->id)?->form_snapshot['fields'] ?? $type->form_fields ?? [],
+                'form_fields' => $forms->get($type->id)?->form_snapshot['fields'] ?? $this->dynamicForms->resolvedFields($type->form_fields ?? []),
                 'submission' => $forms->get($type->id),
             ])->values(),
         ]);
@@ -40,15 +44,16 @@ class TaskTestFormController extends Controller
     {
         $this->authorizeAssignee($request, $task);
         $this->assertAssignedType($task, $testType);
-        $data = $request->validate(['answers' => 'required|array']);
+        $data = $request->validate(['answers' => 'present|array']);
         $form = DB::transaction(function () use ($task, $testType, $data) {
             $form = TaskTestForm::query()->firstOrCreate(
                 ['mission_task_id' => $task->id, 'test_type_id' => $testType->id],
                 ['status' => 'draft', 'form_snapshot' => $this->snapshot($testType), 'answers' => []],
             );
             abort_unless(in_array($form->status, ['draft', 'correction_requested'], true), 422, 'Ce formulaire ne peut plus être modifié.');
-            $this->validateAnswers($form, $data['answers'], false);
-            $form->update(['answers' => $data['answers'], 'status' => 'draft', 'correction_note' => null]);
+            $answers = $this->dynamicForms->calculateAnswers($form->form_snapshot['fields'] ?? [], $data['answers']);
+            $this->validateAnswers($form, $answers, false);
+            $form->update(['answers' => $answers, 'status' => 'draft', 'correction_note' => null]);
 
             return $form;
         });
@@ -158,7 +163,8 @@ class TaskTestFormController extends Controller
 
     private function snapshot(TestType $testType): array
     {
-        return ['name' => $testType->name, 'norm' => $testType->norm, 'fields' => $testType->form_fields ?? []];
+        return ['name' => $testType->name, 'norm' => $testType->norm,
+            'fields' => $this->dynamicForms->resolvedFields($testType->form_fields ?? [])];
     }
 
     private function validateAnswers(TaskTestForm $form, array $answers, bool $complete): void
@@ -180,25 +186,54 @@ class TaskTestFormController extends Controller
                 }
                 continue;
             }
-            if ($value === null || $value === '') {
-                if ($complete && ($field['required'] ?? false)) {
-                    $errors["answers.$key"] = 'Champ requis.';
+            if ($field['type'] === 'table') {
+                if (! is_array($value) || ! array_is_list($value)) {
+                    $errors["answers.$key"] = 'Le tableau doit contenir des lignes.';
+                    continue;
+                }
+                if ($complete && ($field['required'] ?? false) && $value === []) {
+                    $errors["answers.$key"] = 'Ajoutez au moins une ligne.';
+                }
+                foreach ($value as $rowIndex => $row) {
+                    if (! is_array($row)) {
+                        $errors["answers.$key.$rowIndex"] = 'Ligne invalide.';
+                        continue;
+                    }
+                    $columnKeys = array_column($field['columns'] ?? [], 'key');
+                    foreach (array_keys($row) as $columnKey) {
+                        if (! in_array($columnKey, $columnKeys, true)) $errors["answers.$key.$rowIndex.$columnKey"] = 'Colonne inconnue.';
+                    }
+                    foreach ($field['columns'] ?? [] as $column) {
+                        $columnKey = $column['key'];
+                        $error = $this->valueError($column, $row[$columnKey] ?? null, $complete);
+                        if ($error) $errors["answers.$key.$rowIndex.$columnKey"] = $error;
+                    }
                 }
                 continue;
             }
-            $valid = match ($field['type']) {
-                'number' => is_numeric($value),
-                'boolean' => is_bool($value),
-                'date' => is_string($value) && (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $value),
-                'select' => is_string($value) && in_array($value, $field['options'] ?? [], true),
-                default => is_string($value),
-            };
-            if (! $valid) {
-                $errors["answers.$key"] = 'Valeur invalide.';
-            }
+            $error = $this->valueError($field, $value, $complete);
+            if ($error) $errors["answers.$key"] = $error;
         }
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
+    }
+
+    private function valueError(array $field, mixed $value, bool $complete): ?string
+    {
+        if ($value === null || $value === '' || $value === []) {
+            return $complete && ($field['required'] ?? false) ? 'Champ requis.' : null;
+        }
+        $valid = match ($field['type']) {
+            'number', 'formula' => is_numeric($value),
+            'boolean' => is_bool($value),
+            'date' => is_string($value) && (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $value),
+            'select' => is_string($value) && in_array($value, $field['options'] ?? [], true),
+            'checkboxes' => is_array($value) && array_is_list($value)
+                && count($value) === count(array_unique($value))
+                && collect($value)->every(fn ($item) => is_string($item) && in_array($item, $field['options'] ?? [], true)),
+            default => is_string($value),
+        };
+        return $valid ? null : 'Valeur invalide.';
     }
 }

@@ -9,6 +9,7 @@ import DossierDocumentsTab from './pages/dossiers/tabs/DossierDocumentsTab'
 import DossierExtrafieldsTab from './pages/dossiers/tabs/DossierExtrafieldsTab'
 import CatalogueListePage from './pages/catalogue/CatalogueListePage'
 import Catalog from './pages/Catalog'
+import FormOptionListsPage from './pages/settings/FormOptionListsPage'
 import ArticleFichePage from './pages/catalogue/ArticleFichePage'
 import DossierNewPage from './pages/dossiers/DossierNewPage'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -276,6 +277,7 @@ function AppRoutes() {
         <Route path="rapport-bc/:id" element={<RapportBCDetailPage />} />
         <Route path="catalogue" element={<CatalogueListePage />} />
         <Route path="catalogue/essais" element={<Catalog />} />
+        <Route path="config/listes-essais" element={<FormOptionListsPage />} />
         <Route path="catalogue/services" element={<CommercialCatalogPage />} />
         <Route path="catalogue/articles/:id" element={<ArticleFichePage />} />
         <Route path="dossiers/new" element={<DossierNewPage />} />

@@ -89,6 +89,7 @@ function isMaterielActive(pathname: string): boolean {
 }
 
 function isConfigurationActive(pathname: string): boolean {
+  if (pathname.startsWith('/config/listes-essais')) return true
   if (pathname.startsWith('/config/agences')) return true
   if (pathname.startsWith('/config/centres')) return true
   if (pathname.startsWith('/settings/utilisateurs')) return true
@@ -289,6 +290,7 @@ export default function AppNavigation() {
     if (canManageGroups(user))
       items.push({ to: '/settings/groupes', label: 'Groupes & droits', module: 'configuration' as StaffModuleKey })
     if (canManageAppConfig(user)) {
+      items.push({ to: '/config/listes-essais', label: 'Listes de choix des essais', module: 'configuration' as StaffModuleKey })
       items.push({ to: '/back-office/modeles-documents-pdf', label: 'Modèles PDF', module: 'configuration' as StaffModuleKey })
       items.push({ to: '/back-office/configuration', label: 'Modules', module: 'configuration' as StaffModuleKey })
     }

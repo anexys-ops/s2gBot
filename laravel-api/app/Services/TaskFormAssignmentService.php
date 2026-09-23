@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\MissionTask;
+use App\Models\OrdreMission;
 use App\Models\TestType;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -25,6 +26,18 @@ class TaskFormAssignmentService
                             $query->orWhere('article_test_type.article_action_id', $line->article_action_id);
                         }
                     });
+            })
+            ->where(function ($query) use ($line) {
+                $query->whereNull('context');
+                $context = match ($line->ordreMission?->type) {
+                    OrdreMission::TYPE_TECHNICIEN => 'terrain',
+                    OrdreMission::TYPE_INGENIEUR => 'ingenieur',
+                    OrdreMission::TYPE_LABO => 'labo',
+                    default => null,
+                };
+                if ($context) {
+                    $query->orWhere('context', $context);
+                }
             })->get();
     }
 

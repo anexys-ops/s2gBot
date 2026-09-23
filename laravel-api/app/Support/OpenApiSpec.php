@@ -217,6 +217,40 @@ class OpenApiSpec
     private static function mobilePaths(): array
     {
         return [
+            '/mobile/terrain/calendar' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Agenda personnel : tâches, événements et matériel',
+                    'parameters' => [self::dateQuery('from', true), self::dateQuery('to', true)],
+                    'responses' => ['200' => ['description' => 'tasks, events, equipment_movements']]],
+            ],
+            '/mobile/terrain/tasks' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Tâches affectées au compte connecté',
+                    'parameters' => [self::dateQuery('from'), self::dateQuery('to'),
+                        ['name' => 'statut', 'in' => 'query', 'schema' => ['type' => 'string']],
+                        ['name' => 'active_only', 'in' => 'query', 'schema' => ['type' => 'boolean']]],
+                    'responses' => ['200' => ['description' => 'Liste des tâches']]],
+            ],
+            '/mobile/terrain/tasks/{task}' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Détail de ma tâche, client, chantier et matériel',
+                    'parameters' => [self::pathId('task')], 'responses' => ['200' => ['description' => 'Tâche']]],
+            ],
+            '/mobile/terrain/expense-options' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'OM éligibles et référentiels de notes de frais',
+                    'responses' => ['200' => ['description' => 'Options']]],
+            ],
+            '/mobile/terrain/expense-reports' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Mes notes de frais',
+                    'responses' => ['200' => ['description' => 'Liste']]],
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Créer un brouillon de note de frais',
+                    'responses' => ['201' => ['description' => 'Brouillon créé']]],
+            ],
+            '/mobile/terrain/expense-reports/{expenseReport}/lines' => [
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Ajouter une dépense à mon brouillon',
+                    'parameters' => [self::pathId('expenseReport')], 'responses' => ['201' => ['description' => 'Ligne créée']]],
+            ],
+            '/mobile/terrain/expense-reports/{expenseReport}/submit' => [
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Soumettre ma note de frais',
+                    'parameters' => [self::pathId('expenseReport')], 'responses' => ['200' => ['description' => 'Note soumise']]],
+            ],
             '/mobile/dossiers/{kind}/{id}/measure-forms' => [
                 'get' => [
                     'tags' => ['Terrain mobile'],
@@ -240,6 +274,11 @@ class OpenApiSpec
                 ],
             ],
         ];
+    }
+
+    private static function dateQuery(string $name, bool $required = false): array
+    {
+        return ['name' => $name, 'in' => 'query', 'required' => $required, 'schema' => ['type' => 'string', 'format' => 'date']];
     }
 
     private static function adminPaths(): array

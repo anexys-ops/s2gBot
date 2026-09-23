@@ -50,6 +50,7 @@ use App\Http\Controllers\Api\MailController;
 use App\Http\Controllers\Api\MailTemplateController;
 use App\Http\Controllers\Api\MissionController;
 use App\Http\Controllers\Api\Mobile\MobileDossierController;
+use App\Http\Controllers\Api\Mobile\MobileTerrainController;
 use App\Http\Controllers\Api\ModuleSettingController;
 use App\Http\Controllers\Api\NonConformityController;
 use App\Http\Controllers\Api\OpenApiController;
@@ -480,6 +481,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('expense-reports/{expenseReport}/lines/{line}/receipt', [ExpenseReportController::class, 'uploadLineReceipt']);
     Route::get('expense-reports/{expenseReport}/lines/{line}/receipt', [ExpenseReportController::class, 'downloadLineReceipt']);
     Route::delete('expense-reports/{expenseReport}/lines/{line}/receipt', [ExpenseReportController::class, 'deleteLineReceipt']);
+
+    // App mobile terrain — données limitées aux missions du compte connecté.
+    Route::prefix('mobile/terrain')->group(function () {
+        Route::get('calendar', [MobileTerrainController::class, 'calendar']);
+        Route::get('tasks', [MobileTerrainController::class, 'tasks']);
+        Route::get('tasks/{task}', [MobileTerrainController::class, 'task'])->whereNumber('task');
+        Route::get('expense-options', [MobileTerrainController::class, 'expenseOptions']);
+        Route::get('expense-reports', [MobileTerrainController::class, 'expenses']);
+        Route::post('expense-reports', [MobileTerrainController::class, 'storeExpense']);
+        Route::post('expense-reports/{expenseReport}/lines', [MobileTerrainController::class, 'storeExpenseLine'])->whereNumber('expenseReport');
+        Route::post('expense-reports/{expenseReport}/submit', [MobileTerrainController::class, 'submitExpense'])->whereNumber('expenseReport');
+    });
 
     // App mobile laboratoire / terrain — dossiers (mesures + photos)
     Route::prefix('mobile/dossiers')->group(function () {

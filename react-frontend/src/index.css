@@ -11744,6 +11744,76 @@ a.catalogue-tree__link-article:hover {
   outline-offset: 2px;
 }
 
+.mission-task-list__search-filters {
+  display: grid;
+  grid-template-columns: minmax(13rem, 2fr) repeat(2, minmax(10rem, 1.2fr)) repeat(2, minmax(9rem, 1fr)) auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 1rem;
+  padding: 0.9rem;
+}
+
+.mission-task-list__search-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-muted);
+}
+
+.mission-task-list__search-filters input,
+.mission-task-list__search-filters select {
+  width: 100%;
+  min-width: 0;
+}
+
+.mission-task-list__dossier-row th {
+  padding: 0.75rem 0.9rem;
+  background: #eaf1fa;
+  color: #183654;
+  border-top: 2px solid #b6cbe4;
+  text-align: left;
+}
+
+.mission-task-list__dossier-row th > span,
+.mission-task-list__dossier-row th > strong {
+  display: inline-block;
+  margin-right: 1.25rem;
+}
+
+.mission-task-list__dossier-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.mission-task-list__jalon-row th {
+  padding: 0.5rem 0.9rem 0.5rem 1.5rem;
+  background: #fff3ea;
+  color: #a3450d;
+  text-align: left;
+}
+
+.mission-task-list__jalon-row span {
+  font-weight: 400;
+}
+
+@media (max-width: 1150px) {
+  .mission-task-list__search-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .mission-task-list__search-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mission-task-list__search-field {
+    grid-column: 1 / -1;
+  }
+}
+
 .mission-task-list__table-card {
   padding: 0;
   overflow: hidden;

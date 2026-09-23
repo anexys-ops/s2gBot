@@ -3365,6 +3365,7 @@ export interface OrdreMission {
   bonCommande?: {
     id: number
     numero: string
+    dossier_id?: number | null
     quote_id?: number | null
     quote?: { id: number; number: string } | null
     lignes?: BonCommandeLigne[]

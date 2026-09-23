@@ -94,6 +94,57 @@ function taskLabel(task: MissionTask): string {
   return ligne?.articleAction?.libelle || ligne?.libelle || ligne?.article?.libelle || 'Tâche sans libellé'
 }
 
+type TaskJalonGroup = { key: string; label: string; tasks: MissionTask[] }
+type TaskDossierGroup = {
+  key: string
+  reference: string
+  client: string
+  site: string
+  jalons: TaskJalonGroup[]
+  count: number
+}
+
+function groupTasksByDossierAndJalon(tasks: MissionTask[]): TaskDossierGroup[] {
+  const dossiers = new Map<string, TaskDossierGroup>()
+  for (const task of tasks) {
+    const om = task.ordreMissionLigne?.ordreMission
+    const dossier = om?.dossier ?? om?.bonCommande?.dossier
+    const dossierId = om?.dossier_id ?? om?.bonCommande?.dossier_id
+    const dossierKey = dossierId ? `dossier-${dossierId}` : `om-${om?.id ?? task.id}`
+    let group = dossiers.get(dossierKey)
+    if (!group) {
+      group = {
+        key: dossierKey,
+        reference: dossier?.reference ?? (om ? `Sans dossier · ${om.numero}` : 'Sans dossier'),
+        client: om?.client?.name ?? 'Client non renseigné',
+        site: om?.site?.name ?? 'Chantier non renseigné',
+        jalons: [],
+        count: 0,
+      }
+      dossiers.set(dossierKey, group)
+    }
+    const jalon = task.jalon_context
+    const jalonKey = jalon?.id || jalon?.label || 'sans-jalon'
+    let jalonGroup = group.jalons.find((item) => item.key === jalonKey)
+    if (!jalonGroup) {
+      jalonGroup = {
+        key: jalonKey,
+        label: jalon ? `${jalon.code ? `${jalon.code} — ` : ''}${jalon.label}` : 'Tâches sans jalon',
+        tasks: [],
+      }
+      group.jalons.push(jalonGroup)
+    }
+    jalonGroup.tasks.push(task)
+    group.count += 1
+  }
+  return [...dossiers.values()]
+    .sort((a, b) => a.reference.localeCompare(b.reference, 'fr', { numeric: true }))
+    .map((group) => ({
+      ...group,
+      jalons: group.jalons.sort((a, b) => a.label.localeCompare(b.label, 'fr', { numeric: true })),
+    }))
+}
+
 function DelayCell({ task }: { task: MissionTask }) {
   const date = taskReferenceDate(task)
   if (!date) return <span className="text-muted">Non programmée</span>
@@ -253,6 +304,11 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
   const meta = CONTEXT_META[context]
   const [searchParams, setSearchParams] = useSearchParams()
   const [statusFilter, setStatusFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const [clientFilter, setClientFilter] = useState('')
+  const [technicianFilter, setTechnicianFilter] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [selectedTask, setSelectedTask] = useState<MissionTask | null>(null)
 
   const { data: tasks = [], isLoading, error } = useQuery({
@@ -287,12 +343,34 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
     return result
   }, [tasks])
 
-  const displayed = useMemo(
-    () => statusFilter
-      ? tasks.filter((task) => taskFilterKey(task.statut) === statusFilter)
-      : tasks,
-    [statusFilter, tasks],
-  )
+  const clients = useMemo(() => [...new Map(tasks.flatMap((task) => {
+    const client = task.ordreMissionLigne?.ordreMission?.client
+    return client ? [[client.id, client.name] as const] : []
+  })).entries()].sort((a, b) => a[1].localeCompare(b[1], 'fr')), [tasks])
+  const technicians = useMemo(() => [...new Map(tasks.flatMap((task) => {
+    const technician = task.assignedUser
+    return technician ? [[technician.id, technician.name] as const] : []
+  })).entries()].sort((a, b) => a[1].localeCompare(b[1], 'fr')), [tasks])
+
+  const displayed = useMemo(() => tasks.filter((task) => {
+    if (statusFilter && taskFilterKey(task.statut) !== statusFilter) return false
+    const om = task.ordreMissionLigne?.ordreMission
+    const dossier = om?.dossier ?? om?.bonCommande?.dossier
+    if (clientFilter && String(om?.client?.id ?? '') !== clientFilter) return false
+    if (technicianFilter && String(task.assigned_user_id ?? '') !== technicianFilter) return false
+    const date = taskReferenceDate(task)
+    if (dateFrom && (!date || date < dateFrom)) return false
+    if (dateTo && (!date || date > dateTo)) return false
+    const query = search.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('fr')
+    if (!query) return true
+    const searchable = [
+      task.unique_number, taskLabel(task), task.jalon_context?.code, task.jalon_context?.label,
+      task.assignedUser?.name, om?.numero, om?.client?.name, om?.site?.name,
+      dossier?.reference, dossier?.titre, date, date ? formatAppDate(date) : '',
+    ].filter(Boolean).join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('fr')
+    return searchable.includes(query)
+  }), [tasks, statusFilter, clientFilter, technicianFilter, dateFrom, dateTo, search])
+  const grouped = useMemo(() => groupTasksByDossierAndJalon(displayed), [displayed])
 
   return (
     <ModuleEntityShell
@@ -337,6 +415,29 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
         })}
       </section>
 
+      <section className="card mission-task-list__search-filters" aria-label="Rechercher des tâches">
+        <label className="mission-task-list__search-field">Recherche
+          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tâche, dossier, client, chantier, jalon…" />
+        </label>
+        <label>Client
+          <select value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
+            <option value="">Tous les clients</option>
+            {clients.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </select>
+        </label>
+        <label>Technicien
+          <select value={technicianFilter} onChange={(event) => setTechnicianFilter(event.target.value)}>
+            <option value="">Tous les techniciens</option>
+            {technicians.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </select>
+        </label>
+        <label>Du <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label>
+        <label>Au <input type="date" min={dateFrom || undefined} value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => {
+          setSearch(''); setClientFilter(''); setTechnicianFilter(''); setDateFrom(''); setDateTo(''); setStatusFilter('')
+        }}>Effacer les filtres</button>
+      </section>
+
       {isLoading ? <p className="text-muted">Chargement…</p> : null}
       {error ? <p className="error">{(error as Error).message}</p> : null}
 
@@ -347,7 +448,7 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
               <thead>
                 <tr>
                   <th>N° tâche</th>
-                  <th>Tâche et jalon</th>
+                  <th>Tâche</th>
                   <th>Technicien assigné</th>
                   <th>Statut</th>
                   <th>Date programmée</th>
@@ -358,7 +459,20 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                 {displayed.length === 0 ? (
                   <tr><td colSpan={6} className="text-muted">Aucune tâche pour ce filtre.</td></tr>
                 ) : null}
-                {displayed.map((task) => {
+                {grouped.flatMap((dossier) => [
+                  <tr key={dossier.key} className="mission-task-list__dossier-row">
+                    <th colSpan={6} scope="rowgroup">
+                      <span className="mission-task-list__dossier-title">{dossier.reference}</span>
+                      <span>{dossier.client}</span>
+                      <span>{dossier.site}</span>
+                      <strong>{dossier.count} tâche{dossier.count > 1 ? 's' : ''}</strong>
+                    </th>
+                  </tr>,
+                  ...dossier.jalons.flatMap((jalon) => [
+                    <tr key={`${dossier.key}-${jalon.key}`} className="mission-task-list__jalon-row">
+                      <th colSpan={6} scope="rowgroup">{jalon.label} <span>· {jalon.tasks.length} tâche{jalon.tasks.length > 1 ? 's' : ''}</span></th>
+                    </tr>,
+                    ...jalon.tasks.map((task) => {
                   const om = task.ordreMissionLigne?.ordreMission
                   const statut = getTaskStatutMeta(task.statut)
                   const plannedDate = taskReferenceDate(task)
@@ -382,11 +496,6 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                         {om ? <div className="text-muted mission-task-list__sub">{om.numero}</div> : null}
                       </td>
                       <td>
-                        {task.jalon_context ? (
-                          <div className="mission-task-list__jalon">
-                            {task.jalon_context.code ? `${task.jalon_context.code} — ` : ''}{task.jalon_context.label}
-                          </div>
-                        ) : null}
                         <div className="mission-task-list__task">{taskLabel(task)}</div>
                       </td>
                       <td>{task.assignedUser?.name ?? <span className="text-muted">Non assigné</span>}</td>
@@ -399,7 +508,9 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                       <td><DelayCell task={task} /></td>
                     </tr>
                   )
-                })}
+                    }),
+                  ]),
+                ])}
               </tbody>
             </table>
           </div>

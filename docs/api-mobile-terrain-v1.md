@@ -12,6 +12,7 @@ Ces routes sont **personnelles** : elles renvoient uniquement les tâches terrai
 | GET | `/mobile/terrain/tasks?active_only=1` | Mes tâches à faire, y compris celles sans date |
 | GET | `/mobile/terrain/tasks?from=2026-09-21&to=2026-09-27&statut=todo` | Filtrer par période et statut |
 | GET | `/mobile/terrain/tasks/{id}` | Fiche tâche, client, chantier, dossier et matériel |
+| PATCH | `/mobile/terrain/tasks/{id}/status` | Démarrer, mettre en pause, terminer ou annuler ma tâche |
 
 `calendar` renvoie trois tableaux : `tasks`, `events`, `equipment_movements`. Les tâches sont prises dans l'OM ; les événements sont les entrées personnelles du planning sans tâche liée. Une ancienne affectation directe du BC figure dans `events` avec `source_type: "terrain_bc"`, son libellé et son contexte BC/client/dossier. Le calendrier ne duplique pas les événements de planning rattachés aux tâches. Un mouvement fournit `a_recuperer_le` et `a_deposer_le` ; la date de dépôt effective remplace la date prévue lorsqu'elle existe.
 
@@ -40,6 +41,23 @@ Exemple abrégé de `GET /mobile/terrain/tasks/{id}` :
 `equipment` peut également contenir une entrée `source: "ligne_om"` (matériel prévu sur la ligne) ou `source: "planning"` (réservation, avec `date_debut`/`date_fin`). Ces sources indiquent le **type d'affectation**, pas une remise matérielle confirmée. Seules les entrées `source: "affectation"` portent les dates de récupération et dépôt. Les tâches sans date restent dans `tasks`, pas dans `calendar.tasks`.
 
 Statuts possibles des tâches : `todo`, `in_progress`, `paused`, `frozen`, `rescheduled`, `done`, `validated`, `rejected`. `active_only=1` exclut `done`, `validated` et `rejected`. Une tâche d'un autre utilisateur donne `403` à la lecture de sa fiche.
+
+### Changer le statut d'une tâche
+
+Une seule route : `PATCH /mobile/terrain/tasks/{id}/status` avec `Content-Type: application/json`. Le champ `statut` accepte uniquement `in_progress`, `paused`, `done` ou `rejected`. Pour annuler, fournir aussi `motif` (chaîne obligatoire de 3 à 2000 caractères après retrait des espaces extérieurs) :
+
+```json
+{ "statut": "rejected", "motif": "Chantier annulé par le client" }
+```
+
+| Statut demandé | Action | Statuts de départ autorisés |
+|---|---|---|
+| `in_progress` | Démarrer / reprendre | `todo`, `paused`, `rescheduled` |
+| `paused` | Mettre en pause | `in_progress` |
+| `done` | Terminer, en attente de validation | `in_progress` |
+| `rejected` | Annuler | `todo`, `in_progress`, `paused`, `rescheduled` |
+
+Une tâche `frozen`, `done`, `validated` ou `rejected` ne peut pas être relancée depuis cette route. `done` n'est pas une validation définitive : la validation du rapport ou des formulaires d'essai reste nécessaire pour passer à `validated`. Le motif d'annulation est conservé dans `cancellation_reason`. Le serveur fixe `started_at` et `completed_at` lors du premier démarrage et de la fin, et synchronise la ligne d'OM, l'OM et le planning. La réponse `200` est la même fiche complète que `GET /mobile/terrain/tasks/{id}`, avec client, site, dossier et matériel actualisés. Une transition interdite renvoie `422` avec `errors.statut` ; un motif manquant ou invalide renvoie `422` avec `errors.motif`. Une tâche non affectée au compte renvoie `403`.
 
 ## Notes de frais
 

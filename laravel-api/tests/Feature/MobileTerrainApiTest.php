@@ -71,6 +71,50 @@ class MobileTerrainApiTest extends TestCase
         $this->getJson('/api/mobile/terrain/tasks/'.$theirs->id)->assertForbidden();
     }
 
+    public function test_mobile_task_status_transitions_sync_mission_and_return_detail(): void
+    {
+        [$user, $other, $om] = $this->seedMission();
+        $task = $this->taskFor($om, $user, 'Tâche mobile');
+        $otherTask = $this->taskFor($om, $other, 'Tâche autre');
+        $url = '/api/mobile/terrain/tasks/'.$task->id.'/status';
+
+        $this->actingAs($other, 'sanctum')->patchJson($url, ['statut' => 'in_progress'])->assertForbidden();
+        $this->actingAs($user, 'sanctum')->patchJson($url, ['statut' => 'done'])
+            ->assertUnprocessable()->assertJsonValidationErrors('statut');
+        $this->patchJson($url, ['statut' => 'in_progress'])
+            ->assertOk()->assertJsonPath('statut', 'in_progress')
+            ->assertJsonPath('client.name', 'Client mobile');
+        $this->assertNotNull($task->fresh()->started_at);
+        $this->assertDatabaseHas('ordre_mission_lignes', [
+            'id' => $task->ordre_mission_ligne_id, 'statut' => 'en_cours',
+        ]);
+        $this->assertDatabaseHas('ordres_mission', ['id' => $om->id, 'statut' => OrdreMission::STATUT_EN_COURS]);
+        $this->patchJson($url, ['statut' => 'paused'])->assertOk()->assertJsonPath('statut', 'paused');
+        $this->patchJson($url, ['statut' => 'in_progress'])->assertOk();
+        $this->patchJson($url, ['statut' => 'done'])
+            ->assertOk()->assertJsonPath('statut', 'done')->assertJsonPath('ordre_mission.id', $om->id);
+        $this->assertNotNull($task->fresh()->completed_at);
+        $this->assertDatabaseHas('ordre_mission_lignes', [
+            'id' => $task->ordre_mission_ligne_id, 'statut' => 'attente_validation',
+        ]);
+        $this->patchJson($url, ['statut' => 'done'])->assertUnprocessable()->assertJsonValidationErrors('statut');
+        $this->patchJson($url, ['statut' => 'rejected', 'motif' => 'Abandon'])
+            ->assertUnprocessable()->assertJsonValidationErrors('statut');
+
+        $cancelUrl = '/api/mobile/terrain/tasks/'.$otherTask->id.'/status';
+        $this->actingAs($other, 'sanctum')->patchJson($cancelUrl, ['statut' => 'rejected'])
+            ->assertUnprocessable()->assertJsonValidationErrors('motif');
+        $this->patchJson($cancelUrl, ['statut' => 'rejected', 'motif' => '   '])
+            ->assertUnprocessable()->assertJsonValidationErrors('motif');
+        $this->patchJson($cancelUrl, ['statut' => 'rejected', 'motif' => 'Chantier annulé'])
+            ->assertOk()->assertJsonPath('statut', 'rejected')
+            ->assertJsonPath('cancellation_reason', 'Chantier annulé');
+        $this->getJson('/api/mobile/terrain/tasks/'.$otherTask->id)
+            ->assertOk()->assertJsonPath('cancellation_reason', 'Chantier annulé');
+        $this->patchJson($cancelUrl, ['statut' => 'in_progress'])
+            ->assertUnprocessable()->assertJsonValidationErrors('statut');
+    }
+
     public function test_mobile_expense_reports_are_limited_to_assigned_missions_and_owner(): void
     {
         [$user, $other, $om] = $this->seedMission();

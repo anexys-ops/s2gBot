@@ -253,6 +253,13 @@ class OpenApiSpec
                 'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Détail de ma tâche, client, chantier et matériel',
                     'parameters' => [self::pathId('task')], 'responses' => ['200' => ['description' => 'Tâche']]],
             ],
+            '/mobile/terrain/tasks/{task}/status' => [
+                'patch' => ['tags' => ['Terrain mobile'], 'summary' => 'Démarrer, mettre en pause, terminer ou annuler ma tâche',
+                    'parameters' => [self::pathId('task')],
+                    'responses' => ['200' => ['description' => 'Fiche tâche mise à jour'],
+                        '403' => ['description' => 'Tâche non affectée au compte'],
+                        '422' => ['description' => 'Transition interdite ou motif manquant']]],
+            ],
             '/mobile/terrain/expense-options' => [
                 'get' => ['tags' => ['Terrain mobile'], 'summary' => 'OM éligibles et référentiels de notes de frais',
                     'responses' => ['200' => ['description' => 'Options']]],

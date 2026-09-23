@@ -12,11 +12,14 @@ use App\Models\PlanningEquipment;
 use App\Models\PlanningEvent;
 use App\Support\UserExpenseBareme;
 use App\Services\ExpenseReportService;
+use App\Services\MissionTaskStatusService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MobileTerrainController extends Controller
@@ -129,6 +132,54 @@ class MobileTerrainController extends Controller
             'dossier' => $om?->dossier?->only(['id', 'reference', 'titre']),
             'equipment' => $this->equipmentForTask($task),
         ]);
+    }
+
+    public function updateTaskStatus(Request $request, MissionTask $task, MissionTaskStatusService $statusSync): JsonResponse
+    {
+        if (is_string($request->input('motif'))) {
+            $request->merge(['motif' => trim($request->input('motif'))]);
+        }
+        $data = $request->validate([
+            'statut' => ['required', Rule::in([
+                MissionTask::STATUT_IN_PROGRESS,
+                MissionTask::STATUT_PAUSED,
+                MissionTask::STATUT_DONE,
+                MissionTask::STATUT_REJECTED,
+            ])],
+            'motif' => 'required_if:statut,rejected|prohibited_unless:statut,rejected|string|min:3|max:2000',
+        ]);
+
+        DB::transaction(function () use ($request, $task, $data, $statusSync) {
+            $locked = MissionTask::query()->lockForUpdate()->findOrFail($task->id);
+            abort_unless($this->ownTasks($request->user()->id)->whereKey($locked->id)->exists(), 403);
+
+            $allowedFrom = match ($data['statut']) {
+                MissionTask::STATUT_IN_PROGRESS => [MissionTask::STATUT_TODO, MissionTask::STATUT_PAUSED, MissionTask::STATUT_RESCHEDULED],
+                MissionTask::STATUT_PAUSED => [MissionTask::STATUT_IN_PROGRESS],
+                MissionTask::STATUT_DONE => [MissionTask::STATUT_IN_PROGRESS],
+                MissionTask::STATUT_REJECTED => [MissionTask::STATUT_TODO, MissionTask::STATUT_IN_PROGRESS, MissionTask::STATUT_PAUSED, MissionTask::STATUT_RESCHEDULED],
+            };
+            if (! in_array($locked->statut, $allowedFrom, true)) {
+                throw ValidationException::withMessages([
+                    'statut' => "Transition impossible de {$locked->statut} vers {$data['statut']}.",
+                ]);
+            }
+
+            $changes = ['statut' => $data['statut']];
+            if ($data['statut'] === MissionTask::STATUT_IN_PROGRESS && ! $locked->started_at) {
+                $changes['started_at'] = now();
+            }
+            if ($data['statut'] === MissionTask::STATUT_DONE) {
+                $changes['completed_at'] = now();
+            }
+            if ($data['statut'] === MissionTask::STATUT_REJECTED) {
+                $changes['cancellation_reason'] = trim($data['motif']);
+            }
+            $locked->update($changes);
+            $statusSync->syncOrdreMissionFromTask($locked);
+        });
+
+        return $this->task($request, $task->fresh());
     }
 
     public function expenses(Request $request): JsonResponse
@@ -272,8 +323,7 @@ class MobileTerrainController extends Controller
     {
         return MissionTask::query()->where('assigned_user_id', $userId)
             ->whereHas('ordreMissionLigne.ordreMission', fn (Builder $q) => $q
-                ->whereIn('type', [OrdreMission::TYPE_TECHNICIEN, OrdreMission::TYPE_INGENIEUR, OrdreMission::TYPE_LABO])
-                ->where('statut', '!=', OrdreMission::STATUT_ANNULE))
+                ->whereIn('type', [OrdreMission::TYPE_TECHNICIEN, OrdreMission::TYPE_INGENIEUR, OrdreMission::TYPE_LABO]))
             ->with([
                 'ordreMissionLigne.ordreMission.client:id,name',
                 'ordreMissionLigne.ordreMission.site:id,name',
@@ -299,7 +349,10 @@ class MobileTerrainController extends Controller
             'statut' => $task->statut,
             'planned_date' => $task->planned_date?->format('Y-m-d'),
             'due_date' => $task->due_date?->format('Y-m-d'),
+            'started_at' => $task->started_at?->toIso8601String(),
+            'completed_at' => $task->completed_at?->toIso8601String(),
             'notes' => $task->notes,
+            'cancellation_reason' => $task->cancellation_reason,
             'libelle' => $line?->libelle,
             'quantite' => $line?->quantite,
             'ordre_mission' => $om?->only(['id', 'numero', 'type', 'statut']),

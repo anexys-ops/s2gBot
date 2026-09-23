@@ -493,6 +493,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('calendar', [MobileTerrainController::class, 'calendar']);
         Route::get('tasks', [MobileTerrainController::class, 'tasks']);
         Route::get('tasks/{task}', [MobileTerrainController::class, 'task'])->whereNumber('task');
+        Route::patch('tasks/{task}/status', [MobileTerrainController::class, 'updateTaskStatus'])->whereNumber('task');
         Route::get('expense-options', [MobileTerrainController::class, 'expenseOptions']);
         Route::get('expense-reports', [MobileTerrainController::class, 'expenses']);
         Route::post('expense-reports', [MobileTerrainController::class, 'storeExpense']);

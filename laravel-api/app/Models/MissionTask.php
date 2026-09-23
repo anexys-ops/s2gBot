@@ -48,6 +48,7 @@ class MissionTask extends Model
         'validated_at',
         'validated_by',
         'notes',
+        'cancellation_reason',
         'pv_numbers',
         'quantity_unit',
         'quantity_count',

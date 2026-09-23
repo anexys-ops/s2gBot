@@ -593,7 +593,7 @@ class MissionTaskController extends Controller
                 ]
             );
         } else {
-            PlanningHuman::query()->where('mission_task_id', $task->id)->delete();
+            PlanningHuman::query()->where('mission_task_id', $task->id)->get()->each->delete();
         }
 
         if ($ligne->equipment_id && $date) {
@@ -609,7 +609,7 @@ class MissionTaskController extends Controller
                 ]
             );
         } else {
-            PlanningEquipment::query()->where('mission_task_id', $task->id)->delete();
+            PlanningEquipment::query()->where('mission_task_id', $task->id)->get()->each->delete();
         }
     }
 

@@ -2,12 +2,27 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\SyncsPlanningEvent;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MaterielAffectation extends Model
 {
+    use SyncsPlanningEvent;
+
+    protected function planningEventSourceType(): string { return 'materiel_affectation'; }
+
+    protected function planningEventAttributes(): array
+    {
+        return array_merge($this->basePlanningEventAttributes(), [
+            'dossier_id' => $this->dossier_id,
+            'ordre_mission_id' => $this->ordre_mission_id,
+            'date_fin' => $this->effectiveEndDate()->format('Y-m-d'),
+            'type_evenement' => 'utilisation_chantier',
+            'notes' => $this->observations,
+        ]);
+    }
     protected $table = 'materiel_affectations';
 
     protected $fillable = [

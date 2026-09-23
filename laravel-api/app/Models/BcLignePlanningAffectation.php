@@ -2,11 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\SyncsPlanningEvent;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class BcLignePlanningAffectation extends Model
 {
+    use SyncsPlanningEvent;
+
+    protected function planningEventSourceType(): string { return 'terrain_bc'; }
+
     protected $table = 'bc_ligne_planning_affectations';
 
     protected $fillable = [

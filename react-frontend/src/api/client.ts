@@ -1132,9 +1132,17 @@ export const bonsCommandeApi = {
 
 /** Réponse list GET planning-terrain (affectation + relations). */
 export type PlanningTerrainAffectationRow = BcLignePlanningAffectation & {
+  source?: 'bc' | 'om'
+  mission_task_id?: number
+  ordre_mission_id?: number | null
+  ordre_mission_numero?: string | null
+  statut?: string
+  date_debut: string
+  date_fin: string
   bon_commande_ligne?: {
-    id: number
-    libelle: string
+    id: number | null
+    libelle: string | null
+    bon_commande_id?: number | null
     date_debut_prevue?: string | null
     date_fin_prevue?: string | null
     bon_commande?: {
@@ -1151,11 +1159,12 @@ import type { TechnicienOption } from '../lib/userRolePresentation'
 export const planningTerrainApi = {
   techniciens: (context: 'terrain' | 'labo' | 'ingenieur' = 'terrain') =>
     api<TechnicienOption[]>(`/v1/planning-terrain/techniciens?context=${context}`),
-  list: (params: { from: string; to: string; user_id?: number }) => {
+  list: (params: { from: string; to: string; user_id?: number; undated?: boolean }) => {
     const q = new URLSearchParams()
     q.set('from', params.from)
     q.set('to', params.to)
     if (params.user_id) q.set('user_id', String(params.user_id))
+    if (params.undated) q.set('undated', '1')
     return api<PlanningTerrainAffectationRow[]>(`/v1/planning-terrain?${q.toString()}`)
   },
   fetchPdf: async (params: { from: string; to: string; user_id?: number; template_id?: number }) => {
@@ -3783,11 +3792,32 @@ export type PlanningTerrainBcSlot = {
 }
 
 export interface PlanningOverview {
+  events: PlanningEvent[]
   humans: PlanningHuman[]
   equipments: PlanningEquipmentSlot[]
   stock_personnels: StockPersonnel[]
   stock_equipments: StockEquipmentEntry[]
   terrain_bc?: PlanningTerrainBcSlot[]
+}
+
+export interface PlanningEvent {
+  id: number
+  source_type: string
+  source_id: number
+  user_id: number | null
+  equipment_id: number | null
+  mission_task_id: number | null
+  bon_commande_ligne_id: number | null
+  dossier_id: number | null
+  ordre_mission_id: number | null
+  date_debut: string
+  date_fin: string
+  type_evenement: string
+  notes: string | null
+  user?: { id: number; name: string } | null
+  equipment?: { id: number; name: string; code?: string } | null
+  mission_task?: { id: number; ordre_mission_ligne?: { id: number; libelle: string; ordre_mission?: { id: number; numero: string; bon_commande_id: number | null } | null } | null } | null
+  bon_commande_ligne?: { id: number; libelle: string; bon_commande?: { id: number; numero: string } | null } | null
 }
 
 export const planningApi = {

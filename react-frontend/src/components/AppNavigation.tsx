@@ -64,6 +64,7 @@ function isLaboratoireActive(pathname: string): boolean {
 }
 
 function isPlanificationActive(pathname: string): boolean {
+  if (pathname === '/planning') return true
   if (pathname.startsWith('/ordres-mission')) return true
   if (pathname.startsWith('/labo/taches') || pathname.startsWith('/labo/planning')) return true
   if (pathname.startsWith('/materiel/planning')) return true
@@ -178,6 +179,7 @@ export default function AppNavigation() {
         id: 'planification',
         label: 'Planification',
         items: filterItems([
+          { to: '/planning', label: 'Planning global' },
           ...(canOdm ? [{ to: '/ordres-mission', label: 'Ordres de missions' }] : []),
           { to: '/terrain/planning', label: 'Planning terrain', module: 'terrain' },
           { to: '/terrain/taches', label: 'Tâches terrain', module: 'terrain' },
@@ -210,16 +212,6 @@ export default function AppNavigation() {
         ]),
       },
       {
-        id: 'materiel',
-        label: 'Matériel',
-        module: 'catalogue',
-        items: filterItems([
-          { to: '/materiel/equipements', label: 'Équipements', module: 'catalogue' },
-          { to: '/materiel/planning', label: 'Planning matériel', module: 'catalogue' },
-          { to: '/materiel/stocks', label: 'Stocks', module: 'catalogue' },
-        ]),
-      },
-      {
         id: 'ingenierie',
         label: 'Ingénierie',
         module: 'ingenierie',
@@ -230,6 +222,16 @@ export default function AppNavigation() {
           { to: '/ingenierie/taches', label: 'Tâches ingénieur', module: 'ingenierie' },
           { to: '/ingenierie/planning', label: 'Planning ingénieur', module: 'ingenierie' },
           { to: '/rapport-bc', label: 'Rapports de mission', module: 'rapport-bc' },
+        ]),
+      },
+      {
+        id: 'materiel',
+        label: 'Matériel',
+        module: 'catalogue',
+        items: filterItems([
+          { to: '/materiel/equipements', label: 'Équipements', module: 'catalogue' },
+          { to: '/materiel/planning', label: 'Planning matériel', module: 'catalogue' },
+          { to: '/materiel/stocks', label: 'Stocks', module: 'catalogue' },
         ]),
       },
       {

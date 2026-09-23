@@ -90,16 +90,17 @@ class OrdreMissionLigne extends Model
         );
 
         $updates = [];
-        if ($this->assigned_user_id !== null && $task->assigned_user_id !== $this->assigned_user_id) {
+        if ($task->assigned_user_id !== $this->assigned_user_id) {
             $updates['assigned_user_id'] = $this->assigned_user_id;
         }
-        if ($this->date_prevue !== null) {
-            $planned = $this->date_prevue instanceof \DateTimeInterface
-                ? $this->date_prevue->format('Y-m-d')
-                : (string) $this->date_prevue;
-            if ($task->planned_date?->format('Y-m-d') !== $planned) {
-                $updates['planned_date'] = $planned;
-            }
+        $planned = $this->date_prevue instanceof \DateTimeInterface
+            ? $this->date_prevue->format('Y-m-d')
+            : ($this->date_prevue !== null ? (string) $this->date_prevue : null);
+        if ($task->planned_date?->format('Y-m-d') !== $planned) {
+            $updates['planned_date'] = $planned;
+        }
+        if ($planned === null && $task->due_date !== null) {
+            $updates['due_date'] = null;
         }
         if ($updates !== []) {
             $task->update($updates);

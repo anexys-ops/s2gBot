@@ -9,6 +9,7 @@ use App\Models\BonCommandeLigne;
 use App\Models\Catalogue\Article;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
+use App\Models\PlanningHuman;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -105,6 +106,18 @@ class OrdreMissionFromBonCommandeService
                             'planned_date' => $ligne->date_debut_prevue->format('Y-m-d'),
                             'due_date' => $ligne->date_fin_prevue?->format('Y-m-d') ?? $ligne->date_debut_prevue->format('Y-m-d'),
                         ]);
+                    }
+                    if ($task->assigned_user_id && $task->planned_date) {
+                        PlanningHuman::query()->updateOrCreate(
+                            ['mission_task_id' => $task->id],
+                            [
+                                'user_id' => $task->assigned_user_id,
+                                'date_debut' => $task->planned_date->format('Y-m-d'),
+                                'date_fin' => ($task->due_date ?? $task->planned_date)->format('Y-m-d'),
+                                'type_evenement' => 'tache',
+                                'notes' => $omLigne->libelle,
+                            ],
+                        );
                     }
                 }
 

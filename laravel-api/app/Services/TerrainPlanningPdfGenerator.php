@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BcLignePlanningAffectation;
+use App\Models\MissionTask;
 use App\Support\AppBranding;
 use App\Support\PdfTemplateResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -10,6 +11,8 @@ use Carbon\CarbonImmutable;
 
 class TerrainPlanningPdfGenerator
 {
+    public function __construct(private readonly TerrainPlanningMissionTasksService $missionTasks) {}
+
     /**
      * @return array{0: string, 1: string}
      */
@@ -39,7 +42,12 @@ class TerrainPlanningPdfGenerator
             ->orderBy('date_debut')
             ->orderBy('user_id')
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->concat($this->missionTasks->scheduled($from, $to, $userId))
+            ->sortBy(fn ($row) => $row instanceof MissionTask
+                ? $row->planned_date?->format('Y-m-d')
+                : $row->date_debut?->format('Y-m-d'))
+            ->values();
 
         $isDaily = $from === $to;
         $title = $isDaily ? 'Programme journalier' : 'Programme hebdomadaire';

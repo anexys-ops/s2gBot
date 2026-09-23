@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\BcLignePlanningAffectation;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
+use App\Models\MissionTask;
 use App\Models\User;
 use App\Services\TerrainPlanningBcLinesService;
+use App\Services\TerrainPlanningMissionTasksService;
 use App\Services\TerrainPlanningPdfGenerator;
 use App\Support\AgencyAccess;
 use App\Support\UserPresentation;
@@ -84,7 +86,7 @@ class PlanningTerrainController extends Controller
         return response()->json($users->map(fn (User $u) => UserPresentation::technicienPayload($u)));
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, TerrainPlanningMissionTasksService $missionTasks): JsonResponse
     {
         $user = $request->user();
         if (! $user->isLab() && ! $user->client_id) {
@@ -95,10 +97,18 @@ class PlanningTerrainController extends Controller
             'from' => 'required|date',
             'to' => 'required|date|after_or_equal:from',
             'user_id' => 'sometimes|nullable|integer|exists:users,id',
+            'undated' => 'sometimes|boolean',
         ]);
 
         $from = $validated['from'];
         $to = $validated['to'];
+        $selectedUserId = ! empty($validated['user_id']) ? (int) $validated['user_id'] : null;
+
+        if (! empty($validated['undated'])) {
+            return response()->json($missionTasks->undated($selectedUserId, $user)
+                ->map(fn (MissionTask $task) => $this->missionPlanningRow($task))
+                ->values());
+        }
 
         $q = BcLignePlanningAffectation::query()
             ->with([
@@ -112,8 +122,8 @@ class PlanningTerrainController extends Controller
                     ->where('date_fin', '>=', $from);
             });
 
-        if (! empty($validated['user_id'])) {
-            $q->where('user_id', (int) $validated['user_id']);
+        if ($selectedUserId !== null) {
+            $q->where('user_id', $selectedUserId);
         }
 
         if (! $user->isLab()) {
@@ -122,9 +132,47 @@ class PlanningTerrainController extends Controller
             });
         }
 
-        $rows = $q->orderBy('date_debut')->orderBy('id')->get();
+        $rows = $q->orderBy('date_debut')->orderBy('id')->get()
+            ->map(fn (BcLignePlanningAffectation $row) => [...$row->toArray(), 'source' => 'bc']);
+        $rows = $rows->concat($missionTasks->scheduled($from, $to, $selectedUserId, $user)
+            ->map(fn (MissionTask $task) => $this->missionPlanningRow($task)))
+            ->sortBy(fn (array $row) => $row['date_debut'].'-'.$row['id'])
+            ->values();
 
         return response()->json($rows);
+    }
+
+    /** @return array<string, mixed> */
+    private function missionPlanningRow(MissionTask $task): array
+    {
+        $line = $task->ordreMissionLigne;
+        $om = $line?->ordreMission;
+        $bc = $om?->bonCommande;
+
+        return [
+            'id' => -$task->id,
+            'source' => 'om',
+            'mission_task_id' => $task->id,
+            'ordre_mission_id' => $om?->id,
+            'ordre_mission_numero' => $om?->numero,
+            'user_id' => $task->assigned_user_id,
+            'user' => $task->assignedUser,
+            'date_debut' => $task->planned_date?->format('Y-m-d'),
+            'date_fin' => ($task->due_date ?? $task->planned_date)?->format('Y-m-d'),
+            'statut' => $task->statut,
+            'notes' => $task->notes,
+            'bon_commande_ligne' => [
+                'id' => $line?->bon_commande_ligne_id,
+                'libelle' => $line?->libelle,
+                'bon_commande_id' => $bc?->id,
+                'bon_commande' => $bc ? [
+                    'id' => $bc->id,
+                    'numero' => $bc->numero,
+                    'dossier_id' => $bc->dossier_id,
+                    'client' => $bc->client,
+                ] : null,
+            ],
+        ];
     }
 
     public function store(Request $request, TerrainPlanningBcLinesService $planningLines): JsonResponse

@@ -79,6 +79,16 @@ export default function PlanningTechniciensPage() {
     }),
   })
 
+  const { data: assignedWithoutDate = [] } = useQuery({
+    queryKey: ['planning-terrain', 'undated', userFilter],
+    queryFn: () => planningTerrainApi.list({
+      from,
+      to,
+      user_id: userFilter === '' ? undefined : userFilter,
+      undated: true,
+    }),
+  })
+
   const { data: techniciens } = useQuery({
     queryKey: ['planning-terrain', 'techniciens'],
     queryFn: () => planningTerrainApi.techniciens(),
@@ -371,6 +381,7 @@ export default function PlanningTechniciensPage() {
                         <div key={item.id} className="terrain-planning__day-event">
                           <strong>{item.user?.name ?? `Utilisateur #${item.user_id}`}</strong>
                           {bc ? <Link to={`/bons-commande/${bc.id}`} className="link-inline">{bc.numero}</Link> : null}
+                          {item.ordre_mission_id ? <Link to={`/ordres-mission/${item.ordre_mission_id}`} className="link-inline">{item.ordre_mission_numero} — {item.bon_commande_ligne?.libelle}</Link> : null}
                         </div>
                       )
                     })}
@@ -400,20 +411,23 @@ export default function PlanningTechniciensPage() {
                       <td>{dateInputFromApi(item.date_debut)} → {dateInputFromApi(item.date_fin)}</td>
                       <td>{item.user?.name ?? `Utilisateur #${item.user_id}`}</td>
                       <td>
-                        {bc ? <><Link to={`/bons-commande/${bc.id}`} className="link-inline">{bc.numero}</Link>{ligne ? ` — ${ligne.libelle}` : ''}</> : '—'}
+                          {bc ? <><Link to={`/bons-commande/${bc.id}`} className="link-inline">{bc.numero}</Link>{ligne?.libelle ? ` — ${ligne.libelle}` : ''}</> : '—'}
+                          {item.ordre_mission_id ? <> · <Link to={`/ordres-mission/${item.ordre_mission_id}`} className="link-inline">{item.ordre_mission_numero}</Link></> : null}
                       </td>
                       <td>
                         {bc ? <>{bc.client?.name ?? '—'} / <Link to={`/dossiers/${bc.dossier_id}/bc-bl`} className="link-inline">Dossier #{bc.dossier_id}</Link></> : '—'}
                       </td>
                       {lab ? (
                         <td className="terrain-planning__actions">
-                          <button
+                          {item.source === 'om' && item.ordre_mission_id ? (
+                            <Link to={`/ordres-mission/${item.ordre_mission_id}`} className="link-inline">Modifier dans l’OM</Link>
+                          ) : <button
                             type="button"
                             className="button button--secondary"
                             onClick={() => {
                               if (window.confirm('Supprimer cette affectation du planning ?')) deleteMut.mutate(item.id)
                             }}
-                          >Supprimer</button>
+                          >Supprimer</button>}
                         </td>
                       ) : null}
                     </tr>
@@ -423,6 +437,26 @@ export default function PlanningTechniciensPage() {
             </table>
           </div>
         </div>
+      ) : null}
+
+      {assignedWithoutDate.length > 0 ? (
+        <section className="card no-print" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
+          <h2 className="h2" style={{ fontSize: '1rem' }}>Tâches terrain affectées sans date ({assignedWithoutDate.length})</h2>
+          <p className="text-muted">Ces tâches sont attribuées à un technicien mais ne peuvent pas apparaître dans le calendrier avant la saisie d’une date prévue dans l’OM.</p>
+          <div className="table-wrap">
+            <table className="data-table data-table--compact">
+              <thead><tr><th>Technicien</th><th>BC</th><th>Tâche</th><th>Ordre de mission</th></tr></thead>
+              <tbody>{assignedWithoutDate.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.user?.name ?? `Utilisateur #${item.user_id}`}</td>
+                  <td>{item.bon_commande_ligne?.bon_commande ? <Link to={`/bons-commande/${item.bon_commande_ligne.bon_commande.id}`}>{item.bon_commande_ligne.bon_commande.numero}</Link> : '—'}</td>
+                  <td>{item.bon_commande_ligne?.libelle ?? '—'}</td>
+                  <td>{item.ordre_mission_id ? <Link to={`/ordres-mission/${item.ordre_mission_id}`}>{item.ordre_mission_numero}</Link> : '—'}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </section>
       ) : null}
 
       <p className="text-muted no-print" style={{ marginTop: '1.5rem' }}>

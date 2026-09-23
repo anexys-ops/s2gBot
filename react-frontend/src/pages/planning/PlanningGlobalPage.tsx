@@ -1,297 +1,120 @@
-/**
- * PlanningGlobalPage
- *
- * Vue planning mensuelle unifiée :
- *  - Colonne par personne / machine
- *  - Ligne par jour
- *  - Code couleur par type d'événement
- *  - Onglets : Personnel | Matériel | Indisponibilités
- */
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { planningApi } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
-import { getTaskStatutMeta } from '../../lib/missionTaskStatuts'
+import { dateInputFromApi } from '../../lib/appLocale'
 
-type TabId = 'personnel' | 'materiel' | 'indispo'
-
-const EVENT_COLORS: Record<string, string> = {
-  terrain_bc:   '#0ea5e9',
-  tache:        '#3b82f6',
-  utilisation:  '#3b82f6',
-  conge:        '#10b981',
-  formation:    '#8b5cf6',
-  absent:       '#f59e0b',
-  maintenance:  '#f59e0b',
-  panne:        '#ef4444',
-  calibration:  '#6b7280',
-  indispo:      '#ef4444',
-  autre:        '#6b7280',
-}
-
-function ymdLocal(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+function ymdLocal(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 function monthRange(year: number, month: number) {
   const first = new Date(year, month, 1)
   const last = new Date(year, month + 1, 0)
-  return {
-    from: ymdLocal(first),
-    to: ymdLocal(last),
-    days: last.getDate(),
-    label: first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
-  }
+  return { from: ymdLocal(first), to: ymdLocal(last), label: first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) }
 }
 
-function dayLabel(year: number, month: number, day: number) {
-  return new Date(year, month, day).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })
+function eventLabel(type: string): string {
+  const labels: Record<string, string> = {
+    tache: 'Tâche', terrain_bc: 'Terrain BC', utilisation: 'Utilisation matériel',
+    conge: 'Congé', maladie: 'Maladie', formation: 'Formation', absent: 'Absence',
+    maintenance: 'Maintenance', panne: 'Panne', calibration: 'Étalonnage', indispo: 'Indisponibilité',
+    utilisation_chantier: 'Affectation chantier', etalonnage: 'Étalonnage', verification: 'Vérification',
+  }
+  return labels[type] ?? type
 }
 
 export default function PlanningGlobalPage() {
   const now = new Date()
-  const [year, setYear]   = useState(now.getFullYear())
+  const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
-  const [tab, setTab]     = useState<TabId>('personnel')
+  const [userFilter, setUserFilter] = useState('')
+  const [equipmentFilter, setEquipmentFilter] = useState('')
+  const [eventFilter, setEventFilter] = useState('')
+  const { from, to, label } = monthRange(year, month)
 
-  const { from, to, days, label } = monthRange(year, month)
-
-  const { data: overview, isLoading } = useQuery({
+  const { data: overview, isLoading, error } = useQuery({
     queryKey: ['planning-overview', from, to],
     queryFn: () => planningApi.overview(from, to),
     staleTime: 30_000,
   })
 
-  const prevMonth = () => { if (month === 0) { setYear(y => y - 1); setMonth(11) } else setMonth(m => m - 1) }
-  const nextMonth = () => { if (month === 11) { setYear(y => y + 1); setMonth(0) } else setMonth(m => m + 1) }
+  const events = overview?.events ?? []
+  const users = useMemo(() => [...new Map(events.filter((e) => e.user).map((e) => [e.user!.id, e.user!.name])).entries()], [events])
+  const equipments = useMemo(() => [...new Map(events.filter((e) => e.equipment).map((e) => [e.equipment!.id, e.equipment!.name])).entries()], [events])
+  const types = useMemo(() => [...new Set(events.map((e) => e.type_evenement))].sort(), [events])
+  const filtered = events.filter((event) =>
+    (!userFilter || event.user_id === Number(userFilter))
+    && (!equipmentFilter || event.equipment_id === Number(equipmentFilter))
+    && (!eventFilter || event.type_evenement === eventFilter))
 
-  // Grouper les slots par personne/équipement pour la grille
-  const humanSlots   = overview?.humans ?? []
-  const terrainBc    = overview?.terrain_bc ?? []
-  const equipSlots   = overview?.equipments ?? []
-  const stockPerso   = overview?.stock_personnels ?? []
-  const stockEquip   = overview?.stock_equipments ?? []
-
-  const humanNames   = [
-    ...new Map([
-      ...humanSlots.map((s) => [s.user_id, s.user?.name ?? `#${s.user_id}`] as const),
-      ...terrainBc.map((s) => [s.user_id, s.user?.name ?? `#${s.user_id}`] as const),
-    ]).entries(),
-  ]
-  const equipNames   = [...new Map(equipSlots.map((s) => [s.equipment_id, s.equipment?.name ?? `#${s.equipment_id}`])).entries()]
-
-  function slotsForDay(day: number, userId?: number, equipId?: number): Array<{ label: string; color: string }> {
-    const d = ymdLocal(new Date(year, month, day))
-    if (userId !== undefined) {
-      return [
-        ...terrainBc
-          .filter((s) => s.user_id === userId && s.date_debut <= d && s.date_fin >= d)
-          .map((s) => ({
-            label: s.bon_commande_ligne?.bon_commande?.numero ?? 'BC terrain',
-            color: EVENT_COLORS.terrain_bc,
-          })),
-        ...humanSlots
-          .filter((s) => s.user_id === userId && s.date_debut <= d && s.date_fin >= d)
-          .map((s) => {
-            const taskStatut = s.missionTask?.statut
-            const taskMeta = taskStatut ? getTaskStatutMeta(taskStatut) : null
-            return {
-              label: s.missionTask ? `Tâche ${taskMeta?.label ?? ''} #${s.mission_task_id}` : s.type_evenement,
-              color: taskMeta ? taskMeta.color : (EVENT_COLORS[s.type_evenement] ?? '#6b7280'),
-            }
-          }),
-        ...stockPerso
-          .filter((s) => s.user_id === userId && s.date_debut <= d && s.date_fin >= d)
-          .map((s) => ({ label: s.motif, color: EVENT_COLORS[s.motif] ?? '#6b7280' })),
-      ]
-    }
-    if (equipId !== undefined) {
-      return [
-        ...equipSlots
-          .filter((s) => s.equipment_id === equipId && s.date_debut <= d && s.date_fin >= d)
-          .map((s) => {
-            const taskStatut = s.missionTask?.statut
-            const taskMeta = taskStatut ? getTaskStatutMeta(taskStatut) : null
-            return {
-              label: s.missionTask ? `Tâche ${taskMeta?.label ?? ''} #${s.mission_task_id}` : s.type_evenement,
-              color: taskMeta ? taskMeta.color : (EVENT_COLORS[s.type_evenement] ?? '#6b7280'),
-            }
-          }),
-        ...stockEquip
-          .filter((s) => s.equipment_id === equipId && s.date_debut <= d && s.date_fin >= d)
-          .map((s) => ({ label: s.motif, color: EVENT_COLORS[s.motif] ?? '#6b7280' })),
-      ]
-    }
-    return []
+  function changeMonth(amount: number) {
+    const next = new Date(year, month + amount, 1)
+    setYear(next.getFullYear())
+    setMonth(next.getMonth())
   }
-
-  const subjects = tab === 'materiel' ? equipNames : humanNames
-  const gridCols = `80px repeat(${subjects.length}, minmax(80px, 1fr))`
 
   return (
     <ModuleEntityShell
-      breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Planning' }]}
-      moduleBarLabel="Planning global"
+      breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Planification' }]}
+      moduleBarLabel="Planification"
       title="Planning global"
-      subtitle={label}
-      actions={
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={prevMonth}>‹</button>
-          <strong style={{ minWidth: 140, textAlign: 'center', lineHeight: '1.8' }}>{label}</strong>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={nextMonth}>›</button>
-        </div>
-      }
+      subtitle="Personnes, matériel et événements liés dans un seul tableau."
+      actions={<div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => changeMonth(-1)}>‹</button>
+        <strong style={{ minWidth: 140, textAlign: 'center' }}>{label}</strong>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => changeMonth(1)}>›</button>
+      </div>}
     >
-      {/* Onglets */}
-      <div className="article-fiche-tabs" role="tablist" style={{ marginBottom: '1rem' }}>
-        {(['personnel', 'materiel', 'indispo'] as TabId[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            className={`article-fiche-tabs__btn${tab === t ? ' article-fiche-tabs__btn--active' : ''}`}
-            onClick={() => setTab(t)}
-          >
-            {t === 'personnel' ? '👤 Personnel' : t === 'materiel' ? '🔧 Matériel' : '🚫 Indisponibilités'}
-          </button>
-        ))}
-      </div>
-
-      {isLoading && <p className="text-muted">Chargement…</p>}
-
-      {/* Vue indisponibilités */}
-      {tab === 'indispo' && !isLoading && (
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 300 }}>
-            <div style={{ fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem' }}>Congés / Absences personnel</div>
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <table className="data-table data-table--compact">
-                <thead>
-                  <tr><th>Personne</th><th>Du</th><th>Au</th><th>Motif</th></tr>
-                </thead>
-                <tbody>
-                  {stockPerso.length === 0 ? (
-                    <tr><td colSpan={4} className="text-muted" style={{ padding: '0.75rem' }}>Aucune indisponibilité</td></tr>
-                  ) : stockPerso.map((s) => (
-                    <tr key={s.id}>
-                      <td>{s.user?.name ?? `#${s.user_id}`}</td>
-                      <td>{new Date(s.date_debut).toLocaleDateString('fr-FR')}</td>
-                      <td>{new Date(s.date_fin).toLocaleDateString('fr-FR')}</td>
-                      <td><span className="badge">{s.motif}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div style={{ flex: 1, minWidth: 300 }}>
-            <div style={{ fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem' }}>Maintenance / Indispo matériel</div>
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <table className="data-table data-table--compact">
-                <thead>
-                  <tr><th>Équipement</th><th>Du</th><th>Au</th><th>Motif</th></tr>
-                </thead>
-                <tbody>
-                  {stockEquip.length === 0 ? (
-                    <tr><td colSpan={4} className="text-muted" style={{ padding: '0.75rem' }}>Aucune indisponibilité</td></tr>
-                  ) : stockEquip.map((s) => (
-                    <tr key={s.id}>
-                      <td>{s.equipment?.name ?? `#${s.equipment_id}`}</td>
-                      <td>{new Date(s.date_debut).toLocaleDateString('fr-FR')}</td>
-                      <td>{new Date(s.date_fin).toLocaleDateString('fr-FR')}</td>
-                      <td><span className="badge">{s.motif}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+      <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <label>Utilisateur <select value={userFilter} onChange={(e) => setUserFilter(e.target.value)}>
+            <option value="">Tous</option>
+            {users.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </select></label>
+          <label>Matériel <select value={equipmentFilter} onChange={(e) => setEquipmentFilter(e.target.value)}>
+            <option value="">Tout</option>
+            {equipments.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </select></label>
+          <label>Événement <select value={eventFilter} onChange={(e) => setEventFilter(e.target.value)}>
+            <option value="">Tous</option>
+            {types.map((type) => <option key={type} value={type}>{eventLabel(type)}</option>)}
+          </select></label>
         </div>
-      )}
-
-      {/* Vue grille calendaire */}
-      {tab !== 'indispo' && !isLoading && (
-        <>
-          {subjects.length === 0 ? (
-            <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
-              <p className="text-muted">Aucune donnée de planning pour cette période.</p>
-            </div>
-          ) : (
-            <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: gridCols, minWidth: 400 }}>
-                {/* En-tête */}
-                <div style={{ padding: '0.4rem', fontWeight: 600, fontSize: '0.75rem', background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)' }}>
-                  Jour
-                </div>
-                {subjects.map(([id, name]) => (
-                  <div key={id} style={{
-                    padding: '0.4rem', fontWeight: 600, fontSize: '0.75rem', textAlign: 'center',
-                    background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)',
-                    borderRight: '1px solid var(--color-border)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {name}
-                  </div>
-                ))}
-
-                {/* Lignes jours */}
-                {Array.from({ length: days }, (_, i) => i + 1).map((day) => {
-                  const isToday = day === now.getDate() && month === now.getMonth() && year === now.getFullYear()
-                  const isWeekend = [0, 6].includes(new Date(year, month, day).getDay())
-                  return (
-                    <>
-                      <div key={`d-${day}`} style={{
-                        padding: '0.3rem 0.4rem', fontSize: '0.75rem',
-                        fontWeight: isToday ? 700 : 400,
-                        color: isToday ? '#3b82f6' : isWeekend ? 'var(--color-text-muted)' : 'var(--color-text)',
-                        background: isWeekend ? 'var(--color-surface)' : undefined,
-                        borderBottom: '1px solid var(--color-border)',
-                        borderRight: '1px solid var(--color-border)',
-                      }}>
-                        {dayLabel(year, month, day)}
-                      </div>
-                      {subjects.map(([id]) => {
-                        const slots = slotsForDay(day,
-                          tab === 'personnel' ? Number(id) : undefined,
-                          tab === 'materiel'  ? Number(id) : undefined,
-                        )
-                        return (
-                          <div key={`${id}-${day}`} style={{
-                            padding: '0.2rem 0.3rem', minHeight: 28,
-                            background: isWeekend ? 'var(--color-surface)' : undefined,
-                            borderBottom: '1px solid var(--color-border)',
-                            borderRight: '1px solid var(--color-border)',
-                          }}>
-                            {slots.map((s, i) => (
-                              <div key={i} style={{
-                                fontSize: '0.65rem', padding: '1px 4px', borderRadius: 3,
-                                background: s.color + '22', color: s.color,
-                                fontWeight: 600, marginBottom: 1,
-                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                              }}>
-                                {s.label}
-                              </div>
-                            ))}
-                          </div>
-                        )
-                      })}
-                    </>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Légende */}
-      <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-        {Object.entries(EVENT_COLORS).slice(0, 6).map(([k, c]) => (
-          <span key={k} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: c, display: 'inline-block' }} />
-            {k}
-          </span>
-        ))}
       </div>
+
+      {isLoading ? <p className="text-muted">Chargement…</p> : null}
+      {error ? <p className="error">{(error as Error).message}</p> : null}
+      {!isLoading && !error ? (
+        <div className="card table-wrap" style={{ padding: 0 }}>
+          <table className="data-table data-table--compact" style={{ width: '100%' }}>
+            <thead><tr><th>Période</th><th>Utilisateur</th><th>Matériel</th><th>Événement</th><th>Tâche / document</th><th>Notes</th></tr></thead>
+            <tbody>
+              {filtered.length === 0 ? <tr><td colSpan={6} className="text-muted">Aucun événement pour cette période et ces filtres.</td></tr> : null}
+              {filtered.map((event) => {
+                const line = event.mission_task?.ordre_mission_ligne
+                const om = line?.ordre_mission
+                const bc = event.bon_commande_ligne?.bon_commande
+                return <tr key={event.id}>
+                  <td>{dateInputFromApi(event.date_debut)} → {dateInputFromApi(event.date_fin)}</td>
+                  <td>{event.user?.name ?? '—'}</td>
+                  <td>{event.equipment ? <Link to={`/materiel/equipements/${event.equipment.id}`}>{event.equipment.code ? `${event.equipment.code} — ` : ''}{event.equipment.name}</Link> : '—'}</td>
+                  <td>{eventLabel(event.type_evenement)}</td>
+                  <td>
+                    {om ? <><Link to={`/ordres-mission/${om.id}`}>{om.numero}</Link> — {line?.libelle}</> : null}
+                    {!om && bc ? <><Link to={`/bons-commande/${bc.id}`}>{bc.numero}</Link> — {event.bon_commande_ligne?.libelle}</> : null}
+                    {!om && !bc && event.ordre_mission_id ? <Link to={`/ordres-mission/${event.ordre_mission_id}`}>Voir l’OM</Link> : null}
+                    {!om && !bc && !event.ordre_mission_id && event.dossier_id ? <Link to={`/dossiers/${event.dossier_id}`}>Voir le dossier</Link> : null}
+                    {!om && !bc && !event.ordre_mission_id && !event.dossier_id ? '—' : null}
+                  </td>
+                  <td>{event.notes ?? '—'}</td>
+                </tr>
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </ModuleEntityShell>
   )
 }

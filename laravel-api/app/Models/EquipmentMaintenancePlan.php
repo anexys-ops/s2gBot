@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\SyncsPlanningEvent;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,21 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EquipmentMaintenancePlan extends Model
 {
+    use SyncsPlanningEvent;
+
+    protected function planningEventSourceType(): string { return 'maintenance_plan'; }
+
+    protected function planningEventShouldSync(): bool { return $this->active && $this->next_due_at !== null; }
+
+    protected function planningEventAttributes(): array
+    {
+        return array_merge($this->basePlanningEventAttributes(), [
+            'date_debut' => $this->next_due_at?->format('Y-m-d'),
+            'date_fin' => $this->next_due_at?->format('Y-m-d'),
+            'type_evenement' => $this->kind,
+            'notes' => $this->label,
+        ]);
+    }
     public const KIND_ETALONNAGE = 'etalonnage';
 
     public const KIND_MAINTENANCE = 'maintenance';

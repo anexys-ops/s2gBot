@@ -61,17 +61,21 @@
         <tbody>
             @forelse($pageRows as $affectation)
                 @php
-                    $line = $affectation->bonCommandeLigne;
-                    $order = $line?->bonCommande;
+                    $isMissionTask = $affectation instanceof \App\Models\MissionTask;
+                    $line = $isMissionTask ? $affectation->ordreMissionLigne : $affectation->bonCommandeLigne;
+                    $order = $isMissionTask ? $line?->ordreMission?->bonCommande : $line?->bonCommande;
+                    $startDate = $isMissionTask ? $affectation->planned_date : $affectation->date_debut;
+                    $endDate = $isMissionTask ? ($affectation->due_date ?? $affectation->planned_date) : $affectation->date_fin;
+                    $technician = $isMissionTask ? $affectation->assignedUser : $affectation->user;
                     $notes = array_values(array_unique(array_filter([
                         trim((string) $affectation->notes),
-                        trim((string) $line?->notes_ligne),
+                        trim((string) ($isMissionTask ? $line?->bonCommandeLigne?->notes_ligne : $line?->notes_ligne)),
                     ])));
                 @endphp
                 <tr>
-                    @if($show('show_start_date'))<td class="date">{{ $affectation->date_debut?->format('d/m/Y') ?? '—' }}</td>@endif
-                    @if($show('show_end_date'))<td class="date">{{ $affectation->date_fin?->format('d/m/Y') ?? '—' }}</td>@endif
-                    @if($show('show_technician'))<td><strong>{{ $affectation->user?->name ?? '—' }}</strong></td>@endif
+                    @if($show('show_start_date'))<td class="date">{{ $startDate?->format('d/m/Y') ?? '—' }}</td>@endif
+                    @if($show('show_end_date'))<td class="date">{{ $endDate?->format('d/m/Y') ?? '—' }}</td>@endif
+                    @if($show('show_technician'))<td><strong>{{ $technician?->name ?? '—' }}</strong></td>@endif
                     @if($show('show_client'))<td>{{ $order?->client?->name ?? '—' }}</td>@endif
                     @if($show('show_order'))<td>{{ $order?->numero ?? '—' }}</td>@endif
                     @if($show('show_task'))<td>{{ $line?->libelle ?? '—' }}</td>@endif

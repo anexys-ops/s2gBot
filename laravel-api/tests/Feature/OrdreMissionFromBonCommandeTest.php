@@ -68,6 +68,37 @@ class OrdreMissionFromBonCommandeTest extends TestCase
         $this->assertSame(1, MissionTask::query()->count());
     }
 
+    public function test_terrain_planning_lists_assigned_om_tasks_and_separates_undated_tasks(): void
+    {
+        [$bc, $lab, $tech] = $this->seedBcWithTechnicienAction();
+        $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")
+            ->assertCreated();
+
+        $omLine = OrdreMissionLigne::query()->firstOrFail();
+        $scheduledUrl = "/api/v1/planning-terrain?from=2026-03-09&to=2026-03-15&user_id={$tech->id}";
+        $this->actingAs($lab, 'sanctum')->getJson($scheduledUrl)
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.source', 'om')
+            ->assertJsonPath('0.bon_commande_ligne.libelle', 'Prélèvement terrain');
+        $this->actingAs($lab, 'sanctum')->getJson(
+            "/api/v1/planning-terrain?from=2026-03-09&to=2026-03-15&user_id={$lab->id}"
+        )->assertOk()->assertJsonCount(0);
+
+        $this->actingAs($lab, 'sanctum')->putJson(
+            "/api/ordres-mission/{$omLine->ordre_mission_id}/lignes",
+            ['lignes' => [['id' => $omLine->id, 'date_prevue' => null]]],
+        )->assertOk();
+
+        $this->actingAs($lab, 'sanctum')->getJson($scheduledUrl)->assertJsonCount(0);
+        $this->actingAs($lab, 'sanctum')->getJson("{$scheduledUrl}&undated=1")
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.source', 'om')
+            ->assertJsonPath('0.user_id', $tech->id);
+    }
+
     public function test_bulk_update_applies_jalon_values_and_syncs_planning_in_one_request(): void
     {
         [$bc, $lab, $tech] = $this->seedBcWithTechnicienAction();

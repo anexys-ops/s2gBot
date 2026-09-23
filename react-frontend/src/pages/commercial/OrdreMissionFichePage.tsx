@@ -280,6 +280,16 @@ export default function OrdreMissionFichePage() {
   })
   const equipments: EquipmentRow[] = equipmentsRaw ?? []
 
+  function refreshLinkedDocuments() {
+    void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
+    void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
+    void qc.invalidateQueries({ queryKey: ['mission-tasks-list'] })
+    if (om?.bon_commande_id) {
+      void qc.invalidateQueries({ queryKey: ['bon-commande', om.bon_commande_id] })
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+    }
+  }
+
   const saveMut = useMutation({
     mutationFn: async () => {
       if (!om || !omDraft) return
@@ -317,9 +327,7 @@ export default function OrdreMissionFichePage() {
       if (lineUpdates.length > 0) await ordresMissionApi.updateLignes(omId, lineUpdates)
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
-      void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
-      void qc.invalidateQueries({ queryKey: ['mission-tasks-list'] })
+      refreshLinkedDocuments()
     },
   })
 
@@ -331,8 +339,7 @@ export default function OrdreMissionFichePage() {
       return { previousStatut }
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
-      void qc.invalidateQueries({ queryKey: ['mission-tasks-list'] })
+      refreshLinkedDocuments()
     },
     onError: (_error, _statut, context) => {
       if (context?.previousStatut) {
@@ -372,9 +379,7 @@ export default function OrdreMissionFichePage() {
     mutationFn: ({ ligne }: { ligne: OrdreMissionLigne }) =>
       ordresMissionApi.updateLigne(omId, ligne.id, ligneUpdateBody(ligne)),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
-      void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
-      void qc.invalidateQueries({ queryKey: ['mission-tasks-list'] })
+      refreshLinkedDocuments()
       void qc.invalidateQueries({ queryKey: ['om-availability'] })
     },
   })
@@ -386,9 +391,7 @@ export default function OrdreMissionFichePage() {
         group.lignes.map((ligne) => ({ id: ligne.id, ...patch })),
       ),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
-      void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
-      void qc.invalidateQueries({ queryKey: ['mission-tasks-list'] })
+      refreshLinkedDocuments()
       void qc.invalidateQueries({ queryKey: ['om-availability'] })
     },
   })
@@ -396,9 +399,7 @@ export default function OrdreMissionFichePage() {
   const deleteLigneMut = useMutation({
     mutationFn: (ligneId: number) => ordresMissionApi.deleteLigne(omId, ligneId),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
-      void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
-      void qc.invalidateQueries({ queryKey: ['mission-tasks-list'] })
+      refreshLinkedDocuments()
       setDeleteLigneTarget(null)
     },
   })

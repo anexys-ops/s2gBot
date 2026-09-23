@@ -27,6 +27,7 @@ import { formatAppDate, formatMoney, formatQuantity, MONEY_UNIT_LABEL } from '..
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
 const omProgressLabels: Record<string, string> = {
   a_planifier: 'À planifier',
+  planification_en_cours: 'Planification en cours',
   planifie: 'Planifié',
   a_replanifier: 'À replanifier',
   replanifie: 'Replanifié',

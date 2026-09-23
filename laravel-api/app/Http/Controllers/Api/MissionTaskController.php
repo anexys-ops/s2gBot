@@ -645,7 +645,7 @@ class MissionTaskController extends Controller
         }
         $active = $lignes->reject(fn (OrdreMissionLigne $ligne) => $ligne->statut === 'annule');
         $ordreMission->update(['statut' => $active->isNotEmpty()
-            && $active->every(fn (OrdreMissionLigne $ligne) => $ligne->assigned_user_id && $ligne->date_prevue)
+            && $active->contains(fn (OrdreMissionLigne $ligne) => $ligne->assigned_user_id && $ligne->date_prevue)
             ? OrdreMission::STATUT_PLANIFIE
             : OrdreMission::STATUT_BROUILLON]);
     }

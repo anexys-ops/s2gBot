@@ -222,6 +222,7 @@ class OrdreMissionController extends Controller
         ]);
 
         $ligne->ensureTaskExists();
+        $this->syncOrdreMissionStatusFromLignes($ordreMission);
 
         return response()->json(
             $ligne->fresh()->load(['assignedUser:id,name', 'equipment:id,name,code', 'article:id,code,libelle', 'articleAction']),
@@ -322,6 +323,7 @@ class OrdreMissionController extends Controller
             $task->delete();
         });
         $ligne->delete();
+        $this->syncOrdreMissionStatusFromLignes($ordreMission);
 
         return response()->json(null, 204);
     }
@@ -397,6 +399,7 @@ class OrdreMissionController extends Controller
     {
         $lignes = $ordreMission->lignes()->get();
         if ($lignes->isEmpty()) {
+            $ordreMission->update(['statut' => OrdreMission::STATUT_BROUILLON]);
             return;
         }
 
@@ -422,7 +425,7 @@ class OrdreMissionController extends Controller
         }
         $active = $lignes->reject(fn (OrdreMissionLigne $item) => $item->statut === 'annule');
         $ordreMission->update(['statut' => $active->isNotEmpty()
-            && $active->every(fn (OrdreMissionLigne $item) => $item->assigned_user_id && $item->date_prevue)
+            && $active->contains(fn (OrdreMissionLigne $item) => $item->assigned_user_id && $item->date_prevue)
             ? OrdreMission::STATUT_PLANIFIE
             : OrdreMission::STATUT_BROUILLON]);
     }

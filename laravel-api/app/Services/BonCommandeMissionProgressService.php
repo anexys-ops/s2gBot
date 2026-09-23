@@ -60,10 +60,10 @@ class BonCommandeMissionProgressService
             && $task->planned_date->isBefore(today())
             && $task->statut === MissionTask::STATUT_TODO)) {
             $status = 'a_replanifier';
-        } elseif ($hasRemainder) {
-            $status = 'a_planifier';
-        } elseif ($planned === $total) {
+        } elseif ($planned === $total && ! $hasRemainder) {
             $status = 'planifie';
+        } elseif ($planned > 0) {
+            $status = 'planification_en_cours';
         } else {
             $status = 'a_planifier';
         }

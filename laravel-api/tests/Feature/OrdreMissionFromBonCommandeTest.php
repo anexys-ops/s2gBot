@@ -151,6 +151,56 @@ class OrdreMissionFromBonCommandeTest extends TestCase
         ]);
     }
 
+    public function test_first_saved_assignment_plans_om_and_advances_bc_operational_status(): void
+    {
+        [$bc, $lab, $tech] = $this->seedBcWithTechnicienAction();
+        $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")
+            ->assertCreated();
+
+        $om = OrdreMission::query()->firstOrFail();
+        $first = $om->lignes()->firstOrFail();
+        $second = OrdreMissionLigne::query()->create([
+            'ordre_mission_id' => $om->id,
+            'bon_commande_ligne_id' => $first->bon_commande_ligne_id,
+            'ref_article_id' => $first->ref_article_id,
+            'article_action_id' => $first->article_action_id,
+            'libelle' => 'Deuxième intervention',
+            'quantite' => 1,
+            'statut' => 'planifie',
+            'ordre' => 2,
+        ]);
+        $second->ensureTaskExists();
+
+        $this->actingAs($lab, 'sanctum')->putJson(
+            "/api/ordres-mission/{$om->id}/lignes/{$first->id}",
+            ['assigned_user_id' => null, 'date_prevue' => null],
+        )->assertOk();
+        $this->assertSame(OrdreMission::STATUT_BROUILLON, $om->fresh()->statut);
+
+        $this->actingAs($lab, 'sanctum')->putJson(
+            "/api/ordres-mission/{$om->id}/lignes/{$first->id}",
+            ['assigned_user_id' => $tech->id, 'date_prevue' => '2026-09-25'],
+        )->assertOk();
+        $this->assertSame(OrdreMission::STATUT_PLANIFIE, $om->fresh()->statut);
+        $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-commande/{$bc->id}")
+            ->assertJsonPath('statut', $bc->statut)
+            ->assertJsonPath('avancement_om.statut', 'planification_en_cours')
+            ->assertJsonPath('avancement_om.planifiees', 1);
+
+        $this->actingAs($lab, 'sanctum')->putJson(
+            "/api/ordres-mission/{$om->id}/lignes",
+            ['lignes' => [[
+                'id' => $second->id,
+                'assigned_user_id' => $tech->id,
+                'date_prevue' => '2026-09-26',
+            ]]],
+        )->assertOk();
+        $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-commande/{$bc->id}")
+            ->assertJsonPath('avancement_om.statut', 'planifie')
+            ->assertJsonPath('avancement_om.planifiees', 2);
+    }
+
     public function test_generate_rejects_brouillon_bc(): void
     {
         [$bc, $lab] = $this->seedBcWithTechnicienAction(statut: BonCommande::STATUT_BROUILLON);
@@ -542,7 +592,7 @@ class OrdreMissionFromBonCommandeTest extends TestCase
         $line->update(['quantite' => 3]);
         $this->actingAs($lab, 'sanctum')
             ->getJson("/api/v1/bons-commande/{$bc->id}")
-            ->assertJsonPath('avancement_om.statut', 'a_planifier');
+            ->assertJsonPath('avancement_om.statut', 'planification_en_cours');
         $this->actingAs($lab, 'sanctum')
             ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")
             ->assertCreated()->assertJsonCount(4);

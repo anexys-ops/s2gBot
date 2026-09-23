@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        Schema::create('planning_events', function (Blueprint $table) {
+        if (! Schema::hasTable('planning_events')) {
+            Schema::create('planning_events', function (Blueprint $table) {
             $table->id();
             $table->string('source_type', 32);
             $table->unsignedBigInteger('source_id');
@@ -31,7 +32,8 @@ return new class extends Migration {
             $table->index(['user_id', 'date_debut']);
             $table->index(['equipment_id', 'date_debut']);
             $table->index('mission_task_id');
-        });
+            });
+        }
 
         // Older OM tasks could have an assignee and date without a planning slot.
         DB::table('mission_tasks as task')
@@ -45,7 +47,7 @@ return new class extends Migration {
             ->orderBy('task.id')
             ->chunkById(500, function ($rows) {
                 $now = now();
-                DB::table('planning_humans')->insert($rows->map(fn ($task) => [
+                DB::table('planning_humans')->insertOrIgnore($rows->map(fn ($task) => [
                     'mission_task_id' => $task->task_id,
                     'user_id' => $task->assigned_user_id,
                     'date_debut' => substr($task->planned_date, 0, 10),
@@ -68,7 +70,7 @@ return new class extends Migration {
             ->orderBy('task.id')
             ->chunkById(500, function ($rows) {
                 $now = now();
-                DB::table('planning_equipments')->insert($rows->map(fn ($task) => [
+                DB::table('planning_equipments')->insertOrIgnore($rows->map(fn ($task) => [
                     'mission_task_id' => $task->task_id,
                     'equipment_id' => $task->equipment_id,
                     'user_id' => $task->assigned_user_id,
@@ -109,12 +111,12 @@ return new class extends Migration {
                         'updated_at' => $row->updated_at,
                     ];
                 }
-                DB::table('planning_events')->insert($events);
+                DB::table('planning_events')->insertOrIgnore($events);
             });
         }
 
         DB::table('materiel_affectations')->orderBy('id')->chunkById(500, function ($rows) {
-            DB::table('planning_events')->insert($rows->map(fn ($row) => [
+            DB::table('planning_events')->insertOrIgnore($rows->map(fn ($row) => [
                 'source_type' => 'materiel_affectation',
                 'source_id' => $row->id,
                 'user_id' => $row->user_id,
@@ -132,7 +134,7 @@ return new class extends Migration {
 
         DB::table('equipment_maintenance_plans')->where('active', true)->whereNotNull('next_due_at')
             ->orderBy('id')->chunkById(500, function ($rows) {
-                DB::table('planning_events')->insert($rows->map(fn ($row) => [
+                DB::table('planning_events')->insertOrIgnore($rows->map(fn ($row) => [
                     'source_type' => 'maintenance_plan',
                     'source_id' => $row->id,
                     'equipment_id' => $row->equipment_id,

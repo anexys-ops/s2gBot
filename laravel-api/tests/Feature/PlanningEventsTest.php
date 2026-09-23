@@ -89,5 +89,10 @@ class PlanningEventsTest extends TestCase
             ->exists());
         $human->delete();
         $this->assertDatabaseCount('planning_events', 4);
+
+        // MySQL can retain this table after a failed, unrecorded migration.
+        $migration = require database_path('migrations/2026_09_23_120000_create_planning_events.php');
+        $migration->up();
+        $this->assertDatabaseCount('planning_events', 4);
     }
 }

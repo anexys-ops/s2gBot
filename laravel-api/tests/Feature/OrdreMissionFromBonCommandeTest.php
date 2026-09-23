@@ -160,8 +160,8 @@ class OrdreMissionFromBonCommandeTest extends TestCase
         ]);
         $productA = Article::query()->create([
             'ref_famille_article_id' => $famille->id,
-            'code' => 'PRD-ODM-A',
-            'libelle' => 'Prélèvement A',
+            'code' => 'D00063-ODM',
+            'libelle' => 'Déplacement de technicien pour contrôle',
             'kind' => Article::KIND_PRODUCT,
             'actif' => true,
             'prix_unitaire_ht' => 100,
@@ -187,23 +187,16 @@ class OrdreMissionFromBonCommandeTest extends TestCase
             'ordre' => 2,
         ]);
         ArticleSectionProduct::query()->create([
-            'ref_article_id' => $jalon->id,
+            'ref_article_id' => $productA->id,
             'product_article_id' => $productA->id,
             'section_type' => ArticleSectionProduct::SECTION_TECHNICIEN,
             'ordre' => 1,
         ]);
         ArticleSectionProduct::query()->create([
-            'ref_article_id' => $jalon->id,
+            'ref_article_id' => $productB->id,
             'product_article_id' => $productB->id,
             'section_type' => ArticleSectionProduct::SECTION_TECHNICIEN,
             'ordre' => 2,
-        ]);
-        $actionA = ArticleAction::query()->create([
-            'ref_article_id' => $productA->id,
-            'type' => ArticleAction::TYPE_TECHNICIEN,
-            'libelle' => 'Prélèvement terrain A',
-            'duree_heures' => 1,
-            'ordre' => 1,
         ]);
         $actionB = ArticleAction::query()->create([
             'ref_article_id' => $productB->id,
@@ -238,12 +231,13 @@ class OrdreMissionFromBonCommandeTest extends TestCase
             ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission");
 
         $res->assertCreated();
+        $res->assertJsonCount(1);
         $res->assertJsonPath('0.type', OrdreMission::TYPE_TECHNICIEN);
         $this->assertSame(2, OrdreMissionLigne::query()->count());
         $this->assertSame(2, MissionTask::query()->count());
         $this->assertDatabaseHas('ordre_mission_lignes', [
             'ref_article_id' => $productA->id,
-            'article_action_id' => $actionA->id,
+            'article_action_id' => null,
         ]);
         $this->assertDatabaseHas('ordre_mission_lignes', [
             'ref_article_id' => $productB->id,
@@ -415,6 +409,8 @@ class OrdreMissionFromBonCommandeTest extends TestCase
             'ref_article_id' => $product->id,
             'libelle' => $product->libelle,
             'quantite' => 1,
+            'technicien_id' => $lab->id,
+            'date_debut_prevue' => '2026-03-18',
             'prix_unitaire_ht' => 100,
             'tva_rate' => 20,
             'montant_ht' => 100,
@@ -424,6 +420,7 @@ class OrdreMissionFromBonCommandeTest extends TestCase
             ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission");
 
         $res->assertCreated();
+        $res->assertJsonCount(1);
         $res->assertJsonPath('0.type', OrdreMission::TYPE_LABO);
         $this->assertDatabaseHas('ordre_mission_lignes', [
             'ref_article_id' => $product->id,

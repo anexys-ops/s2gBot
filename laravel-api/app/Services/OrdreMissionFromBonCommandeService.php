@@ -220,6 +220,12 @@ class OrdreMissionFromBonCommandeService
             return collect();
         }
 
+        // The product's configured profile takes precedence over legacy actions
+        // and jalon links, which may still reference it from another profile.
+        if ($article->isProduct() && ! $this->productAllowsType($article, $type)) {
+            return collect();
+        }
+
         $direct = $article->actions->where('type', $type)->values();
         if ($direct->isNotEmpty()) {
             return $direct;
@@ -354,7 +360,7 @@ class OrdreMissionFromBonCommandeService
         // Sans sections catalogue : tous les sous-produits du jalon (legacy).
         if ($productEntries->isEmpty() && $jalon->sectionProducts->isEmpty()) {
             foreach ($jalon->jalonProductLinks->sortBy('ordre') as $link) {
-                if ($link->product) {
+                if ($link->product && $this->productAllowsType($link->product, $type)) {
                     $productEntries->push(['product' => $link->product, 'quantite' => 1]);
                 }
             }
@@ -379,6 +385,21 @@ class OrdreMissionFromBonCommandeService
         }
 
         return $actions;
+    }
+
+    private function productAllowsType(Article $product, string $type): bool
+    {
+        $sectionType = match ($type) {
+            OrdreMission::TYPE_TECHNICIEN => ArticleSectionProduct::SECTION_TECHNICIEN,
+            OrdreMission::TYPE_LABO => ArticleSectionProduct::SECTION_LABO,
+            OrdreMission::TYPE_INGENIEUR => ArticleSectionProduct::SECTION_INGENIEUR,
+            default => null,
+        };
+
+        $product->loadMissing('sectionProducts');
+
+        return $product->sectionProducts->isEmpty()
+            || ($sectionType !== null && $product->sectionProducts->contains('section_type', $sectionType));
     }
 
     private function syntheticAction(Article $article, string $type): ArticleAction
@@ -410,6 +431,18 @@ class OrdreMissionFromBonCommandeService
             }
             // Jalon legacy sans sections : repli planification terrain BC.
             return (bool) ($ligne->technicien_id && $ligne->date_debut_prevue);
+        }
+
+        if ($ligne->article?->isProduct()) {
+            $ligne->article->loadMissing(['sectionProducts', 'productJalonLinks.jalon.sectionProducts']);
+            if ($ligne->article->sectionProducts->isNotEmpty()) {
+                return false;
+            }
+            foreach ($ligne->article->productJalonLinks as $link) {
+                if ($link->jalon?->sectionProducts->contains('product_article_id', $ligne->article->id)) {
+                    return false;
+                }
+            }
         }
 
         if ($ligne->technicien_id && $ligne->date_debut_prevue) {

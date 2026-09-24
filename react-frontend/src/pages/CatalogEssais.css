@@ -1,0 +1,31 @@
+.catalog-essai-form { display: flex; flex-direction: column; gap: 1rem; }
+.catalog-essai-form__section { padding: 1.25rem; border: 1px solid #dbe4ee; border-radius: 14px; background: #fff; }
+.catalog-essai-form__section-title { margin-bottom: 1rem; }
+.catalog-essai-form__section-title h3 { margin: 0 0 .25rem; }
+.catalog-essai-form__section-title p { margin: 0; color: #536175; }
+.catalog-essai-form__identity { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem 1rem; }
+.catalog-essai-form__identity .form-group { min-width: 0; margin: 0; }
+.catalog-essai-form__identity .form-group:first-child { grid-column: 1 / -1; }
+.catalog-essai-form__identity input, .catalog-essai-form__identity select { box-sizing: border-box; width: 100%; }
+.catalog-essai-form__details summary { cursor: pointer; font-weight: 700; }
+.catalog-essai-form__details summary span { margin-left: .5rem; color: #667085; font-size: .9rem; font-weight: 400; }
+.catalog-essai-form__params { margin-top: 1rem; }
+.catalog-essai-form__param-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, .8fr) minmax(0, 1fr) auto; gap: .6rem; align-items: end; margin-bottom: .65rem; }
+.catalog-essai-form__param-row label { display: block; margin-bottom: .25rem; font-weight: 600; }
+.catalog-essai-form__param-row input, .catalog-essai-form__param-row select { box-sizing: border-box; width: 100%; }
+.catalog-essai-form__search { display: flex; flex-direction: column; gap: .35rem; font-weight: 600; }
+.catalog-essai-form__search input { box-sizing: border-box; width: 100%; }
+.catalog-essai-form__assignment { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) auto; gap: .75rem; align-items: center; padding: .7rem 0; border-bottom: 1px solid #e5e7eb; }
+.catalog-essai-form__assignment select { width: 100%; }
+.catalog-essai-form__notice { margin: .75rem 0 0; padding: .7rem .85rem; border: 1px solid #f1d6a8; border-radius: 8px; background: #fff8eb; color: #744a17; }
+.catalog-essai-form__error { margin: 0; padding: .7rem .85rem; border-radius: 8px; background: #fef2f2; }
+.catalog-essai-form__actions { position: sticky; bottom: 0; z-index: 2; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: .65rem; padding: .85rem 0; border-top: 1px solid #dbe4ee; background: #fff; }
+.catalog-essai-form__actions .catalog-essai-form__error { flex: 0 0 100%; }
+.catalog-essai-form__actions span { margin-right: auto; color: #536175; font-size: .9rem; }
+@media (max-width: 700px) {
+  .catalog-essai-form__section { padding: .9rem; }
+  .catalog-essai-form__identity, .catalog-essai-form__param-row, .catalog-essai-form__assignment { grid-template-columns: 1fr; }
+  .catalog-essai-form__identity .form-group:first-child { grid-column: auto; }
+  .catalog-essai-form__actions { flex-wrap: wrap; }
+  .catalog-essai-form__actions span { width: 100%; }
+}

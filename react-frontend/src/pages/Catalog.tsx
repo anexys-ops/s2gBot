@@ -11,7 +11,8 @@ import { sumNumeric } from '../lib/listTableTotals'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import { formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
-import TestFormFieldsEditor from '../components/Catalogue/TestFormFieldsEditor'
+import TestFormFieldsEditor, { validateFormFields } from '../components/Catalogue/TestFormFieldsEditor'
+import './CatalogEssais.css'
 
 type ParamRow = { id?: number; name: string; unit: string; expected_type: string }
 type ProductAssignment = { article_id: number; article_action_id: number | null; label: string }
@@ -56,6 +57,7 @@ export default function Catalog() {
   const [formFields, setFormFields] = useState<TestTypeFormField[]>([])
   const [assignments, setAssignments] = useState<ProductAssignment[]>([])
   const [productSearch, setProductSearch] = useState('')
+  const [formError, setFormError] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [contextFilter, setContextFilter] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
@@ -90,7 +92,7 @@ export default function Catalog() {
         unit_price: form.unit_price,
         context: form.context,
         params: normalizeParamPayload(paramRows),
-        form_fields: formFields.filter((field) => field.key.trim() && field.label.trim()).map((field) => ({ ...field, key: field.key.trim(), label: field.label.trim() })),
+        form_fields: formFields.map((field) => ({ ...field, key: field.key.trim(), label: field.label.trim() })),
         assignments: assignments.map(({ article_id, article_action_id }) => ({ article_id, article_action_id })),
       })
       return created
@@ -110,7 +112,7 @@ export default function Catalog() {
         unit_price: form.unit_price,
         context: form.context,
         params: normalizeParamPayload(paramRows),
-        form_fields: formFields.filter((field) => field.key.trim() && field.label.trim()).map((field) => ({ ...field, key: field.key.trim(), label: field.label.trim() })),
+        form_fields: formFields.map((field) => ({ ...field, key: field.key.trim(), label: field.label.trim() })),
       })
       return testTypesApi.syncProducts(editingId!, assignments.map(({ article_id, article_action_id }) => ({ article_id, article_action_id })))
     },
@@ -160,6 +162,7 @@ export default function Catalog() {
     setFormFields([])
     setAssignments([])
     setProductSearch('')
+    setFormError('')
   }
 
   const openCreate = () => {
@@ -168,6 +171,7 @@ export default function Catalog() {
     setParamRows([{ name: '', unit: '', expected_type: 'numeric' }])
     setFormFields([])
     setAssignments([])
+    setFormError('')
     setModal('create')
   }
 
@@ -196,6 +200,7 @@ export default function Catalog() {
       article_action_id: article.pivot?.article_action_id ?? null,
       label: `${article.code} — ${article.libelle}`,
     })))
+    setFormError('')
     setModal('edit')
   }
 
@@ -209,7 +214,9 @@ export default function Catalog() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name.trim()) return
-    if (formFields.length === 0) { window.alert('Ajoutez au moins un champ au formulaire.'); return }
+    const errors = validateFormFields(formFields)
+    if (errors.length > 0) { setFormError(errors[0]); return }
+    setFormError('')
     if (modal === 'create') createMut.mutate()
     else if (modal === 'edit') updateMut.mutate()
   }
@@ -327,8 +334,12 @@ export default function Catalog() {
         <Modal
           title={modal === 'create' ? "Nouveau type d'essai" : "Modifier le type d'essai"}
           onClose={closeModal}
+          size="xl"
         >
-          <form onSubmit={handleSubmit}>
+          <form className="catalog-essai-form" onSubmit={handleSubmit}>
+            <section className="catalog-essai-form__section">
+              <div className="catalog-essai-form__section-title"><h3>Informations de l’essai</h3><p>Le domaine détermine les tâches qui pourront utiliser ce formulaire.</p></div>
+              <div className="catalog-essai-form__identity">
             <div className="form-group">
               <label>Nom *</label>
               <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
@@ -360,14 +371,15 @@ export default function Catalog() {
                 required
               />
             </div>
-            <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '0.5rem' }}>
-              Paramètres mesurés (utilisés à la saisie des résultats sur les échantillons)
-            </p>
+              </div>
+            </section>
+            <details className="catalog-essai-form__section catalog-essai-form__details">
+              <summary>Paramètres de résultats sur échantillons <span>Optionnel · distincts du formulaire mobile</span></summary>
+              <div className="catalog-essai-form__params">
             {paramRows.map((row, i) => (
               <div
                 key={row.id ?? `new-${i}`}
-                className="form-group"
-                style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px auto', gap: '0.5rem', alignItems: 'end' }}
+                className="catalog-essai-form__param-row"
               >
                 <div>
                   <label>Paramètre</label>
@@ -419,24 +431,31 @@ export default function Catalog() {
             >
               + Paramètre
             </button>
+              </div>
+            </details>
             <TestFormFieldsEditor fields={formFields} onChange={setFormFields} lists={optionLists} />
-            <h3>Produits et actions concernés</h3>
-            <input value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder="Rechercher un produit (2 caractères minimum)" />
+            <section className="catalog-essai-form__section">
+            <div className="catalog-essai-form__section-title"><h3>Produits et actions concernés</h3><p>Le formulaire apparaît sur les tâches de ces produits, dans le domaine choisi ci-dessus.</p></div>
+            <label className="catalog-essai-form__search">Rechercher un produit à associer<input value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder="Code ou nom du produit (2 caractères minimum)" /></label>
             {productSearch.length >= 2 ? <select value="" onChange={(e) => {
               const product = products.find((item) => item.id === Number(e.target.value))
               if (product && !assignments.some((a) => a.article_id === product.id)) setAssignments((rows) => [...rows, { article_id: product.id, article_action_id: null, label: `${product.code} — ${product.libelle}` }])
             }}><option value="">— Ajouter un produit —</option>{products.filter((item) => !assignments.some((a) => a.article_id === item.id)).map((item) => <option key={item.id} value={item.id}>{item.code} — {item.libelle}</option>)}</select> : null}
-            {assignments.map((assignment) => <div key={assignment.article_id} className="form-group" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {assignments.length === 0 ? <p className="catalog-essai-form__notice">Aucun produit associé : ce formulaire ne sera visible sur aucune tâche tant que vous n’ajoutez pas un produit.</p> : null}
+            {assignments.map((assignment) => <div key={assignment.article_id} className="catalog-essai-form__assignment">
               <span>{assignment.label}</span>
               <ProductActionSelect assignment={assignment} context={form.context} onChange={(article_action_id) => setAssignments((rows) => rows.map((row) => row.article_id === assignment.article_id ? { ...row, article_action_id } : row))} />
               <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAssignments((rows) => rows.filter((row) => row.article_id !== assignment.article_id))}>Retirer</button>
             </div>)}
-            {(createMut.isError || updateMut.isError) && (
-              <p className="error">{(createMut.error || updateMut.error)?.message}</p>
-            )}
-            <div className="crud-actions" style={{ marginTop: '1rem' }}>
+            </section>
+            <div className="catalog-essai-form__actions">
+              {formError ? <p className="error catalog-essai-form__error" role="alert">{formError}</p> : null}
+              {(createMut.isError || updateMut.isError) && (
+                <p className="error catalog-essai-form__error" role="alert">{(createMut.error || updateMut.error)?.message}</p>
+              )}
+              <span>{formFields.length} champ{formFields.length > 1 ? 's' : ''} · {assignments.length} produit{assignments.length > 1 ? 's' : ''}</span>
               <button type="submit" className="btn btn-primary" disabled={createMut.isPending || updateMut.isPending}>
-                Enregistrer
+                {createMut.isPending || updateMut.isPending ? 'Enregistrement…' : 'Enregistrer l’essai'}
               </button>
               <button type="button" className="btn btn-secondary" onClick={closeModal}>
                 Annuler

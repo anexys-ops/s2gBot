@@ -439,6 +439,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('rapport-bc/{rapportBC}/suivis', [RapportBCController::class, 'addSuivi']);
     Route::post('rapport-bc/{rapportBC}/request-validation', [RapportBCController::class, 'requestValidation']);
     Route::post('rapport-bc/{rapportBC}/versions', [RapportBCController::class, 'uploadVersion']);
+    Route::post('rapport-bc/{rapportBC}/taches/{task}/mesures-pdf', [RapportBCController::class, 'addTaskMeasurementsPdf']);
     Route::get('rapport-bc/{rapportBC}/versions/{version}/download', [RapportBCController::class, 'downloadVersion']);
     Route::delete('rapport-bc/{rapportBC}/versions/{version}', [RapportBCController::class, 'destroyVersion']);
 

@@ -428,7 +428,11 @@ class MissionTaskController extends Controller
             ->whereHas('ordreMissionLigne.ordreMission', function ($sq) {
                 $sq->whereIn('type', ['technicien', 'ingenieur']);
             })
-            ->whereHas('ordreMissionLigne.articleAction.measureConfigs')
+            ->where(function ($query) {
+                $query->whereHas('ordreMissionLigne.articleAction.measureConfigs')
+                    ->orWhereHas('testForms');
+            })
+            ->withCount('testForms')
             ->with([
                 'assignedUser:id,name',
                 'ordreMissionLigne:id,ordre_mission_id,libelle,ref_article_id,article_action_id,statut',

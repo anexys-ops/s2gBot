@@ -8,6 +8,7 @@ import Modal from '../Modal'
 import { TASK_FILTERS, getTaskStatutMeta } from '../../lib/missionTaskStatuts'
 import { dateInputFromApi, formatAppDate } from '../../lib/appLocale'
 import { formatTechnicienOption } from '../../lib/userRolePresentation'
+import TaskTestFormResults from './TaskTestFormResults'
 
 export type MissionTasksContext = 'labo' | 'terrain' | 'ingenieur'
 
@@ -173,6 +174,7 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
   const [quantityCount, setQuantityCount] = useState(String(task.quantity_count ?? Math.min(1, task.remaining_quantity ?? 1)))
   const [message, setMessage] = useState('')
   const [correctionNotes, setCorrectionNotes] = useState<Record<number, string>>({})
+  const [activeTab, setActiveTab] = useState<'suivi' | 'essais'>('suivi')
 
   const { data: taskForms } = useQuery({
     queryKey: ['task-test-forms', task.id],
@@ -253,6 +255,11 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
   return (
     <Modal title={`${task.unique_number ?? `Tâche ${task.id}`} — ${taskLabel(task)}`} onClose={onClose} size="wide">
       {task.jalon_context ? <p className="mission-task-modal__jalon">Jalon : {task.jalon_context.label}</p> : null}
+      <div className="terrain-mesures-tabs" role="tablist" aria-label="Sections de la tâche">
+        <button type="button" role="tab" aria-selected={activeTab === 'suivi'} className={`terrain-mesures-tab${activeTab === 'suivi' ? ' is-active' : ''}`} onClick={() => setActiveTab('suivi')}>Suivi de la tâche</button>
+        <button type="button" role="tab" aria-selected={activeTab === 'essais'} className={`terrain-mesures-tab${activeTab === 'essais' ? ' is-active' : ''}`} onClick={() => setActiveTab('essais')}>Essais et résultats{taskForms?.forms?.length ? ` (${taskForms.forms.length})` : ''}</button>
+      </div>
+      {activeTab === 'suivi' && <>
       <div className="mission-task-modal__grid">
         <label>Technicien assigné
           <select value={assignedUserId} onChange={(event) => setAssignedUserId(event.target.value)}>
@@ -314,28 +321,6 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
           <span className="text-muted">{pvCount} numéro{pvCount !== 1 ? 's' : ''} de PV saisi{pvCount !== 1 ? 's' : ''}</span>
         </label>
       </div>
-      {taskForms?.forms?.length ? <section className="card" style={{ padding: '1rem', marginTop: '1rem' }}>
-        <h3>Formulaires d’essai liés à cette tâche</h3>
-        {taskForms.forms.map((form) => <div key={form.test_type.id} style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem', marginTop: '0.75rem' }}>
-          <strong>{form.test_type.name}</strong> · {form.submission?.status ?? 'À remplir'}
-          {form.submission?.correction_note ? <p>Correction demandée : {form.submission.correction_note}</p> : null}
-          {form.submission ? <dl>{form.form_fields.filter((field) => field.type !== 'photo').map((field) => {
-            const value = form.submission?.answers?.[field.key]
-            return <div key={field.key}><dt>{field.label}</dt><dd>
-              {field.type === 'table' && Array.isArray(value) ? <div className="table-wrap"><table className="data-table data-table--compact"><thead><tr>{field.columns?.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead><tbody>
-                {value.map((row: Record<string, unknown>, index: number) => <tr key={index}>{field.columns?.map((column) => <td key={column.key}>{String(row[column.key] ?? '—')}</td>)}</tr>)}
-              </tbody></table></div> : Array.isArray(value) ? value.join(', ') : String(value ?? '—')}{field.unit ? ` ${field.unit}` : ''}
-            </dd></div>
-          })}</dl> : null}
-          {form.submission?.photos?.map((photo) => <button key={photo.id} type="button" className="btn btn-secondary btn-sm" onClick={() => void openFormPhoto(photo.id)}>Voir la photo : {photo.original_name}</button>)}
-          {(user?.role === 'lab_admin' || user?.role === 'responsable') && user?.id !== task.assigned_user_id && form.submission?.status === 'submitted' ? <div className="crud-actions">
-            <input placeholder="Motif de correction" value={correctionNotes[form.test_type.id] ?? ''} onChange={(event) => setCorrectionNotes((current) => ({ ...current, [form.test_type.id]: event.target.value }))} />
-            <button type="button" className="btn btn-secondary btn-sm" disabled={review.isPending || !(correctionNotes[form.test_type.id] ?? '').trim()} onClick={() => review.mutate({ typeId: form.test_type.id, decision: 'correction', correctionNote: correctionNotes[form.test_type.id] })}>Demander correction</button>
-            <button type="button" className="btn btn-primary btn-sm" disabled={review.isPending} onClick={() => review.mutate({ typeId: form.test_type.id, decision: 'validate' })}>Valider le formulaire</button>
-          </div> : null}
-        </div>)}
-        {review.isError ? <p className="error">{(review.error as Error).message}</p> : null}
-      </section> : null}
       {message ? <p className="success">{message}</p> : null}
       {error ? <p className="error">{(error as Error).message}</p> : null}
       <div className="mission-task-modal__actions">
@@ -346,6 +331,18 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
           {task.reception_generated_at ? 'Réception déjà générée' : 'Clôturer et préparer les étiquettes'}
         </button>
       </div>
+      </>}
+      {activeTab === 'essais' && <section className="card" style={{ padding: '1rem', marginTop: '1rem' }}>
+        <h3>Formulaires d’essai et résultats</h3>
+        <TaskTestFormResults forms={taskForms?.forms ?? []} onOpenPhoto={(photoId) => void openFormPhoto(photoId)} renderActions={(form) =>
+          (user?.role === 'lab_admin' || user?.role === 'responsable') && user?.id !== task.assigned_user_id && form.submission?.status === 'submitted' ? <div className="crud-actions">
+            <input placeholder="Motif de correction" value={correctionNotes[form.test_type.id] ?? ''} onChange={(event) => setCorrectionNotes((current) => ({ ...current, [form.test_type.id]: event.target.value }))} />
+            <button type="button" className="btn btn-secondary btn-sm" disabled={review.isPending || !(correctionNotes[form.test_type.id] ?? '').trim()} onClick={() => review.mutate({ typeId: form.test_type.id, decision: 'correction', correctionNote: correctionNotes[form.test_type.id] })}>Demander correction</button>
+            <button type="button" className="btn btn-primary btn-sm" disabled={review.isPending} onClick={() => review.mutate({ typeId: form.test_type.id, decision: 'validate' })}>Valider le formulaire</button>
+          </div> : null
+        } />
+        {review.isError ? <p className="error">{(review.error as Error).message}</p> : null}
+      </section>}
     </Modal>
   )
 }

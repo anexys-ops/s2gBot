@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Models\RapportBCSuivi;
 use App\Models\User;
+use App\Services\TaskMeasurementsPdfGenerator;
+use Illuminate\Support\Str;
 
 class RapportBCController extends Controller
 {
@@ -446,6 +448,50 @@ class RapportBCController extends Controller
         return response()->json($this->formatVersion($version->load('uploadedByUser')), 201);
     }
 
+    public function addTaskMeasurementsPdf(
+        Request $request,
+        RapportBC $rapportBC,
+        MissionTask $task,
+        TaskMeasurementsPdfGenerator $generator,
+    ): JsonResponse {
+        if (! $this->canWrite($request)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if (! $rapportBC->taches()->whereKey($task->id)->exists()) {
+            return response()->json(['message' => 'Cette tâche n’est pas associée au rapport.'], 404);
+        }
+        if (! $task->measures()->exists() && ! $task->testForms()->exists()) {
+            return response()->json(['message' => 'Aucune mesure enregistrée pour cette tâche.'], 422);
+        }
+
+        [$bytes, $filename] = $generator->generate($task);
+        $path = "rapport-bc/{$rapportBC->id}/".Str::uuid().'.pdf';
+        Storage::disk('local')->put($path, $bytes);
+        try {
+            $version = DB::transaction(function () use ($rapportBC, $task, $request, $path, $filename, $bytes) {
+                RapportBC::query()->whereKey($rapportBC->id)->lockForUpdate()->firstOrFail();
+                $last = $rapportBC->versions()->orderByDesc('version_number')->first();
+                return RapportBCVersion::query()->create([
+                    'rapport_bc_id' => $rapportBC->id,
+                    'version_number' => $last ? $last->version_number + 1 : 1,
+                    'file_path' => $path,
+                    'original_filename' => $filename,
+                    'file_hash' => md5($bytes),
+                    'file_size' => strlen($bytes),
+                    'uploaded_by' => $request->user()->id,
+                    'upload_notes' => 'Mesures de la tâche '.($task->unique_number ?? '#'.$task->id),
+                    'created_at' => now(),
+                ]);
+            });
+        } catch (\Throwable $error) {
+            Storage::disk('local')->delete($path);
+            throw $error;
+        }
+        $rapportBC->touch();
+
+        return response()->json($this->formatVersion($version->load('uploadedByUser')), 201);
+    }
+
     public function downloadVersion(Request $request, RapportBC $rapportBC, RapportBCVersion $version): StreamedResponse|JsonResponse
     {
         if (! $this->canRead($request)) {
@@ -489,6 +535,7 @@ class RapportBCController extends Controller
             'taches.ordreMissionLigne:id,libelle,ordre_mission_id',
             'taches.assignedUser:id,name',
         ]);
+        $rapportBC->taches->loadCount(['measures', 'testForms']);
 
         $allBcTaches = MissionTask::query()
             ->join('ordre_mission_lignes', 'ordre_mission_lignes.id', '=', 'mission_tasks.ordre_mission_ligne_id')
@@ -510,6 +557,7 @@ class RapportBCController extends Controller
                 'planned_date'  => $t->planned_date,
                 'completed_at'  => $t->completed_at?->toIso8601String(),
                 'created_at'    => $t->created_at?->toIso8601String(),
+                'measurements_count' => (int) $t->measures_count + (int) $t->test_forms_count,
             ])->values(),
         ]);
     }

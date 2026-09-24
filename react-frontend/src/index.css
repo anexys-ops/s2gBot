@@ -11142,6 +11142,45 @@ a.catalogue-tree__link-article:hover {
   font-size: 0.75rem;
 }
 
+.task-test-results {
+  display: grid;
+  gap: 1rem;
+}
+
+.task-test-results__form {
+  border: 1px solid var(--color-border, #dbe3eb);
+  border-radius: 8px;
+  padding: 1rem;
+  min-width: 0;
+}
+
+.task-test-results__form h3 {
+  margin: 0 0 0.75rem;
+}
+
+.task-test-results__form h3 small {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #64748b);
+}
+
+.task-test-results__form dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.65rem;
+}
+
+.task-test-results__form dt {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #64748b);
+}
+
+.task-test-results__form dd {
+  margin: 0.2rem 0 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 .terrain-mesures-section {
   margin-bottom: 1rem;
 }

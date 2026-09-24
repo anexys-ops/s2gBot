@@ -16,6 +16,7 @@ use App\Models\ExpenseReport;
 use App\Models\MaterielAffectation;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
+use App\Models\RapportBC;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -263,6 +264,7 @@ class MobileTerrainApiTest extends TestCase
         ], ['Accept' => 'application/json'])->assertCreated()->json('id');
         $this->get('/api/mobile/task-forms/photos/'.$photoId, ['Accept' => 'application/json'])->assertOk();
         $this->postJson($url.'/submit')->assertOk()->assertJsonPath('status', 'submitted');
+
         $this->assertDatabaseHas('mission_tasks', ['id' => $task->id, 'statut' => 'todo']);
         $this->actingAs($other, 'sanctum')->getJson('/api/mobile/task-forms/tasks/'.$task->id)->assertForbidden();
         $this->actingAs($reviewer, 'sanctum')->postJson($url.'/review', [
@@ -395,6 +397,25 @@ class MobileTerrainApiTest extends TestCase
         $this->actingAs($user, 'sanctum')->getJson('/api/mobile/task-forms/tasks/'.$task->id)
             ->assertOk()->assertJsonPath('forms.0.form_fields.3.options.1', 'Humide');
         $this->postJson($url.'/submit')->assertOk()->assertJsonPath('status', 'submitted');
+
+        // Un formulaire rempli doit aussi apparaître dans Mesures terrain.
+        $this->actingAs($admin, 'sanctum')->getJson('/api/mission-tasks/terrain/measures')
+            ->assertOk()->assertJsonFragment(['id' => $task->id]);
+
+        Storage::fake('local');
+        $rapport = RapportBC::query()->create([
+            'numero' => 'RAP-MOBILE-TEST', 'bon_commande_id' => $om->bon_commande_id,
+            'statut' => RapportBC::STATUT_BROUILLON, 'created_by' => $admin->id,
+        ]);
+        $rapport->taches()->attach($task->id);
+        $this->getJson('/api/rapport-bc/'.$rapport->id.'/recap')
+            ->assertOk()->assertJsonPath('taches.0.measurements_count', 1);
+        $this->postJson('/api/rapport-bc/'.$rapport->id.'/taches/'.$task->id.'/mesures-pdf')
+            ->assertCreated()->assertJsonPath('original_filename', 'mesures-'.$task->unique_number.'.pdf');
+        $version = $rapport->versions()->firstOrFail();
+        Storage::disk('local')->assertExists($version->file_path);
+        $this->assertStringStartsWith('%PDF', Storage::disk('local')->get($version->file_path));
+        $this->get('/api/rapport-bc/'.$rapport->id.'/versions/'.$version->id.'/download')->assertOk();
     }
 
     private function seedMission(): array

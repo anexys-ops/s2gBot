@@ -3627,6 +3627,7 @@ export interface TaskResult {
 
 export interface MissionTask {
   id: number
+  test_forms_count?: number
   unique_number?: string
   ordre_mission_ligne_id: number
   assigned_user_id?: number | null
@@ -4241,6 +4242,7 @@ export type RapportBC = {
 
 export type RapportBCTask = {
   id: number
+  measurements_count?: number
   libelle: string | null
   statut: string
   planned_date: string | null
@@ -4288,6 +4290,8 @@ export const rapportBCApi = {
     api<RapportBC>(`/rapport-bc/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api<void>(`/rapport-bc/${id}`, { method: 'DELETE' }),
   recap: (id: number) => api<{ rapport: RapportBC; bc_statuts: Record<string, number>; taches: RapportBCTask[] }>(`/rapport-bc/${id}/recap`),
+  addTaskMeasurementsPdf: (id: number, taskId: number) =>
+    api<RapportBCVersion>(`/rapport-bc/${id}/taches/${taskId}/mesures-pdf`, { method: 'POST' }),
   uploadVersion: async (id: number, file: File, notes?: string): Promise<RapportBCVersion> => {
     const token = getToken()
     const fd = new FormData()

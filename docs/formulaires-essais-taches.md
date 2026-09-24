@@ -21,6 +21,10 @@ Les champs `select` et `checkboxes` peuvent utiliser des choix locaux ou une **l
 
 Base : `https://s2g.apps-dev.fr/api`, avec `Authorization: Bearer <token>` et `Accept: application/json`.
 
+**Pour l’application mobile :** `GET /mobile/terrain/tasks/{task}` donne la fiche et l’ID numérique de la tâche, mais n’inclut pas les formulaires. L’application doit appeler séparément `GET /mobile/task-forms/tasks/{task}` avec le même jeton. `{task}` est le champ numérique `id` de l’API, pas le numéro affiché `TSK-…`. La réponse contient `task_id` et `forms`, chaque entrée ayant `test_type` (`id`, `name`, `norm`), `form_fields` et `submission` (`null` avant la première saisie). Une liste `forms: []` signifie qu’aucun essai applicable n’est affecté à cette tâche ; ce n’est pas une erreur de réseau.
+
+Pour qu’un essai apparaisse, son produit doit être celui de la ligne d’OM (`ref_article_id`), son domaine doit correspondre au type d’OM (`terrain` pour technicien, `ingenieur` ou `labo`), et, si l’affectation vise une action précise, `article_action_id` doit correspondre aussi. Un essai « laboratoire » associé à un produit utilisé dans une mission terrain ne s’affiche donc pas dans le formulaire de cette tâche terrain. Un type d’essai sans `form_fields` ne peut pas être associé à un produit.
+
 | Méthode | Route | Rôle |
 |---|---|---|
 | `GET` | `/test-types` | Types d’essais et produits liés |

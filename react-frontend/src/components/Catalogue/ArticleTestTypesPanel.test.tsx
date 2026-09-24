@@ -28,16 +28,24 @@ describe('liaison essai-produit', () => {
     expect(sync).not.toHaveBeenCalled()
   })
 
-  it('enregistre uniquement après sélection et ajout, puis confirme la réponse du serveur', async () => {
+  it('ajoute et enregistre en un clic, puis confirme la réponse du serveur', async () => {
     const sync = vi.spyOn(api.catalogueApi, 'syncArticleTestTypes').mockResolvedValue({
       ...article, test_types: [{ id: 8, name: 'Essai terrain', article_action_id: null }],
     } as api.RefArticleRow)
     showPanel()
     await screen.findByRole('option', { name: 'Essai terrain · Terrain' })
     fireEvent.change(screen.getByRole('combobox', { name: 'Essai à ajouter' }), { target: { value: '8' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Ajouter l’essai' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer les essais' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter et enregistrer' }))
     await waitFor(() => expect(sync).toHaveBeenCalledWith(2871, [{ test_type_id: 8, article_action_id: null }]))
     expect(await screen.findByText('Essais enregistrés.')).toBeInTheDocument()
+  })
+
+  it('explique pourquoi un essai sans formulaire ne peut pas être ajouté', async () => {
+    vi.spyOn(api.testTypesApi, 'list').mockResolvedValue([{ ...testType, form_fields: [] }])
+    showPanel()
+    await screen.findByRole('option', { name: /formulaire à construire/ })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Essai à ajouter' }), { target: { value: '8' } })
+    expect(screen.getByRole('button', { name: 'Ajouter et enregistrer' })).toBeDisabled()
+    expect(screen.getByRole('link', { name: 'Modifier cet essai' })).toHaveAttribute('href', '/catalogue/essais?edit=8')
   })
 })

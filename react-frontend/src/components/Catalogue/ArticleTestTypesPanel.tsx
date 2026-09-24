@@ -30,7 +30,10 @@ export default function ArticleTestTypesPanel({ article, canEdit }: { article: R
 
   const save = useMutation({
     mutationFn: (next: Assignment[]) => catalogueApi.syncArticleTestTypes(article.id, next),
-    onSuccess: () => {
+    onSuccess: (savedArticle) => {
+      setAssignments((savedArticle.test_types ?? []).map((type) => ({
+        test_type_id: type.id, article_action_id: type.article_action_id ?? null,
+      })))
       void queryClient.invalidateQueries({ queryKey: ['catalogue-article', article.id] })
       void queryClient.invalidateQueries({ queryKey: ['test-types'] })
     },
@@ -56,6 +59,7 @@ export default function ArticleTestTypesPanel({ article, canEdit }: { article: R
       const context = type && 'context' in type ? type.context : null
       return <div key={assignment.test_type_id} style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
         <strong>{type?.name ?? `Essai #${assignment.test_type_id}`}</strong>
+        {context ? <span className="text-muted">{context === 'terrain' ? 'Terrain' : context === 'ingenieur' ? 'Ingénierie' : 'Laboratoire'} uniquement</span> : null}
         {!savedAssignments.some((saved) => saved.test_type_id === assignment.test_type_id) && !saveConfirmed ? <span className="text-muted">À enregistrer</span> : null}
         {type?.norm ? <span className="text-muted">{type.norm}</span> : null}
         <select
@@ -79,13 +83,16 @@ export default function ArticleTestTypesPanel({ article, canEdit }: { article: R
           {available.map((type) => <option key={type.id} value={type.id}>{type.name} · {type.context === 'terrain' ? 'Terrain' : type.context === 'ingenieur' ? 'Ingénierie' : type.context === 'labo' ? 'Laboratoire' : 'Historique (tous)'}{(type.form_fields?.length ?? 0) === 0 ? ' · formulaire à construire' : ''}</option>)}
         </select>
         <button type="button" className="btn btn-secondary btn-sm" disabled={!selectedTypeId || (selectedType?.form_fields?.length ?? 0) === 0 || save.isPending}
-          onClick={() => { setAssignments((current) => [...current, { test_type_id: Number(selectedTypeId), article_action_id: null }]); setSelectedTypeId('') }}>Ajouter l’essai</button>
+          onClick={() => save.mutate([...assignments, { test_type_id: Number(selectedTypeId), article_action_id: null }], {
+            onSuccess: () => setSelectedTypeId(''),
+          })}>{save.isPending ? 'Ajout en cours…' : 'Ajouter et enregistrer'}</button>
         <button type="button" className="btn btn-primary btn-sm" disabled={save.isPending || !hasChanges}
           onClick={() => save.mutate(assignments)}>{save.isPending ? 'Enregistrement…' : 'Enregistrer les essais'}</button>
       </div>
-      {assignments.length === 0 && !hasChanges ? <p className="text-muted">Sélectionnez un essai, cliquez sur « Ajouter l’essai », puis sur « Enregistrer les essais ».</p> : null}
+      {assignments.length === 0 && !hasChanges ? <p className="text-muted">Sélectionnez un essai avec formulaire : son ajout sera enregistré immédiatement.</p> : null}
       {hasChanges ? <p className="text-muted">Modifications non enregistrées.</p> : null}
       {selectedType && (selectedType.form_fields?.length ?? 0) === 0 ? <p className="text-muted">Cet essai existe, mais son formulaire doit être construit avant de l’affecter. <Link to={`/catalogue/essais?edit=${selectedType.id}`}>Modifier cet essai</Link></p> : null}
+      {selectedType?.context ? <p className="text-muted">Un essai « {selectedType.context === 'terrain' ? 'Terrain' : selectedType.context === 'ingenieur' ? 'Ingénierie' : 'Laboratoire'} » n’apparaît que sur les tâches du même domaine, même s’il est associé au produit.</p> : null}
       {save.isError ? <p className="error">{(save.error as Error).message}</p> : null}
       {saveConfirmed ? <p>Essais enregistrés.</p> : null}
       {save.isSuccess && !serverConfirmed ? <p className="error">L’association n’a pas été confirmée par le serveur. Rechargez la fiche et réessayez.</p> : null}

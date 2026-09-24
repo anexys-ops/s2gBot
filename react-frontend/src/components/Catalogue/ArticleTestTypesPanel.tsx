@@ -5,6 +5,14 @@ import { articleActionsApi, catalogueApi, testTypesApi, type RefArticleRow } fro
 
 type Assignment = { test_type_id: number; article_action_id: number | null }
 
+function sameAssignments(left: Assignment[], right: Assignment[]): boolean {
+  const key = (assignment: Assignment) => `${assignment.test_type_id}:${assignment.article_action_id ?? ''}`
+  if (left.length !== right.length) return false
+  const leftKeys = left.map(key).sort()
+  const rightKeys = right.map(key).sort()
+  return leftKeys.every((value, index) => value === rightKeys[index])
+}
+
 export default function ArticleTestTypesPanel({ article, canEdit }: { article: RefArticleRow; canEdit: boolean }) {
   const queryClient = useQueryClient()
   const [assignments, setAssignments] = useState<Assignment[]>([])
@@ -21,7 +29,7 @@ export default function ArticleTestTypesPanel({ article, canEdit }: { article: R
   }, [article.id, article.test_types])
 
   const save = useMutation({
-    mutationFn: () => catalogueApi.syncArticleTestTypes(article.id, assignments),
+    mutationFn: (next: Assignment[]) => catalogueApi.syncArticleTestTypes(article.id, next),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['catalogue-article', article.id] })
       void queryClient.invalidateQueries({ queryKey: ['test-types'] })
@@ -29,6 +37,15 @@ export default function ArticleTestTypesPanel({ article, canEdit }: { article: R
   })
   const available = types.filter((type) => !assignments.some((item) => item.test_type_id === type.id))
   const selectedType = available.find((type) => type.id === Number(selectedTypeId))
+  const savedAssignments = (article.test_types ?? []).map((type) => ({
+    test_type_id: type.id, article_action_id: type.article_action_id ?? null,
+  }))
+  const serverConfirmed = save.isSuccess && sameAssignments(
+    save.variables ?? [],
+    (save.data?.test_types ?? []).map((type) => ({ test_type_id: type.id, article_action_id: type.article_action_id ?? null })),
+  )
+  const saveConfirmed = serverConfirmed && sameAssignments(assignments, save.variables ?? [])
+  const hasChanges = !sameAssignments(assignments, savedAssignments) && !saveConfirmed
 
   return <section className="card" style={{ marginBottom: '1rem', padding: '1rem' }}>
     <h2>Essais et formulaires nécessaires</h2>
@@ -39,6 +56,7 @@ export default function ArticleTestTypesPanel({ article, canEdit }: { article: R
       const context = type && 'context' in type ? type.context : null
       return <div key={assignment.test_type_id} style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
         <strong>{type?.name ?? `Essai #${assignment.test_type_id}`}</strong>
+        {!savedAssignments.some((saved) => saved.test_type_id === assignment.test_type_id) && !saveConfirmed ? <span className="text-muted">À enregistrer</span> : null}
         {type?.norm ? <span className="text-muted">{type.norm}</span> : null}
         <select
           aria-label={`Action pour ${type?.name ?? assignment.test_type_id}`}
@@ -62,12 +80,15 @@ export default function ArticleTestTypesPanel({ article, canEdit }: { article: R
         </select>
         <button type="button" className="btn btn-secondary btn-sm" disabled={!selectedTypeId || (selectedType?.form_fields?.length ?? 0) === 0 || save.isPending}
           onClick={() => { setAssignments((current) => [...current, { test_type_id: Number(selectedTypeId), article_action_id: null }]); setSelectedTypeId('') }}>Ajouter l’essai</button>
-        <button type="button" className="btn btn-primary btn-sm" disabled={save.isPending}
-          onClick={() => save.mutate()}>{save.isPending ? 'Enregistrement…' : 'Enregistrer les essais'}</button>
+        <button type="button" className="btn btn-primary btn-sm" disabled={save.isPending || !hasChanges}
+          onClick={() => save.mutate(assignments)}>{save.isPending ? 'Enregistrement…' : 'Enregistrer les essais'}</button>
       </div>
+      {assignments.length === 0 && !hasChanges ? <p className="text-muted">Sélectionnez un essai, cliquez sur « Ajouter l’essai », puis sur « Enregistrer les essais ».</p> : null}
+      {hasChanges ? <p className="text-muted">Modifications non enregistrées.</p> : null}
       {selectedType && (selectedType.form_fields?.length ?? 0) === 0 ? <p className="text-muted">Cet essai existe, mais son formulaire doit être construit avant de l’affecter. <Link to={`/catalogue/essais?edit=${selectedType.id}`}>Modifier cet essai</Link></p> : null}
       {save.isError ? <p className="error">{(save.error as Error).message}</p> : null}
-      {save.isSuccess ? <p>Essais enregistrés.</p> : null}
+      {saveConfirmed ? <p>Essais enregistrés.</p> : null}
+      {save.isSuccess && !serverConfirmed ? <p className="error">L’association n’a pas été confirmée par le serveur. Rechargez la fiche et réessayez.</p> : null}
     </> : null}
     <p style={{ marginTop: '0.75rem' }}><Link to="/catalogue/essais">Créer ou modifier un type d’essai et son formulaire</Link></p>
   </section>

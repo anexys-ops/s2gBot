@@ -3885,9 +3885,10 @@ export interface PlanningEvent {
   date_fin: string
   type_evenement: string
   notes: string | null
+  is_validated?: boolean
   user?: { id: number; name: string } | null
   equipment?: { id: number; name: string; code?: string } | null
-  mission_task?: { id: number; ordre_mission_ligne?: { id: number; libelle: string; ordre_mission?: { id: number; numero: string; bon_commande_id: number | null } | null } | null } | null
+  mission_task?: { id: number; statut?: 'todo' | 'in_progress' | 'paused' | 'frozen' | 'rescheduled' | 'done' | 'validated' | 'rejected'; ordre_mission_ligne?: { id: number; libelle: string; ordre_mission?: { id: number; numero: string; bon_commande_id: number | null } | null } | null } | null
   bon_commande_ligne?: { id: number; libelle: string; bon_commande?: { id: number; numero: string } | null } | null
 }
 

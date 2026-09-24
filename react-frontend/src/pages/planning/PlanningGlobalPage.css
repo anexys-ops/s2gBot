@@ -1,0 +1,14 @@
+.planning-global__controls { padding: 1rem; margin-bottom: 1rem; }
+.planning-global__period, .planning-global__statuses, .planning-global__pagination { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.planning-global__period label { display: inline-flex; align-items: center; gap: .4rem; }
+.planning-global__period input { max-width: 11rem; }
+.planning-global__statuses { margin-top: 1rem; }
+.planning-global__status { border: 1px solid #d6dce5; border-radius: 999px; padding: .35rem .75rem; background: #fff; color: #344054; cursor: pointer; }
+.planning-global__status.is-active { background: #af4d1e; border-color: #af4d1e; color: #fff; }
+.planning-global__status strong { margin-left: .25rem; }
+.planning-global__result-count { margin: 0 0 .5rem; color: #536175; }
+.planning-global__table { padding: 0; }
+.planning-global__table table { width: 100%; }
+.planning-global__filter-row th { padding: .35rem; }
+.planning-global__filter-row input, .planning-global__filter-row select { box-sizing: border-box; width: 100%; min-width: 7rem; max-width: 18rem; font-size: .85rem; }
+.planning-global__pagination { justify-content: flex-end; margin-top: .75rem; }

@@ -1,19 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { planningApi } from '../../api/client'
+import { planningApi, type PlanningEvent } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { dateInputFromApi } from '../../lib/appLocale'
+import { eventStatus, matchesText, statusLabels, weekRange, type PlanningStatus } from './planningGlobalFilters'
+import './PlanningGlobalPage.css'
 
-function ymdLocal(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
-
-function monthRange(year: number, month: number) {
-  const first = new Date(year, month, 1)
-  const last = new Date(year, month + 1, 0)
-  return { from: ymdLocal(first), to: ymdLocal(last), label: first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) }
-}
+const PAGE_SIZE = 25
 
 function eventLabel(type: string): string {
   const labels: Record<string, string> = {
@@ -25,34 +19,69 @@ function eventLabel(type: string): string {
   return labels[type] ?? type
 }
 
+function taskDocumentText(event: PlanningEvent): string {
+  const line = event.mission_task?.ordre_mission_ligne
+  const om = line?.ordre_mission
+  const bc = event.bon_commande_ligne?.bon_commande
+  return [om?.numero, line?.libelle, bc?.numero, event.bon_commande_ligne?.libelle].filter(Boolean).join(' ')
+}
+
 export default function PlanningGlobalPage() {
-  const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth())
+  const [week, setWeek] = useState(() => weekRange(new Date()))
+  const [customPeriod, setCustomPeriod] = useState(false)
+  const [customFrom, setCustomFrom] = useState(week.from)
+  const [customTo, setCustomTo] = useState(week.to)
+  const [statusFilter, setStatusFilter] = useState<PlanningStatus | ''>('')
   const [userFilter, setUserFilter] = useState('')
   const [equipmentFilter, setEquipmentFilter] = useState('')
   const [eventFilter, setEventFilter] = useState('')
-  const { from, to, label } = monthRange(year, month)
+  const [dateFilter, setDateFilter] = useState('')
+  const [taskFilter, setTaskFilter] = useState('')
+  const [notesFilter, setNotesFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const from = customPeriod ? customFrom : week.from
+  const to = customPeriod ? customTo : week.to
+  const validPeriod = Boolean(from && to && from <= to)
 
   const { data: overview, isLoading, error } = useQuery({
     queryKey: ['planning-overview', from, to],
     queryFn: () => planningApi.overview(from, to),
+    enabled: validPeriod,
     staleTime: 30_000,
   })
 
-  const events = overview?.events ?? []
-  const users = useMemo(() => [...new Map(events.filter((e) => e.user).map((e) => [e.user!.id, e.user!.name])).entries()], [events])
-  const equipments = useMemo(() => [...new Map(events.filter((e) => e.equipment).map((e) => [e.equipment!.id, e.equipment!.name])).entries()], [events])
+  const events = useMemo(() => overview?.events ?? [], [overview?.events])
+  const users = useMemo(() => [...new Map(events.filter((e) => e.user).map((e) => [e.user!.id, e.user!.name])).entries()].sort((a, b) => a[1].localeCompare(b[1])), [events])
+  const equipments = useMemo(() => [...new Map(events.filter((e) => e.equipment).map((e) => [e.equipment!.id, e.equipment!.name])).entries()].sort((a, b) => a[1].localeCompare(b[1])), [events])
   const types = useMemo(() => [...new Set(events.map((e) => e.type_evenement))].sort(), [events])
-  const filtered = events.filter((event) =>
-    (!userFilter || event.user_id === Number(userFilter))
+  const statusCounts = useMemo(() => events.reduce((counts, event) => {
+    const status = eventStatus(event)
+    counts[status] = (counts[status] ?? 0) + 1
+    return counts
+  }, {} as Partial<Record<PlanningStatus, number>>), [events])
+  const filtered = useMemo(() => events.filter((event) =>
+    (!statusFilter || eventStatus(event) === statusFilter)
+    && (!userFilter || event.user_id === Number(userFilter))
     && (!equipmentFilter || event.equipment_id === Number(equipmentFilter))
-    && (!eventFilter || event.type_evenement === eventFilter))
+    && (!eventFilter || event.type_evenement === eventFilter)
+    && (!dateFilter || (dateInputFromApi(event.date_debut) <= dateFilter && dateInputFromApi(event.date_fin) >= dateFilter))
+    && matchesText(taskDocumentText(event), taskFilter)
+    && matchesText(event.notes, notesFilter)
+  ), [events, statusFilter, userFilter, equipmentFilter, eventFilter, dateFilter, taskFilter, notesFilter])
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
-  function changeMonth(amount: number) {
-    const next = new Date(year, month + amount, 1)
-    setYear(next.getFullYear())
-    setMonth(next.getMonth())
+  useEffect(() => setPage(1), [from, to, statusFilter, userFilter, equipmentFilter, eventFilter, dateFilter, taskFilter, notesFilter])
+
+  function changeWeek(amount: number) {
+    const monday = new Date(`${week.from}T12:00:00`)
+    monday.setDate(monday.getDate() + 7 * amount)
+    setWeek(weekRange(monday))
+  }
+
+  function selectWeek(date: string) {
+    if (date) setWeek(weekRange(new Date(`${date}T12:00:00`)))
   }
 
   return (
@@ -61,38 +90,52 @@ export default function PlanningGlobalPage() {
       moduleBarLabel="Planification"
       title="Planning global"
       subtitle="Personnes, matériel et événements liés dans un seul tableau."
-      actions={<div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => changeMonth(-1)}>‹</button>
-        <strong style={{ minWidth: 140, textAlign: 'center' }}>{label}</strong>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => changeMonth(1)}>›</button>
-      </div>}
     >
-      <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <label>Utilisateur <select value={userFilter} onChange={(e) => setUserFilter(e.target.value)}>
-            <option value="">Tous</option>
-            {users.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select></label>
-          <label>Matériel <select value={equipmentFilter} onChange={(e) => setEquipmentFilter(e.target.value)}>
-            <option value="">Tout</option>
-            {equipments.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select></label>
-          <label>Événement <select value={eventFilter} onChange={(e) => setEventFilter(e.target.value)}>
-            <option value="">Tous</option>
-            {types.map((type) => <option key={type} value={type}>{eventLabel(type)}</option>)}
-          </select></label>
+      <div className="card planning-global__controls">
+        <div className="planning-global__period">
+          <button type="button" className={`btn btn-sm ${!customPeriod ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setCustomPeriod(false)}>Semaine</button>
+          <button type="button" className={`btn btn-sm ${customPeriod ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setCustomPeriod(true)}>Période</button>
+          {!customPeriod ? <>
+            <button type="button" className="btn btn-secondary btn-sm" aria-label="Semaine précédente" onClick={() => changeWeek(-1)}>‹</button>
+            <label>Semaine du <input type="date" aria-label="Choisir une semaine" value={week.from} onChange={(e) => selectWeek(e.target.value)} /></label>
+            <span>au {new Date(`${week.to}T12:00:00`).toLocaleDateString('fr-FR')}</span>
+            <button type="button" className="btn btn-secondary btn-sm" aria-label="Semaine suivante" onClick={() => changeWeek(1)}>›</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setWeek(weekRange(new Date()))}>Cette semaine</button>
+          </> : <>
+            <label>Du <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} /></label>
+            <label>Au <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} /></label>
+          </>}
+        </div>
+        {!validPeriod ? <p className="error">Choisissez une période valide.</p> : null}
+        <div className="planning-global__statuses" aria-label="Filtrer par statut">
+          <button type="button" className={`planning-global__status ${statusFilter === '' ? 'is-active' : ''}`} onClick={() => setStatusFilter('')}>Tous <strong>{events.length}</strong></button>
+          {(Object.keys(statusLabels) as PlanningStatus[]).map((status) =>
+            <button type="button" key={status} className={`planning-global__status ${statusFilter === status ? 'is-active' : ''}`} onClick={() => setStatusFilter(status)}>{statusLabels[status]} <strong>{statusCounts[status] ?? 0}</strong></button>
+          )}
         </div>
       </div>
 
       {isLoading ? <p className="text-muted">Chargement…</p> : null}
       {error ? <p className="error">{(error as Error).message}</p> : null}
-      {!isLoading && !error ? (
-        <div className="card table-wrap" style={{ padding: 0 }}>
-          <table className="data-table data-table--compact" style={{ width: '100%' }}>
-            <thead><tr><th>Période</th><th>Utilisateur</th><th>Matériel</th><th>Événement</th><th>Tâche / document</th><th>Notes</th></tr></thead>
+      {validPeriod && !isLoading && !error ? <>
+        <div className="planning-global__result-count">{filtered.length} événement{filtered.length > 1 ? 's' : ''} affiché{filtered.length > 1 ? 's' : ''} du {new Date(`${from}T12:00:00`).toLocaleDateString('fr-FR')} au {new Date(`${to}T12:00:00`).toLocaleDateString('fr-FR')}</div>
+        <div className="card table-wrap planning-global__table">
+          <table className="data-table data-table--compact">
+            <thead>
+              <tr><th>Période</th><th>Utilisateur</th><th>Matériel</th><th>Événement</th><th>Statut</th><th>Tâche / document</th><th>Notes</th></tr>
+              <tr className="planning-global__filter-row">
+                <th><input type="date" aria-label="Filtrer par date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} /></th>
+                <th><select aria-label="Filtrer par utilisateur" value={userFilter} onChange={(e) => setUserFilter(e.target.value)}><option value="">Tous</option>{users.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></th>
+                <th><select aria-label="Filtrer par matériel" value={equipmentFilter} onChange={(e) => setEquipmentFilter(e.target.value)}><option value="">Tout</option>{equipments.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></th>
+                <th><select aria-label="Filtrer par événement" value={eventFilter} onChange={(e) => setEventFilter(e.target.value)}><option value="">Tous</option>{types.map((type) => <option key={type} value={type}>{eventLabel(type)}</option>)}</select></th>
+                <th><select aria-label="Filtrer par statut" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as PlanningStatus | '')}><option value="">Tous</option>{(Object.keys(statusLabels) as PlanningStatus[]).map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select></th>
+                <th><input type="search" aria-label="Rechercher une tâche ou un document" placeholder="Rechercher…" value={taskFilter} onChange={(e) => setTaskFilter(e.target.value)} /></th>
+                <th><input type="search" aria-label="Rechercher dans les notes" placeholder="Rechercher…" value={notesFilter} onChange={(e) => setNotesFilter(e.target.value)} /></th>
+              </tr>
+            </thead>
             <tbody>
-              {filtered.length === 0 ? <tr><td colSpan={6} className="text-muted">Aucun événement pour cette période et ces filtres.</td></tr> : null}
-              {filtered.map((event) => {
+              {filtered.length === 0 ? <tr><td colSpan={7} className="text-muted">Aucun événement pour cette période et ces filtres.</td></tr> : null}
+              {visible.map((event) => {
                 const line = event.mission_task?.ordre_mission_ligne
                 const om = line?.ordre_mission
                 const bc = event.bon_commande_ligne?.bon_commande
@@ -101,6 +144,7 @@ export default function PlanningGlobalPage() {
                   <td>{event.user?.name ?? '—'}</td>
                   <td>{event.equipment ? <Link to={`/materiel/equipements/${event.equipment.id}`}>{event.equipment.code ? `${event.equipment.code} — ` : ''}{event.equipment.name}</Link> : '—'}</td>
                   <td>{eventLabel(event.type_evenement)}</td>
+                  <td>{statusLabels[eventStatus(event)]}</td>
                   <td>
                     {om ? <><Link to={`/ordres-mission/${om.id}`}>{om.numero}</Link> — {line?.libelle}</> : null}
                     {!om && bc ? <><Link to={`/bons-commande/${bc.id}`}>{bc.numero}</Link> — {event.bon_commande_ligne?.libelle}</> : null}
@@ -114,7 +158,12 @@ export default function PlanningGlobalPage() {
             </tbody>
           </table>
         </div>
-      ) : null}
+        {pageCount > 1 ? <nav className="planning-global__pagination" aria-label="Pages du planning">
+          <button type="button" className="btn btn-secondary btn-sm" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Précédent</button>
+          <span>Page {currentPage} sur {pageCount}</span>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Suivant</button>
+        </nav> : null}
+      </> : null}
     </ModuleEntityShell>
   )
 }

@@ -522,6 +522,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('tasks/{task}/types/{testType}/submit', [TaskTestFormController::class, 'submit'])->whereNumber('task')->whereNumber('testType');
         Route::post('tasks/{task}/types/{testType}/review', [TaskTestFormController::class, 'review'])->whereNumber('task')->whereNumber('testType');
         Route::post('tasks/{task}/types/{testType}/photos', [TaskTestFormController::class, 'uploadPhoto'])->whereNumber('task')->whereNumber('testType');
+        Route::get('tasks/{task}/types/{testType}/report.docx', [TaskTestFormController::class, 'downloadWord'])->whereNumber('task')->whereNumber('testType');
+        Route::get('tasks/{task}/types/{testType}/report.xlsx', [TaskTestFormController::class, 'downloadExcel'])->whereNumber('task')->whereNumber('testType');
         Route::get('photos/{photo}', [TaskTestFormController::class, 'downloadPhoto'])->whereNumber('photo');
         Route::delete('photos/{photo}', [TaskTestFormController::class, 'deletePhoto'])->whereNumber('photo');
     });

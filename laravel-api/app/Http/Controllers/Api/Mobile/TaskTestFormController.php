@@ -11,6 +11,8 @@ use App\Models\User;
 use App\Services\MissionTaskClosureService;
 use App\Services\TaskFormAssignmentService;
 use App\Services\DynamicTestFormService;
+use App\Services\TaskTestFormExcelGenerator;
+use App\Services\TaskTestFormWordGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -127,6 +129,40 @@ class TaskTestFormController extends Controller
     {
         $this->authorizeTask($request, $photo->form->missionTask);
         return Storage::disk('local')->download($photo->path, $photo->original_name);
+    }
+
+    public function downloadWord(Request $request, MissionTask $task, TestType $testType, TaskTestFormWordGenerator $generator): \Illuminate\Http\Response
+    {
+        $this->authorizeTask($request, $task);
+        $form = $this->assignedForm($task, $testType);
+        [$content, $filename] = $generator->generate($form);
+
+        return response($content, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    public function downloadExcel(Request $request, MissionTask $task, TestType $testType, TaskTestFormExcelGenerator $generator): \Illuminate\Http\Response
+    {
+        $this->authorizeTask($request, $task);
+        $form = $this->assignedForm($task, $testType);
+        [$content, $filename] = $generator->generate($form);
+
+        return response($content, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    private function assignedForm(MissionTask $task, TestType $testType): TaskTestForm
+    {
+        $this->assertAssignedType($task, $testType);
+
+        return TaskTestForm::query()
+            ->where('mission_task_id', $task->id)
+            ->where('test_type_id', $testType->id)
+            ->firstOrFail();
     }
 
     public function deletePhoto(Request $request, TaskTestFormPhoto $photo): JsonResponse

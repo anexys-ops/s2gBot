@@ -137,14 +137,14 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-                    <span style={{ fontSize: '1rem', color: '#6b7280', width: '1rem', textAlign: 'center' }}>
+                    <span style={{ fontSize: '1rem', color: '#374151', width: '1rem', textAlign: 'center' }}>
                       {isExpanded ? '▼' : '▶'}
                     </span>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
                         {jalon.article ? (
                           <>
-                            <span style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                            <span style={{ color: '#374151', fontSize: '0.85rem' }}>
                               [{jalon.article.code}]
                             </span>{' '}
                             {jalon.article.libelle}
@@ -153,7 +153,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                           jalon.libelle
                         )}
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                      <div style={{ fontSize: '0.8rem', color: '#374151', marginTop: '0.25rem' }}>
                         Total: <strong>{formatQuantity(jalon.quantite_totale)}</strong> •
                         Reste: <strong style={{ color: canSelect ? '#ef4444' : '#6b7280' }}>{formatQuantity(jalon.quantite_restante)}</strong>
                       </div>
@@ -190,7 +190,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                           }}
                         />
                       </label>
-                      <div style={{ fontSize: '0.8rem', color: '#6b7280', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: '0.8rem', color: '#374151', whiteSpace: 'nowrap' }}>
                         max: {formatQuantity(jalon.quantite_restante)}
                       </div>
                     </div>

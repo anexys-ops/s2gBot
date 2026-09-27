@@ -315,6 +315,8 @@ class OrdreMissionController extends Controller
         abort_if($ligne->ordre_mission_id !== $ordreMission->id, 404);
 
         $validated = $request->validate([
+            'libelle'             => 'sometimes|string',
+            'quantite'            => 'sometimes|numeric|min:0',
             'statut'              => 'sometimes|in:a_faire,en_cours,realise,annule',
             'assigned_user_id'    => 'nullable|exists:users,id',
             'equipment_id'        => 'nullable|exists:equipments,id',
@@ -329,6 +331,45 @@ class OrdreMissionController extends Controller
         $ligne->ensureTaskExists();
 
         return response()->json($ligne->fresh()->load(['assignedUser:id,name', 'equipment:id,name,code']));
+    }
+
+    public function updateLignes(Request $request, OrdreMission $ordreMission): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $validated = $request->validate([
+            'lignes'                        => 'required|array|min:1',
+            'lignes.*.id'                    => 'required|integer',
+            'lignes.*.libelle'               => 'sometimes|string',
+            'lignes.*.quantite'              => 'sometimes|numeric|min:0',
+            'lignes.*.statut'                => 'sometimes|in:a_faire,en_cours,realise,annule',
+            'lignes.*.assigned_user_id'      => 'nullable|exists:users,id',
+            'lignes.*.equipment_id'          => 'nullable|exists:equipments,id',
+            'lignes.*.date_prevue'           => 'nullable|date',
+            'lignes.*.date_realisation'      => 'nullable|date',
+            'lignes.*.duree_reelle_heures'   => 'nullable|integer|min:0',
+            'lignes.*.notes'                 => 'nullable|string',
+        ]);
+
+        $ligneIds = collect($validated['lignes'])->pluck('id');
+        $lignes = $ordreMission->lignes()->whereIn('id', $ligneIds)->get()->keyBy('id');
+
+        foreach ($validated['lignes'] as $row) {
+            $ligne = $lignes->get($row['id']);
+            abort_if(! $ligne, 404);
+
+            $ligne->update(collect($row)->except('id')->all());
+            $ligne->ensureTaskExists();
+        }
+
+        return response()->json(
+            $ordreMission->lignes()
+                ->whereIn('id', $ligneIds)
+                ->with(['assignedUser:id,name', 'equipment:id,name,code'])
+                ->get()
+        );
     }
 
     public function destroyLigne(Request $request, OrdreMission $ordreMission, OrdreMissionLigne $ligne): JsonResponse

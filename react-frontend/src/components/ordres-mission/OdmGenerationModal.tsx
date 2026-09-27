@@ -98,13 +98,34 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
     const ligne = allLignes.find((l) => l.id === ligneId)
     if (!ligne) return
 
-    const next = new Map(selections)
-    if (qty > 0 && qty <= ligne.quantite_restante) {
-      next.set(ligneId, qty)
-    } else {
-      next.delete(ligneId)
-    }
-    setSelections(next)
+    setSelections((prev) => {
+      const next = new Map(prev)
+      const capped = Math.max(0, Math.min(qty, ligne.quantite_restante))
+      if (capped > 0) {
+        next.set(ligneId, capped)
+      } else {
+        next.delete(ligneId)
+      }
+      return next
+    })
+  }
+
+  // Distribue une quantité totale sur les lignes d'un jalon (par ordre, jusqu'au max de chacune)
+  const applyJalonTotal = (lignes: typeof allLignes, totalQty: number) => {
+    setSelections((prev) => {
+      const next = new Map(prev)
+      let remaining = Math.max(0, totalQty)
+      for (const ligne of lignes) {
+        const take = Math.max(0, Math.min(remaining, ligne.quantite_restante))
+        if (take > 0) {
+          next.set(ligne.id, take)
+        } else {
+          next.delete(ligne.id)
+        }
+        remaining -= take
+      }
+      return next
+    })
   }
 
   if (isLoading) {
@@ -161,21 +182,15 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
-                    {/* Checkbox sélectionner tout le jalon */}
+                    {/* Checkbox sélectionner tout le jalon (quantité max disponible) */}
                     <input
                       type="checkbox"
                       checked={jalonSelected}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          // Sélectionner tous les produits du jalon avec quantité 1
-                          jalonGroup.lignes.forEach((ligne) => {
-                            updateQuantite(ligne.id, 1)
-                          })
+                          applyJalonTotal(jalonGroup.lignes, Math.max(0, jalonQtyBc - jalonQtyOm))
                         } else {
-                          // Déselectionner tous les produits du jalon
-                          jalonGroup.lignes.forEach((ligne) => {
-                            updateQuantite(ligne.id, 0)
-                          })
+                          applyJalonTotal(jalonGroup.lignes, 0)
                         }
                       }}
                       style={{
@@ -229,11 +244,31 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                       </div>
                     </div>
                   </div>
-                  {jalonSelected && (
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#3b82f6', whiteSpace: 'nowrap' }}>
-                      ✓ {formatQuantity(jalonTotalQty)}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+                    <input
+                      type="number"
+                      min={0}
+                      max={Math.max(0, jalonQtyBc - jalonQtyOm)}
+                      value={jalonTotalQty}
+                      onChange={(e) => applyJalonTotal(jalonGroup.lignes, Number(e.target.value) || 0)}
+                      placeholder="0"
+                      title="Quantité totale à générer pour ce jalon (répartie sur les produits)"
+                      style={{
+                        width: '70px',
+                        padding: '0.4rem 0.5rem',
+                        borderRadius: 3,
+                        border: `1px solid ${jalonSelected ? '#3b82f6' : '#d1d5db'}`,
+                        fontSize: '0.9rem',
+                        fontFamily: 'inherit',
+                        textAlign: 'center',
+                        fontWeight: 600,
+                        color: jalonSelected ? '#1e40af' : '#1f2937',
+                      }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                      / {formatQuantity(Math.max(0, jalonQtyBc - jalonQtyOm))}
                     </span>
-                  )}
+                  </div>
                 </div>
 
                 {/* NIVEAU 2: PRODUITS DU JALON */}

@@ -1,7 +1,7 @@
 {
   "name": "lab-btp-frontend",
   "private": true,
-  "version": "1.11.40",
+  "version": "1.11.41",
   "type": "module",
   "scripts": {
     "dev": "vite",

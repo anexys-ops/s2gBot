@@ -132,27 +132,26 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
               <div
                 key={jalon.id}
                 style={{
-                  minHeight: '55px',
                   borderRadius: 6,
                   border: `1px solid ${isSelected ? '#3b82f6' : '#e5e7eb'}`,
                   background: isSelected ? '#eff6ff' : '#f9fafb',
-                  overflow: 'visible',
                 }}
               >
-                {/* En-tête jalon (dépliable avec checkbox) */}
+                {/* En-tête jalon */}
                 <div
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    background: 'transparent',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.75rem',
                     justifyContent: 'space-between',
                     textAlign: 'left',
+                    minHeight: '55px',
+                    boxSizing: 'border-box',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
                     {/* Checkbox */}
                     <input
                       type="checkbox"
@@ -166,13 +165,15 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                         }
                       }}
                       style={{
-                        width: '1.1rem',
-                        height: '1.1rem',
+                        width: '1.2rem',
+                        height: '1.2rem',
                         cursor: 'pointer',
                         flexShrink: 0,
+                        accentColor: '#3b82f6',
                       }}
                     />
-                    {/* Expand/collapse button */}
+
+                    {/* Expand button */}
                     <button
                       type="button"
                       onClick={() => toggleJalon(jalon.id)}
@@ -181,20 +182,26 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                         border: 'none',
                         cursor: 'pointer',
                         padding: 0,
+                        fontSize: '0.8rem',
+                        color: '#6b7280',
+                        flexShrink: 0,
+                        width: '1rem',
+                        height: '1rem',
                         display: 'flex',
                         alignItems: 'center',
-                        fontSize: '0.9rem',
-                        color: '#374151',
+                        justifyContent: 'center',
                       }}
+                      title={isExpanded ? 'Replier' : 'Déplie'}
                     >
                       {isExpanded ? '▼' : '▶'}
                     </button>
+
                     {/* Jalon info */}
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#1f2937' }}>
                         {jalon.article ? (
                           <>
-                            <span style={{ color: '#374151', fontSize: '0.85rem' }}>
+                            <span style={{ color: '#6b7280', fontSize: '0.85rem' }}>
                               [{jalon.article.code}]
                             </span>{' '}
                             {jalon.article.libelle}
@@ -203,38 +210,38 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                           jalon.libelle
                         )}
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
-                        <div>BC: <strong style={{ color: '#1f2937' }}>{formatQuantity(jalon.quantite_totale)}</strong></div>
-                        <div>OM: <strong style={{ color: '#1f2937' }}>{formatQuantity(jalon.quantite_generee ?? 0)}</strong></div>
-                        <div>Reste: <strong style={{ color: canSelect ? '#ef4444' : '#6b7280' }}>{formatQuantity(jalon.quantite_restante)}</strong></div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                        BC: <strong>{formatQuantity(jalon.quantite_totale)}</strong> • OM: <strong>{formatQuantity(jalon.quantite_generee ?? 0)}</strong> • Reste: <strong style={{ color: canSelect ? '#dc2626' : '#9ca3af' }}>{formatQuantity(jalon.quantite_restante)}</strong>
                       </div>
                     </div>
                   </div>
+
                   {isSelected && (
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#3b82f6' }}>
-                      {selectedQty} à générer
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#3b82f6', whiteSpace: 'nowrap' }}>
+                      ✓ {formatQuantity(selectedQty)}
                     </span>
                   )}
                 </div>
 
-                {/* Contenu dépliable - Détails et quantité */}
+                {/* Contenu dépliable */}
                 {isExpanded && (
-                  <div style={{ padding: '0.75rem', paddingTop: 0, borderTop: '1px solid #e5e7eb', background: '#fafbfc' }}>
-                    <div style={{ marginBottom: '0.75rem' }}>
+                  <div style={{ padding: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid #e5e7eb', background: '#fafbfc' }}>
+                    <div style={{ marginBottom: '1rem' }}>
                       <div style={{ fontSize: '0.85rem', fontWeight: 500, color: '#374151', marginBottom: '0.5rem' }}>
-                        Article: <span style={{ fontWeight: 600, color: '#1f2937' }}>{jalon.article?.libelle || 'N/A'}</span>
+                        📦 {jalon.article?.libelle || 'Article'}
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: '#6b7280', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                      <div style={{ fontSize: '0.8rem', color: '#6b7280', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                         <div>BC: {formatQuantity(jalon.quantite_totale)}</div>
                         <div>OM: {formatQuantity(jalon.quantite_generee ?? 0)}</div>
-                        <div>Dispo: <strong style={{ color: '#10b981' }}>{formatQuantity(jalon.quantite_restante)}</strong></div>
+                        <div style={{ gridColumn: '1 / -1' }}>Disponible: <strong style={{ color: '#10b981' }}>{formatQuantity(jalon.quantite_restante)}</strong></div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.75rem' }}>
-                      <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#374151' }}>
-                          Quantité à générer en OM
-                        </span>
+
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#374151' }}>
+                        Quantité à générer
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <input
                           type="number"
                           min={0}
@@ -243,6 +250,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                           onChange={(e) => updateQuantite(jalon.id, Number(e.target.value) || 0)}
                           placeholder="0"
                           style={{
+                            flex: 1,
                             padding: '0.5rem 0.75rem',
                             borderRadius: 4,
                             border: '1px solid #d1d5db',
@@ -250,14 +258,15 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                             fontFamily: 'inherit',
                           }}
                         />
-                      </label>
-                      <div style={{ fontSize: '0.8rem', color: '#6b7280', whiteSpace: 'nowrap' }}>
-                        max: {formatQuantity(jalon.quantite_restante)}
+                        <span style={{ fontSize: '0.8rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                          / {formatQuantity(jalon.quantite_restante)}
+                        </span>
                       </div>
-                    </div>
+                    </label>
+
                     {selectedQty > 0 && (
-                      <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#10b981', fontWeight: 500 }}>
-                        ✓ {formatQuantity(selectedQty)} sera généré en OM
+                      <div style={{ marginTop: '0.75rem', padding: '0.5rem', borderRadius: 3, background: '#dcfce7', fontSize: '0.8rem', color: '#166534', fontWeight: 500 }}>
+                        ✓ Inclus dans la génération
                       </div>
                     )}
                   </div>

@@ -23,10 +23,12 @@ type SubItem = {
 
 type MenuGroupId =
   | 'commercial'
+  | 'planification'
   | 'terrain'
   | 'laboratoire'
+  | 'essais'
+  | 'materiel'
   | 'ingenierie'
-  | 'rapport-bc'
   | 'catalogue'
   | 'configuration'
   | 'rapports'
@@ -34,7 +36,7 @@ type MenuGroupId =
 type MenuGroup = {
   id: MenuGroupId
   label: string
-  module: StaffModuleKey
+  module?: StaffModuleKey
   items: SubItem[]
 }
 
@@ -50,14 +52,24 @@ function isCommercialActive(pathname: string): boolean {
 }
 
 function isTerrainActive(pathname: string): boolean {
+  if (pathname.startsWith('/terrain/taches') || pathname.startsWith('/terrain/planning')) return false
   if (pathname.startsWith('/terrain')) return true
-  if (pathname.startsWith('/ordres-mission')) return true
   if (pathname.startsWith('/notes-de-frais')) return true
   return false
 }
 
 function isLaboratoireActive(pathname: string): boolean {
+  if (pathname.startsWith('/labo/taches') || pathname.startsWith('/labo/planning')) return false
   if (pathname.startsWith('/labo')) return true
+  return false
+}
+
+function isPlanificationActive(pathname: string): boolean {
+  if (pathname === '/planning') return true
+  if (pathname.startsWith('/ordres-mission')) return true
+  if (pathname.startsWith('/labo/taches') || pathname.startsWith('/labo/planning')) return true
+  if (pathname.startsWith('/materiel/planning')) return true
+  if (pathname.startsWith('/terrain/taches') || pathname.startsWith('/terrain/planning')) return true
   return false
 }
 
@@ -68,12 +80,18 @@ function isIngenerieActive(pathname: string): boolean {
 
 function isCatalogueActive(pathname: string): boolean {
   if (pathname === '/catalogue' || pathname.startsWith('/catalogue/')) return true
-  if (pathname.startsWith('/materiel')) return true
   return false
 }
 
+function isMaterielActive(pathname: string): boolean {
+  if (pathname.startsWith('/materiel/planning')) return false
+  return pathname.startsWith('/materiel')
+}
+
 function isConfigurationActive(pathname: string): boolean {
+  if (pathname.startsWith('/config/listes-essais')) return true
   if (pathname.startsWith('/config/agences')) return true
+  if (pathname.startsWith('/config/centres')) return true
   if (pathname.startsWith('/settings/utilisateurs')) return true
   if (pathname.startsWith('/settings/groupes')) return true
   if (pathname.startsWith('/back-office/modeles-documents-pdf')) return true
@@ -89,14 +107,18 @@ function isGroupActive(id: MenuGroupId, pathname: string): boolean {
   switch (id) {
     case 'commercial':
       return isCommercialActive(pathname) || pathname.startsWith('/dossiers')
+    case 'planification':
+      return isPlanificationActive(pathname)
     case 'terrain':
       return isTerrainActive(pathname)
     case 'laboratoire':
       return isLaboratoireActive(pathname)
+    case 'essais':
+      return pathname.startsWith('/catalogue/essais')
+    case 'materiel':
+      return isMaterielActive(pathname)
     case 'ingenierie':
       return isIngenerieActive(pathname)
-    case 'rapport-bc':
-      return pathname.startsWith('/rapport-bc')
     case 'catalogue':
       return isCatalogueActive(pathname)
     case 'configuration':
@@ -158,17 +180,26 @@ export default function AppNavigation() {
         ]),
       },
       {
+        id: 'planification',
+        label: 'Planification',
+        items: filterItems([
+          { to: '/planning', label: 'Planning global' },
+          ...(canOdm ? [{ to: '/ordres-mission', label: 'Ordres de missions' }] : []),
+          { to: '/terrain/planning', label: 'Planning terrain', module: 'terrain' },
+          { to: '/terrain/taches', label: 'Tâches terrain', module: 'terrain' },
+          { to: '/labo/planning', label: 'Planning laboratoire', module: 'laboratoire' },
+          { to: '/labo/taches', label: 'Tâches laboratoire', module: 'laboratoire' },
+          { to: '/materiel/planning', label: 'Planning matériel', module: 'catalogue' },
+        ]),
+      },
+      {
         id: 'terrain',
         label: 'Terrain',
         module: 'terrain',
         items: filterItems([
           { to: '/terrain/chantiers', label: 'Chantiers et carte GPS', module: 'terrain' },
           { to: '/terrain/mesures', label: 'Mesures terrain', module: 'terrain' },
-          ...(canOdm
-            ? [{ to: '/ordres-mission?context=terrain&type=technicien', label: 'Ordres de mission', module: 'terrain' as StaffModuleKey }]
-            : []),
-          { to: '/terrain/taches', label: 'Tâches terrain', module: 'terrain' },
-          { to: '/terrain/planning', label: 'Planning terrain', module: 'terrain' },
+          { to: '/rapport-bc', label: 'Rapports de mission', module: 'rapport-bc' },
           { to: '/notes-de-frais', label: 'Notes de frais', module: 'terrain' },
         ]),
       },
@@ -178,14 +209,18 @@ export default function AppNavigation() {
         module: 'laboratoire',
         items: filterItems([
           { to: '/labo/reception', label: 'Réception (FOLD)', module: 'laboratoire' },
-          ...(canOdm
-            ? [{ to: '/ordres-mission?context=labo&type=labo', label: 'Ordres de mission', module: 'laboratoire' as StaffModuleKey }]
-            : []),
-          { to: '/labo/taches', label: 'Tâches labo', module: 'laboratoire' },
-          { to: '/labo/planning', label: 'Planning labo', module: 'laboratoire' },
           { to: '/labo/rapports', label: "Rapports d'essais", module: 'laboratoire' },
+          { to: '/rapport-bc', label: 'Rapports de mission', module: 'rapport-bc' },
           { to: '/labo/fiches', label: 'Fiches techniques', module: 'laboratoire' },
           { to: '/labo/transco', label: 'Transco FOLD', module: 'laboratoire', permission: 'config.manage' },
+        ]),
+      },
+      {
+        id: 'essais',
+        label: 'Essais',
+        items: filterItems([
+          { to: '/catalogue/essais', label: 'Types d’essais et formulaires' },
+          { to: '/graphiques-essais', label: 'Graphiques d’essais', module: 'laboratoire' },
         ]),
       },
       {
@@ -198,14 +233,17 @@ export default function AppNavigation() {
             : []),
           { to: '/ingenierie/taches', label: 'Tâches ingénieur', module: 'ingenierie' },
           { to: '/ingenierie/planning', label: 'Planning ingénieur', module: 'ingenierie' },
+          { to: '/rapport-bc', label: 'Rapports de mission', module: 'rapport-bc' },
         ]),
       },
       {
-        id: 'rapport-bc',
-        label: 'Rapport',
-        module: 'rapport-bc',
+        id: 'materiel',
+        label: 'Matériel',
+        module: 'catalogue',
         items: filterItems([
-          { to: '/rapport-bc', label: 'Rapports de mission', module: 'rapport-bc' as StaffModuleKey },
+          { to: '/materiel/equipements', label: 'Équipements', module: 'catalogue' },
+          { to: '/materiel/planning', label: 'Planning matériel', module: 'catalogue' },
+          { to: '/materiel/stocks', label: 'Stocks', module: 'catalogue' },
         ]),
       },
       {
@@ -221,8 +259,9 @@ export default function AppNavigation() {
     ]
 
     return allGroups.filter((group) => {
+      if (group.id === 'essais') return canAccessStaffModule(user, 'catalogue') || canAccessStaffModule(user, 'laboratoire')
       if (group.id === 'commercial' && !canCommercial && !canDossiers) return false
-      if (!canAccessStaffModule(user, group.module) && group.id !== 'commercial') return false
+      if (group.module && !canAccessStaffModule(user, group.module) && group.id !== 'commercial') return false
       if (group.id === 'commercial' && (canCommercial || canDossiers)) return group.items.length > 0
       return group.items.length > 0
     })
@@ -237,7 +276,7 @@ export default function AppNavigation() {
       })
     return filterItems([
       { to: '/catalogue', label: 'Articles & essais', module: 'catalogue' as StaffModuleKey },
-      { to: '/materiel/equipements', label: 'Matériel / Équipements', module: 'catalogue' as StaffModuleKey },
+      { to: '/catalogue/essais', label: 'Types d’essais et formulaires' },
       { to: '/labo/fiches', label: 'Fiches techniques', module: 'laboratoire' as StaffModuleKey },
     ])
   }, [user])
@@ -251,6 +290,7 @@ export default function AppNavigation() {
     if (canManageGroups(user))
       items.push({ to: '/settings/groupes', label: 'Groupes & droits', module: 'configuration' as StaffModuleKey })
     if (canManageAppConfig(user)) {
+      items.push({ to: '/config/listes-essais', label: 'Listes de choix des essais', module: 'configuration' as StaffModuleKey })
       items.push({ to: '/back-office/modeles-documents-pdf', label: 'Modèles PDF', module: 'configuration' as StaffModuleKey })
       items.push({ to: '/back-office/configuration', label: 'Modules', module: 'configuration' as StaffModuleKey })
     }

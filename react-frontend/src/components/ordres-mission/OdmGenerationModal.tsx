@@ -113,6 +113,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
               <div
                 key={jalon.id}
                 style={{
+                  minHeight: '55px',
                   borderRadius: 6,
                   border: `1px solid ${isSelected ? '#3b82f6' : '#e5e7eb'}`,
                   background: isSelected ? '#eff6ff' : '#f9fafb',

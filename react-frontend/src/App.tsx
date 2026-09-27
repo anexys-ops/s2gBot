@@ -1,121 +1,132 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
-import DossiersListPage from './pages/dossiers/DossiersListPage'
-import DossierFichePage from './pages/dossiers/DossierFichePage'
-import DossierInfosTab from './pages/dossiers/tabs/DossierInfosTab'
-import DossierEssaisTab from './pages/dossiers/tabs/DossierEssaisTab'
-import DossierBcBlTab from './pages/dossiers/tabs/DossierBcBlTab'
-import DossierDevisTab from './pages/dossiers/tabs/DossierDevisTab'
-import DossierDocumentsTab from './pages/dossiers/tabs/DossierDocumentsTab'
-import DossierExtrafieldsTab from './pages/dossiers/tabs/DossierExtrafieldsTab'
-import CatalogueListePage from './pages/catalogue/CatalogueListePage'
-import Catalog from './pages/Catalog'
-import FormOptionListsPage from './pages/settings/FormOptionListsPage'
-import ArticleFichePage from './pages/catalogue/ArticleFichePage'
-import DossierNewPage from './pages/dossiers/DossierNewPage'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import Layout from './components/Layout'
-import Login from './pages/Login'
-import ResetPasswordPage from './pages/ResetPasswordPage'
-import Register from './pages/Register'
-import Dashboard from './pages/Dashboard'
-import Orders from './pages/Orders'
-import OrderDetail from './pages/OrderDetail'
-import OrderNew from './pages/OrderNew'
-import Invoices from './pages/Invoices'
-import InvoiceEditorPage from './pages/invoices/InvoiceEditorPage'
-import Clients from './pages/Clients'
-import Sites from './pages/Sites'
-import Devis from './pages/Devis'
-import PdfModule from './pages/PdfModule'
-import Mails from './pages/Mails'
-import Cadrage from './pages/back-office/Cadrage'
-import ExemplesCalculs from './pages/back-office/ExemplesCalculs'
-import GranulometryLab from './pages/back-office/GranulometryLab'
-import ActivityLogPage from './pages/back-office/ActivityLogPage'
-import EquipmentsPage from './pages/back-office/EquipmentsPage'
-import EquipmentDetailPage from './pages/back-office/EquipmentDetailPage'
-import NonConformitiesPage from './pages/back-office/NonConformitiesPage'
-import NonConformityDetailPage from './pages/back-office/NonConformityDetailPage'
-import BackOfficeLayout from './pages/back-office/BackOfficeLayout'
-import GraphiquesEssais from './pages/GraphiquesEssais'
-import CrmHub from './pages/hub/CrmHub'
-import CrmDocuments from './pages/CrmDocuments'
-import TerrainHub from './pages/hub/TerrainHub'
-import LaboHub from './pages/hub/LaboHub'
-import TerrainMesuresPage from './pages/terrain/TerrainMesuresPage'
-import TerrainChantiersCartePage from './pages/TerrainChantiersCartePage'
-import LaboEssaisPage from './pages/LaboEssaisPage'
-import LaboTasksPage from './pages/labo/LaboTasksPage'
-import FichesTechniquesPage from './pages/labo/FichesTechniquesPage'
-import TerrainTasksPage from './pages/terrain/TerrainTasksPage'
-import ExpenseReportsPage from './pages/terrain/ExpenseReportsPage'
-import PlanningGlobalPage from './pages/planning/PlanningGlobalPage'
-import ReportsLayout from './pages/reports/ReportsLayout'
-import HelpOpenApiPage from './pages/HelpOpenApiPage'
-import ClientLayout, { LegacyClientCommercialRedirect } from './pages/clients/ClientLayout'
-import ClientFicheTab from './pages/clients/ClientFicheTab'
-import ClientCommerceTab from './pages/clients/ClientCommerceTab'
-import ClientDocumentsTab from './pages/clients/ClientDocumentsTab'
-import ClientContactsPage from './pages/clients/ClientContactsPage'
-import ClientExtrafieldsTab from './pages/clients/ClientExtrafieldsTab'
-import ClientAgenciesRoute from './pages/clients/ClientAgenciesRoute'
-import ClientsMapPage from './pages/clients/ClientsMapPage'
-import SiteLayout from './pages/sites/SiteLayout'
-import SiteFicheTab from './pages/sites/SiteFicheTab'
-import SiteMissionsTab from './pages/sites/SiteMissionsTab'
-import SiteMapTab from './pages/sites/SiteMapTab'
-import DocumentPdfTemplates from './pages/DocumentPdfTemplates'
-import DocumentPdfTemplateDetail from './pages/DocumentPdfTemplateDetail'
-import ModuleConfigurationPage from './pages/back-office/ModuleConfigurationPage'
-import ReportComptaPage from './pages/reports/ReportComptaPage'
-import ReportVentesPage from './pages/reports/ReportVentesPage'
-import ReportDelaiTraitementPage from './pages/reports/ReportDelaiTraitementPage'
-import ReportKpiPage from './pages/reports/ReportKpiPage'
-import QuoteEditorPage from './pages/QuoteEditorPage'
-import CommercialCatalogPage from './pages/CommercialCatalogPage'
-import SettingsLayout from './pages/settings/SettingsLayout'
-import SettingsAccountPage from './pages/settings/SettingsAccountPage'
-import SettingsSecurityPage from './pages/settings/SettingsSecurityPage'
-import SettingsUsersPage from './pages/settings/SettingsUsersPage'
-import SettingsGroupsPage from './pages/settings/SettingsGroupsPage'
-import SettingsBrandingPage from './pages/settings/SettingsBrandingPage'
-import SettingsLogsPage from './pages/settings/SettingsLogsPage'
-import BonsCommandeListPage from './pages/commercial/BonsCommandeListPage'
-import BonCommandeFichePage from './pages/commercial/BonCommandeFichePage'
-import BonsLivraisonListPage from './pages/commercial/BonsLivraisonListPage'
-import BonLivraisonFichePage from './pages/commercial/BonLivraisonFichePage'
-import ComptaFondationPage from './pages/commercial/ComptaFondationPage'
-import OrdresMissionPage from './pages/commercial/OrdresMissionPage'
-import OrdreMissionFichePage from './pages/commercial/OrdreMissionFichePage'
-import OrdreMissionPlanningPage from './pages/commercial/OrdreMissionPlanningPage'
-import MaterielModuleLayout from './pages/materiel/MaterielModuleLayout'
-import MaterielPlanningPage from './pages/materiel/MaterielPlanningPage'
-import MaterielStocksPage from './pages/materiel/MaterielStocksPage'
-import {
-  BackOfficeEquipementsListRedirect,
-  BackOfficeEquipementDetailRedirect,
-} from './pages/back-office/BackOfficeMaterielRedirects'
-import PlanningTechniciensPage from './pages/terrain/PlanningTechniciensPage'
-import AgencesPage from './pages/config/AgencesPage'
-import SettingsCentresPage from './pages/settings/SettingsCentresPage'
-import PlanningIngenieurPage from './pages/ingenierie/PlanningIngenieurPage'
-import LaboReceptionPage from './pages/labo/LaboReceptionPage'
-import PlanningLaboPage from './pages/labo/PlanningLaboPage'
-import TranscoFoldPage from './pages/labo/TranscoFoldPage'
-import LabReportsListPage from './pages/labo/LabReportsListPage'
-import LabReportViewPage from './pages/labo/LabReportViewPage'
-import RapportBCListPage from './pages/rapport-bc/RapportBCListPage'
-import RapportBCDetailPage from './pages/rapport-bc/RapportBCDetailPage'
-import NotFoundPage from './pages/NotFoundPage'
-import PortalLayout from './components/PortalLayout'
-import PortalHomePage from './pages/portal/PortalHomePage'
-import PortalInterventionsPage from './pages/portal/PortalInterventionsPage'
-import PortalRapportsPage from './pages/portal/PortalRapportsPage'
-import PortalRapportViewPage from './pages/portal/PortalRapportViewPage'
-import PortalBonsLivraisonPage from './pages/portal/PortalBonsLivraisonPage'
-import PortalBLFichePage from './pages/portal/PortalBLFichePage'
 import { hasPortalModule, isPortalUser, type PortalModuleKey } from './lib/portalAccess'
 import { canAccessStaffPath, staffHomePath } from './lib/staffAccess'
+
+// Chaque page est chargée à la demande (code-splitting par route) plutôt que
+// regroupée dans un seul bundle initial — évite de télécharger/parser tout le
+// site (115+ pages) avant d'afficher la première.
+const DossiersListPage = lazy(() => import('./pages/dossiers/DossiersListPage'))
+const DossierFichePage = lazy(() => import('./pages/dossiers/DossierFichePage'))
+const DossierInfosTab = lazy(() => import('./pages/dossiers/tabs/DossierInfosTab'))
+const DossierEssaisTab = lazy(() => import('./pages/dossiers/tabs/DossierEssaisTab'))
+const DossierBcBlTab = lazy(() => import('./pages/dossiers/tabs/DossierBcBlTab'))
+const DossierDevisTab = lazy(() => import('./pages/dossiers/tabs/DossierDevisTab'))
+const DossierDocumentsTab = lazy(() => import('./pages/dossiers/tabs/DossierDocumentsTab'))
+const DossierExtrafieldsTab = lazy(() => import('./pages/dossiers/tabs/DossierExtrafieldsTab'))
+const CatalogueListePage = lazy(() => import('./pages/catalogue/CatalogueListePage'))
+const Catalog = lazy(() => import('./pages/Catalog'))
+const FormOptionListsPage = lazy(() => import('./pages/settings/FormOptionListsPage'))
+const ArticleFichePage = lazy(() => import('./pages/catalogue/ArticleFichePage'))
+const DossierNewPage = lazy(() => import('./pages/dossiers/DossierNewPage'))
+const Layout = lazy(() => import('./components/Layout'))
+const Login = lazy(() => import('./pages/Login'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
+const Register = lazy(() => import('./pages/Register'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Orders = lazy(() => import('./pages/Orders'))
+const OrderDetail = lazy(() => import('./pages/OrderDetail'))
+const OrderNew = lazy(() => import('./pages/OrderNew'))
+const Invoices = lazy(() => import('./pages/Invoices'))
+const InvoiceEditorPage = lazy(() => import('./pages/invoices/InvoiceEditorPage'))
+const Clients = lazy(() => import('./pages/Clients'))
+const Sites = lazy(() => import('./pages/Sites'))
+const Devis = lazy(() => import('./pages/Devis'))
+const PdfModule = lazy(() => import('./pages/PdfModule'))
+const Mails = lazy(() => import('./pages/Mails'))
+const Cadrage = lazy(() => import('./pages/back-office/Cadrage'))
+const ExemplesCalculs = lazy(() => import('./pages/back-office/ExemplesCalculs'))
+const GranulometryLab = lazy(() => import('./pages/back-office/GranulometryLab'))
+const ActivityLogPage = lazy(() => import('./pages/back-office/ActivityLogPage'))
+const EquipmentsPage = lazy(() => import('./pages/back-office/EquipmentsPage'))
+const EquipmentDetailPage = lazy(() => import('./pages/back-office/EquipmentDetailPage'))
+const NonConformitiesPage = lazy(() => import('./pages/back-office/NonConformitiesPage'))
+const NonConformityDetailPage = lazy(() => import('./pages/back-office/NonConformityDetailPage'))
+const BackOfficeLayout = lazy(() => import('./pages/back-office/BackOfficeLayout'))
+const GraphiquesEssais = lazy(() => import('./pages/GraphiquesEssais'))
+const CrmHub = lazy(() => import('./pages/hub/CrmHub'))
+const CrmDocuments = lazy(() => import('./pages/CrmDocuments'))
+const TerrainHub = lazy(() => import('./pages/hub/TerrainHub'))
+const LaboHub = lazy(() => import('./pages/hub/LaboHub'))
+const TerrainMesuresPage = lazy(() => import('./pages/terrain/TerrainMesuresPage'))
+const TerrainChantiersCartePage = lazy(() => import('./pages/TerrainChantiersCartePage'))
+const LaboEssaisPage = lazy(() => import('./pages/LaboEssaisPage'))
+const LaboTasksPage = lazy(() => import('./pages/labo/LaboTasksPage'))
+const FichesTechniquesPage = lazy(() => import('./pages/labo/FichesTechniquesPage'))
+const TerrainTasksPage = lazy(() => import('./pages/terrain/TerrainTasksPage'))
+const ExpenseReportsPage = lazy(() => import('./pages/terrain/ExpenseReportsPage'))
+const PlanningGlobalPage = lazy(() => import('./pages/planning/PlanningGlobalPage'))
+const ReportsLayout = lazy(() => import('./pages/reports/ReportsLayout'))
+const HelpOpenApiPage = lazy(() => import('./pages/HelpOpenApiPage'))
+const ClientLayout = lazy(() => import('./pages/clients/ClientLayout'))
+const LegacyClientCommercialRedirect = lazy(() =>
+  import('./pages/clients/ClientLayout').then((m) => ({ default: m.LegacyClientCommercialRedirect })))
+const ClientFicheTab = lazy(() => import('./pages/clients/ClientFicheTab'))
+const ClientCommerceTab = lazy(() => import('./pages/clients/ClientCommerceTab'))
+const ClientDocumentsTab = lazy(() => import('./pages/clients/ClientDocumentsTab'))
+const ClientContactsPage = lazy(() => import('./pages/clients/ClientContactsPage'))
+const ClientExtrafieldsTab = lazy(() => import('./pages/clients/ClientExtrafieldsTab'))
+const ClientAgenciesRoute = lazy(() => import('./pages/clients/ClientAgenciesRoute'))
+const ClientsMapPage = lazy(() => import('./pages/clients/ClientsMapPage'))
+const SiteLayout = lazy(() => import('./pages/sites/SiteLayout'))
+const SiteFicheTab = lazy(() => import('./pages/sites/SiteFicheTab'))
+const SiteMissionsTab = lazy(() => import('./pages/sites/SiteMissionsTab'))
+const SiteMapTab = lazy(() => import('./pages/sites/SiteMapTab'))
+const DocumentPdfTemplates = lazy(() => import('./pages/DocumentPdfTemplates'))
+const DocumentPdfTemplateDetail = lazy(() => import('./pages/DocumentPdfTemplateDetail'))
+const ModuleConfigurationPage = lazy(() => import('./pages/back-office/ModuleConfigurationPage'))
+const ReportComptaPage = lazy(() => import('./pages/reports/ReportComptaPage'))
+const ReportVentesPage = lazy(() => import('./pages/reports/ReportVentesPage'))
+const ReportDelaiTraitementPage = lazy(() => import('./pages/reports/ReportDelaiTraitementPage'))
+const ReportKpiPage = lazy(() => import('./pages/reports/ReportKpiPage'))
+const QuoteEditorPage = lazy(() => import('./pages/QuoteEditorPage'))
+const CommercialCatalogPage = lazy(() => import('./pages/CommercialCatalogPage'))
+const SettingsLayout = lazy(() => import('./pages/settings/SettingsLayout'))
+const SettingsAccountPage = lazy(() => import('./pages/settings/SettingsAccountPage'))
+const SettingsSecurityPage = lazy(() => import('./pages/settings/SettingsSecurityPage'))
+const SettingsUsersPage = lazy(() => import('./pages/settings/SettingsUsersPage'))
+const SettingsGroupsPage = lazy(() => import('./pages/settings/SettingsGroupsPage'))
+const SettingsBrandingPage = lazy(() => import('./pages/settings/SettingsBrandingPage'))
+const SettingsLogsPage = lazy(() => import('./pages/settings/SettingsLogsPage'))
+const BonsCommandeListPage = lazy(() => import('./pages/commercial/BonsCommandeListPage'))
+const BonCommandeFichePage = lazy(() => import('./pages/commercial/BonCommandeFichePage'))
+const BonsLivraisonListPage = lazy(() => import('./pages/commercial/BonsLivraisonListPage'))
+const BonLivraisonFichePage = lazy(() => import('./pages/commercial/BonLivraisonFichePage'))
+const ComptaFondationPage = lazy(() => import('./pages/commercial/ComptaFondationPage'))
+const OrdresMissionPage = lazy(() => import('./pages/commercial/OrdresMissionPage'))
+const OrdreMissionFichePage = lazy(() => import('./pages/commercial/OrdreMissionFichePage'))
+const OrdreMissionPlanningPage = lazy(() => import('./pages/commercial/OrdreMissionPlanningPage'))
+const MaterielModuleLayout = lazy(() => import('./pages/materiel/MaterielModuleLayout'))
+const MaterielPlanningPage = lazy(() => import('./pages/materiel/MaterielPlanningPage'))
+const MaterielStocksPage = lazy(() => import('./pages/materiel/MaterielStocksPage'))
+const BackOfficeEquipementsListRedirect = lazy(() =>
+  import('./pages/back-office/BackOfficeMaterielRedirects').then((m) => ({ default: m.BackOfficeEquipementsListRedirect })))
+const BackOfficeEquipementDetailRedirect = lazy(() =>
+  import('./pages/back-office/BackOfficeMaterielRedirects').then((m) => ({ default: m.BackOfficeEquipementDetailRedirect })))
+const PlanningTechniciensPage = lazy(() => import('./pages/terrain/PlanningTechniciensPage'))
+const AgencesPage = lazy(() => import('./pages/config/AgencesPage'))
+const SettingsCentresPage = lazy(() => import('./pages/settings/SettingsCentresPage'))
+const PlanningIngenieurPage = lazy(() => import('./pages/ingenierie/PlanningIngenieurPage'))
+const LaboReceptionPage = lazy(() => import('./pages/labo/LaboReceptionPage'))
+const PlanningLaboPage = lazy(() => import('./pages/labo/PlanningLaboPage'))
+const TranscoFoldPage = lazy(() => import('./pages/labo/TranscoFoldPage'))
+const LabReportsListPage = lazy(() => import('./pages/labo/LabReportsListPage'))
+const LabReportViewPage = lazy(() => import('./pages/labo/LabReportViewPage'))
+const RapportBCListPage = lazy(() => import('./pages/rapport-bc/RapportBCListPage'))
+const RapportBCDetailPage = lazy(() => import('./pages/rapport-bc/RapportBCDetailPage'))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
+const PortalLayout = lazy(() => import('./components/PortalLayout'))
+const PortalHomePage = lazy(() => import('./pages/portal/PortalHomePage'))
+const PortalInterventionsPage = lazy(() => import('./pages/portal/PortalInterventionsPage'))
+const PortalRapportsPage = lazy(() => import('./pages/portal/PortalRapportsPage'))
+const PortalRapportViewPage = lazy(() => import('./pages/portal/PortalRapportViewPage'))
+const PortalBonsLivraisonPage = lazy(() => import('./pages/portal/PortalBonsLivraisonPage'))
+const PortalBLFichePage = lazy(() => import('./pages/portal/PortalBLFichePage'))
+
+function RouteFallback() {
+  return <div className="container">Chargement...</div>
+}
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -164,6 +175,7 @@ function QuoteIdRedirect() {
 
 function AppRoutes() {
   return (
+    <Suspense fallback={<RouteFallback />}>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/login/reinitialiser" element={<ResetPasswordPage />} />
@@ -392,6 +404,7 @@ function AppRoutes() {
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
+    </Suspense>
   )
 }
 

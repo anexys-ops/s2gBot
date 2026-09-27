@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { taskTestFormsApi, type TaskTestFormSummary } from '../../api/client'
 import type { ReactNode } from 'react'
+import TableFieldChart from './TableFieldChart'
 
 export default function TaskTestFormResults({ forms, taskId, onOpenPhoto, renderActions }: {
   forms: TaskTestFormSummary[]
@@ -34,9 +35,12 @@ export default function TaskTestFormResults({ forms, taskId, onOpenPhoto, render
       {form.submission ? <dl>{form.form_fields.filter((field) => field.type !== 'photo').map((field) => {
         const value = form.submission?.answers?.[field.key]
         return <div key={field.key}><dt>{field.label}{field.help ? <div className="text-muted mission-task-list__sub">{field.help}</div> : null}</dt><dd>
-          {field.type === 'table' && Array.isArray(value) ? <div className="table-wrap"><table className="data-table data-table--compact"><thead><tr>{field.columns?.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead><tbody>
-            {value.map((row: Record<string, unknown>, index: number) => <tr key={index}>{field.columns?.map((column) => <td key={column.key}>{String(row[column.key] ?? '—')}</td>)}</tr>)}
-          </tbody></table></div> : typeof value === 'boolean' ? (value ? 'Oui' : 'Non') : Array.isArray(value) ? value.join(', ') : String(value ?? '—')}{field.unit ? ` ${field.unit}` : ''}
+          {field.type === 'table' && Array.isArray(value) ? <>
+            <div className="table-wrap"><table className="data-table data-table--compact"><thead><tr>{field.columns?.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead><tbody>
+              {value.map((row: Record<string, unknown>, index: number) => <tr key={index}>{field.columns?.map((column) => <td key={column.key}>{String(row[column.key] ?? '—')}</td>)}</tr>)}
+            </tbody></table></div>
+            <TableFieldChart field={field} rows={value as Record<string, unknown>[]} />
+          </> : typeof value === 'boolean' ? (value ? 'Oui' : 'Non') : Array.isArray(value) ? value.join(', ') : String(value ?? '—')}{field.unit ? ` ${field.unit}` : ''}
         </dd></div>
       })}</dl> : <p className="text-muted">Le formulaire n’a pas encore été rempli.</p>}
       {form.submission?.photos?.map((photo) => onOpenPhoto ? <button key={photo.id} type="button" className="btn btn-secondary btn-sm" onClick={() => onOpenPhoto(photo.id)}>Voir la photo : {photo.original_name}</button> : <span key={photo.id}>{photo.original_name}</span>)}

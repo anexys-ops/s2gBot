@@ -27,6 +27,57 @@ class TaskTestFormController extends Controller
         private readonly DynamicTestFormService $dynamicForms,
     ) {}
 
+    /** Liste tous les formulaires d'essai (tous chantiers/tâches), pour le suivi labo. */
+    public function indexAll(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->isLab() || $request->user()->canValidateStatus(), 403);
+        $data = $request->validate([
+            'status' => 'nullable|in:draft,submitted,correction_requested,validated',
+            'context' => 'nullable|in:terrain,ingenieur,labo',
+            'page' => 'nullable|integer|min:1',
+        ]);
+
+        $query = TaskTestForm::query()
+            ->with([
+                'testType:id,name,norm,context',
+                'missionTask:id,unique_number,assigned_user_id,ordre_mission_ligne_id',
+                'missionTask.assignedUser:id,name',
+                'missionTask.ordreMissionLigne:id,ordre_mission_id',
+                'missionTask.ordreMissionLigne.ordreMission:id,client_id,site_id,dossier_id',
+                'missionTask.ordreMissionLigne.ordreMission.client:id,name',
+                'missionTask.ordreMissionLigne.ordreMission.site:id,name',
+                'missionTask.ordreMissionLigne.ordreMission.dossier:id,reference',
+            ])
+            ->when($data['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($data['context'] ?? null, fn ($q, $context) => $q->whereHas('testType', fn ($qq) => $qq->where('context', $context)))
+            ->orderByDesc('updated_at');
+
+        $forms = $query->paginate(30, page: $data['page'] ?? 1);
+
+        $forms->getCollection()->transform(function (TaskTestForm $form) {
+            $task = $form->missionTask;
+            $om = $task?->ordreMissionLigne?->ordreMission;
+
+            return [
+                'id' => $form->id,
+                'status' => $form->status,
+                'submitted_at' => $form->submitted_at,
+                'updated_at' => $form->updated_at,
+                'test_type' => $form->testType?->only(['id', 'name', 'norm', 'context']),
+                'task' => $task ? [
+                    'id' => $task->id,
+                    'unique_number' => $task->unique_number,
+                    'assigned_user' => $task->assignedUser?->name,
+                ] : null,
+                'client' => $om?->client?->name,
+                'chantier' => $om?->site?->name,
+                'dossier' => $om?->dossier?->reference,
+            ];
+        });
+
+        return response()->json($forms);
+    }
+
     public function index(Request $request, MissionTask $task): JsonResponse
     {
         $this->authorizeTask($request, $task);

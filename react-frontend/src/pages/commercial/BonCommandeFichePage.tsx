@@ -16,7 +16,6 @@ import {
   filterForfaitBcLigneIds,
   filterForfaitBcLignes,
   isForfaitBcJalon,
-  isForfaitBcLigne,
   resolveDevisDisplayMeta,
   resolveQuantiteDevis,
 } from '../../lib/bcLigneDisplay'
@@ -670,7 +669,6 @@ export default function BonCommandeFichePage() {
                           )
                         }
                         const l = row.ligne
-                        const isForfaitLine = isForfaitBcLigne(l, devisDisplayMeta)
                         const canEditQty = canEditQuantites
                         const maxDevis = resolveQuantiteDevis(l)
                         const rawQty = qtyEdits[l.id] ?? qtyInputFromApi(l.quantite)

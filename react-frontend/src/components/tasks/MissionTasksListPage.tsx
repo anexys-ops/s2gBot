@@ -5,6 +5,7 @@ import { missionTasksApi, planningTerrainApi, taskTestFormsApi, type MissionTask
 import { useAuth } from '../../contexts/AuthContext'
 import ModuleEntityShell from '../module/ModuleEntityShell'
 import Modal from '../Modal'
+import SearchableSelect from '../ds/SearchableSelect'
 import { TASK_FILTERS, getTaskStatutMeta } from '../../lib/missionTaskStatuts'
 import { dateInputFromApi, formatAppDate } from '../../lib/appLocale'
 import { formatTechnicienOption } from '../../lib/userRolePresentation'
@@ -283,10 +284,16 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
       {activeTab === 'suivi' && <>
       <div className="mission-task-modal__grid">
         <label>Technicien assigné
-          <select value={assignedUserId} onChange={(event) => setAssignedUserId(event.target.value)}>
-            <option value="">Non assigné</option>
-            {technicians.map((technician) => <option key={technician.id} value={technician.id}>{formatTechnicienOption(technician)}</option>)}
-          </select>
+          <SearchableSelect
+            options={technicians.map((technician) => ({
+              id: technician.id,
+              label: formatTechnicienOption(technician),
+            }))}
+            value={assignedUserId}
+            onChange={setAssignedUserId}
+            placeholder="Rechercher un technicien…"
+            emptyLabel="Non assigné"
+          />
         </label>
         <label>Date programmée
           <input type="date" value={plannedDate} onChange={(event) => setPlannedDate(event.target.value)} />

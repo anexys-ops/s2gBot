@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Modal from '../Modal'
+import SearchableSelect from '../ds/SearchableSelect'
 import {
   adminUsersApi,
   samplesReceptionApi,
@@ -142,16 +143,13 @@ export default function SampleEditModal({ sample, onClose, onSaved, onDeleted, o
 
         <label>
           <span style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Remis par</span>
-          <select
+          <SearchableSelect
+            options={users.map((u) => ({ id: u.id, label: u.name }))}
             value={collectedBy}
-            onChange={(e) => setCollectedBy(e.target.value ? Number(e.target.value) : '')}
-            style={{ width: '100%' }}
-          >
-            <option value="">— Non renseigné —</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>{u.name}</option>
-            ))}
-          </select>
+            onChange={(val) => setCollectedBy(val ? Number(val) : '')}
+            placeholder="Rechercher une personne…"
+            emptyLabel="Non renseigné"
+          />
         </label>
 
         <label>

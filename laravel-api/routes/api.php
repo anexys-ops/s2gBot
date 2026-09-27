@@ -390,41 +390,51 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('fx-rates/refresh', [FxRateController::class, 'refresh']);
 
     // ── Actions par article & matériel requis ────────────────────────────────
-    Route::get('articles/{article}/actions', [ArticleActionController::class, 'index']);
-    Route::post('articles/{article}/actions', [ArticleActionController::class, 'store']);
-    Route::put('articles/{article}/actions/{action}', [ArticleActionController::class, 'update']);
-    Route::delete('articles/{article}/actions/{action}', [ArticleActionController::class, 'destroy']);
-    Route::get('articles/{article}/equipment-requirements', [ArticleActionController::class, 'equipmentIndex']);
-    Route::post('articles/{article}/equipment-requirements', [ArticleActionController::class, 'equipmentStore']);
-    Route::delete('articles/{article}/equipment-requirements/{requirement}', [ArticleActionController::class, 'equipmentDestroy']);
-    Route::get('articles/{article}/section-products', [ArticleSectionProductController::class, 'index']);
-    Route::post('articles/{article}/section-products', [ArticleSectionProductController::class, 'store']);
-    Route::patch('articles/{article}/section-products/{sectionProduct}', [ArticleSectionProductController::class, 'update']);
-    Route::delete('articles/{article}/section-products/{sectionProduct}', [ArticleSectionProductController::class, 'destroy']);
-    Route::put('articles/{article}/section-products', [ArticleSectionProductController::class, 'sync']);
+    // Config catalogue interne — aucune page portail client n'y accède.
+    Route::middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur,commercial')->group(function () {
+        Route::get('articles/{article}/actions', [ArticleActionController::class, 'index']);
+        Route::post('articles/{article}/actions', [ArticleActionController::class, 'store']);
+        Route::put('articles/{article}/actions/{action}', [ArticleActionController::class, 'update']);
+        Route::delete('articles/{article}/actions/{action}', [ArticleActionController::class, 'destroy']);
+        Route::get('articles/{article}/equipment-requirements', [ArticleActionController::class, 'equipmentIndex']);
+        Route::post('articles/{article}/equipment-requirements', [ArticleActionController::class, 'equipmentStore']);
+        Route::delete('articles/{article}/equipment-requirements/{requirement}', [ArticleActionController::class, 'equipmentDestroy']);
+        Route::get('articles/{article}/section-products', [ArticleSectionProductController::class, 'index']);
+        Route::post('articles/{article}/section-products', [ArticleSectionProductController::class, 'store']);
+        Route::patch('articles/{article}/section-products/{sectionProduct}', [ArticleSectionProductController::class, 'update']);
+        Route::delete('articles/{article}/section-products/{sectionProduct}', [ArticleSectionProductController::class, 'destroy']);
+        Route::put('articles/{article}/section-products', [ArticleSectionProductController::class, 'sync']);
 
-    // ── Configuration des mesures par action ─────────────────────────────────
-    Route::get('articles/{article}/actions/{action}/measures', [ActionMeasureConfigController::class, 'index']);
-    Route::post('articles/{article}/actions/{action}/measures', [ActionMeasureConfigController::class, 'store']);
-    Route::put('articles/{article}/actions/{action}/measures/{measure}', [ActionMeasureConfigController::class, 'update']);
-    Route::delete('articles/{article}/actions/{action}/measures/{measure}', [ActionMeasureConfigController::class, 'destroy']);
+        // ── Configuration des mesures par action ─────────────────────────────
+        Route::get('articles/{article}/actions/{action}/measures', [ActionMeasureConfigController::class, 'index']);
+        Route::post('articles/{article}/actions/{action}/measures', [ActionMeasureConfigController::class, 'store']);
+        Route::put('articles/{article}/actions/{action}/measures/{measure}', [ActionMeasureConfigController::class, 'update']);
+        Route::delete('articles/{article}/actions/{action}/measures/{measure}', [ActionMeasureConfigController::class, 'destroy']);
+    });
 
     // ── Tâches de mission ────────────────────────────────────────────────────
-    Route::get('mission-tasks/labo', [MissionTaskController::class, 'laboBoard']);
-    Route::get('mission-tasks/terrain/history', [MissionTaskController::class, 'terrainHistory']);
-    Route::get('mission-tasks/terrain/measures', [MissionTaskController::class, 'terrainMeasuresBoard']);
-    Route::get('mission-tasks/terrain', [MissionTaskController::class, 'terrainBoard']);
-    Route::get('mission-tasks', [MissionTaskController::class, 'index']);
-    Route::get('mission-tasks/{task}', [MissionTaskController::class, 'show']);
-    Route::put('mission-tasks/{task}', [MissionTaskController::class, 'update']);
-    Route::get('mission-tasks/{task}/available-samples', [MissionTaskController::class, 'availableSamples']);
-    Route::post('mission-tasks/{task}/samples', [MissionTaskController::class, 'attachSamples']);
-    Route::delete('mission-tasks/{task}/samples/{sampleId}', [MissionTaskController::class, 'detachSample']);
-    Route::post('mission-tasks/{task}/close-reception', [MissionTaskController::class, 'closeReception']);
-    Route::post('mission-tasks/{task}/duplicate', [MissionTaskController::class, 'duplicate']);
-    Route::post('mission-tasks/{task}/measures', [MissionTaskController::class, 'storeMeasures']);
-    Route::post('mission-tasks/{task}/validate', [MissionTaskController::class, 'validate']);
-    Route::delete('mission-tasks/{task}', [MissionTaskController::class, 'destroy']);
+    // Réservé au personnel interne (aucune de ces routes n'était protégée par un
+    // rôle jusqu'ici — seul auth:sanctum s'appliquait, donc n'importe quel compte
+    // authentifié, y compris un compte portail client externe, pouvait modifier/
+    // supprimer des tâches internes). Même périmètre de rôles que le module
+    // Réception (fonctionnellement adjacent) ; lab_admin passe toujours.
+    Route::middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur')->group(function () {
+        Route::get('mission-tasks/labo', [MissionTaskController::class, 'laboBoard']);
+        Route::get('mission-tasks/terrain/history', [MissionTaskController::class, 'terrainHistory']);
+        Route::get('mission-tasks/terrain/measures', [MissionTaskController::class, 'terrainMeasuresBoard']);
+        Route::get('mission-tasks/terrain', [MissionTaskController::class, 'terrainBoard']);
+        Route::get('mission-tasks', [MissionTaskController::class, 'index']);
+        Route::get('mission-tasks/{task}', [MissionTaskController::class, 'show']);
+        Route::put('mission-tasks/{task}', [MissionTaskController::class, 'update']);
+        Route::get('mission-tasks/{task}/available-samples', [MissionTaskController::class, 'availableSamples']);
+        Route::post('mission-tasks/{task}/samples', [MissionTaskController::class, 'attachSamples']);
+        Route::delete('mission-tasks/{task}/samples/{sampleId}', [MissionTaskController::class, 'detachSample']);
+        Route::post('mission-tasks/{task}/close-reception', [MissionTaskController::class, 'closeReception']);
+        Route::post('mission-tasks/{task}/duplicate', [MissionTaskController::class, 'duplicate']);
+        Route::post('mission-tasks/{task}/measures', [MissionTaskController::class, 'storeMeasures']);
+        Route::post('mission-tasks/{task}/validate', [MissionTaskController::class, 'validate']);
+        Route::delete('mission-tasks/{task}', [MissionTaskController::class, 'destroy']);
+    });
 
     // ── Rapport BC ───────────────────────────────────────────────────────────
     Route::get('rapport-bc', [RapportBCController::class, 'index']);
@@ -447,19 +457,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('rapport-bc/{rapportBC}/versions/{version}', [RapportBCController::class, 'destroyVersion']);
 
     // ── Planning & stock ─────────────────────────────────────────────────────
-    Route::get('planning/overview', [PlanningController::class, 'overview']);
-    Route::get('planning/humans', [PlanningController::class, 'humansIndex']);
-    Route::post('planning/humans', [PlanningController::class, 'humansStore']);
-    Route::delete('planning/humans/{id}', [PlanningController::class, 'humansDestroy']);
-    Route::get('planning/equipments', [PlanningController::class, 'equipmentsIndex']);
-    Route::post('planning/equipments', [PlanningController::class, 'equipmentsStore']);
-    Route::delete('planning/equipments/{id}', [PlanningController::class, 'equipmentsDestroy']);
-    Route::get('planning/stock/personnel', [PlanningController::class, 'stockPersonnelIndex']);
-    Route::post('planning/stock/personnel', [PlanningController::class, 'stockPersonnelStore']);
-    Route::delete('planning/stock/personnel/{id}', [PlanningController::class, 'stockPersonnelDestroy']);
-    Route::get('planning/stock/equipment', [PlanningController::class, 'stockEquipmentIndex']);
-    Route::post('planning/stock/equipment', [PlanningController::class, 'stockEquipmentStore']);
-    Route::delete('planning/stock/equipment/{id}', [PlanningController::class, 'stockEquipmentDestroy']);
+    Route::middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur')->group(function () {
+        Route::get('planning/overview', [PlanningController::class, 'overview']);
+        Route::get('planning/humans', [PlanningController::class, 'humansIndex']);
+        Route::post('planning/humans', [PlanningController::class, 'humansStore']);
+        Route::delete('planning/humans/{id}', [PlanningController::class, 'humansDestroy']);
+        Route::get('planning/equipments', [PlanningController::class, 'equipmentsIndex']);
+        Route::post('planning/equipments', [PlanningController::class, 'equipmentsStore']);
+        Route::delete('planning/equipments/{id}', [PlanningController::class, 'equipmentsDestroy']);
+        Route::get('planning/stock/personnel', [PlanningController::class, 'stockPersonnelIndex']);
+        Route::post('planning/stock/personnel', [PlanningController::class, 'stockPersonnelStore']);
+        Route::delete('planning/stock/personnel/{id}', [PlanningController::class, 'stockPersonnelDestroy']);
+        Route::get('planning/stock/equipment', [PlanningController::class, 'stockEquipmentIndex']);
+        Route::post('planning/stock/equipment', [PlanningController::class, 'stockEquipmentStore']);
+        Route::delete('planning/stock/equipment/{id}', [PlanningController::class, 'stockEquipmentDestroy']);
+    });
 
     // ── Ordres de mission ────────────────────────────────────────────────────
     Route::get('ordres-mission', [OrdreMissionController::class, 'index']);
@@ -479,6 +491,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('bons-commande/{bon_commande}/generate-ordres-mission', [OrdreMissionController::class, 'generateFromBC']);
 
     // ── Notes de frais ───────────────────────────────────────────────────────
+    // ⚠️ Aucune de ces routes n'est protégée par un rôle (données financières +
+    // pièces jointes accessibles à tout compte authentifié, y compris portail
+    // client externe). Repéré pendant l'audit sécurité mais NON corrigé ici :
+    // les tests existants (ExpenseLineCrudTest, FraisDeplacementExpenseUnificationTest)
+    // utilisent un user sans rôle explicite (rôle par défaut de la factory =
+    // "client"), ce qui suggère un périmètre d'accès métier plus large que celui
+    // de mission-tasks/réception — à clarifier avec le métier avant de restreindre.
     Route::get('expense-reports/eligible-oms', [ExpenseReportController::class, 'eligibleOrdresMission']);
     Route::get('expense-reports', [ExpenseReportController::class, 'index']);
     Route::post('expense-reports', [ExpenseReportController::class, 'store']);
@@ -577,10 +596,14 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // ── Recherche globale & tags ──────────────────────────────────────────────
-    Route::get('global-search', [GlobalSearchController::class, 'search']);
-    Route::get('tags', [TagController::class, 'index']);
-    Route::post('tags/sync', [TagController::class, 'sync']);
-    Route::get('tags/entity', [TagController::class, 'forEntity']);
+    // Cherche parmi TOUS les clients (nom, ICE, email) et documents commerciaux :
+    // fuite de données inter-clients si un compte portail externe y accédait.
+    Route::middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur,commercial')->group(function () {
+        Route::get('global-search', [GlobalSearchController::class, 'search']);
+        Route::get('tags', [TagController::class, 'index']);
+        Route::post('tags/sync', [TagController::class, 'sync']);
+        Route::get('tags/entity', [TagController::class, 'forEntity']);
+    });
 
     // ── v1.2.0 — Multi-agences labo (standalone) ─────────────────────────────
     Route::get('agences', [AgencyController::class, 'indexStandalone']);
@@ -605,16 +628,18 @@ Route::middleware('auth:sanctum')->group(function () {
         ->whereNumber('id')->whereNumber('sid');
 
     // ── v1.2.0 — Compositions d'articles ────────────────────────────────────
-    Route::get('articles/{articleId}/compositions', [ArticleCompositionController::class, 'index'])
-        ->whereNumber('articleId');
-    Route::post('articles/{articleId}/compositions', [ArticleCompositionController::class, 'store'])
-        ->whereNumber('articleId');
-    Route::post('articles/{articleId}/compositions/reorder', [ArticleCompositionController::class, 'reorder'])
-        ->whereNumber('articleId');
-    Route::put('articles/{articleId}/compositions/{id}', [ArticleCompositionController::class, 'update'])
-        ->whereNumber('articleId')->whereNumber('id');
-    Route::delete('articles/{articleId}/compositions/{id}', [ArticleCompositionController::class, 'destroy'])
-        ->whereNumber('articleId')->whereNumber('id');
+    Route::middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur,commercial')->group(function () {
+        Route::get('articles/{articleId}/compositions', [ArticleCompositionController::class, 'index'])
+            ->whereNumber('articleId');
+        Route::post('articles/{articleId}/compositions', [ArticleCompositionController::class, 'store'])
+            ->whereNumber('articleId');
+        Route::post('articles/{articleId}/compositions/reorder', [ArticleCompositionController::class, 'reorder'])
+            ->whereNumber('articleId');
+        Route::put('articles/{articleId}/compositions/{id}', [ArticleCompositionController::class, 'update'])
+            ->whereNumber('articleId')->whereNumber('id');
+        Route::delete('articles/{articleId}/compositions/{id}', [ArticleCompositionController::class, 'destroy'])
+            ->whereNumber('articleId')->whereNumber('id');
+    });
 });
 
 Route::middleware('signed')->group(function () {

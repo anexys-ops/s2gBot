@@ -11856,10 +11856,14 @@ a.catalogue-tree__link-article:hover {
   background: #fff3ea;
   color: #a3450d;
   text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
 }
 
-.mission-task-list__jalon-row span {
-  font-weight: 400;
+.mission-task-list__jalon-row .mission-task-list__toggle {
+  flex-shrink: 0;
 }
 
 .mission-task-list__produit-row th {
@@ -11868,10 +11872,27 @@ a.catalogue-tree__link-article:hover {
   color: #3c5a3c;
   text-align: left;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
 }
 
-.mission-task-list__produit-row span {
+.mission-task-list__produit-row .mission-task-list__toggle {
+  flex-shrink: 0;
+}
+
+.mission-task-list__jalon-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.mission-task-list__jalon-count {
+  flex-shrink: 0;
   font-weight: 400;
+  white-space: nowrap;
 }
 
 .mission-task-list__toggle {

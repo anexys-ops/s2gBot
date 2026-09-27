@@ -717,7 +717,8 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                             >
                               {jalonOpen ? '▾' : '▸'}
                             </button>
-                            {jalon.label} <span>· {jalon.count} tâche{jalon.count > 1 ? 's' : ''}</span>
+                            <span className="mission-task-list__jalon-label" title={jalon.label}>{jalon.label}</span>
+                            <span className="mission-task-list__jalon-count">· {jalon.count} tâche{jalon.count > 1 ? 's' : ''}</span>
                           </th>
                         </tr>,
                         ...(jalonOpen ? jalon.produits.flatMap((produit) => {
@@ -735,7 +736,8 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                                 >
                                   {produitOpen ? '▾' : '▸'}
                                 </button>
-                                {produit.label} <span>· {produit.tasks.length} tâche{produit.tasks.length > 1 ? 's' : ''}</span>
+                                <span className="mission-task-list__jalon-label" title={produit.label}>{produit.label}</span>
+                                <span className="mission-task-list__jalon-count">· {produit.tasks.length} tâche{produit.tasks.length > 1 ? 's' : ''}</span>
                               </th>
                             </tr>,
                             ...(produitOpen ? produit.tasks.map((task) => {

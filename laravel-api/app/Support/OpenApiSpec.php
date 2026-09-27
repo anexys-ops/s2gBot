@@ -162,6 +162,26 @@ class OpenApiSpec
             ],
             '/test-types' => [
                 'get' => ['tags' => ['Labo'], 'summary' => 'Types d’essais', 'responses' => ['200' => ['description' => 'OK']]],
+                'post' => ['tags' => ['Labo'], 'summary' => 'Créer un type d’essai et son formulaire', 'responses' => ['201' => ['description' => 'Créé']]],
+            ],
+            '/test-types/{testType}' => [
+                'get' => ['tags' => ['Labo'], 'summary' => 'Détail du type d’essai', 'parameters' => [self::pathId('testType')], 'responses' => ['200' => ['description' => 'OK']]],
+                'put' => ['tags' => ['Labo'], 'summary' => 'Modifier le type d’essai et son formulaire', 'parameters' => [self::pathId('testType')], 'responses' => ['200' => ['description' => 'OK']]],
+            ],
+            '/test-types/{testType}/products' => [
+                'put' => ['tags' => ['Labo'], 'summary' => 'Affecter le formulaire aux produits et actions', 'parameters' => [self::pathId('testType')], 'responses' => ['200' => ['description' => 'Affectations mises à jour']]],
+            ],
+            '/form-option-lists' => [
+                'get' => ['tags' => ['Référentiels'], 'summary' => 'Listes de choix communes aux formulaires', 'responses' => ['200' => ['description' => 'Listes']]],
+                'post' => ['tags' => ['Référentiels'], 'summary' => 'Créer une liste de choix commune', 'responses' => ['201' => ['description' => 'Créée']]],
+            ],
+            '/form-option-lists/{formOptionList}' => [
+                'put' => ['tags' => ['Référentiels'], 'summary' => 'Modifier une liste de choix', 'parameters' => [self::pathId('formOptionList')], 'responses' => ['200' => ['description' => 'Modifiée']]],
+                'delete' => ['tags' => ['Référentiels'], 'summary' => 'Supprimer une liste inutilisée', 'parameters' => [self::pathId('formOptionList')], 'responses' => ['204' => ['description' => 'Supprimée']]],
+            ],
+            '/v1/catalogue/articles/{article}/test-types' => [
+                'put' => ['tags' => ['Référentiels'], 'summary' => 'Affecter les essais et formulaires à un produit',
+                    'parameters' => [self::pathId('article')], 'responses' => ['200' => ['description' => 'Essais du produit mis à jour']]],
             ],
             '/samples/{sample}/results' => [
                 'post' => ['tags' => ['Labo'], 'summary' => 'Saisir résultat d’essai', 'parameters' => [self::pathId('sample')], 'responses' => ['201' => ['description' => 'OK']]],
@@ -217,6 +237,101 @@ class OpenApiSpec
     private static function mobilePaths(): array
     {
         return [
+            '/mobile/terrain/calendar' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Agenda personnel : tâches, événements et matériel',
+                    'parameters' => [self::dateQuery('from', true), self::dateQuery('to', true)],
+                    'responses' => ['200' => ['description' => 'tasks, events, equipment_movements']]],
+            ],
+            '/mobile/terrain/tasks' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Tâches affectées au compte connecté',
+                    'parameters' => [self::dateQuery('from'), self::dateQuery('to'),
+                        ['name' => 'statut', 'in' => 'query', 'schema' => ['type' => 'string']],
+                        ['name' => 'active_only', 'in' => 'query', 'schema' => ['type' => 'boolean']]],
+                    'responses' => ['200' => ['description' => 'Liste des tâches']]],
+            ],
+            '/mobile/terrain/tasks/{task}' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Détail de ma tâche, client, chantier et matériel',
+                    'parameters' => [self::pathId('task')], 'responses' => ['200' => ['description' => 'Tâche']]],
+            ],
+            '/mobile/terrain/tasks/{task}/status' => [
+                'patch' => ['tags' => ['Terrain mobile'], 'summary' => 'Démarrer, mettre en pause, terminer ou annuler ma tâche',
+                    'parameters' => [self::pathId('task')],
+                    'responses' => ['200' => ['description' => 'Fiche tâche mise à jour'],
+                        '403' => ['description' => 'Tâche non affectée au compte'],
+                        '422' => ['description' => 'Transition interdite ou motif manquant']]],
+            ],
+            '/mobile/terrain/tasks/{task}/notes' => [
+                'patch' => ['tags' => ['Terrain mobile'], 'summary' => 'Modifier ma note de tâche, quel que soit son statut',
+                    'parameters' => [self::pathId('task')],
+                    'responses' => ['200' => ['description' => 'Fiche tâche mise à jour']]],
+            ],
+            '/mobile/terrain/tasks/{task}/pv-numbers' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Lister les numéros de PV de ma tâche',
+                    'parameters' => [self::pathId('task')],
+                    'responses' => ['200' => ['description' => 'pv_numbers, count, editable']]],
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Ajouter un numéro de PV libre à ma tâche',
+                    'parameters' => [self::pathId('task')],
+                    'responses' => ['200' => ['description' => 'Liste mise à jour']]],
+                'delete' => ['tags' => ['Terrain mobile'], 'summary' => 'Retirer un numéro de PV de ma tâche',
+                    'parameters' => [self::pathId('task')],
+                    'responses' => ['200' => ['description' => 'Liste mise à jour']]],
+            ],
+            '/mobile/terrain/expense-options' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'OM éligibles et référentiels de notes de frais',
+                    'responses' => ['200' => ['description' => 'Options']]],
+            ],
+            '/mobile/terrain/expense-reports' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Mes notes de frais',
+                    'responses' => ['200' => ['description' => 'Liste']]],
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Créer un brouillon de note de frais',
+                    'responses' => ['201' => ['description' => 'Brouillon créé']]],
+            ],
+            '/mobile/terrain/expense-reports/standalone' => [
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Créer ma note de frais sans ordre de mission',
+                    'responses' => ['201' => ['description' => 'Brouillon sans OM créé']]],
+            ],
+            '/mobile/terrain/expense-reports/{expenseReport}/lines' => [
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Ajouter une dépense à mon brouillon',
+                    'parameters' => [self::pathId('expenseReport')], 'responses' => ['201' => ['description' => 'Ligne créée']]],
+            ],
+            '/mobile/terrain/expense-reports/{expenseReport}/lines/{line}/photo' => [
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Joindre une photo à ma ligne de frais en brouillon',
+                    'parameters' => [self::pathId('expenseReport'), self::pathId('line')],
+                    'responses' => ['200' => ['description' => 'Photo enregistrée']]],
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Télécharger la photo de ma ligne de frais',
+                    'parameters' => [self::pathId('expenseReport'), self::pathId('line')],
+                    'responses' => ['200' => ['description' => 'Photo']]],
+            ],
+            '/mobile/terrain/expense-reports/{expenseReport}/submit' => [
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Soumettre ma note de frais',
+                    'parameters' => [self::pathId('expenseReport')], 'responses' => ['200' => ['description' => 'Note soumise']]],
+            ],
+            '/mobile/task-forms/tasks/{task}' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Formulaires affectés à une tâche',
+                    'parameters' => [self::pathId('task')], 'responses' => ['200' => ['description' => 'Formulaires et soumissions']]],
+            ],
+            '/mobile/task-forms/tasks/{task}/types/{testType}' => [
+                'put' => ['tags' => ['Terrain mobile'], 'summary' => 'Enregistrer un brouillon de formulaire',
+                    'parameters' => [self::pathId('task'), self::pathId('testType')], 'responses' => ['200' => ['description' => 'Brouillon']]],
+            ],
+            '/mobile/task-forms/tasks/{task}/types/{testType}/photos' => [
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Joindre une photo au formulaire',
+                    'parameters' => [self::pathId('task'), self::pathId('testType')], 'responses' => ['201' => ['description' => 'Photo enregistrée']]],
+            ],
+            '/mobile/task-forms/tasks/{task}/types/{testType}/submit' => [
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Soumettre le formulaire',
+                    'parameters' => [self::pathId('task'), self::pathId('testType')], 'responses' => ['200' => ['description' => 'Soumis']]],
+            ],
+            '/mobile/task-forms/tasks/{task}/types/{testType}/review' => [
+                'post' => ['tags' => ['Terrain mobile'], 'summary' => 'Valider ou demander une correction',
+                    'parameters' => [self::pathId('task'), self::pathId('testType')], 'responses' => ['200' => ['description' => 'Décision enregistrée']]],
+            ],
+            '/mobile/task-forms/photos/{photo}' => [
+                'get' => ['tags' => ['Terrain mobile'], 'summary' => 'Télécharger une photo du formulaire',
+                    'parameters' => [self::pathId('photo')], 'responses' => ['200' => ['description' => 'Image']]],
+                'delete' => ['tags' => ['Terrain mobile'], 'summary' => 'Retirer une photo du brouillon',
+                    'parameters' => [self::pathId('photo')], 'responses' => ['204' => ['description' => 'Supprimée']]],
+            ],
             '/mobile/dossiers/{kind}/{id}/measure-forms' => [
                 'get' => [
                     'tags' => ['Terrain mobile'],
@@ -240,6 +355,11 @@ class OpenApiSpec
                 ],
             ],
         ];
+    }
+
+    private static function dateQuery(string $name, bool $required = false): array
+    {
+        return ['name' => $name, 'in' => 'query', 'required' => $required, 'schema' => ['type' => 'string', 'format' => 'date']];
     }
 
     private static function adminPaths(): array

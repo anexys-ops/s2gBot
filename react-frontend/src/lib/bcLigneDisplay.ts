@@ -3,6 +3,7 @@ import type { BonCommandeLigne, EntityMetaPayload } from '../api/client'
 export type GroupableLigne = {
   id: number
   ref_article_id?: number | null
+  libelle?: string
   ordre?: number
 }
 
@@ -27,7 +28,7 @@ export function resolveDevisDisplayMeta(
 }
 
 export type BcLigneDisplayRow<T extends GroupableLigne = BonCommandeLigne> =
-  | { type: 'jalon_header'; key: string; jalonId: string; label: string; code?: string | null; ligneIds: number[] }
+  | { type: 'jalon_header'; key: string; jalonId: string; label: string; code?: string | null; ligneIds: number[]; forfaitLigne?: T }
   | { type: 'product'; key: string; ligne: T; nested: boolean }
 
 export function isDocumentForfaitMeta(meta?: EntityMetaPayload | null): boolean {
@@ -44,6 +45,17 @@ export function collectForfaitRefArticleIds(meta?: EntityMetaPayload | null): Se
     }
   }
   return ids
+}
+
+/** Ligne de détail informative déjà comprise dans le prix forfaitaire du document ou du jalon. */
+export function isNonBillableForfaitBcLigne(
+  ligne: Pick<BonCommandeLigne, 'ref_article_id'>,
+  meta?: EntityMetaPayload | null,
+): boolean {
+  const refId = ligne.ref_article_id != null ? Number(ligne.ref_article_id) : 0
+  if (refId <= 0) return false
+  if (isDocumentForfaitMeta(meta) && Number(meta?.tarif_global_hors_lignes_ht ?? 0) > 0) return true
+  return collectForfaitRefArticleIds(meta).has(refId)
 }
 
 /** Ligne BC rattachée à un forfait document ou jalon forfait (meta devis source). */
@@ -134,6 +146,28 @@ export function buildBcLigneDisplayRows<T extends GroupableLigne>(
   const usedIds = new Set<number>()
   const rows: BcLigneDisplayRow<T>[] = []
 
+  // Pré-clamer les lignes "Prestation forfaitaire" pour chaque jalon AVANT le parcours,
+  // pour éviter que nextStandalone() les vole avant que le jalon soit traité.
+  const forfaitLigneByJalonId = new Map<string, T>()
+  for (const jalon of jalons) {
+    if (!jalon.id) continue
+    const forfaitLibelle = jalon.libelle
+      ? `Prestation forfaitaire — ${jalon.libelle}`
+      : 'Prestation forfaitaire'
+    for (const l of sorted) {
+      if (usedIds.has(l.id)) continue
+      if (forfaitLigneByJalonId.has(jalon.id)) break
+      // Skip lines already claimed by another jalon
+      const alreadyClaimed = [...forfaitLigneByJalonId.values()].some((fl) => fl.id === l.id)
+      if (alreadyClaimed) continue
+      if (l.libelle === forfaitLibelle) {
+        forfaitLigneByJalonId.set(jalon.id, l)
+        usedIds.add(l.id)
+        break
+      }
+    }
+  }
+
   const findByRefId = (refId: number): T | undefined => {
     for (const l of sorted) {
       if (usedIds.has(l.id)) continue
@@ -166,6 +200,7 @@ export function buildBcLigneDisplayRows<T extends GroupableLigne>(
       const ligne = findByRefId(refId)
       if (ligne) childLignes.push(ligne)
     }
+    const forfaitLigne = forfaitLigneByJalonId.get(jalonId)
     rows.push({
       type: 'jalon_header',
       key: `j-${jalonId}`,
@@ -173,6 +208,7 @@ export function buildBcLigneDisplayRows<T extends GroupableLigne>(
       label: jalon.libelle,
       code: jalon.s2g_code ?? null,
       ligneIds: childLignes.map((l) => l.id),
+      forfaitLigne,
     })
     for (const ligne of childLignes) emitProduct(ligne, true)
   }

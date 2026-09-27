@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\ArticleSectionProduct;
 use App\Models\BcLignePlanningAffectation;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
+use App\Models\Catalogue\Article;
+use App\Models\Catalogue\FamilleArticle;
 use App\Models\Client;
 use App\Models\Dossier;
 use App\Models\Quote;
@@ -108,6 +111,62 @@ class BonCommandeWorkflowTest extends TestCase
         $r->assertJsonPath('lignes.0.libelle', 'Essai A');
         $r->assertJsonPath('lignes.0.quantite_devis', 1);
         $this->assertNotNull(Quote::query()->find($q->id)->meta);
+    }
+
+    public function test_bc_from_forfait_jalon_quote_carries_jalon_price(): void
+    {
+        $client = Client::query()->create(['name' => 'BC Forfait Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site F']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-0002',
+            'titre' => 'D forfait',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $q = Quote::query()->create([
+            'number' => 'Q-FORFAIT',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 1200,
+            'amount_ttc' => 1440,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+            'meta' => [
+                'devis_jalons' => [
+                    [
+                        'id' => 'j1',
+                        'libelle' => 'Etude de formulation de béton',
+                        'mode' => 'forfait',
+                        'montant_ht' => 1200,
+                        'product_ref_article_ids' => [],
+                    ],
+                ],
+            ],
+        ]);
+        // Les lignes d'un jalon forfait sont enregistrées à prix 0 — le prix réel vit
+        // dans meta.devis_jalons.*.montant_ht (voir QuotePricingService::totalsLines).
+        QuoteLine::query()->create([
+            'quote_id' => $q->id,
+            'description' => 'Essai de résistance à la compression',
+            'quantity' => 6,
+            'unit_price' => 0,
+            'tva_rate' => 20,
+            'total' => 0,
+        ]);
+
+        $r = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc");
+        $r->assertCreated();
+        $r->assertJsonPath('lignes.0.libelle', 'Essai de résistance à la compression');
+        $r->assertJsonPath('lignes.0.prix_unitaire_ht', 0);
+        $r->assertJsonPath('lignes.1.libelle', 'Prestation forfaitaire — Etude de formulation de béton');
+        $r->assertJsonPath('lignes.1.prix_unitaire_ht', 1200);
+        $r->assertJsonPath('lignes.1.montant_ht', 1200);
     }
 
     public function test_update_bc_ligne_persists_planning_extra_fields(): void
@@ -765,6 +824,151 @@ class BonCommandeWorkflowTest extends TestCase
         $numeros = collect($list->json())->pluck('numero')->all();
         $this->assertContains($bc['numero'], $numeros);
         $this->assertNotContains('BCC-2099-ANNULE', $numeros);
+
+        $unassigned = $this->actingAs($lab, 'sanctum')
+            ->getJson('/api/v1/bons-commande?planning=1&planning_unassigned=1');
+        $unassigned->assertOk()->assertJsonCount(1)->assertJsonCount(1, '0.lignes');
+        $this->assertSame($bc['numero'], $unassigned->json('0.numero'));
+
+        $tech = User::factory()->create(['role' => User::ROLE_LAB_TECHNICIAN]);
+        BcLignePlanningAffectation::query()->create([
+            'bon_commande_ligne_id' => $bc['lignes'][0]['id'],
+            'user_id' => $tech->id,
+            'date_debut' => '2026-03-01',
+            'date_fin' => '2026-03-01',
+            'created_by' => $lab->id,
+        ]);
+
+        $this->actingAs($lab, 'sanctum')
+            ->getJson('/api/v1/bons-commande?planning=1&planning_unassigned=1')
+            ->assertOk()
+            ->assertJsonCount(0);
+    }
+
+    public function test_unassigned_planning_list_only_returns_terrain_lines_grouped_by_quote_jalon(): void
+    {
+        $client = Client::query()->create(['name' => 'BC Planning Terrain']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site Terrain']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-2099-TERRAIN',
+            'titre' => 'Dossier terrain',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01',
+            'created_by' => $lab->id,
+        ]);
+        $famille = FamilleArticle::query()->create([
+            'code' => 'PLAN-TERRAIN',
+            'libelle' => 'Planning terrain',
+            'ordre' => 1,
+            'actif' => true,
+        ]);
+        $jalon = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
+            'code' => 'JAL-PLAN',
+            'libelle' => 'Contrôle de béton',
+            'kind' => Article::KIND_JALON,
+            'actif' => true,
+            'prix_unitaire_ht' => 0,
+            'tva_rate' => 20,
+        ]);
+        $terrainProduct = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
+            'code' => 'PRD-TERRAIN',
+            'libelle' => 'Prélèvement terrain',
+            'kind' => Article::KIND_PRODUCT,
+            'actif' => true,
+            'prix_unitaire_ht' => 100,
+            'tva_rate' => 20,
+        ]);
+        $labProduct = Article::query()->create([
+            'ref_famille_article_id' => $famille->id,
+            'code' => 'PRD-LABO',
+            'libelle' => 'Analyse laboratoire',
+            'kind' => Article::KIND_PRODUCT,
+            'actif' => true,
+            'triggers_odm_terrain' => true,
+            'prix_unitaire_ht' => 200,
+            'tva_rate' => 20,
+        ]);
+        ArticleSectionProduct::query()->create([
+            'ref_article_id' => $jalon->id,
+            'product_article_id' => $terrainProduct->id,
+            'section_type' => ArticleSectionProduct::SECTION_TECHNICIEN,
+            'ordre' => 1,
+        ]);
+        ArticleSectionProduct::query()->create([
+            'ref_article_id' => $jalon->id,
+            'product_article_id' => $labProduct->id,
+            'section_type' => ArticleSectionProduct::SECTION_LABO,
+            'ordre' => 2,
+        ]);
+        $quote = Quote::query()->create([
+            'number' => 'Q-PLAN-TERRAIN',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01',
+            'amount_ht' => 300,
+            'amount_ttc' => 360,
+            'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+            'meta' => [
+                'devis_parcours' => [['kind' => 'jalon', 'id' => 'jalon-beton']],
+                'devis_jalons' => [[
+                    'id' => 'jalon-beton',
+                    'libelle' => 'Contrôle de béton',
+                    's2g_code' => 'JAL-PLAN',
+                    'ref_article_id' => $jalon->id,
+                    'product_ref_article_ids' => [$terrainProduct->id, $labProduct->id],
+                ]],
+            ],
+        ]);
+        foreach ([
+            [$terrainProduct, 'Prélèvement terrain', 100],
+            [$labProduct, 'Analyse laboratoire', 200],
+        ] as [$article, $description, $price]) {
+            QuoteLine::query()->create([
+                'quote_id' => $quote->id,
+                'ref_article_id' => $article->id,
+                'description' => $description,
+                'quantity' => 1,
+                'unit_price' => $price,
+                'tva_rate' => 20,
+                'total' => $price,
+            ]);
+        }
+
+        $bc = $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/v1/devis/{$quote->id}/transformer-bc")
+            ->assertCreated()
+            ->json();
+
+        $response = $this->actingAs($lab, 'sanctum')
+            ->getJson('/api/v1/bons-commande?planning=1&planning_unassigned=1');
+        $response
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.id', $bc['id'])
+            ->assertJsonCount(1, '0.lignes')
+            ->assertJsonPath('0.lignes.0.libelle', 'Prélèvement terrain')
+            ->assertJsonCount(1, '0.planning_terrain_groups')
+            ->assertJsonPath('0.planning_terrain_groups.0.jalon.label', 'Contrôle de béton')
+            ->assertJsonCount(1, '0.planning_terrain_groups.0.lignes');
+
+        $this->assertSame('Prélèvement terrain', $response->json('0.planning_terrain_groups.0.lignes.0.libelle'));
+
+        $labLineId = collect($bc['lignes'])->firstWhere('libelle', 'Analyse laboratoire')['id'];
+        $technician = User::factory()->create(['role' => User::ROLE_LAB_TECHNICIAN]);
+        $this->actingAs($lab, 'sanctum')->postJson('/api/v1/planning-terrain', [
+            'bon_commande_ligne_id' => $labLineId,
+            'user_id' => $technician->id,
+            'date_debut' => '2026-03-01',
+            'date_fin' => '2026-03-01',
+        ])->assertStatus(422)
+            ->assertJsonPath('message', 'Cette ligne ne correspond pas à une tâche terrain de ce bon de commande.');
     }
 
     public function test_planning_terrain_store_accepts_brouillon_bc_line(): void

@@ -11,6 +11,7 @@ use App\Models\SampleStatusLog;
 use App\Models\Sequence;
 use App\Models\User;
 use App\Services\LabReceptionService;
+use App\Services\MissionTaskClosureService;
 use App\Services\SampleLabelPayloadBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,7 +31,7 @@ class SampleReceptionController extends Controller
     private const REL = [
         'dossier:id,reference,titre',
         'missionOrder:id,unique_number,numero,type',
-        'task:id,unique_number,statut',
+        'task:id,unique_number,statut,quantity_count,quantity_unit,pv_numbers',
         'product:id,libelle,code',
         'bonCommandeLigne:id,libelle,bon_commande_id',
         'bonCommandeLigne.bonCommande:id,numero,client_id,dossier_id',
@@ -44,6 +45,7 @@ class SampleReceptionController extends Controller
     public function __construct(
         private readonly LabReceptionService $receptionService,
         private readonly SampleLabelPayloadBuilder $labelBuilder,
+        private readonly MissionTaskClosureService $taskClosure,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -484,6 +486,7 @@ class SampleReceptionController extends Controller
         }
 
         $sample->save();
+        $this->taskClosure->afterSampleReceived($sample, $user instanceof User ? $user->id : null);
     }
 
     /** @param  array<string, mixed>  $data */

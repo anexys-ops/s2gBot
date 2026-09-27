@@ -2,11 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\SyncsPlanningEvent;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StockEquipment extends Model
 {
+    use SyncsPlanningEvent;
+
+    protected function planningEventSourceType(): string { return 'stock_equipment'; }
+
     protected $table = 'stock_equipments';
 
     protected $fillable = [

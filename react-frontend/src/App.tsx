@@ -8,6 +8,8 @@ import DossierDevisTab from './pages/dossiers/tabs/DossierDevisTab'
 import DossierDocumentsTab from './pages/dossiers/tabs/DossierDocumentsTab'
 import DossierExtrafieldsTab from './pages/dossiers/tabs/DossierExtrafieldsTab'
 import CatalogueListePage from './pages/catalogue/CatalogueListePage'
+import Catalog from './pages/Catalog'
+import FormOptionListsPage from './pages/settings/FormOptionListsPage'
 import ArticleFichePage from './pages/catalogue/ArticleFichePage'
 import DossierNewPage from './pages/dossiers/DossierNewPage'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -95,6 +97,7 @@ import {
 } from './pages/back-office/BackOfficeMaterielRedirects'
 import PlanningTechniciensPage from './pages/terrain/PlanningTechniciensPage'
 import AgencesPage from './pages/config/AgencesPage'
+import SettingsCentresPage from './pages/settings/SettingsCentresPage'
 import PlanningIngenieurPage from './pages/ingenierie/PlanningIngenieurPage'
 import LaboReceptionPage from './pages/labo/LaboReceptionPage'
 import PlanningLaboPage from './pages/labo/PlanningLaboPage'
@@ -273,6 +276,8 @@ function AppRoutes() {
         <Route path="rapport-bc" element={<RapportBCListPage />} />
         <Route path="rapport-bc/:id" element={<RapportBCDetailPage />} />
         <Route path="catalogue" element={<CatalogueListePage />} />
+        <Route path="catalogue/essais" element={<Catalog />} />
+        <Route path="config/listes-essais" element={<FormOptionListsPage />} />
         <Route path="catalogue/services" element={<CommercialCatalogPage />} />
         <Route path="catalogue/articles/:id" element={<ArticleFichePage />} />
         <Route path="dossiers/new" element={<DossierNewPage />} />
@@ -336,7 +341,7 @@ function AppRoutes() {
           <Route path="equipements/:id" element={<BackOfficeEquipementDetailRedirect />} />
           <Route index element={<Navigate to="/catalogue" replace />} />
           <Route element={<BackOfficeLayout />}>
-            <Route path="catalogue-essais" element={<Navigate to="/catalogue" replace />} />
+            <Route path="catalogue-essais" element={<Navigate to="/catalogue/essais" replace />} />
             <Route path="catalogue-btp" element={<Navigate to="/catalogue" replace />} />
             <Route path="catalogue-commercial" element={<Navigate to="/catalogue" replace />} />
             <Route path="offres" element={<CommercialCatalogPage />} />
@@ -383,6 +388,7 @@ function AppRoutes() {
           <Route path="charte" element={<SettingsBrandingPage />} />
         </Route>
         <Route path="config/agences" element={<AgencesPage />} />
+        <Route path="config/centres" element={<SettingsCentresPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

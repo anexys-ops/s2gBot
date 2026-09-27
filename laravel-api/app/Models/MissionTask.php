@@ -16,6 +16,7 @@ class MissionTask extends Model
     const STATUT_IN_PROGRESS = 'in_progress';
     const STATUT_PAUSED      = 'paused';
     const STATUT_FROZEN      = 'frozen';
+    const STATUT_RESCHEDULED = 'rescheduled';
     const STATUT_DONE        = 'done';
     const STATUT_VALIDATED   = 'validated';
     const STATUT_REJECTED    = 'rejected';
@@ -28,6 +29,7 @@ class MissionTask extends Model
             self::STATUT_IN_PROGRESS,
             self::STATUT_PAUSED,
             self::STATUT_FROZEN,
+            self::STATUT_RESCHEDULED,
             self::STATUT_DONE,
             self::STATUT_VALIDATED,
             self::STATUT_REJECTED,
@@ -46,6 +48,11 @@ class MissionTask extends Model
         'validated_at',
         'validated_by',
         'notes',
+        'cancellation_reason',
+        'pv_numbers',
+        'quantity_unit',
+        'quantity_count',
+        'reception_generated_at',
         'is_conform',
     ];
 
@@ -55,6 +62,9 @@ class MissionTask extends Model
         'started_at'     => 'datetime',
         'completed_at'   => 'datetime',
         'validated_at'   => 'datetime',
+        'pv_numbers'      => 'array',
+        'quantity_count'  => 'integer',
+        'reception_generated_at' => 'datetime',
         'is_conform'     => 'boolean',
     ];
 
@@ -100,6 +110,11 @@ class MissionTask extends Model
     public function planningEquipments(): HasMany
     {
         return $this->hasMany(PlanningEquipment::class, 'mission_task_id');
+    }
+
+    public function testForms(): HasMany
+    {
+        return $this->hasMany(TaskTestForm::class);
     }
 
     /**

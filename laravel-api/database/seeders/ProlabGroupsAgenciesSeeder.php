@@ -186,10 +186,17 @@ class ProlabGroupsAgenciesSeeder extends Seeder
         // 1. Créer les groupes d'accès
         $groupIds = [];
         foreach (self::GROUPS as $g) {
-            $existing = DB::table('access_groups')->where('slug', Str::slug($g['name']))->first();
+            $slug = Str::slug($g['name']).'-'.strtolower($g['code']);
+            $existing = DB::table('access_groups')
+                ->where('slug', $slug)
+                ->orWhere('slug', Str::slug($g['name']))
+                ->orWhere('name', $g['name'])
+                ->first();
             if ($existing) {
-                $groupIds[$g['code']] = $existing->id;
+                $groupIds[$g['code']] = (int) $existing->id;
                 DB::table('access_groups')->where('id', $existing->id)->update([
+                    'name'        => $g['name'],
+                    'slug'        => $slug,
                     'permissions' => json_encode($g['permissions']),
                     'description' => $g['description'],
                     'updated_at'  => now(),
@@ -198,7 +205,7 @@ class ProlabGroupsAgenciesSeeder extends Seeder
             }
             $id = DB::table('access_groups')->insertGetId([
                 'name'        => $g['name'],
-                'slug'        => Str::slug($g['name']).'-'.strtolower($g['code']),
+                'slug'        => $slug,
                 'description' => $g['description'],
                 'permissions' => json_encode($g['permissions']),
                 'created_at'  => now(),

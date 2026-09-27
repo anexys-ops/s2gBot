@@ -1,297 +1,169 @@
-/**
- * PlanningGlobalPage
- *
- * Vue planning mensuelle unifiée :
- *  - Colonne par personne / machine
- *  - Ligne par jour
- *  - Code couleur par type d'événement
- *  - Onglets : Personnel | Matériel | Indisponibilités
- */
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { planningApi } from '../../api/client'
+import { planningApi, type PlanningEvent } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
-import { getTaskStatutMeta } from '../../lib/missionTaskStatuts'
+import { dateInputFromApi } from '../../lib/appLocale'
+import { eventStatus, matchesText, statusLabels, weekRange, type PlanningStatus } from './planningGlobalFilters'
+import './PlanningGlobalPage.css'
 
-type TabId = 'personnel' | 'materiel' | 'indispo'
+const PAGE_SIZE = 25
 
-const EVENT_COLORS: Record<string, string> = {
-  terrain_bc:   '#0ea5e9',
-  tache:        '#3b82f6',
-  utilisation:  '#3b82f6',
-  conge:        '#10b981',
-  formation:    '#8b5cf6',
-  absent:       '#f59e0b',
-  maintenance:  '#f59e0b',
-  panne:        '#ef4444',
-  calibration:  '#6b7280',
-  indispo:      '#ef4444',
-  autre:        '#6b7280',
-}
-
-function ymdLocal(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function monthRange(year: number, month: number) {
-  const first = new Date(year, month, 1)
-  const last = new Date(year, month + 1, 0)
-  return {
-    from: ymdLocal(first),
-    to: ymdLocal(last),
-    days: last.getDate(),
-    label: first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+function eventLabel(type: string): string {
+  const labels: Record<string, string> = {
+    tache: 'Tâche', terrain_bc: 'Terrain BC', utilisation: 'Utilisation matériel',
+    conge: 'Congé', maladie: 'Maladie', formation: 'Formation', absent: 'Absence',
+    maintenance: 'Maintenance', panne: 'Panne', calibration: 'Étalonnage', indispo: 'Indisponibilité',
+    utilisation_chantier: 'Affectation chantier', etalonnage: 'Étalonnage', verification: 'Vérification',
   }
+  return labels[type] ?? type
 }
 
-function dayLabel(year: number, month: number, day: number) {
-  return new Date(year, month, day).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })
+function taskDocumentText(event: PlanningEvent): string {
+  const line = event.mission_task?.ordre_mission_ligne
+  const om = line?.ordre_mission
+  const bc = event.bon_commande_ligne?.bon_commande
+  return [om?.numero, line?.libelle, bc?.numero, event.bon_commande_ligne?.libelle].filter(Boolean).join(' ')
 }
 
 export default function PlanningGlobalPage() {
-  const now = new Date()
-  const [year, setYear]   = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth())
-  const [tab, setTab]     = useState<TabId>('personnel')
+  const [week, setWeek] = useState(() => weekRange(new Date()))
+  const [customPeriod, setCustomPeriod] = useState(false)
+  const [customFrom, setCustomFrom] = useState(week.from)
+  const [customTo, setCustomTo] = useState(week.to)
+  const [statusFilter, setStatusFilter] = useState<PlanningStatus | ''>('')
+  const [userFilter, setUserFilter] = useState('')
+  const [equipmentFilter, setEquipmentFilter] = useState('')
+  const [eventFilter, setEventFilter] = useState('')
+  const [dateFilter, setDateFilter] = useState('')
+  const [taskFilter, setTaskFilter] = useState('')
+  const [notesFilter, setNotesFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const from = customPeriod ? customFrom : week.from
+  const to = customPeriod ? customTo : week.to
+  const validPeriod = Boolean(from && to && from <= to)
 
-  const { from, to, days, label } = monthRange(year, month)
-
-  const { data: overview, isLoading } = useQuery({
+  const { data: overview, isLoading, error } = useQuery({
     queryKey: ['planning-overview', from, to],
     queryFn: () => planningApi.overview(from, to),
+    enabled: validPeriod,
     staleTime: 30_000,
   })
 
-  const prevMonth = () => { if (month === 0) { setYear(y => y - 1); setMonth(11) } else setMonth(m => m - 1) }
-  const nextMonth = () => { if (month === 11) { setYear(y => y + 1); setMonth(0) } else setMonth(m => m + 1) }
+  const events = useMemo(() => overview?.events ?? [], [overview?.events])
+  const users = useMemo(() => [...new Map(events.filter((e) => e.user).map((e) => [e.user!.id, e.user!.name])).entries()].sort((a, b) => a[1].localeCompare(b[1])), [events])
+  const equipments = useMemo(() => [...new Map(events.filter((e) => e.equipment).map((e) => [e.equipment!.id, e.equipment!.name])).entries()].sort((a, b) => a[1].localeCompare(b[1])), [events])
+  const types = useMemo(() => [...new Set(events.map((e) => e.type_evenement))].sort(), [events])
+  const statusCounts = useMemo(() => events.reduce((counts, event) => {
+    const status = eventStatus(event)
+    counts[status] = (counts[status] ?? 0) + 1
+    return counts
+  }, {} as Partial<Record<PlanningStatus, number>>), [events])
+  const filtered = useMemo(() => events.filter((event) =>
+    (!statusFilter || eventStatus(event) === statusFilter)
+    && (!userFilter || event.user_id === Number(userFilter))
+    && (!equipmentFilter || event.equipment_id === Number(equipmentFilter))
+    && (!eventFilter || event.type_evenement === eventFilter)
+    && (!dateFilter || (dateInputFromApi(event.date_debut) <= dateFilter && dateInputFromApi(event.date_fin) >= dateFilter))
+    && matchesText(taskDocumentText(event), taskFilter)
+    && matchesText(event.notes, notesFilter)
+  ), [events, statusFilter, userFilter, equipmentFilter, eventFilter, dateFilter, taskFilter, notesFilter])
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
-  // Grouper les slots par personne/équipement pour la grille
-  const humanSlots   = overview?.humans ?? []
-  const terrainBc    = overview?.terrain_bc ?? []
-  const equipSlots   = overview?.equipments ?? []
-  const stockPerso   = overview?.stock_personnels ?? []
-  const stockEquip   = overview?.stock_equipments ?? []
+  useEffect(() => setPage(1), [from, to, statusFilter, userFilter, equipmentFilter, eventFilter, dateFilter, taskFilter, notesFilter])
 
-  const humanNames   = [
-    ...new Map([
-      ...humanSlots.map((s) => [s.user_id, s.user?.name ?? `#${s.user_id}`] as const),
-      ...terrainBc.map((s) => [s.user_id, s.user?.name ?? `#${s.user_id}`] as const),
-    ]).entries(),
-  ]
-  const equipNames   = [...new Map(equipSlots.map((s) => [s.equipment_id, s.equipment?.name ?? `#${s.equipment_id}`])).entries()]
-
-  function slotsForDay(day: number, userId?: number, equipId?: number): Array<{ label: string; color: string }> {
-    const d = ymdLocal(new Date(year, month, day))
-    if (userId !== undefined) {
-      return [
-        ...terrainBc
-          .filter((s) => s.user_id === userId && s.date_debut <= d && s.date_fin >= d)
-          .map((s) => ({
-            label: s.bon_commande_ligne?.bon_commande?.numero ?? 'BC terrain',
-            color: EVENT_COLORS.terrain_bc,
-          })),
-        ...humanSlots
-          .filter((s) => s.user_id === userId && s.date_debut <= d && s.date_fin >= d)
-          .map((s) => {
-            const taskStatut = s.missionTask?.statut
-            const taskMeta = taskStatut ? getTaskStatutMeta(taskStatut) : null
-            return {
-              label: s.missionTask ? `Tâche ${taskMeta?.label ?? ''} #${s.mission_task_id}` : s.type_evenement,
-              color: taskMeta ? taskMeta.color : (EVENT_COLORS[s.type_evenement] ?? '#6b7280'),
-            }
-          }),
-        ...stockPerso
-          .filter((s) => s.user_id === userId && s.date_debut <= d && s.date_fin >= d)
-          .map((s) => ({ label: s.motif, color: EVENT_COLORS[s.motif] ?? '#6b7280' })),
-      ]
-    }
-    if (equipId !== undefined) {
-      return [
-        ...equipSlots
-          .filter((s) => s.equipment_id === equipId && s.date_debut <= d && s.date_fin >= d)
-          .map((s) => {
-            const taskStatut = s.missionTask?.statut
-            const taskMeta = taskStatut ? getTaskStatutMeta(taskStatut) : null
-            return {
-              label: s.missionTask ? `Tâche ${taskMeta?.label ?? ''} #${s.mission_task_id}` : s.type_evenement,
-              color: taskMeta ? taskMeta.color : (EVENT_COLORS[s.type_evenement] ?? '#6b7280'),
-            }
-          }),
-        ...stockEquip
-          .filter((s) => s.equipment_id === equipId && s.date_debut <= d && s.date_fin >= d)
-          .map((s) => ({ label: s.motif, color: EVENT_COLORS[s.motif] ?? '#6b7280' })),
-      ]
-    }
-    return []
+  function changeWeek(amount: number) {
+    const monday = new Date(`${week.from}T12:00:00`)
+    monday.setDate(monday.getDate() + 7 * amount)
+    setWeek(weekRange(monday))
   }
 
-  const subjects = tab === 'materiel' ? equipNames : humanNames
-  const gridCols = `80px repeat(${subjects.length}, minmax(80px, 1fr))`
+  function selectWeek(date: string) {
+    if (date) setWeek(weekRange(new Date(`${date}T12:00:00`)))
+  }
 
   return (
     <ModuleEntityShell
-      breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Planning' }]}
-      moduleBarLabel="Planning global"
+      breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Planification' }]}
+      moduleBarLabel="Planification"
       title="Planning global"
-      subtitle={label}
-      actions={
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={prevMonth}>‹</button>
-          <strong style={{ minWidth: 140, textAlign: 'center', lineHeight: '1.8' }}>{label}</strong>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={nextMonth}>›</button>
-        </div>
-      }
+      subtitle="Personnes, matériel et événements liés dans un seul tableau."
     >
-      {/* Onglets */}
-      <div className="article-fiche-tabs" role="tablist" style={{ marginBottom: '1rem' }}>
-        {(['personnel', 'materiel', 'indispo'] as TabId[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            className={`article-fiche-tabs__btn${tab === t ? ' article-fiche-tabs__btn--active' : ''}`}
-            onClick={() => setTab(t)}
-          >
-            {t === 'personnel' ? '👤 Personnel' : t === 'materiel' ? '🔧 Matériel' : '🚫 Indisponibilités'}
-          </button>
-        ))}
-      </div>
-
-      {isLoading && <p className="text-muted">Chargement…</p>}
-
-      {/* Vue indisponibilités */}
-      {tab === 'indispo' && !isLoading && (
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 300 }}>
-            <div style={{ fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem' }}>Congés / Absences personnel</div>
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <table className="data-table data-table--compact">
-                <thead>
-                  <tr><th>Personne</th><th>Du</th><th>Au</th><th>Motif</th></tr>
-                </thead>
-                <tbody>
-                  {stockPerso.length === 0 ? (
-                    <tr><td colSpan={4} className="text-muted" style={{ padding: '0.75rem' }}>Aucune indisponibilité</td></tr>
-                  ) : stockPerso.map((s) => (
-                    <tr key={s.id}>
-                      <td>{s.user?.name ?? `#${s.user_id}`}</td>
-                      <td>{new Date(s.date_debut).toLocaleDateString('fr-FR')}</td>
-                      <td>{new Date(s.date_fin).toLocaleDateString('fr-FR')}</td>
-                      <td><span className="badge">{s.motif}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div style={{ flex: 1, minWidth: 300 }}>
-            <div style={{ fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem' }}>Maintenance / Indispo matériel</div>
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <table className="data-table data-table--compact">
-                <thead>
-                  <tr><th>Équipement</th><th>Du</th><th>Au</th><th>Motif</th></tr>
-                </thead>
-                <tbody>
-                  {stockEquip.length === 0 ? (
-                    <tr><td colSpan={4} className="text-muted" style={{ padding: '0.75rem' }}>Aucune indisponibilité</td></tr>
-                  ) : stockEquip.map((s) => (
-                    <tr key={s.id}>
-                      <td>{s.equipment?.name ?? `#${s.equipment_id}`}</td>
-                      <td>{new Date(s.date_debut).toLocaleDateString('fr-FR')}</td>
-                      <td>{new Date(s.date_fin).toLocaleDateString('fr-FR')}</td>
-                      <td><span className="badge">{s.motif}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+      <div className="card planning-global__controls">
+        <div className="planning-global__period">
+          <button type="button" className={`btn btn-sm ${!customPeriod ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setCustomPeriod(false)}>Semaine</button>
+          <button type="button" className={`btn btn-sm ${customPeriod ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setCustomPeriod(true)}>Période</button>
+          {!customPeriod ? <>
+            <button type="button" className="btn btn-secondary btn-sm" aria-label="Semaine précédente" onClick={() => changeWeek(-1)}>‹</button>
+            <label>Semaine du <input type="date" aria-label="Choisir une semaine" value={week.from} onChange={(e) => selectWeek(e.target.value)} /></label>
+            <span>au {new Date(`${week.to}T12:00:00`).toLocaleDateString('fr-FR')}</span>
+            <button type="button" className="btn btn-secondary btn-sm" aria-label="Semaine suivante" onClick={() => changeWeek(1)}>›</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setWeek(weekRange(new Date()))}>Cette semaine</button>
+          </> : <>
+            <label>Du <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} /></label>
+            <label>Au <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} /></label>
+          </>}
         </div>
-      )}
-
-      {/* Vue grille calendaire */}
-      {tab !== 'indispo' && !isLoading && (
-        <>
-          {subjects.length === 0 ? (
-            <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
-              <p className="text-muted">Aucune donnée de planning pour cette période.</p>
-            </div>
-          ) : (
-            <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: gridCols, minWidth: 400 }}>
-                {/* En-tête */}
-                <div style={{ padding: '0.4rem', fontWeight: 600, fontSize: '0.75rem', background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)' }}>
-                  Jour
-                </div>
-                {subjects.map(([id, name]) => (
-                  <div key={id} style={{
-                    padding: '0.4rem', fontWeight: 600, fontSize: '0.75rem', textAlign: 'center',
-                    background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)',
-                    borderRight: '1px solid var(--color-border)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {name}
-                  </div>
-                ))}
-
-                {/* Lignes jours */}
-                {Array.from({ length: days }, (_, i) => i + 1).map((day) => {
-                  const isToday = day === now.getDate() && month === now.getMonth() && year === now.getFullYear()
-                  const isWeekend = [0, 6].includes(new Date(year, month, day).getDay())
-                  return (
-                    <>
-                      <div key={`d-${day}`} style={{
-                        padding: '0.3rem 0.4rem', fontSize: '0.75rem',
-                        fontWeight: isToday ? 700 : 400,
-                        color: isToday ? '#3b82f6' : isWeekend ? 'var(--color-text-muted)' : 'var(--color-text)',
-                        background: isWeekend ? 'var(--color-surface)' : undefined,
-                        borderBottom: '1px solid var(--color-border)',
-                        borderRight: '1px solid var(--color-border)',
-                      }}>
-                        {dayLabel(year, month, day)}
-                      </div>
-                      {subjects.map(([id]) => {
-                        const slots = slotsForDay(day,
-                          tab === 'personnel' ? Number(id) : undefined,
-                          tab === 'materiel'  ? Number(id) : undefined,
-                        )
-                        return (
-                          <div key={`${id}-${day}`} style={{
-                            padding: '0.2rem 0.3rem', minHeight: 28,
-                            background: isWeekend ? 'var(--color-surface)' : undefined,
-                            borderBottom: '1px solid var(--color-border)',
-                            borderRight: '1px solid var(--color-border)',
-                          }}>
-                            {slots.map((s, i) => (
-                              <div key={i} style={{
-                                fontSize: '0.65rem', padding: '1px 4px', borderRadius: 3,
-                                background: s.color + '22', color: s.color,
-                                fontWeight: 600, marginBottom: 1,
-                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                              }}>
-                                {s.label}
-                              </div>
-                            ))}
-                          </div>
-                        )
-                      })}
-                    </>
-                  )
-                })}
-              </div>
-            </div>
+        {!validPeriod ? <p className="error">Choisissez une période valide.</p> : null}
+        <div className="planning-global__statuses" aria-label="Filtrer par statut">
+          <button type="button" className={`planning-global__status ${statusFilter === '' ? 'is-active' : ''}`} onClick={() => setStatusFilter('')}>Tous <strong>{events.length}</strong></button>
+          {(Object.keys(statusLabels) as PlanningStatus[]).map((status) =>
+            <button type="button" key={status} className={`planning-global__status ${statusFilter === status ? 'is-active' : ''}`} onClick={() => setStatusFilter(status)}>{statusLabels[status]} <strong>{statusCounts[status] ?? 0}</strong></button>
           )}
-        </>
-      )}
-
-      {/* Légende */}
-      <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-        {Object.entries(EVENT_COLORS).slice(0, 6).map(([k, c]) => (
-          <span key={k} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: c, display: 'inline-block' }} />
-            {k}
-          </span>
-        ))}
+        </div>
       </div>
+
+      {isLoading ? <p className="text-muted">Chargement…</p> : null}
+      {error ? <p className="error">{(error as Error).message}</p> : null}
+      {validPeriod && !isLoading && !error ? <>
+        <div className="planning-global__result-count">{filtered.length} événement{filtered.length > 1 ? 's' : ''} affiché{filtered.length > 1 ? 's' : ''} du {new Date(`${from}T12:00:00`).toLocaleDateString('fr-FR')} au {new Date(`${to}T12:00:00`).toLocaleDateString('fr-FR')}</div>
+        <div className="card table-wrap planning-global__table">
+          <table className="data-table data-table--compact">
+            <thead>
+              <tr><th>Période</th><th>Utilisateur</th><th>Matériel</th><th>Événement</th><th>Statut</th><th>Tâche / document</th><th>Notes</th></tr>
+              <tr className="planning-global__filter-row">
+                <th><input type="date" aria-label="Filtrer par date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} /></th>
+                <th><select aria-label="Filtrer par utilisateur" value={userFilter} onChange={(e) => setUserFilter(e.target.value)}><option value="">Tous</option>{users.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></th>
+                <th><select aria-label="Filtrer par matériel" value={equipmentFilter} onChange={(e) => setEquipmentFilter(e.target.value)}><option value="">Tout</option>{equipments.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></th>
+                <th><select aria-label="Filtrer par événement" value={eventFilter} onChange={(e) => setEventFilter(e.target.value)}><option value="">Tous</option>{types.map((type) => <option key={type} value={type}>{eventLabel(type)}</option>)}</select></th>
+                <th><select aria-label="Filtrer par statut" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as PlanningStatus | '')}><option value="">Tous</option>{(Object.keys(statusLabels) as PlanningStatus[]).map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select></th>
+                <th><input type="search" aria-label="Rechercher une tâche ou un document" placeholder="Rechercher…" value={taskFilter} onChange={(e) => setTaskFilter(e.target.value)} /></th>
+                <th><input type="search" aria-label="Rechercher dans les notes" placeholder="Rechercher…" value={notesFilter} onChange={(e) => setNotesFilter(e.target.value)} /></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? <tr><td colSpan={7} className="text-muted">Aucun événement pour cette période et ces filtres.</td></tr> : null}
+              {visible.map((event) => {
+                const line = event.mission_task?.ordre_mission_ligne
+                const om = line?.ordre_mission
+                const bc = event.bon_commande_ligne?.bon_commande
+                return <tr key={event.id}>
+                  <td>{dateInputFromApi(event.date_debut)} → {dateInputFromApi(event.date_fin)}</td>
+                  <td>{event.user?.name ?? '—'}</td>
+                  <td>{event.equipment ? <Link to={`/materiel/equipements/${event.equipment.id}`}>{event.equipment.code ? `${event.equipment.code} — ` : ''}{event.equipment.name}</Link> : '—'}</td>
+                  <td>{eventLabel(event.type_evenement)}</td>
+                  <td>{statusLabels[eventStatus(event)]}</td>
+                  <td>
+                    {om ? <><Link to={`/ordres-mission/${om.id}`}>{om.numero}</Link> — {line?.libelle}</> : null}
+                    {!om && bc ? <><Link to={`/bons-commande/${bc.id}`}>{bc.numero}</Link> — {event.bon_commande_ligne?.libelle}</> : null}
+                    {!om && !bc && event.ordre_mission_id ? <Link to={`/ordres-mission/${event.ordre_mission_id}`}>Voir l’OM</Link> : null}
+                    {!om && !bc && !event.ordre_mission_id && event.dossier_id ? <Link to={`/dossiers/${event.dossier_id}`}>Voir le dossier</Link> : null}
+                    {!om && !bc && !event.ordre_mission_id && !event.dossier_id ? '—' : null}
+                  </td>
+                  <td>{event.notes ?? '—'}</td>
+                </tr>
+              })}
+            </tbody>
+          </table>
+        </div>
+        {pageCount > 1 ? <nav className="planning-global__pagination" aria-label="Pages du planning">
+          <button type="button" className="btn btn-secondary btn-sm" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Précédent</button>
+          <span>Page {currentPage} sur {pageCount}</span>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Suivant</button>
+        </nav> : null}
+      </> : null}
     </ModuleEntityShell>
   )
 }

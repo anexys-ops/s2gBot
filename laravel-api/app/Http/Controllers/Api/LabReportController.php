@@ -6,12 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\LabReport;
 use App\Support\ClientPortalAccess;
 use App\Models\LabReportSection;
+use App\Models\MissionTask;
+use App\Models\Sample;
 use App\Models\Sequence;
+use App\Services\MissionTaskClosureService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class LabReportController extends Controller
 {
+    public function __construct(private readonly MissionTaskClosureService $taskClosure) {}
+
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -192,6 +197,20 @@ class LabReportController extends Controller
         }
 
         $report->update($update);
+
+        if ($newStatus === 'valide' && $report->bc_id) {
+            $sampleIds = LabReportSection::query()->where('report_id', $report->id)
+                ->whereNotNull('sample_id')->pluck('sample_id');
+            $taskIds = Sample::query()->whereIn('id', $sampleIds)
+                ->whereHas('bonCommandeLigne', fn ($query) => $query->where('bon_commande_id', $report->bc_id))
+                ->whereNotNull('task_id')->distinct()->pluck('task_id');
+            MissionTask::query()->whereIn('id', $taskIds)->each(function (MissionTask $task) use ($sampleIds, $request) {
+                if (! $task->reception_generated_at
+                    && ! Sample::query()->where('task_id', $task->id)->whereNotIn('id', $sampleIds)->exists()) {
+                    $this->taskClosure->validate($task, $request->user()?->id);
+                }
+            });
+        }
 
         return response()->json($report->fresh());
     }

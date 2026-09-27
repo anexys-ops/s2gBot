@@ -33,13 +33,8 @@ class MaterielAffectationController extends Controller
 
         if (! empty($validated['from'])) {
             $q->where(function ($sub) use ($validated) {
-                $sub->whereDate('date_retour_prevue', '>=', $validated['from'])
-                    ->orWhereDate('date_retour_effective', '>=', $validated['from'])
-                    ->orWhere(function ($inner) use ($validated) {
-                        $inner->whereNull('date_retour_prevue')
-                            ->whereNull('date_retour_effective')
-                            ->whereDate('date_debut', '>=', $validated['from']);
-                    });
+                $sub->whereNull('date_retour_effective')
+                    ->orWhereDate('date_retour_effective', '>=', $validated['from']);
             });
         }
 
@@ -81,10 +76,24 @@ class MaterielAffectationController extends Controller
 
     public function update(Request $request, Equipment $equipment, MaterielAffectation $affectation): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $request->user()->isLab()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
         $this->assertBelongsToEquipment($affectation, $equipment);
+
+        if (! $request->user()->isLabAdmin()) {
+            $isAssignedTechnician = (int) $affectation->user_id === (int) $request->user()->id;
+            $isReturnConfirmation = $request->filled('date_retour_effective')
+                && empty(array_diff(array_keys($request->all()), [
+                    'date_retour_effective',
+                    'etat_retour',
+                    'observations',
+                ]));
+
+            if (! $isAssignedTechnician || ! $isReturnConfirmation) {
+                return response()->json(['message' => 'Non autorisé'], 403);
+            }
+        }
 
         $affectation->update($this->validatedPayload($request, true));
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\BcLignePlanningAffectation;
 use App\Models\PlanningEquipment;
+use App\Models\PlanningEvent;
 use App\Models\PlanningHuman;
 use App\Models\StockEquipment;
 use App\Models\StockPersonnel;
@@ -198,6 +199,18 @@ class PlanningController extends Controller
         $to   = $request->string('to')   ?: now()->endOfMonth()->toDateString();
 
         return response()->json([
+            'events' => PlanningEvent::query()
+                ->whereDate('date_debut', '<=', $to)
+                ->whereDate('date_fin', '>=', $from)
+                ->with([
+                    'user:id,name',
+                    'equipment:id,name,code',
+                    'missionTask.ordreMissionLigne.ordreMission:id,numero,bon_commande_id',
+                    'bonCommandeLigne.bonCommande:id,numero,dossier_id',
+                ])
+                ->orderBy('date_debut')
+                ->orderBy('id')
+                ->get(),
             'humans' => PlanningHuman::query()
                 ->whereBetween('date_debut', [$from, $to])
                 ->orWhereBetween('date_fin', [$from, $to])

@@ -147,6 +147,7 @@ export default function BonLivraisonFichePage() {
         notes: notes || undefined,
         contact_id: contactId,
         date_livraison: dateLivraison || undefined,
+        lab_centre_group_id: centreGroupId,
       }),
     onSuccess: () => {
       setToast({ message: 'Informations du BL enregistrées.', variant: 'success' })

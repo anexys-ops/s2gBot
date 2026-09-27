@@ -735,6 +735,7 @@ export interface RefArticleRow {
   article_lie?: { id: number; code: string; libelle: string } | null
   famille_packages?: RefFamillePackageRow[]
   parametres_essai?: RefParametreEssaiRow[]
+  test_types?: Array<{ id: number; name: string; norm?: string | null; article_action_id?: number | null }>
   resultats?: RefResultatRow[]
   qualification_tags?: RefQualificationTagRow[]
   jalon_products?: RefArticleJalonProductRow[]
@@ -829,6 +830,10 @@ export const catalogueApi = {
   },
   article: (id: number) =>
     api<RefArticleRow | { data: RefArticleRow }>(`/v1/catalogue/articles/${id}`).then(unwrapCatalogueArticle),
+  syncArticleTestTypes: (id: number, assignments: Array<{ test_type_id: number; article_action_id: number | null }>) =>
+    api<RefArticleRow | { data: RefArticleRow }>(`/v1/catalogue/articles/${id}/test-types`, {
+      method: 'PUT', body: JSON.stringify({ assignments }),
+    }).then(unwrapCatalogueArticle),
   createArticle: (body: RefArticleCreateInput) =>
     api<RefArticleRow | { data: RefArticleRow }>('/v1/catalogue/articles', {
       method: 'POST',
@@ -949,6 +954,7 @@ export type BonCommandeLigne = {
   notes_ligne?: string | null
   technicien?: { id: number; name: string } | null
   planning_affectations?: BcLignePlanningAffectation[]
+  om_quantites?: Partial<Record<'technicien' | 'ingenieur' | 'labo', number>>
 }
 
 export type BonCommande = {
@@ -956,6 +962,8 @@ export type BonCommande = {
   numero: string
   quote_id: number | null
   dossier_id: number
+  lab_centre_group_id?: number | null
+  centre_group?: LabCentreGroup | null
   client_id: number
   contact_id?: number | null
   statut: string
@@ -966,6 +974,11 @@ export type BonCommande = {
   tva_rate: string | number
   notes?: string | null
   lignes?: BonCommandeLigne[]
+  avancement_om?: { statut: string; total: number; cloturees: number; planifiees: number }
+  planning_terrain_groups?: Array<{
+    jalon: { id: string; code?: string | null; label: string }
+    lignes: BonCommandeLigne[]
+  }>
   client?: { id: number; name: string }
   clientContact?: ClientContactRow
   dossier?: DossierRow
@@ -1075,23 +1088,32 @@ export const dossiersApi = {
     api<{ id: number; reference: string; titre: string; statut: string }[]>(`/v1/sites/${siteId}/dossiers`),
 }
 
+export type LabCentreGroup = { id: number; code: string; name: string; sort_order: number; active: boolean }
+
 export const labCentreGroupsApi = {
-  list: () => api<{ id: number; code: string; name: string; sort_order: number; active: boolean }[]>('/v1/lab-centre-groups'),
+  list: () => api<LabCentreGroup[]>('/v1/lab-centre-groups'),
+  listAll: () => api<LabCentreGroup[]>('/v1/lab-centre-groups?all=1'),
+  create: (body: { code: string; name: string; sort_order?: number; active?: boolean }) =>
+    api<LabCentreGroup>('/v1/lab-centre-groups', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: number, body: Partial<{ code: string; name: string; sort_order: number; active: boolean }>) =>
+    api<LabCentreGroup>(`/v1/lab-centre-groups/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api<void>(`/v1/lab-centre-groups/${id}`, { method: 'DELETE' }),
 }
 
 export const bonsCommandeApi = {
-  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string; planning?: boolean }) => {
+  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string; planning?: boolean; unassignedPlanning?: boolean }) => {
     const q = new URLSearchParams()
     if (params?.dossier_id) q.set('dossier_id', String(params.dossier_id))
     if (params?.client_id) q.set('client_id', String(params.client_id))
     if (params?.statut) q.set('statut', params.statut)
     if (params?.search) q.set('search', params.search)
     if (params?.planning) q.set('planning', '1')
+    if (params?.unassignedPlanning) q.set('planning_unassigned', '1')
     const s = q.toString()
     return api<BonCommande[]>(`/v1/bons-commande${s ? `?${s}` : ''}`)
   },
   get: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}`),
-  update: (id: number, body: { notes?: string; date_livraison_prevue?: string; montant_ht?: number; montant_ttc?: number; contact_id?: number | null; statut?: string }) =>
+  update: (id: number, body: { notes?: string; date_livraison_prevue?: string; montant_ht?: number; montant_ttc?: number; contact_id?: number | null; statut?: string; lab_centre_group_id?: number | null }) =>
     api<BonCommande>(`/v1/bons-commande/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api<null>(`/v1/bons-commande/${id}`, { method: 'DELETE' }),
   syncPrixDevis: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}/sync-prix-devis`, { method: 'POST' }),
@@ -1115,9 +1137,21 @@ export const bonsCommandeApi = {
 
 /** Réponse list GET planning-terrain (affectation + relations). */
 export type PlanningTerrainAffectationRow = BcLignePlanningAffectation & {
+  source?: 'bc' | 'om'
+  mission_task_id?: number
+  ordre_mission_id?: number | null
+  ordre_mission_numero?: string | null
+  client_name?: string | null
+  dossier_id?: number | null
+  dossier_reference?: string | null
+  site_name?: string | null
+  statut?: string
+  date_debut: string
+  date_fin: string
   bon_commande_ligne?: {
-    id: number
-    libelle: string
+    id: number | null
+    libelle: string | null
+    bon_commande_id?: number | null
     date_debut_prevue?: string | null
     date_fin_prevue?: string | null
     bon_commande?: {
@@ -1134,12 +1168,34 @@ import type { TechnicienOption } from '../lib/userRolePresentation'
 export const planningTerrainApi = {
   techniciens: (context: 'terrain' | 'labo' | 'ingenieur' = 'terrain') =>
     api<TechnicienOption[]>(`/v1/planning-terrain/techniciens?context=${context}`),
-  list: (params: { from: string; to: string; user_id?: number }) => {
+  list: (params: { from: string; to: string; user_id?: number; undated?: boolean; context?: 'terrain' | 'labo' | 'ingenieur' }) => {
     const q = new URLSearchParams()
     q.set('from', params.from)
     q.set('to', params.to)
     if (params.user_id) q.set('user_id', String(params.user_id))
+    if (params.undated) q.set('undated', '1')
+    if (params.context) q.set('context', params.context)
     return api<PlanningTerrainAffectationRow[]>(`/v1/planning-terrain?${q.toString()}`)
+  },
+  fetchPdf: async (params: { from: string; to: string; user_id?: number; template_id?: number; context?: 'terrain' | 'labo' | 'ingenieur' }) => {
+    const token = getToken()
+    const res = await fetch(`${API_BASE}/v1/planning-terrain/pdf`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/pdf,*/*',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(params),
+    })
+    if (res.status === 401) {
+      handleApiUnauthorized('/v1/planning-terrain/pdf', Boolean(token))
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.message || 'Erreur lors de la génération du planning PDF')
+    }
+    return res.blob()
   },
   create: (body: {
     bon_commande_ligne_id: number
@@ -1171,6 +1227,7 @@ export const bonsLivraisonApi = {
       date_livraison?: string
       contact_id?: number | null
       statut?: string
+      lab_centre_group_id?: number | null
       lignes?: { id: number; quantite_livree: number }[]
     },
   ) => api<BonLivraison>(`/v1/bons-livraison/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
@@ -1481,6 +1538,7 @@ export interface EquipmentRow {
   maintenance_plans?: EquipmentMaintenancePlanRow[]
   affectations?: MaterielAffectationRow[]
   planning_slots?: PlanningEquipmentSlot[]
+  article_requirements?: ArticleEquipmentRequirement[]
 }
 
 export const equipmentsApi = {
@@ -1639,6 +1697,7 @@ export const equipmentsApi = {
       date_debut: string
       date_retour_prevue: string | null
       date_retour_effective: string | null
+      etat_retour: 'bon' | 'usage' | 'degrade' | null
       observations: string | null
     }>,
   ) =>
@@ -1772,6 +1831,9 @@ export const testTypesApi = {
     unit_price: number
     thresholds?: Record<string, number>
     params?: TestTypeParamInput[]
+    form_fields?: TestTypeFormField[]
+    context?: 'terrain' | 'ingenieur' | 'labo'
+    assignments?: Array<{ article_id: number; article_action_id?: number | null }>
   }) => api<TestType>('/test-types', { method: 'POST', body: JSON.stringify(body) }),
   update: (
     id: number,
@@ -1782,9 +1844,13 @@ export const testTypesApi = {
       unit_price?: number
       thresholds?: Record<string, number>
       params?: TestTypeParamInput[]
+      form_fields?: TestTypeFormField[]
+      context?: 'terrain' | 'ingenieur' | 'labo'
     },
   ) => api<TestType>(`/test-types/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api(`/test-types/${id}`, { method: 'DELETE' }),
+  syncProducts: (id: number, assignments: Array<{ article_id: number; article_action_id?: number | null }>) =>
+    api<TestType>(`/test-types/${id}/products`, { method: 'PUT', body: JSON.stringify({ assignments }) }),
 }
 
 export const ordersApi = {
@@ -1825,6 +1891,17 @@ export type LabReceptionAttendu = {
   quantite_recue: number
   quantite_manquante: number
   reception_complete: boolean
+  tasks: Array<{
+    id: number
+    unique_number?: string | null
+    statut: string
+    quantity_count?: number | null
+    quantity_unit?: string | null
+    pending_labels: number
+    pv_numbers?: string[] | null
+    assigned_user?: { id: number; name: string } | null
+    reception_generated_at?: string | null
+  }>
   article?: { id: number; code: string; libelle: string } | null
   technicien?: { id: number; name: string } | null
   bon_commande?: { id: number; numero: string; statut: string; date_commande?: string | null } | null
@@ -1847,6 +1924,7 @@ export type LabReceptionAttendusResponse = {
 
 export type ReceptionSample = {
   id: number
+  task_id?: number | null
   fold_number?: string | null
   transco_number?: string | null
   reception_index?: number | null
@@ -1872,6 +1950,14 @@ export type ReceptionSample = {
   product?: { id: number; code: string; libelle: string } | null
   collected_by?: { id: number; name: string } | null
   received_by?: { id: number; name: string } | null
+  task?: {
+    id: number
+    unique_number?: string | null
+    statut: string
+    quantity_count?: number | null
+    quantity_unit?: string | null
+    pv_numbers?: string[] | null
+  } | null
   cancelled_by?: { id: number; name: string } | null
   bon_commande_ligne?: {
     id: number
@@ -2619,6 +2705,8 @@ export interface Quote {
   contact_id?: number | null
   site_id?: number
   dossier_id?: number | null
+  lab_centre_group_id?: number | null
+  centre_group?: LabCentreGroup | null
   quote_date: string
   order_date?: string
   site_delivery_date?: string
@@ -2704,6 +2792,7 @@ export interface QuoteCreateBody {
   filiale_agency_id?: number
   site_id?: number
   dossier_id?: number | null
+  lab_centre_group_id?: number | null
   meta?: EntityMetaPayload | null
   quote_date: string
   order_date?: string
@@ -3058,6 +3147,59 @@ export interface TestType {
   unit_price: number
   thresholds?: Record<string, number>
   params?: TestTypeParam[]
+  form_fields?: TestTypeFormField[]
+  context?: 'terrain' | 'ingenieur' | 'labo' | null
+  articles?: Array<{ id: number; code: string; libelle: string; pivot?: { article_action_id: number | null } }>
+}
+
+export interface TestTypeFormField {
+  key: string
+  label: string
+  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'photo' | 'checkboxes' | 'table' | 'formula'
+  required: boolean
+  unit?: string
+  options?: string[]
+  list_id?: number | null
+  formula?: string
+  columns?: TestTypeFormColumn[]
+}
+
+export interface TestTypeFormColumn extends Omit<TestTypeFormField, 'columns' | 'type'> {
+  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'formula'
+}
+
+export interface FormOptionList { id: number; name: string; options: string[] }
+
+export const formOptionListsApi = {
+  list: () => api<FormOptionList[]>('/form-option-lists'),
+  create: (body: { name: string; options: string[] }) => api<FormOptionList>('/form-option-lists', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: number, body: { name: string; options: string[] }) => api<FormOptionList>(`/form-option-lists/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id: number) => api<void>(`/form-option-lists/${id}`, { method: 'DELETE' }),
+}
+
+export interface TaskTestFormSummary {
+  test_type: { id: number; name: string; norm?: string | null }
+  form_fields: TestTypeFormField[]
+  submission: null | {
+    id: number
+    status: 'draft' | 'submitted' | 'correction_requested' | 'validated'
+    answers: Record<string, unknown>
+    correction_note?: string | null
+    photos?: Array<{ id: number; field_key: string; original_name: string }>
+  }
+}
+
+export const taskTestFormsApi = {
+  list: (taskId: number) => api<{ task_id: number; forms: TaskTestFormSummary[] }>(`/mobile/task-forms/tasks/${taskId}`),
+  review: (taskId: number, typeId: number, decision: 'validate' | 'correction', correction_note?: string) =>
+    api(`/mobile/task-forms/tasks/${taskId}/types/${typeId}/review`, { method: 'POST', body: JSON.stringify({ decision, correction_note }) }),
+  photo: async (photoId: number): Promise<Blob> => {
+    const response = await fetch(`/api/mobile/task-forms/photos/${photoId}`, {
+      headers: { Authorization: `Bearer ${getToken() ?? ''}`, Accept: 'image/*' },
+    })
+    if (!response.ok) throw new Error('Photo indisponible')
+    return response.blob()
+  },
 }
 
 export interface OrderItem {
@@ -3173,6 +3315,8 @@ export interface Invoice {
   next_reminder_date?: string | null
   reminder_notes?: string | null
   meta?: EntityMetaPayload | null
+  lab_centre_group_id?: number | null
+  centre_group?: LabCentreGroup | null
   client?: Client
   client_contact?: ClientContactRow
   orders?: Order[]
@@ -3243,6 +3387,7 @@ export interface ArticleEquipmentRequirement {
   quantite: number
   notes?: string | null
   equipment?: { id: number; name: string; code?: string; type?: string }
+  article?: Pick<RefArticleRow, 'id' | 'code' | 'libelle' | 'kind' | 'actif'>
 }
 
 export interface OdmJalon {
@@ -3266,7 +3411,7 @@ export interface OrdreMissionLigne {
   article_action_id?: number | null
   libelle: string
   quantite: number
-  statut: 'a_faire' | 'en_cours' | 'realise' | 'annule'
+  statut: 'planifie' | 'replanifie' | 'en_cours' | 'freeze' | 'annule' | 'attente_validation' | 'cloture' | 'a_faire' | 'realise'
   assigned_user_id?: number | null
   equipment_id?: number | null
   date_prevue?: string | null
@@ -3277,7 +3422,7 @@ export interface OrdreMissionLigne {
   assignedUser?: { id: number; name: string } | null
   equipment?: { id: number; name: string; code?: string } | null
   articleAction?: ArticleAction | null
-  article?: { id: number; code: string; libelle: string } | null
+  article?: { id: number; code: string; libelle: string; unite?: string | null } | null
 }
 
 export interface OrdreMission {
@@ -3303,8 +3448,10 @@ export interface OrdreMission {
   bonCommande?: {
     id: number
     numero: string
+    dossier_id?: number | null
     quote_id?: number | null
     quote?: { id: number; number: string } | null
+    lignes?: BonCommandeLigne[]
     dossier?: { id: number; reference: string; titre?: string | null } | null
   } | null
   /** Sérialisation Laravel (snake_case) */
@@ -3437,6 +3584,11 @@ export const ordresMissionApi = {
     api<OrdreMissionLigne>(`/ordres-mission/${omId}/lignes`, { method: 'POST', body: JSON.stringify(body) }),
   updateLigne: (omId: number, ligneId: number, body: Partial<OrdreMissionLigne>) =>
     api<OrdreMissionLigne>(`/ordres-mission/${omId}/lignes/${ligneId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  updateLignes: (omId: number, lignes: Array<Partial<OrdreMissionLigne> & { id: number }>) =>
+    api<OrdreMissionLigne[]>(`/ordres-mission/${omId}/lignes`, {
+      method: 'PUT',
+      body: JSON.stringify({ lignes }),
+    }),
   deleteLigne: (omId: number, ligneId: number) =>
     api<void>(`/ordres-mission/${omId}/lignes/${ligneId}`, { method: 'DELETE' }),
   planning: (params?: { type?: string; from?: string; to?: string }) => {
@@ -3493,10 +3645,11 @@ export interface TaskResult {
 
 export interface MissionTask {
   id: number
+  test_forms_count?: number
   unique_number?: string
   ordre_mission_ligne_id: number
   assigned_user_id?: number | null
-  statut: 'todo' | 'in_progress' | 'paused' | 'frozen' | 'done' | 'validated' | 'rejected'
+  statut: 'todo' | 'in_progress' | 'paused' | 'frozen' | 'rescheduled' | 'done' | 'validated' | 'rejected'
   planned_date?: string | null
   due_date?: string | null
   started_at?: string | null
@@ -3504,11 +3657,19 @@ export interface MissionTask {
   validated_at?: string | null
   validated_by?: number | null
   notes?: string | null
+  pv_numbers?: string[] | null
+  quantity_unit?: string | null
+  quantity_count?: number | null
+  reception_generated_at?: string | null
+  ordered_quantity?: number
+  received_quantity?: number
+  remaining_quantity?: number
   is_conform?: boolean | null
+  jalon_context?: { id: string; label: string; code?: string | null } | null
   assignedUser?: { id: number; name: string; email?: string }
   ordreMissionLigne?: OrdreMissionLigne & {
     ordreMission?: OrdreMission
-    article?: { id: number; code: string; libelle: string }
+    article?: { id: number; code: string; libelle: string; unite?: string | null }
     articleAction?: ArticleAction & { measure_configs?: ActionMeasureConfig[] }
   }
   measures?: TaskMeasure[]
@@ -3551,7 +3712,7 @@ export function normalizeMissionTask(raw: MissionTaskApiRaw): MissionTask {
             })(),
           } as OrdreMission)
         : undefined,
-      article: articleRaw as { id: number; code: string; libelle: string } | undefined,
+      article: articleRaw as { id: number; code: string; libelle: string; unite?: string | null } | undefined,
       articleAction: articleActionRaw
         ? ({
             ...(articleActionRaw as unknown as ArticleAction),
@@ -3642,6 +3803,12 @@ export const missionTasksApi = {
   get: async (id: number) => normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}`)),
   update: async (id: number, body: Partial<MissionTask>) =>
     normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}`, { method: 'PUT', body: JSON.stringify(body) })),
+  closeReception: async (id: number, body: { pv_numbers: string[]; quantity_unit: string; quantity_count: number }) => {
+    const result = await api<{ task: MissionTaskApiRaw; samples_created: number; remaining_quantity: number }>(`/mission-tasks/${id}/close-reception`, { method: 'POST', body: JSON.stringify(body) })
+    return { ...result, task: normalizeMissionTask(result.task) }
+  },
+  duplicate: async (id: number) =>
+    normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}/duplicate`, { method: 'POST' })),
   submitMeasures: async (id: number, measures: Array<{ measure_config_id: number; value?: string; value_numeric?: number; attachment_path?: string }>) =>
     normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}/measures`, { method: 'POST', body: JSON.stringify({ measures }) })),
   validate: async (id: number, body: { is_conform: boolean; value_final?: number; conclusion?: string; observations?: string; rapport_path?: string }) =>
@@ -3715,11 +3882,33 @@ export type PlanningTerrainBcSlot = {
 }
 
 export interface PlanningOverview {
+  events: PlanningEvent[]
   humans: PlanningHuman[]
   equipments: PlanningEquipmentSlot[]
   stock_personnels: StockPersonnel[]
   stock_equipments: StockEquipmentEntry[]
   terrain_bc?: PlanningTerrainBcSlot[]
+}
+
+export interface PlanningEvent {
+  id: number
+  source_type: string
+  source_id: number
+  user_id: number | null
+  equipment_id: number | null
+  mission_task_id: number | null
+  bon_commande_ligne_id: number | null
+  dossier_id: number | null
+  ordre_mission_id: number | null
+  date_debut: string
+  date_fin: string
+  type_evenement: string
+  notes: string | null
+  is_validated?: boolean
+  user?: { id: number; name: string } | null
+  equipment?: { id: number; name: string; code?: string } | null
+  mission_task?: { id: number; statut?: 'todo' | 'in_progress' | 'paused' | 'frozen' | 'rescheduled' | 'done' | 'validated' | 'rejected'; ordre_mission_ligne?: { id: number; libelle: string; ordre_mission?: { id: number; numero: string; bon_commande_id: number | null } | null } | null } | null
+  bon_commande_ligne?: { id: number; libelle: string; bon_commande?: { id: number; numero: string } | null } | null
 }
 
 export const planningApi = {
@@ -4071,6 +4260,7 @@ export type RapportBC = {
 
 export type RapportBCTask = {
   id: number
+  measurements_count?: number
   libelle: string | null
   statut: string
   planned_date: string | null
@@ -4118,6 +4308,8 @@ export const rapportBCApi = {
     api<RapportBC>(`/rapport-bc/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api<void>(`/rapport-bc/${id}`, { method: 'DELETE' }),
   recap: (id: number) => api<{ rapport: RapportBC; bc_statuts: Record<string, number>; taches: RapportBCTask[] }>(`/rapport-bc/${id}/recap`),
+  addTaskMeasurementsPdf: (id: number, taskId: number) =>
+    api<RapportBCVersion>(`/rapport-bc/${id}/taches/${taskId}/mesures-pdf`, { method: 'POST' }),
   uploadVersion: async (id: number, file: File, notes?: string): Promise<RapportBCVersion> => {
     const token = getToken()
     const fd = new FormData()

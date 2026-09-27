@@ -1,64 +1,57 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  bonsCommandeApi,
-  planningTerrainApi,
-  type BonCommande,
-  type BonCommandeLigne,
-} from '../../api/client'
-import { bonCommandeStatutBadgeProps } from '../../components/ds/StatusBadge'
-import StatusBadge from '../../components/ds/StatusBadge'
+import { bonsCommandeApi, planningTerrainApi, type BonCommande } from '../../api/client'
+import StatusBadge, { bonCommandeStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
-import PlanningMassActionsBar from '../../components/planning/PlanningMassActionsBar'
 import { useAuth } from '../../contexts/AuthContext'
 import { dateInputFromApi, toLocalDateInput } from '../../lib/appLocale'
-import { applyMassToLineIds, toggleAllSelection } from '../../lib/planningMassApply'
 import { formatTechnicienOption } from '../../lib/userRolePresentation'
+import TerrainPlanningPdfModal from '../../components/pdf/TerrainPlanningPdfModal'
 
-function toYmd(d: Date) {
-  return toLocalDateInput(d)
+type PeriodMode = 'jour' | 'semaine' | 'periode'
+type PlanningContext = 'terrain' | 'labo' | 'ingenieur'
+
+const CONTEXT_META: Record<PlanningContext, { title: string; module: string; parent: string; parentTo: string; assignee: string; allAssignees: string }> = {
+  terrain: { title: 'Planning techniciens', module: 'Chantier', parent: 'Chantier', parentTo: '/terrain', assignee: 'Technicien', allAssignees: 'Tous les techniciens' },
+  labo: { title: 'Planning laboratoire', module: 'Laboratoire', parent: 'Laboratoire', parentTo: '/labo', assignee: 'Agent labo', allAssignees: 'Tous les agents labo' },
+  ingenieur: { title: 'Planning ingénieur', module: 'Ingénierie', parent: 'Ingénierie', parentTo: '/ingenierie', assignee: 'Ingénieur', allAssignees: 'Tous les ingénieurs' },
 }
 
-function addDays(d: Date, n: number) {
-  const x = new Date(d)
-  x.setDate(x.getDate() + n)
-  return x
+function toYmd(date: Date) {
+  return toLocalDateInput(date)
 }
 
-/** Lundi 00:00 (local) de la semaine contenant `d`. */
-function startOfWeekMonday(d: Date): Date {
-  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-  const dow = (x.getDay() + 6) % 7
-  x.setDate(x.getDate() - dow)
-  return x
+function addDays(date: Date, amount: number) {
+  const next = new Date(date)
+  next.setDate(next.getDate() + amount)
+  return next
 }
 
-function parseYmdLocal(ymd: string): Date {
-  const [y, m, day] = ymd.split('-').map(Number)
-  return new Date(y, (m ?? 1) - 1, day ?? 1)
+function startOfWeekMonday(date: Date): Date {
+  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  next.setDate(next.getDate() - ((next.getDay() + 6) % 7))
+  return next
 }
 
-function ymdLocal(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+function parseYmdLocal(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(year, (month ?? 1) - 1, day ?? 1)
 }
 
-function weekDaysFrom(ymdFrom: string): Date[] {
-  const start = startOfWeekMonday(parseYmdLocal(ymdFrom))
-  return Array.from({ length: 7 }, (_, i) => addDays(start, i))
+function ymdLocal(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-function affectationOnDay(
-  a: { date_debut: string; date_fin: string },
-  day: Date
-): boolean {
-  const t = ymdLocal(day)
-  const ds = dateInputFromApi(a.date_debut)
-  const de = dateInputFromApi(a.date_fin)
-  return t >= ds && t <= de
+function weekDaysFrom(value: string): Date[] {
+  const start = startOfWeekMonday(parseYmdLocal(value))
+  return Array.from({ length: 7 }, (_, index) => addDays(start, index))
 }
 
-const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
+function affectationOnDay(affectation: { date_debut: string; date_fin: string }, day: Date): boolean {
+  const target = ymdLocal(day)
+  return target >= dateInputFromApi(affectation.date_debut) && target <= dateInputFromApi(affectation.date_fin)
+}
 
 function formatBcPlanningOption(bc: BonCommande): string {
   const statut = bonCommandeStatutBadgeProps(bc.statut).label
@@ -66,113 +59,106 @@ function formatBcPlanningOption(bc: BonCommande): string {
   return `${bc.numero} (${statut})${client}`
 }
 
-function handleDebutCascade(debut: string, setFin: (value: string) => void) {
-  setFin(debut)
-}
+const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
 
-export default function PlanningTechniciensPage() {
+export default function PlanningTechniciensPage({ context = 'terrain' }: { context?: PlanningContext }) {
+  const meta = CONTEXT_META[context]
+  const isTerrain = context === 'terrain'
   const { user } = useAuth()
   const lab = isLab(user?.role)
   const qc = useQueryClient()
-  const [from, setFrom] = useState(() => toYmd(new Date()))
-  const [to, setTo] = useState(() => toYmd(addDays(new Date(), 21)))
+  const initialWeekStart = startOfWeekMonday(new Date())
+  const [from, setFrom] = useState(() => toYmd(initialWeekStart))
+  const [to, setTo] = useState(() => toYmd(addDays(initialWeekStart, 6)))
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('semaine')
   const [userFilter, setUserFilter] = useState<number | ''>('')
-  const [newUserId, setNewUserId] = useState<number | ''>('')
-  const [newBcId, setNewBcId] = useState<number | ''>('')
-  const [newLigneId, setNewLigneId] = useState<number | ''>('')
-  const [newDebut, setNewDebut] = useState(() => toYmd(new Date()))
-  const [newFin, setNewFin] = useState(() => toYmd(new Date()))
-  const [newNotes, setNewNotes] = useState('')
   const [unposBcFilter, setUnposBcFilter] = useState<number | ''>('')
   const [unposUserIdMap, setUnposUserIdMap] = useState<Record<number, number | ''>>({})
-  const [unposDebugMap, setUnposDebugMap] = useState<Record<number, string>>({})
+  const [unposDebutMap, setUnposDebutMap] = useState<Record<number, string>>({})
   const [unposFinMap, setUnposFinMap] = useState<Record<number, string>>({})
   const [unposNotesMap, setUnposNotesMap] = useState<Record<number, string>>({})
-  const [selectedUnposIds, setSelectedUnposIds] = useState<Set<number>>(new Set())
-  const [massUserId, setMassUserId] = useState<number | ''>('')
-  const [massDebut, setMassDebut] = useState(() => toYmd(new Date()))
-  const [massFin, setMassFin] = useState(() => toYmd(new Date()))
+  const [pdfOpen, setPdfOpen] = useState(false)
 
   const { data: affectations, isLoading, error } = useQuery({
-    queryKey: ['planning-terrain', from, to, userFilter],
-    queryFn: () =>
-      planningTerrainApi.list({
-        from,
-        to,
-        user_id: userFilter === '' ? undefined : userFilter,
-      }),
+    queryKey: ['planning-terrain', context, from, to, userFilter],
+    queryFn: () => planningTerrainApi.list({
+      from,
+      to,
+      user_id: userFilter === '' ? undefined : userFilter,
+      context,
+    }),
+  })
+
+  const { data: assignedWithoutDate = [] } = useQuery({
+    queryKey: ['planning-terrain', context, 'undated', userFilter],
+    queryFn: () => planningTerrainApi.list({
+      from,
+      to,
+      user_id: userFilter === '' ? undefined : userFilter,
+      undated: true,
+      context,
+    }),
   })
 
   const { data: techniciens } = useQuery({
-    queryKey: ['planning-terrain', 'techniciens'],
-    queryFn: () => planningTerrainApi.techniciens(),
-    enabled: lab === true,
+    queryKey: ['planning-terrain', context, 'techniciens'],
+    queryFn: () => planningTerrainApi.techniciens(context),
+    enabled: lab,
   })
 
-  const { data: bonsListe } = useQuery({
-    queryKey: ['bons-commande', 'planning'],
-    queryFn: () => bonsCommandeApi.list({ planning: true }),
+  const { data: unassignedBcs } = useQuery({
+    queryKey: ['bons-commande', 'planning', 'unassigned'],
+    queryFn: () => bonsCommandeApi.list({ planning: true, unassignedPlanning: true }),
+    enabled: lab && isTerrain,
   })
 
-  const bcs: BonCommande[] = bonsListe ?? []
   const selectedBc = useMemo(
-    () => bcs.find((b) => b.id === newBcId) ?? null,
-    [bcs, newBcId]
-  )
-
-  const affectatedLigneIds = useMemo(
-    () => new Set((affectations ?? []).map((a) => a.bon_commande_ligne_id)),
-    [affectations]
+    () => (unassignedBcs ?? []).find((bc) => bc.id === unposBcFilter) ?? null,
+    [unassignedBcs, unposBcFilter],
   )
 
   const unpositionedLignes = useMemo(() => {
-    const all: (BonCommandeLigne & { bc_id: number; bc_numero: string; bc_statut: string; dossier_id: number })[] = []
-    for (const bc of bcs) {
-      if (unposBcFilter !== '' && bc.id !== unposBcFilter) continue
-      for (const ligne of bc.lignes ?? []) {
-        if (!affectatedLigneIds.has(ligne.id)) {
-          all.push({
-            ...ligne,
-            bc_id: bc.id,
-            bc_numero: bc.numero,
-            bc_statut: bc.statut,
-            dossier_id: bc.dossier_id,
-          })
-        }
-      }
-    }
-    return all
-  }, [bcs, affectatedLigneIds, unposBcFilter])
+    if (!selectedBc) return []
+    return (selectedBc.lignes ?? []).map((ligne) => ({
+      ...ligne,
+      bc_id: selectedBc.id,
+      bc_numero: selectedBc.numero,
+      bc_statut: selectedBc.statut,
+    }))
+  }, [selectedBc])
 
-  const createMut = useMutation({
-    mutationFn: () =>
-      planningTerrainApi.create({
-        bon_commande_ligne_id: newLigneId as number,
-        user_id: newUserId as number,
-        date_debut: newDebut,
-        date_fin: newFin,
-        notes: newNotes || undefined,
-      }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['planning-terrain'] })
-      setNewNotes('')
-    },
-  })
+  const unpositionedGroups = useMemo(() => {
+    if (!selectedBc) return []
+    if (selectedBc.planning_terrain_groups?.length) {
+      return selectedBc.planning_terrain_groups.map((group) => ({
+        ...group,
+        lignes: group.lignes.map((ligne) => ({
+          ...ligne,
+          bc_id: selectedBc.id,
+          bc_numero: selectedBc.numero,
+          bc_statut: selectedBc.statut,
+        })),
+      }))
+    }
+    return unpositionedLignes.length > 0
+      ? [{ jalon: { id: 'standalone', label: 'Tâches terrain hors jalon' }, lignes: unpositionedLignes }]
+      : []
+  }, [selectedBc, unpositionedLignes])
 
   const createUnposMut = useMutation({
-    mutationFn: (ligneId: number) =>
-      planningTerrainApi.create({
-        bon_commande_ligne_id: ligneId,
-        user_id: unposUserIdMap[ligneId] as number,
-        date_debut: unposDebugMap[ligneId] || toYmd(new Date()),
-        date_fin: unposFinMap[ligneId] || toYmd(new Date()),
-        notes: unposNotesMap[ligneId] || undefined,
-      }),
+    mutationFn: (ligneId: number) => planningTerrainApi.create({
+      bon_commande_ligne_id: ligneId,
+      user_id: unposUserIdMap[ligneId] as number,
+      date_debut: unposDebutMap[ligneId] || toYmd(new Date()),
+      date_fin: unposFinMap[ligneId] || unposDebutMap[ligneId] || toYmd(new Date()),
+      notes: unposNotesMap[ligneId] || undefined,
+    }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['planning-terrain'] })
-      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+      void qc.invalidateQueries({ queryKey: ['bons-commande', 'planning', 'unassigned'] })
+      setUnposBcFilter('')
       setUnposUserIdMap({})
-      setUnposDebugMap({})
+      setUnposDebutMap({})
       setUnposFinMap({})
       setUnposNotesMap({})
     },
@@ -182,376 +168,231 @@ export default function PlanningTechniciensPage() {
     mutationFn: (id: number) => planningTerrainApi.delete(id),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['planning-terrain'] })
+      void qc.invalidateQueries({ queryKey: ['bons-commande', 'planning', 'unassigned'] })
     },
   })
 
-  const bulkCreateUnposMut = useMutation({
-    mutationFn: async (ligneIds: number[]) => {
-      for (const ligneId of ligneIds) {
-        const userId = unposUserIdMap[ligneId]
-        if (userId === '' || userId === undefined) continue
-        await planningTerrainApi.create({
-          bon_commande_ligne_id: ligneId,
-          user_id: userId,
-          date_debut: unposDebugMap[ligneId] || massDebut,
-          date_fin: unposFinMap[ligneId] || massFin,
-          notes: unposNotesMap[ligneId] || undefined,
-        })
-      }
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['planning-terrain'] })
-      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
-      setUnposUserIdMap({})
-      setUnposDebugMap({})
-      setUnposFinMap({})
-      setUnposNotesMap({})
-      setSelectedUnposIds(new Set())
-    },
-  })
+  const selectedTechnician = (techniciens ?? []).find((item) => item.id === userFilter)
+  const printTechnicianLabel = selectedTechnician ? formatTechnicienOption(selectedTechnician) : meta.allAssignees
+  const printPeriodLabel = from === to ? from : `${from} au ${to}`
 
-  function applyMassToUnpositioned() {
-    const targetIds =
-      selectedUnposIds.size > 0 ? [...selectedUnposIds] : unpositionedLignes.map((l) => l.id)
-    applyMassToLineIds(targetIds, {
-      assigneeId: massUserId,
-      dateDebut: massDebut,
-      dateFin: massFin,
-      setAssignee: (id, userId) => setUnposUserIdMap((m) => ({ ...m, [id]: userId })),
-      setDateDebut: (id, value) => setUnposDebugMap((m) => ({ ...m, [id]: value })),
-      setDateFin: (id, value) => setUnposFinMap((m) => ({ ...m, [id]: value })),
-    })
+  function selectDay() {
+    setPeriodMode('jour')
+    setTo(from)
   }
 
-  const bulkCreateTargets = useMemo(() => {
-    const pool =
-      selectedUnposIds.size > 0
-        ? unpositionedLignes.filter((l) => selectedUnposIds.has(l.id))
-        : unpositionedLignes
-    return pool.filter((l) => unposUserIdMap[l.id] !== '' && unposUserIdMap[l.id] !== undefined)
-  }, [unpositionedLignes, selectedUnposIds, unposUserIdMap])
+  function selectWeek() {
+    const start = startOfWeekMonday(parseYmdLocal(from))
+    setPeriodMode('semaine')
+    setFrom(toYmd(start))
+    setTo(toYmd(addDays(start, 6)))
+  }
+
+  function changeFrom(value: string) {
+    if (periodMode === 'semaine') {
+      const start = startOfWeekMonday(parseYmdLocal(value))
+      setFrom(toYmd(start))
+      setTo(toYmd(addDays(start, 6)))
+      return
+    }
+    setFrom(value)
+    if (periodMode === 'jour' || value > to) setTo(value)
+  }
 
   return (
     <ModuleEntityShell
-      shellClassName="module-shell--crm"
+      shellClassName="module-shell--crm terrain-planning"
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'Chantier', to: '/terrain' },
+        { label: meta.parent, to: meta.parentTo },
         { label: 'Planning' },
       ]}
-      moduleBarLabel="Chantier"
-      title="Planning techniciens"
-      subtitle="Affectations rattachées aux lignes des bons de commande — vue semaine (grille) + tableau, création depuis les BC."
+      moduleBarLabel={meta.module}
+      title={meta.title}
+      subtitle={`Planning et aperçu hebdomadaire filtrables par période et par ${meta.assignee.toLocaleLowerCase('fr')}.`}
     >
-      {lab && bonsListe && (
-        <section className="card" style={{ marginBottom: '1.5rem' }}>
-          <h2 className="h2" style={{ fontSize: '1.05rem', marginBottom: '0.75rem' }}>
-            Lignes non affectées
-          </h2>
+      {lab && isTerrain ? (
+        <section className="card terrain-planning__unassigned" style={{ marginBottom: '1.5rem' }}>
+          <h2 className="h2" style={{ fontSize: '1.05rem', marginBottom: '0.75rem' }}>Bons de commande non affectés</h2>
           <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-            Lignes de BC sans affectation terrain (y compris BC en brouillon). Assignez un technicien et des dates pour
-            créer l'affectation.
+            Choisissez un BC pour afficher uniquement ses tâches terrain encore sans affectation, classées par jalon.
           </p>
-          <div style={{ marginBottom: '0.75rem' }}>
-            <label>
-              Filtrer par BC
-              <select
-                value={unposBcFilter === '' ? '' : String(unposBcFilter)}
-                onChange={(e) => setUnposBcFilter(e.target.value === '' ? '' : Number(e.target.value))}
-                style={{ display: 'block', width: '100%', marginTop: 4 }}
-              >
-                <option value="">Tous</option>
-                {bcs.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {formatBcPlanningOption(b)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          {unpositionedLignes.length === 0 && (
-            <p className="text-muted">Aucune ligne non affectée.</p>
-          )}
-          {unpositionedLignes.length > 0 && (
-            <>
-              <PlanningMassActionsBar
-                assignees={techniciens ?? []}
-                assigneeId={massUserId}
-                onAssigneeChange={setMassUserId}
-                dateDebut={massDebut}
-                onDateDebutChange={setMassDebut}
-                dateFin={massFin}
-                onDateFinChange={setMassFin}
-                onApply={applyMassToUnpositioned}
-                applyLabel="Appliquer aux lignes"
-                selectedCount={selectedUnposIds.size > 0 ? selectedUnposIds.size : unpositionedLignes.length}
-                totalCount={unpositionedLignes.length}
-                hint="Cochez des lignes ou laissez la sélection vide pour cibler toutes les lignes visibles."
-              />
-              <div className="planning-mass-actions__save-row">
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  disabled={bulkCreateUnposMut.isPending || bulkCreateTargets.length === 0}
-                  onClick={() => bulkCreateUnposMut.mutate(bulkCreateTargets.map((l) => l.id))}
-                >
-                  {bulkCreateUnposMut.isPending
-                    ? 'Création…'
-                    : `Créer les affectations (${bulkCreateTargets.length})`}
-                </button>
-              </div>
-            </>
-          )}
-          {unpositionedLignes.length > 0 && (
-            <div className="table-wrap">
+          <label>
+            BC non affecté
+            <select
+              value={unposBcFilter}
+              onChange={(event) => setUnposBcFilter(event.target.value ? Number(event.target.value) : '')}
+              style={{ display: 'block', width: '100%', marginTop: 4 }}
+            >
+              <option value="">— Choisir un BC —</option>
+              {(unassignedBcs ?? []).map((bc) => (
+                <option key={bc.id} value={bc.id}>{formatBcPlanningOption(bc)}</option>
+              ))}
+            </select>
+          </label>
+
+          {unposBcFilter === '' ? (
+            <p className="text-muted" style={{ margin: '0.75rem 0 0' }}>
+              Les tâches terrain s’afficheront après la sélection d’un BC.
+            </p>
+          ) : null}
+          {unposBcFilter !== '' && unpositionedLignes.length === 0 ? (
+            <p className="text-muted" style={{ margin: '0.75rem 0 0' }}>Toutes les tâches terrain de ce BC sont affectées.</p>
+          ) : null}
+
+          {unpositionedLignes.length > 0 ? (
+            <div className="table-wrap" style={{ marginTop: '0.75rem' }}>
               <table className="data-table data-table--compact" style={{ width: '100%' }}>
                 <thead>
                   <tr>
-                    <th style={{ width: 36 }}>
-                      <input
-                        type="checkbox"
-                        aria-label="Tout sélectionner"
-                        checked={
-                          unpositionedLignes.length > 0 && selectedUnposIds.size === unpositionedLignes.length
-                        }
-                        onChange={(e) =>
-                          setSelectedUnposIds(
-                            toggleAllSelection(
-                              selectedUnposIds,
-                              unpositionedLignes.map((l) => l.id),
-                              e.target.checked,
-                            ),
-                          )
-                        }
-                      />
-                    </th>
-                    <th>BC</th>
-                    <th>Statut BC</th>
-                    <th>Ligne</th>
-                    <th>Technicien</th>
-                    <th>Début</th>
-                    <th>Fin</th>
-                    <th>Notes</th>
-                    <th>Action</th>
+                    <th>BC</th><th>Statut</th><th>Tâche terrain</th><th>Technicien</th><th>Début</th><th>Fin</th><th>Notes</th><th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {unpositionedLignes.map((ligne) => (
-                    <tr key={ligne.id}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={selectedUnposIds.has(ligne.id)}
-                          onChange={(e) => {
-                            setSelectedUnposIds((prev) => {
-                              const next = new Set(prev)
-                              if (e.target.checked) next.add(ligne.id)
-                              else next.delete(ligne.id)
-                              return next
-                            })
-                          }}
-                        />
-                      </td>
-                      <td>
-                        <Link to={`/bons-commande/${ligne.bc_id}`} className="link-inline">
-                          {ligne.bc_numero}
-                        </Link>
-                      </td>
-                      <td>
-                        <StatusBadge {...bonCommandeStatutBadgeProps(ligne.bc_statut)} />
-                      </td>
-                      <td>{ligne.libelle}</td>
-                      <td>
-                        <select
-                          value={unposUserIdMap[ligne.id] === undefined ? '' : String(unposUserIdMap[ligne.id])}
-                          onChange={(e) =>
-                            setUnposUserIdMap((m) => ({
-                              ...m,
-                              [ligne.id]: e.target.value === '' ? '' : Number(e.target.value),
-                            }))
-                          }
-                          style={{ width: '100%' }}
-                        >
-                          <option value="">—</option>
-                          {techniciens?.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {formatTechnicienOption(t)}
-                            </option>
-                          )) ?? null}
-                        </select>
-                      </td>
-                      <td>
-                        <input
-                          type="date"
-                          value={unposDebugMap[ligne.id] || toYmd(new Date())}
-                          onChange={(e) => {
-                            const debut = e.target.value
-                            setUnposDebugMap((m) => ({
-                              ...m,
-                              [ligne.id]: debut,
-                            }))
-                            setUnposFinMap((m) => ({
-                              ...m,
-                              [ligne.id]: debut,
-                            }))
-                          }}
-                          style={{ width: '100%' }}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="date"
-                          value={unposFinMap[ligne.id] || toYmd(new Date())}
-                          onChange={(e) =>
-                            setUnposFinMap((m) => ({
-                              ...m,
-                              [ligne.id]: e.target.value,
-                            }))
-                          }
-                          style={{ width: '100%' }}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="text"
-                          value={unposNotesMap[ligne.id] || ''}
-                          onChange={(e) =>
-                            setUnposNotesMap((m) => ({
-                              ...m,
-                              [ligne.id]: e.target.value,
-                            }))
-                          }
-                          style={{ width: '100%' }}
-                          placeholder="Notes"
-                        />
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="button button--secondary"
-                          disabled={
-                            createUnposMut.isPending ||
-                            unposUserIdMap[ligne.id] === '' ||
-                            unposUserIdMap[ligne.id] === undefined
-                          }
-                          onClick={() => createUnposMut.mutate(ligne.id)}
-                        >
-                          Créer
-                        </button>
-                      </td>
-                    </tr>
+                  {unpositionedGroups.map((group) => (
+                    <Fragment key={group.jalon.id}>
+                      <tr className="terrain-planning__jalon-row">
+                        <td colSpan={8}>
+                          {group.jalon.code ? <strong>{group.jalon.code} — </strong> : null}
+                          <strong>{group.jalon.label}</strong>
+                        </td>
+                      </tr>
+                      {group.lignes.map((ligne) => (
+                        <tr key={ligne.id}>
+                          <td><Link to={`/bons-commande/${ligne.bc_id}`} className="link-inline">{ligne.bc_numero}</Link></td>
+                          <td><StatusBadge {...bonCommandeStatutBadgeProps(ligne.bc_statut)} /></td>
+                          <td>{ligne.libelle}</td>
+                          <td>
+                            <select
+                              value={unposUserIdMap[ligne.id] ?? ''}
+                              onChange={(event) => setUnposUserIdMap((current) => ({
+                                ...current,
+                                [ligne.id]: event.target.value ? Number(event.target.value) : '',
+                              }))}
+                            >
+                              <option value="">—</option>
+                              {(techniciens ?? []).map((item) => (
+                                <option key={item.id} value={item.id}>{formatTechnicienOption(item)}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              type="date"
+                              value={unposDebutMap[ligne.id] || toYmd(new Date())}
+                              onChange={(event) => {
+                                const value = event.target.value
+                                setUnposDebutMap((current) => ({ ...current, [ligne.id]: value }))
+                                setUnposFinMap((current) => ({ ...current, [ligne.id]: value }))
+                              }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="date"
+                              value={unposFinMap[ligne.id] || unposDebutMap[ligne.id] || toYmd(new Date())}
+                              onChange={(event) => setUnposFinMap((current) => ({ ...current, [ligne.id]: event.target.value }))}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              value={unposNotesMap[ligne.id] || ''}
+                              onChange={(event) => setUnposNotesMap((current) => ({ ...current, [ligne.id]: event.target.value }))}
+                              placeholder="Notes"
+                            />
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              disabled={createUnposMut.isPending || !unposUserIdMap[ligne.id]}
+                              onClick={() => createUnposMut.mutate(ligne.id)}
+                            >
+                              {createUnposMut.isPending && createUnposMut.variables === ligne.id ? 'Création…' : 'Créer'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
             </div>
-          )}
-          {createUnposMut.isError || bulkCreateUnposMut.isError ? (
-            <p className="error" style={{ marginTop: '0.75rem' }}>
-              {((bulkCreateUnposMut.error ?? createUnposMut.error) as Error).message}
-            </p>
           ) : null}
+          {createUnposMut.isError ? <p className="error">{(createUnposMut.error as Error).message}</p> : null}
         </section>
-      )}
+      ) : null}
 
-      <div
-        className="table-wrap"
-        style={{ marginBottom: '1.25rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end' }}
-      >
-        <label>
-          Du
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            style={{ display: 'block', marginTop: 4 }}
-          />
-        </label>
-        <label>
-          au
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            style={{ display: 'block', marginTop: 4 }}
-          />
-        </label>
-        <label>
-          Technicien
-          <select
-            value={userFilter === '' ? '' : String(userFilter)}
-            onChange={(e) => setUserFilter(e.target.value === '' ? '' : Number(e.target.value))}
-            style={{ display: 'block', marginTop: 4, minWidth: 200 }}
-          >
-            <option value="">Tous</option>
-            {lab
-              ? (techniciens ?? []).map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {formatTechnicienOption(t)}
-                  </option>
-                ))
-              : null}
-          </select>
-        </label>
+      <div className="terrain-planning__print-title">
+        <h1>{meta.title}</h1>
+        <p>{printTechnicianLabel} — {printPeriodLabel}</p>
       </div>
-      {lab && techniciens && techniciens.length === 0 && userFilter === '' && (
-        <p className="text-muted" style={{ marginBottom: '0.75rem' }}>
-          Aucun utilisateur lab trouvé pour le filtre.
-        </p>
-      )}
 
-      {isLoading && <p className="text-muted">Chargement…</p>}
-      {error && <p className="error">{(error as Error).message}</p>}
-
-      {!isLoading && affectations !== undefined && (
-        <>
-          <section style={{ marginBottom: '1.5rem' }} aria-label="Aperçu semaine calendrier">
-            <h2 className="h2" style={{ fontSize: '1rem', marginBottom: '0.35rem' }}>
-              Aperçu semaine
-            </h2>
-            <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-              Semaine contenant la date « Du » ({from}) — lundi → dimanche. Même filtre période / technicien que le
-              tableau.
-            </p>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-                gap: 6,
+      <section className="card terrain-planning__filters no-print" style={{ marginBottom: '1.25rem' }}>
+        <div className="terrain-planning__period-modes">
+          <button type="button" className={`btn btn-sm ${periodMode === 'jour' ? 'btn-primary' : 'btn-secondary'}`} onClick={selectDay}>Jour</button>
+          <button type="button" className={`btn btn-sm ${periodMode === 'semaine' ? 'btn-primary' : 'btn-secondary'}`} onClick={selectWeek}>Semaine</button>
+          <button type="button" className={`btn btn-sm ${periodMode === 'periode' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPeriodMode('periode')}>Période</button>
+        </div>
+        <div className="terrain-planning__filter-row">
+          <label>Du<input type="date" value={from} onChange={(event) => changeFrom(event.target.value)} /></label>
+          <label>
+            Au
+            <input
+              type="date"
+              value={to}
+              min={from}
+              onChange={(event) => {
+                setPeriodMode('periode')
+                setTo(event.target.value)
               }}
-            >
+              disabled={periodMode !== 'periode'}
+            />
+          </label>
+          <label>
+            {meta.assignee}
+            <select value={userFilter} onChange={(event) => setUserFilter(event.target.value ? Number(event.target.value) : '')}>
+              <option value="">{meta.allAssignees}</option>
+              {(techniciens ?? []).map((item) => (
+                <option key={item.id} value={item.id}>{formatTechnicienOption(item)}</option>
+              ))}
+            </select>
+          </label>
+          {lab ? (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setPdfOpen(true)}>
+              Générer le PDF
+            </button>
+          ) : null}
+        </div>
+      </section>
+
+      {isLoading ? <p className="text-muted">Chargement…</p> : null}
+      {error ? <p className="error">{(error as Error).message}</p> : null}
+
+      {!isLoading && affectations ? (
+        <div className="terrain-planning__print-area">
+          <section style={{ marginBottom: '1.5rem' }} aria-label="Aperçu semaine calendrier">
+            <h2 className="h2" style={{ fontSize: '1rem', marginBottom: '0.35rem' }}>Aperçu semaine</h2>
+            <p className="text-muted no-print" style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+              Semaine contenant la date de début, avec le même filtre de personnel que le tableau.
+            </p>
+            <div className="terrain-planning__week-grid">
               {weekDaysFrom(from).map((day) => {
-                const label = day.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
-                const dayA = affectations.filter((a) => affectationOnDay(a, day))
+                const dayAffectations = affectations.filter((item) => affectationOnDay(item, day))
                 return (
-                  <div
-                    key={ymdLocal(day)}
-                    className="card"
-                    style={{ padding: '0.5rem', fontSize: '0.8rem', minWidth: 0 }}
-                  >
-                    <div
-                      style={{
-                        fontWeight: 600,
-                        marginBottom: 6,
-                        borderBottom: '1px solid var(--color-border, #ddd)',
-                        paddingBottom: 4,
-                      }}
-                    >
-                      {label}
+                  <div key={ymdLocal(day)} className="card terrain-planning__day-card">
+                    <div className="terrain-planning__day-title">
+                      {day.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
                     </div>
-                    {dayA.length === 0 && <span className="text-muted">—</span>}
-                    {dayA.map((a) => {
-                      const bc = a.bon_commande_ligne?.bon_commande
+                    {dayAffectations.length === 0 ? <span className="text-muted">—</span> : null}
+                    {dayAffectations.map((item) => {
+                      const bc = item.bon_commande_ligne?.bon_commande
                       return (
-                        <div key={a.id} style={{ marginBottom: 6, lineHeight: 1.3 }}>
-                          {a.user?.name?.split(' ')[0] ?? `U${a.user_id}`}
-                          {bc && (
-                            <>
-                              {' '}
-                              <Link to={`/bons-commande/${bc.id}`} className="link-inline">
-                                {bc.numero}
-                              </Link>
-                            </>
-                          )}
+                        <div key={item.id} className="terrain-planning__day-event">
+                          <strong>{item.user?.name ?? (item.user_id ? `Utilisateur #${item.user_id}` : 'Non assigné')}</strong>
+                          {bc ? <Link to={`/bons-commande/${bc.id}`} className="link-inline">{bc.numero}</Link> : null}
+                          {item.ordre_mission_id ? <Link to={`/ordres-mission/${item.ordre_mission_id}`} className="link-inline">{item.ordre_mission_numero} — {item.bon_commande_ligne?.libelle}</Link> : null}
                         </div>
                       )
                     })}
@@ -560,196 +401,88 @@ export default function PlanningTechniciensPage() {
               })}
             </div>
           </section>
+
           <div className="table-wrap" style={{ marginBottom: '2rem' }}>
             <table className="data-table data-table--compact" style={{ width: '100%' }}>
               <thead>
                 <tr>
-                  <th>Période</th>
-                  <th>Technicien</th>
-                  <th>BC / ligne</th>
-                  <th>Client / dossier</th>
-                  {lab && <th>Actions</th>}
+                  <th>Période</th><th>{meta.assignee}</th><th>BC / tâche</th><th>Client / dossier</th>
+                  {lab ? <th className="terrain-planning__actions">Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
-                {affectations.length === 0 && (
-                  <tr>
-                    <td colSpan={lab ? 5 : 4} className="text-muted">
-                      Aucune affectation sur cette période.
-                    </td>
-                  </tr>
-                )}
-                {affectations.map((a) => {
-                  const ligne = a.bon_commande_ligne
+                {affectations.length === 0 ? (
+                  <tr><td colSpan={lab ? 5 : 4} className="text-muted">Aucune affectation sur cette période.</td></tr>
+                ) : null}
+                {affectations.map((item) => {
+                  const ligne = item.bon_commande_ligne
                   const bc = ligne?.bon_commande
                   return (
-                    <tr key={a.id}>
+                    <tr key={item.id}>
+                      <td>{dateInputFromApi(item.date_debut)} → {dateInputFromApi(item.date_fin)}</td>
+                      <td>{item.user?.name ?? (item.user_id ? `Utilisateur #${item.user_id}` : 'Non assigné')}</td>
                       <td>
-                        {dateInputFromApi(a.date_debut)} → {dateInputFromApi(a.date_fin)}
-                      </td>
-                      <td>{a.user?.name ?? `Utilisateur #${a.user_id}`}</td>
-                      <td>
-                        {bc && (
-                          <>
-                            <Link to={`/bons-commande/${bc.id}`} className="link-inline">
-                              {bc.numero}
-                            </Link>
-                            {ligne ? ` — ${ligne.libelle}` : ''}
-                          </>
-                        )}
-                        {!bc && '—'}
+                          {bc ? <><Link to={`/bons-commande/${bc.id}`} className="link-inline">{bc.numero}</Link>{ligne?.libelle ? ` — ${ligne.libelle}` : ''}</> : '—'}
+                          {item.ordre_mission_id ? <> · <Link to={`/ordres-mission/${item.ordre_mission_id}`} className="link-inline">{item.ordre_mission_numero}</Link></> : null}
                       </td>
                       <td>
-                        {bc && (
-                          <>
-                            {bc.client?.name ?? '—'} /{' '}
-                            <Link to={`/dossiers/${bc.dossier_id}/bc-bl`} className="link-inline">
-                              Dossier #{bc.dossier_id}
-                            </Link>
-                          </>
-                        )}
+                        {bc || item.dossier_id ? <>{item.client_name ?? bc?.client?.name ?? '—'} / <Link to={`/dossiers/${item.dossier_id ?? bc?.dossier_id}/bc-bl`} className="link-inline">{item.dossier_reference ?? `Dossier #${item.dossier_id ?? bc?.dossier_id}`}</Link></> : (item.client_name ?? '—')}
                       </td>
-                      {lab && (
-                        <td>
-                          <button
+                      {lab ? (
+                        <td className="terrain-planning__actions">
+                          {item.source === 'om' && item.ordre_mission_id ? (
+                            <Link to={`/ordres-mission/${item.ordre_mission_id}`} className="link-inline">Modifier dans l’OM</Link>
+                          ) : <button
                             type="button"
                             className="button button--secondary"
                             onClick={() => {
-                              if (window.confirm("Supprimer cette affectation du planning ?")) {
-                                deleteMut.mutate(a.id)
-                              }
+                              if (window.confirm('Supprimer cette affectation du planning ?')) deleteMut.mutate(item.id)
                             }}
-                          >
-                            Supprimer
-                          </button>
+                          >Supprimer</button>}
                         </td>
-                      )}
+                      ) : null}
                     </tr>
                   )
                 })}
               </tbody>
             </table>
           </div>
-        </>
-      )}
+        </div>
+      ) : null}
 
-      {lab && techniciens && bonsListe && (
-        <section className="card" style={{ maxWidth: 640 }}>
-          <h2 className="h2" style={{ fontSize: '1.05rem' }}>
-            Nouvelle affectation
-          </h2>
-          <p className="text-muted" style={{ fontSize: '0.9rem' }}>
-            Choisissez un bon de commande (brouillon, confirmé ou en cours), une ligne de produit, puis le technicien
-            et les dates d'intervention. Les dates d'affectation doivent rester dans la période prévue sur la ligne
-            (défini sur la fiche BC).
-          </p>
-          <div style={{ display: 'grid', gap: '0.75rem', marginTop: '0.75rem' }}>
-            <label>
-              Technicien
-              <select
-                value={newUserId === '' ? '' : String(newUserId)}
-                onChange={(e) => setNewUserId(e.target.value === '' ? '' : Number(e.target.value))}
-                style={{ display: 'block', width: '100%', marginTop: 4 }}
-              >
-                <option value="">—</option>
-                {techniciens.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {formatTechnicienOption(t)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Bon de commande
-              <select
-                value={newBcId === '' ? '' : String(newBcId)}
-                onChange={(e) => {
-                  setNewBcId(e.target.value === '' ? '' : Number(e.target.value))
-                  setNewLigneId('')
-                }}
-                style={{ display: 'block', width: '100%', marginTop: 4 }}
-              >
-                <option value="">—</option>
-                {bcs.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {formatBcPlanningOption(b)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Ligne BC
-              <select
-                value={newLigneId === '' ? '' : String(newLigneId)}
-                onChange={(e) => setNewLigneId(e.target.value === '' ? '' : Number(e.target.value))}
-                disabled={!selectedBc}
-                style={{ display: 'block', width: '100%', marginTop: 4 }}
-              >
-                <option value="">—</option>
-                {selectedBc?.lignes?.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.libelle}
-                  </option>
-                )) ?? null}
-              </select>
-            </label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <label>
-                Du
-                <input
-                  type="date"
-                  value={newDebut}
-                  onChange={(e) => {
-                    const debut = e.target.value
-                    setNewDebut(debut)
-                    handleDebutCascade(debut, setNewFin)
-                  }}
-                  style={{ display: 'block', marginTop: 4 }}
-                />
-              </label>
-              <label>
-                au
-                <input
-                  type="date"
-                  value={newFin}
-                  onChange={(e) => setNewFin(e.target.value)}
-                  style={{ display: 'block', marginTop: 4 }}
-                />
-              </label>
-            </div>
-            <label>
-              Notes
-              <textarea
-                value={newNotes}
-                onChange={(e) => setNewNotes(e.target.value)}
-                rows={2}
-                style={{ display: 'block', width: '100%', marginTop: 4 }}
-              />
-            </label>
-            <div>
-              <button
-                type="button"
-                className="button"
-                disabled={
-                  createMut.isPending ||
-                  newUserId === '' ||
-                  newLigneId === '' ||
-                  newDebut > newFin
-                }
-                onClick={() => createMut.mutate()}
-              >
-                Créer l'affectation
-              </button>
-            </div>
-            {createMut.isError && <p className="error">{(createMut.error as Error).message}</p>}
+      {assignedWithoutDate.length > 0 ? (
+        <section className="card no-print" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
+          <h2 className="h2" style={{ fontSize: '1rem' }}>{isTerrain ? 'Tâches terrain affectées sans date' : 'Tâches à planifier'} ({assignedWithoutDate.length})</h2>
+          <p className="text-muted">Ces tâches ne peuvent pas apparaître dans le calendrier avant la saisie d’un responsable et d’une date prévue dans l’OM.</p>
+          <div className="table-wrap">
+            <table className="data-table data-table--compact">
+              <thead><tr><th>{meta.assignee}</th><th>BC</th><th>Tâche</th><th>Ordre de mission</th></tr></thead>
+              <tbody>{assignedWithoutDate.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.user?.name ?? (item.user_id ? `Utilisateur #${item.user_id}` : 'Non assigné')}</td>
+                  <td>{item.bon_commande_ligne?.bon_commande ? <Link to={`/bons-commande/${item.bon_commande_ligne.bon_commande.id}`}>{item.bon_commande_ligne.bon_commande.numero}</Link> : '—'}</td>
+                  <td>{item.bon_commande_ligne?.libelle ?? '—'}</td>
+                  <td>{item.ordre_mission_id ? <Link to={`/ordres-mission/${item.ordre_mission_id}`}>{item.ordre_mission_numero}</Link> : '—'}</td>
+                </tr>
+              ))}</tbody>
+            </table>
           </div>
         </section>
-      )}
+      ) : null}
 
-      <p className="text-muted" style={{ marginTop: '1.5rem' }}>
-        Navigation <Link to="/terrain">Chantier</Link> — les périodes par produit se saisissent sur la fiche d'un{' '}
-        <Link to="/bons-commande">bon de commande</Link> (lignes).
+      <p className="text-muted no-print" style={{ marginTop: '1.5rem' }}>
+        Navigation <Link to={meta.parentTo}>{meta.parent}</Link> — les affectations se modifient dans l’ordre de mission.
       </p>
+      {pdfOpen ? (
+        <TerrainPlanningPdfModal
+          from={from}
+          to={to}
+          userId={userFilter === '' ? undefined : userFilter}
+          technicianLabel={printTechnicianLabel}
+          context={context}
+          onClose={() => setPdfOpen(false)}
+        />
+      ) : null}
     </ModuleEntityShell>
   )
 }

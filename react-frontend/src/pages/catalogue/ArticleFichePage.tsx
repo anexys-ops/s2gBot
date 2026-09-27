@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import ArticleAgencyVisibilityPanel from '../../components/Catalogue/ArticleAgencyVisibilityPanel'
 import ArticleActionsPanel from '../../components/Catalogue/ArticleActionsPanel'
+import ArticleTestTypesPanel from '../../components/Catalogue/ArticleTestTypesPanel'
 import ArticleCompositionEditor from '../../components/Catalogue/ArticleCompositionEditor'
 import JalonProductsPanel from '../../components/Catalogue/JalonProductsPanel'
 import ProductJalonsPanel from '../../components/Catalogue/ProductJalonsPanel'
@@ -24,7 +25,7 @@ const TAB_DEFS: { id: ArticleTab; label: string; labOnly?: boolean }[] = [
   { id: 'descriptions', label: 'Descriptions' },
   { id: 'tables', label: 'Tables' },
   { id: 'composition', label: 'Composition' },
-  { id: 'actions', label: 'Actions & matériel', labOnly: true },
+  { id: 'actions', label: 'Actions, matériel & essais', labOnly: true },
   { id: 'extrafields', label: 'Champs personnalisés', labOnly: true },
 ]
 
@@ -279,7 +280,10 @@ export default function ArticleFichePage() {
       {!isEditing && tab === 'tables' && <FicheArticle article={article} section="tables" showBackLink={false} />}
       {tab === 'composition' && <ArticleCompositionEditor articleId={articleId} canEdit={isLab && isEditing} />}
       {tab === 'actions' && isLab && (
-        <ArticleActionsPanel article={article} canEdit={isEditing && user?.role === 'lab_admin'} />
+        <>
+          {article.kind === 'product' ? <ArticleTestTypesPanel article={article} canEdit={isAdmin} /> : null}
+          <ArticleActionsPanel article={article} canEdit={isEditing && user?.role === 'lab_admin'} />
+        </>
       )}
       {tab === 'extrafields' && isLab && (
         <>

@@ -88,6 +88,7 @@ export function requiredModuleForPath(pathname: string): StaffModuleKey | StaffM
   if (pathname.startsWith('/terrain') || pathname.startsWith('/notes-de-frais')) return 'terrain'
   if (pathname.startsWith('/labo')) return 'laboratoire'
   if (pathname.startsWith('/ingenierie')) return 'ingenierie'
+  if (pathname.startsWith('/catalogue/essais')) return ['catalogue', 'laboratoire']
   if (pathname.startsWith('/catalogue') || pathname.startsWith('/materiel')) return 'catalogue'
   if (pathname.startsWith('/rapport-bc')) return 'rapport-bc'
   if (pathname.startsWith('/rapports')) return 'rapports'

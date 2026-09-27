@@ -3,17 +3,30 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\BonCommandeLigne;
 use App\Models\MissionTask;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
+use App\Models\OrderItem;
+use App\Models\Sample;
+use App\Models\Sequence;
 use App\Models\TaskMeasure;
 use App\Models\TaskResult;
+use App\Services\TaskFormAssignmentService;
+use App\Services\MissionTaskStatusService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class MissionTaskController extends Controller
 {
+    public function __construct(
+        private readonly TaskFormAssignmentService $formAssignments,
+        private readonly MissionTaskStatusService $statusSync,
+    ) {}
+
     private function optionalQueryString(Request $request, string $key): ?string
     {
         if (! $request->filled($key)) {
@@ -37,7 +50,7 @@ class MissionTaskController extends Controller
                 'assignedUser:id,name,email',
                 'ordreMissionLigne.ordreMission:id,numero,type,client_id',
                 'ordreMissionLigne.ordreMission.client:id,name',
-                'ordreMissionLigne.article:id,code,libelle',
+                'ordreMissionLigne.article:id,code,libelle,unite',
                 'ordreMissionLigne.articleAction:id,type,libelle,duree_heures',
                 'ordreMissionLigne.articleAction.measureConfigs',
                 'result',
@@ -76,11 +89,13 @@ class MissionTaskController extends Controller
             'assignedUser:id,name,email',
             'validatedBy:id,name',
             'ordreMissionLigne.ordreMission.client:id,name',
-            'ordreMissionLigne.article:id,code,libelle',
+            'ordreMissionLigne.article:id,code,libelle,unite',
             'ordreMissionLigne.articleAction.measureConfigs',
             'measures.measureConfig',
             'measures.createdBy:id,name',
             'result.validatedBy:id,name',
+            'testForms.testType:id,name,norm',
+            'testForms.photos',
         ])->findOrFail($id);
 
         return response()->json($task);
@@ -101,6 +116,10 @@ class MissionTaskController extends Controller
             'completed_at'     => 'nullable|date',
         ]);
 
+        if (($data['statut'] ?? null) === MissionTask::STATUT_VALIDATED && $this->formAssignments->hasPendingForms($task)) {
+            throw ValidationException::withMessages(['statut' => 'Les formulaires affectés à cette tâche doivent être validés avant sa clôture.']);
+        }
+
         // Auto-timestamps sur changements de statut
         if (isset($data['statut'])) {
             if ($data['statut'] === MissionTask::STATUT_IN_PROGRESS && !$task->started_at) {
@@ -112,7 +131,122 @@ class MissionTaskController extends Controller
         }
 
         $task->update($data);
+        $this->statusSync->syncOrdreMissionFromTask($task);
+
         return response()->json($task->fresh(['assignedUser:id,name', 'measures.measureConfig', 'result']));
+    }
+
+    /** Clôture une tâche et prépare ses étiquettes dans la réception laboratoire. */
+    public function closeReception(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate([
+            'pv_numbers' => 'required|array|min:1',
+            'pv_numbers.*' => 'required|string|max:100|distinct',
+            'quantity_unit' => 'required|string|max:24',
+            'quantity_count' => 'required|integer|min:1',
+        ]);
+
+        $result = DB::transaction(function () use ($id, $data) {
+            $task = MissionTask::query()->lockForUpdate()->with([
+                'ordreMissionLigne.ordreMission',
+                'ordreMissionLigne.bonCommandeLigne',
+            ])->findOrFail($id);
+            $ligne = $task->ordreMissionLigne;
+            $source = $ligne?->bonCommandeLigne;
+            $ordreMission = $ligne?->ordreMission;
+
+            if (! $source || ! $ordreMission) {
+                throw ValidationException::withMessages([
+                    'quantity_count' => "Cette tâche n'est pas reliée à une ligne de bon de commande.",
+                ]);
+            }
+
+            $existing = Sample::query()->where('task_id', $task->id)->count();
+            $remaining = $this->remainingQuantity($source);
+            if ($existing === 0 && (int) $data['quantity_count'] > $remaining) {
+                throw ValidationException::withMessages([
+                    'quantity_count' => "La quantité dépasse le reliquat du bon de commande ({$remaining}).",
+                ]);
+            }
+
+            $task->update([
+                'pv_numbers' => array_values($data['pv_numbers']),
+                'quantity_unit' => $data['quantity_unit'],
+                'quantity_count' => (int) $data['quantity_count'],
+                'statut' => $task->statut === MissionTask::STATUT_VALIDATED
+                    ? MissionTask::STATUT_VALIDATED
+                    : MissionTask::STATUT_DONE,
+                'completed_at' => $task->completed_at ?? now(),
+                'reception_generated_at' => $task->reception_generated_at ?? now(),
+            ]);
+            $this->statusSync->syncOrdreMissionFromTask($task);
+
+            $created = 0;
+            if ($existing === 0) {
+                $pv = implode(', ', $data['pv_numbers']);
+                for ($index = 1; $index <= (int) $data['quantity_count']; $index++) {
+                    $sampleData = [
+                        'reference' => Sequence::next('ECH'),
+                        'reception_index' => $index,
+                        'reception_batch_total' => (int) $data['quantity_count'],
+                        'dossier_id' => $ordreMission->dossier_id,
+                        'mission_order_id' => $ordreMission->id,
+                        'task_id' => $task->id,
+                        'prepared_by_task_at' => now(),
+                        'product_id' => $source->ref_article_id,
+                        'bon_commande_ligne_id' => $source->id,
+                        'description' => $source->libelle,
+                        'sample_type' => 'autre',
+                        'collected_by' => $task->assigned_user_id,
+                        'collected_at' => now(),
+                        'status' => Sample::STATUS_EN_TRANSIT,
+                        'quantity' => 1,
+                        'notes' => "PV : {$pv} · Unité : {$data['quantity_unit']}",
+                    ];
+                    if (Schema::getConnection()->getDriverName() === 'sqlite') {
+                        $sampleData['order_item_id'] = OrderItem::query()->value('id');
+                    }
+                    Sample::query()->create($sampleData);
+                    $created++;
+                }
+            }
+
+            return [
+                'task' => $task->fresh(['assignedUser:id,name', 'ordreMissionLigne.ordreMission']),
+                'samples_created' => $created,
+                'remaining_quantity' => $this->remainingQuantity($source),
+            ];
+        });
+
+        return response()->json($result);
+    }
+
+    /** Ajoute une nouvelle tâche sur la même ligne BC tant qu'un reliquat subsiste. */
+    public function duplicate(int $id): JsonResponse
+    {
+        $task = MissionTask::query()->with('ordreMissionLigne.bonCommandeLigne')->findOrFail($id);
+        $ligne = $task->ordreMissionLigne;
+        $source = $ligne?->bonCommandeLigne;
+        $remaining = $source ? $this->remainingQuantity($source) : 0;
+
+        if (! $source || $remaining < 1) {
+            throw ValidationException::withMessages(['task' => 'Aucun reliquat disponible pour une nouvelle tâche.']);
+        }
+
+        $newTask = DB::transaction(function () use ($ligne, $remaining) {
+            $copy = $ligne->replicate(['date_realisation', 'duree_reelle_heures', 'notes']);
+            $copy->statut = 'planifie';
+            $copy->quantite = $remaining;
+            $copy->assigned_user_id = null;
+            $copy->equipment_id = null;
+            $copy->date_prevue = null;
+            $copy->ordre = ((int) $ligne->ordreMission->lignes()->max('ordre')) + 1;
+            $copy->save();
+
+            return $copy->ensureTaskExists();
+        });
+
+        return response()->json($newTask->fresh(['ordreMissionLigne.ordreMission']), 201);
     }
 
     /** POST /mission-tasks/{task}/measures — soumettre / mettre à jour des mesures */
@@ -153,6 +287,9 @@ class MissionTaskController extends Controller
     public function validate(Request $request, int $id): JsonResponse
     {
         $task = MissionTask::findOrFail($id);
+        if ($this->formAssignments->hasPendingForms($task)) {
+            throw ValidationException::withMessages(['task' => 'Les formulaires affectés à cette tâche doivent être validés avant sa clôture.']);
+        }
 
         $data = $request->validate([
             'is_conform'   => 'required|boolean',
@@ -177,6 +314,8 @@ class MissionTaskController extends Controller
                 'validated_by' => $request->user()?->id,
                 'is_conform'   => $data['is_conform'],
             ]);
+
+            $this->statusSync->syncOrdreMissionFromTask($task);
         });
 
         return response()->json($task->fresh(['result', 'measures.measureConfig']));
@@ -202,10 +341,14 @@ class MissionTaskController extends Controller
             ->whereHas('ordreMissionLigne.ordreMission', fn ($sq) => $sq->where('type', 'labo'))
             ->with([
                 'assignedUser:id,name',
-                'ordreMissionLigne.ordreMission:id,numero,type,statut,client_id,dossier_id',
+                'ordreMissionLigne.ordreMission:id,numero,type,statut,client_id,site_id,dossier_id',
                 'ordreMissionLigne.ordreMission.client:id,name',
+                'ordreMissionLigne.ordreMission.site:id,name',
                 'ordreMissionLigne.ordreMission.dossier:id,reference,titre',
-                'ordreMissionLigne.article:id,code,libelle',
+                'ordreMissionLigne.ordreMission.bonCommande:id,numero,quote_id,dossier_id',
+                'ordreMissionLigne.ordreMission.bonCommande.quote:id,meta',
+                'ordreMissionLigne.ordreMission.bonCommande.lignes:id,bon_commande_id,ref_article_id,libelle,quantite,ordre',
+                'ordreMissionLigne.article:id,code,libelle,unite',
                 'ordreMissionLigne.articleAction:id,type,libelle,duree_heures',
                 'ordreMissionLigne.articleAction.measureConfigs',
                 'measures.measureConfig',
@@ -219,7 +362,7 @@ class MissionTaskController extends Controller
             $q->where('statut', $statut);
         }
 
-        return response()->json($q->orderBy('due_date')->get());
+        return response()->json($this->withJalonContext($q->orderBy('due_date')->get()));
     }
 
     /**
@@ -239,8 +382,10 @@ class MissionTaskController extends Controller
                 'ordreMissionLigne.ordreMission.client',
                 'ordreMissionLigne.ordreMission.site',
                 'ordreMissionLigne.ordreMission.dossier',
-                'ordreMissionLigne.ordreMission.bonCommande:id,numero,dossier_id',
+                'ordreMissionLigne.ordreMission.bonCommande:id,numero,quote_id,dossier_id',
                 'ordreMissionLigne.ordreMission.bonCommande.dossier:id,reference,titre',
+                'ordreMissionLigne.ordreMission.bonCommande.quote:id,meta',
+                'ordreMissionLigne.ordreMission.bonCommande.lignes:id,bon_commande_id,ref_article_id,libelle,quantite,ordre',
                 'ordreMissionLigne.article',
                 'ordreMissionLigne.articleAction.measureConfigs',
                 'measures.measureConfig',
@@ -267,7 +412,7 @@ class MissionTaskController extends Controller
             ]);
         }
 
-        return response()->json($q->orderBy('planned_date')->get());
+        return response()->json($this->withJalonContext($q->orderBy('planned_date')->get()));
     }
 
     /**
@@ -283,7 +428,11 @@ class MissionTaskController extends Controller
             ->whereHas('ordreMissionLigne.ordreMission', function ($sq) {
                 $sq->whereIn('type', ['technicien', 'ingenieur']);
             })
-            ->whereHas('ordreMissionLigne.articleAction.measureConfigs')
+            ->where(function ($query) {
+                $query->whereHas('ordreMissionLigne.articleAction.measureConfigs')
+                    ->orWhereHas('testForms');
+            })
+            ->withCount('testForms')
             ->with([
                 'assignedUser:id,name',
                 'ordreMissionLigne:id,ordre_mission_id,libelle,ref_article_id,article_action_id,statut',
@@ -291,7 +440,7 @@ class MissionTaskController extends Controller
                 'ordreMissionLigne.ordreMission.client:id,name',
                 'ordreMissionLigne.ordreMission.site:id,name',
                 'ordreMissionLigne.ordreMission.dossier:id,reference,titre,date_debut,date_fin_prevue',
-                'ordreMissionLigne.article:id,code,libelle',
+                'ordreMissionLigne.article:id,code,libelle,unite',
                 'ordreMissionLigne.articleAction:id,type,libelle,duree_heures',
                 'ordreMissionLigne.articleAction.measureConfigs',
                 'measures.measureConfig',
@@ -419,5 +568,55 @@ class MissionTaskController extends Controller
                 ->orderByDesc('planned_date')
                 ->get()
         );
+    }
+
+    private function withJalonContext($tasks)
+    {
+        foreach ($tasks as $task) {
+            $ligne = $task->ordreMissionLigne;
+            $bonCommande = $ligne?->ordreMission?->bonCommande;
+            $source = $bonCommande?->lignes?->firstWhere('id', (int) $ligne?->bon_commande_ligne_id);
+            $meta = $bonCommande?->quote?->meta;
+            $context = null;
+
+            if ($source && is_array($meta)) {
+                foreach (($meta['devis_jalons'] ?? []) as $jalon) {
+                    $label = trim((string) ($jalon['libelle'] ?? ''));
+                    $productIds = array_map('intval', $jalon['product_ref_article_ids'] ?? []);
+                    $matchesProduct = $source->ref_article_id && in_array((int) $source->ref_article_id, $productIds, true);
+                    $matchesForfait = $label !== '' && $source->libelle === 'Prestation forfaitaire — '.$label;
+                    if (! $matchesProduct && ! $matchesForfait) {
+                        continue;
+                    }
+
+                    $context = [
+                        'id' => (string) ($jalon['id'] ?? ''),
+                        'label' => $label,
+                        'code' => $jalon['s2g_code'] ?? null,
+                    ];
+                    break;
+                }
+            }
+
+            $task->setAttribute('jalon_context', $context);
+            if ($source) {
+                $remaining = $this->remainingQuantity($source);
+                $task->setAttribute('ordered_quantity', (int) floor((float) $source->quantite));
+                $task->setAttribute('remaining_quantity', $remaining);
+                $task->setAttribute('received_quantity', max(0, (int) floor((float) $source->quantite) - $remaining));
+            }
+        }
+
+        return $tasks;
+    }
+
+    private function remainingQuantity(BonCommandeLigne $ligne): int
+    {
+        $received = Sample::query()
+            ->where('bon_commande_ligne_id', $ligne->id)
+            ->whereNotIn('status', [Sample::STATUS_ANNULE, Sample::STATUS_REJETE])
+            ->count();
+
+        return max(0, (int) floor((float) $ligne->quantite) - $received);
     }
 }

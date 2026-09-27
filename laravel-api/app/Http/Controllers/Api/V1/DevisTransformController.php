@@ -30,6 +30,6 @@ class DevisTransformController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json($bc->load(['dossier', 'client', 'lignes']), 201);
+        return response()->json($bc->load(['dossier.centreGroup', 'centreGroup', 'client', 'lignes']), 201);
     }
 }

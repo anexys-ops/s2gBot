@@ -13,6 +13,7 @@ use App\Models\Quote;
 use App\Models\RapportBC;
 use App\Services\BonCommandePdfGenerator;
 use App\Services\BonLivraisonPdfGenerator;
+use App\Services\DossierPdfGenerator;
 use App\Services\ExpenseReportPdfGenerator;
 use App\Services\QuotePdfGenerator;
 use App\Services\RapportBCPdfGenerator;
@@ -146,54 +147,8 @@ class PdfController extends Controller
         $id = (int) $validated['id'];
         $templateId = isset($validated['template_id']) ? (int) $validated['template_id'] : null;
 
-<<<<<<< HEAD
-        if ($type === 'quote') {
-            $quote = Quote::with([
-                'client',
-                'site',
-                'quoteLines.commercialOffering.equipment',
-                'billingAddress',
-                'deliveryAddress',
-                'pdfTemplate',
-            ])->find($id);
-            if (! $quote) {
-                return response()->json(['message' => 'Devis introuvable'], 404);
-            }
-            $template = $this->resolvePdfTemplate('quote', $validated['template_id'] ?? null, $quote->pdf_template_id);
-            $view = $template?->blade_view ?? 'pdf.quote';
-            $layoutConfig = AppBranding::mergeLayoutConfig($template?->layout_config);
-            $catalogSettings = ModuleSetting::query()->where('module_key', 'commercial_catalog')->value('settings') ?? [];
-            $showEquipmentOnQuotePdf = (bool) ($catalogSettings['show_equipment_on_quote_pdf'] ?? true);
-            $html = view($view, [
-                'quote' => $quote,
-                'template' => $template,
-                'brandingLogoDataUri' => AppBranding::logoDataUriForPdf(),
-                'layoutConfig' => $layoutConfig,
-                'showEquipmentOnQuotePdf' => $showEquipmentOnQuotePdf,
-            ])->render();
-            $filename = 'devis-'.str_replace(['/', '\\'], '-', $quote->number).'.pdf';
-        } elseif ($type === 'invoice') {
-            $invoice = Invoice::with(['client', 'invoiceLines', 'billingAddress', 'deliveryAddress', 'pdfTemplate'])->find($id);
-            if (! $invoice) {
-                return response()->json(['message' => 'Facture introuvable'], 404);
-            }
-
-            return $this->streamInvoicePdf($invoice, $validated['template_id'] ?? null);
-        } else {
-            $order = Order::find($id);
-            if (! $order) {
-                return response()->json(['message' => 'Commande introuvable'], 404);
-            }
-            $report = $this->reportService->generate($order, null, null);
-            return Storage::disk('local')->download(
-                $report->file_path,
-                $report->filename,
-                ['Content-Type' => 'application/pdf']
-            );
-=======
         if ($templateId !== null && ! $this->templateIsValidForType($type, $templateId)) {
             return response()->json(['message' => 'Modèle PDF introuvable ou inactif pour ce type de document.'], 422);
->>>>>>> main
         }
 
         return $this->renderPdfResponse($type, $id, $templateId, inline: false);

@@ -125,6 +125,7 @@ export default function InvoiceEditorPage() {
       next_reminder_date: dateInputFromApi(invoice.next_reminder_date),
       reminder_notes: invoice.reminder_notes ?? '',
     })
+    setCentreGroupId(invoice.lab_centre_group_id ?? null)
     setLines(
       invoiceLinesFromApi(invoice.invoice_lines, Number(invoice.tva_rate)).length
         ? invoiceLinesFromApi(invoice.invoice_lines, Number(invoice.tva_rate))
@@ -145,6 +146,7 @@ export default function InvoiceEditorPage() {
         notes: form.notes || undefined,
         next_reminder_date: form.next_reminder_date || undefined,
         reminder_notes: form.reminder_notes || undefined,
+        lab_centre_group_id: centreGroupId,
       }
       if (isDraft) {
         Object.assign(body, {

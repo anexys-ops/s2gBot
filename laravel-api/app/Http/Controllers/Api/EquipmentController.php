@@ -70,6 +70,7 @@ class EquipmentController extends Controller
             $equipment->load([
                 'agency',
                 'testTypes',
+                'articleRequirements.article:id,code,libelle,kind,actif',
                 'calibrations',
                 'maintenancePlans',
                 'affectations.user:id,name',

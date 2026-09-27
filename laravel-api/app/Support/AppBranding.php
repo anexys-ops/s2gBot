@@ -225,6 +225,17 @@ class AppBranding
                 'show_linked_quote' => true,
                 'show_affaire' => true,
             ],
+            /** Colonnes du programme terrain. */
+            'planning' => [
+                'show_technician' => true,
+                'show_start_date' => true,
+                'show_end_date' => true,
+                'show_client' => true,
+                'show_order' => true,
+                'show_task' => true,
+                'show_quantity' => true,
+                'show_notes' => true,
+            ],
         ];
     }
 

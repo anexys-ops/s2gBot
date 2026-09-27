@@ -11,6 +11,9 @@
         th { background: #eee; }
         .meta { margin: 5px 0; color: #555; }
         .text-right { text-align: right; }
+        .jalon-row { page-break-after: avoid; }
+        .jalon-row td { background: #e8edf5; font-weight: bold; }
+        .nested-line { padding-left: 18px; }
     </style>
 </head>
 <body>
@@ -48,24 +51,29 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($bonCommande->lignes as $ligne)
+            @foreach($displayRows ?? [] as $row)
             @php
-                $articleCode = trim((string) ($ligne->article?->code ?? $ligne->article?->s2g_code ?? ''));
+                $isJalon = ($row['type'] ?? '') === 'jalon_header';
+                $ligne = $isJalon ? ($row['forfait_ligne'] ?? null) : ($row['ligne'] ?? null);
+                $jalonParts = array_filter([$row['code'] ?? null, $row['label'] ?? null]);
+                $articleCode = trim((string) ($ligne?->article?->code ?? $ligne?->article?->s2g_code ?? ''));
                 $lineParts = [];
                 if ($showArticleCode && $articleCode !== '') { $lineParts[] = $articleCode; }
-                if ($showDesignation && !empty($ligne->libelle)) { $lineParts[] = $ligne->libelle; }
-                $lineLabel = $lineParts !== [] ? implode(' — ', $lineParts) : '—';
+                if ($showDesignation && !empty($ligne?->libelle)) { $lineParts[] = $ligne->libelle; }
+                $lineLabel = $isJalon
+                    ? ($jalonParts !== [] ? implode(' — ', $jalonParts) : '—')
+                    : ($lineParts !== [] ? implode(' — ', $lineParts) : '—');
             @endphp
-            <tr>
+            <tr class="{{ $isJalon ? 'jalon-row' : '' }}">
                 @if($showDesignation || $showArticleCode)
-                <td>{{ $lineLabel }}</td>
+                <td class="{{ !$isJalon && !empty($row['nested']) ? 'nested-line' : '' }}">{{ $lineLabel }}</td>
                 @endif
                 @if($showQuantity)
-                <td>{{ $ligne->quantite }}</td>
+                <td>{{ $ligne?->quantite ?? '' }}</td>
                 @endif
                 @if($showPuPtCols)
-                <td>{{ $fmt($ligne->prix_unitaire_ht ?? 0) }} {{ $currencyLabel }}</td>
-                <td class="text-right">{{ $fmt($ligne->montant_ht ?? 0) }} {{ $currencyLabel }}</td>
+                <td>{{ $ligne ? $fmt($ligne->prix_unitaire_ht ?? 0).' '.$currencyLabel : '' }}</td>
+                <td class="text-right">{{ $ligne ? $fmt($ligne->montant_ht ?? 0).' '.$currencyLabel : '' }}</td>
                 @endif
             </tr>
             @endforeach

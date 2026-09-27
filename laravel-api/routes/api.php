@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\DocumentStatusDefinitionController;
 use App\Http\Controllers\Api\DocumentStatusHistoryController;
 use App\Http\Controllers\Api\DossierController;
 use App\Http\Controllers\Api\EquipmentController;
+use App\Http\Controllers\Api\LabCentreGroupController;
 use App\Http\Controllers\Api\EquipmentMaintenancePlanController;
 use App\Http\Controllers\Api\MaterielAffectationController;
 use App\Http\Controllers\Api\ExamplePdfController;
@@ -49,6 +50,9 @@ use App\Http\Controllers\Api\MailController;
 use App\Http\Controllers\Api\MailTemplateController;
 use App\Http\Controllers\Api\MissionController;
 use App\Http\Controllers\Api\Mobile\MobileDossierController;
+use App\Http\Controllers\Api\Mobile\MobileTerrainController;
+use App\Http\Controllers\Api\Mobile\TaskTestFormController;
+use App\Http\Controllers\Api\FormOptionListController;
 use App\Http\Controllers\Api\ModuleSettingController;
 use App\Http\Controllers\Api\NonConformityController;
 use App\Http\Controllers\Api\OpenApiController;
@@ -104,6 +108,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('catalogue/articles', [ArticleController::class, 'store']);
         Route::put('catalogue/articles/{article}', [ArticleController::class, 'update'])
             ->whereNumber('article');
+        Route::put('catalogue/articles/{article}/test-types', [ArticleController::class, 'syncTestTypes'])
+            ->whereNumber('article');
         Route::delete('catalogue/articles/{article}', [ArticleController::class, 'destroy'])
             ->whereNumber('article');
         Route::put('catalogue/articles/{article}/lab-visibility', [ArticleController::class, 'syncLabVisibility'])
@@ -114,7 +120,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('dossiers', [DossierController::class, 'index']);
         Route::post('dossiers', [DossierController::class, 'store']);
-        Route::get('lab-centre-groups', fn () => response()->json(\App\Models\LabCentreGroup::query()->where('active', true)->orderBy('sort_order')->orderBy('name')->get()));
+        Route::get('lab-centre-groups', [LabCentreGroupController::class, 'index']);
+        Route::post('lab-centre-groups', [LabCentreGroupController::class, 'store']);
+        Route::put('lab-centre-groups/{labCentreGroup}', [LabCentreGroupController::class, 'update'])
+            ->whereNumber('labCentreGroup');
+        Route::delete('lab-centre-groups/{labCentreGroup}', [LabCentreGroupController::class, 'destroy'])
+            ->whereNumber('labCentreGroup');
         Route::get('sites/{site}/dossiers', fn (\Illuminate\Http\Request $req, \App\Models\Site $site) => response()->json(
             \App\Models\Dossier::query()
                 ->where('site_id', $site->id)
@@ -152,6 +163,7 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('role:responsable')
             ->whereNumber('bonCommande');
         Route::get('planning-terrain/techniciens', [PlanningTerrainController::class, 'techniciens']);
+        Route::post('planning-terrain/pdf', [PlanningTerrainController::class, 'pdf']);
         Route::get('planning-terrain', [PlanningTerrainController::class, 'index']);
         Route::post('planning-terrain', [PlanningTerrainController::class, 'store']);
         Route::put('planning-terrain/{bcLignePlanningAffectation}', [PlanningTerrainController::class, 'update'])
@@ -259,6 +271,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('lithology-layers/{lithology_layer}', [LithologyLayerController::class, 'update']);
     Route::delete('lithology-layers/{lithology_layer}', [LithologyLayerController::class, 'destroy']);
     Route::apiResource('test-types', TestTypeController::class);
+    Route::apiResource('form-option-lists', FormOptionListController::class)->except(['show']);
+    Route::put('test-types/{testType}/products', [TestTypeController::class, 'syncProducts']);
     Route::get('equipments-maintenance-plans/due', [EquipmentMaintenancePlanController::class, 'dueInRange']);
     Route::get('materiel/affectations', [MaterielAffectationController::class, 'indexAll']);
     Route::apiResource('equipments', EquipmentController::class);
@@ -403,6 +417,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('mission-tasks', [MissionTaskController::class, 'index']);
     Route::get('mission-tasks/{task}', [MissionTaskController::class, 'show']);
     Route::put('mission-tasks/{task}', [MissionTaskController::class, 'update']);
+    Route::post('mission-tasks/{task}/close-reception', [MissionTaskController::class, 'closeReception']);
+    Route::post('mission-tasks/{task}/duplicate', [MissionTaskController::class, 'duplicate']);
     Route::post('mission-tasks/{task}/measures', [MissionTaskController::class, 'storeMeasures']);
     Route::post('mission-tasks/{task}/validate', [MissionTaskController::class, 'validate']);
     Route::delete('mission-tasks/{task}', [MissionTaskController::class, 'destroy']);
@@ -423,6 +439,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('rapport-bc/{rapportBC}/suivis', [RapportBCController::class, 'addSuivi']);
     Route::post('rapport-bc/{rapportBC}/request-validation', [RapportBCController::class, 'requestValidation']);
     Route::post('rapport-bc/{rapportBC}/versions', [RapportBCController::class, 'uploadVersion']);
+    Route::post('rapport-bc/{rapportBC}/taches/{task}/mesures-pdf', [RapportBCController::class, 'addTaskMeasurementsPdf']);
     Route::get('rapport-bc/{rapportBC}/versions/{version}/download', [RapportBCController::class, 'downloadVersion']);
     Route::delete('rapport-bc/{rapportBC}/versions/{version}', [RapportBCController::class, 'destroyVersion']);
 
@@ -448,6 +465,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('ordres-mission/{ordre_mission}', [OrdreMissionController::class, 'update']);
     Route::delete('ordres-mission/{ordre_mission}', [OrdreMissionController::class, 'destroy']);
     Route::post('ordres-mission/{ordre_mission}/lignes', [OrdreMissionController::class, 'storeLigne']);
+    Route::put('ordres-mission/{ordre_mission}/lignes', [OrdreMissionController::class, 'updateLignes']);
     Route::put('ordres-mission/{ordre_mission}/lignes/{ligne}', [OrdreMissionController::class, 'updateLigne']);
     Route::delete('ordres-mission/{ordre_mission}/lignes/{ligne}', [OrdreMissionController::class, 'destroyLigne']);
     Route::get('ordres-mission/{ordre_mission}/frais', [OrdreMissionController::class, 'fraisIndex']);
@@ -471,6 +489,36 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('expense-reports/{expenseReport}/lines/{line}/receipt', [ExpenseReportController::class, 'uploadLineReceipt']);
     Route::get('expense-reports/{expenseReport}/lines/{line}/receipt', [ExpenseReportController::class, 'downloadLineReceipt']);
     Route::delete('expense-reports/{expenseReport}/lines/{line}/receipt', [ExpenseReportController::class, 'deleteLineReceipt']);
+
+    // App mobile terrain — données limitées aux missions du compte connecté.
+    Route::prefix('mobile/terrain')->group(function () {
+        Route::get('calendar', [MobileTerrainController::class, 'calendar']);
+        Route::get('tasks', [MobileTerrainController::class, 'tasks']);
+        Route::get('tasks/{task}', [MobileTerrainController::class, 'task'])->whereNumber('task');
+        Route::patch('tasks/{task}/status', [MobileTerrainController::class, 'updateTaskStatus'])->whereNumber('task');
+        Route::patch('tasks/{task}/notes', [MobileTerrainController::class, 'updateTaskNotes'])->whereNumber('task');
+        Route::get('tasks/{task}/pv-numbers', [MobileTerrainController::class, 'taskPvNumbers'])->whereNumber('task');
+        Route::post('tasks/{task}/pv-numbers', [MobileTerrainController::class, 'addTaskPvNumber'])->whereNumber('task');
+        Route::delete('tasks/{task}/pv-numbers', [MobileTerrainController::class, 'removeTaskPvNumber'])->whereNumber('task');
+        Route::get('expense-options', [MobileTerrainController::class, 'expenseOptions']);
+        Route::get('expense-reports', [MobileTerrainController::class, 'expenses']);
+        Route::post('expense-reports', [MobileTerrainController::class, 'storeExpense']);
+        Route::post('expense-reports/standalone', [MobileTerrainController::class, 'storeStandaloneExpense']);
+        Route::post('expense-reports/{expenseReport}/lines', [MobileTerrainController::class, 'storeExpenseLine'])->whereNumber('expenseReport');
+        Route::post('expense-reports/{expenseReport}/lines/{line}/photo', [MobileTerrainController::class, 'uploadExpenseLinePhoto'])->whereNumber('expenseReport')->whereNumber('line');
+        Route::get('expense-reports/{expenseReport}/lines/{line}/photo', [MobileTerrainController::class, 'downloadExpenseLinePhoto'])->whereNumber('expenseReport')->whereNumber('line');
+        Route::post('expense-reports/{expenseReport}/submit', [MobileTerrainController::class, 'submitExpense'])->whereNumber('expenseReport');
+    });
+
+    Route::prefix('mobile/task-forms')->group(function () {
+        Route::get('tasks/{task}', [TaskTestFormController::class, 'index'])->whereNumber('task');
+        Route::put('tasks/{task}/types/{testType}', [TaskTestFormController::class, 'save'])->whereNumber('task')->whereNumber('testType');
+        Route::post('tasks/{task}/types/{testType}/submit', [TaskTestFormController::class, 'submit'])->whereNumber('task')->whereNumber('testType');
+        Route::post('tasks/{task}/types/{testType}/review', [TaskTestFormController::class, 'review'])->whereNumber('task')->whereNumber('testType');
+        Route::post('tasks/{task}/types/{testType}/photos', [TaskTestFormController::class, 'uploadPhoto'])->whereNumber('task')->whereNumber('testType');
+        Route::get('photos/{photo}', [TaskTestFormController::class, 'downloadPhoto'])->whereNumber('photo');
+        Route::delete('photos/{photo}', [TaskTestFormController::class, 'deletePhoto'])->whereNumber('photo');
+    });
 
     // App mobile laboratoire / terrain — dossiers (mesures + photos)
     Route::prefix('mobile/dossiers')->group(function () {

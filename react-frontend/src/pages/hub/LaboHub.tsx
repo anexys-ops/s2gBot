@@ -20,6 +20,12 @@ export default function LaboHub() {
       icon: 'trend',
     },
     {
+      to: '/catalogue/essais',
+      title: 'Formulaires d’essai',
+      desc: 'Types d’essais, champs de mesure et affectation aux produits et actions.',
+      icon: 'lab',
+    },
+    {
       to: '/graphiques-essais',
       title: 'Graphiques d’essais',
       desc: 'Visualisations des séries de tests.',

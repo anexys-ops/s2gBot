@@ -6,10 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\BcLignePlanningAffectation;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
+use App\Models\OrdreMission;
+use App\Models\OrdreMissionLigne;
 use App\Models\Quote;
+use App\Services\BonCommandeTotalsService;
+use App\Services\BonCommandeMissionProgressService;
 use App\Services\BonLivraisonDeliveryService;
 use App\Services\CommercialDocumentTotalsService;
 use App\Services\CommercialDocumentWorkflowService;
+use App\Services\TerrainPlanningBcLinesService;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
 use Illuminate\Http\JsonResponse;
@@ -20,12 +25,21 @@ class BonCommandeController extends Controller
     public function __construct(
         private readonly CommercialDocumentWorkflowService $workflow,
         private readonly BonLivraisonDeliveryService $delivery,
+        private readonly BonCommandeTotalsService $totals,
+        private readonly BonCommandeMissionProgressService $missionProgress,
+        private readonly TerrainPlanningBcLinesService $terrainPlanningLines,
     ) {}
 
     public function index(Request $request): JsonResponse
     {
+        $unassignedPlanning = $request->boolean('planning_unassigned');
+        $relations = ['dossier', 'client', 'clientContact', 'quote'];
+        $relations['lignes'] = $unassignedPlanning
+            ? fn ($query) => $query->whereDoesntHave('planningAffectations')->orderBy('ordre')->orderBy('id')
+            : fn ($query) => $query->orderBy('ordre')->orderBy('id');
+
         $q = BonCommande::query()
-            ->with(['dossier', 'client', 'clientContact', 'lignes', 'quote'])
+            ->with($relations)
             ->withCount(['bonsLivraison', 'invoices'])
             ->orderByDesc('date_commande')
             ->orderByDesc('id');
@@ -41,6 +55,10 @@ class BonCommandeController extends Controller
         if ($request->boolean('planning')) {
             $q->planifiable();
         }
+        if ($unassignedPlanning) {
+            $q->planifiable()
+                ->whereHas('lignes', fn ($query) => $query->whereDoesntHave('planningAffectations'));
+        }
         if ($search = trim((string) $request->query('search', ''))) {
             $like = '%'.$search.'%';
             $q->where(function ($sub) use ($like) {
@@ -54,7 +72,14 @@ class BonCommandeController extends Controller
             });
         }
         if ($request->user()->isLab()) {
-            return response()->json($q->get());
+            $rows = $q->get();
+            if ($unassignedPlanning) {
+                $rows = $rows
+                    ->filter(fn (BonCommande $bonCommande) => $this->terrainPlanningLines->prepare($bonCommande))
+                    ->values();
+            }
+
+            return response()->json($rows);
         }
         if (! $request->user()->client_id) {
             return response()->json(['message' => 'Non autorisé'], 403);
@@ -69,6 +94,7 @@ class BonCommandeController extends Controller
         if (! AgencyAccess::userMayAccessBonCommande($request->user(), $bonCommande)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
+        $this->totals->synchronize($bonCommande);
         $bonCommande->load([
             'lignes.planningAffectations.user',
             'lignes.technicien',
@@ -78,6 +104,32 @@ class BonCommandeController extends Controller
             'quote',
             'bonsLivraison.lignes',
         ]);
+
+        $covered = [];
+        $omLines = OrdreMissionLigne::query()
+            ->whereIn('bon_commande_ligne_id', $bonCommande->lignes->pluck('id'))
+            ->whereHas('ordreMission', fn ($query) => $query
+                ->where('bon_commande_id', $bonCommande->id)
+                ->where('statut', '!=', OrdreMission::STATUT_ANNULE))
+            ->with('ordreMission:id,type')
+            ->get();
+        foreach ($omLines as $omLine) {
+            $type = $omLine->ordreMission?->type;
+            if (! $type) {
+                continue;
+            }
+            $definition = ($omLine->ref_article_id ?? 0).':'.($omLine->article_action_id ?? 0);
+            $covered[$omLine->bon_commande_ligne_id][$type][$definition] =
+                ($covered[$omLine->bon_commande_ligne_id][$type][$definition] ?? 0) + (float) $omLine->quantite;
+        }
+        foreach ($bonCommande->lignes as $ligne) {
+            $quantities = [];
+            foreach ($covered[$ligne->id] ?? [] as $type => $definitions) {
+                $quantities[$type] = min((float) $ligne->quantite, min($definitions));
+            }
+            $ligne->setAttribute('om_quantites', $quantities);
+        }
+        $bonCommande->setAttribute('avancement_om', $this->missionProgress->forBonCommande($bonCommande));
 
         return response()->json($bonCommande);
     }
@@ -229,20 +281,7 @@ class BonCommandeController extends Controller
 
     private function recalculateBonCommandeTotals(BonCommande $bonCommande): void
     {
-        $bonCommande->load(['lignes', 'client']);
-        $rows = [];
-        foreach ($bonCommande->lignes as $l) {
-            $rows[] = [
-                'ht' => (float) $l->montant_ht,
-                'tva_rate' => (float) $l->tva_rate,
-            ];
-        }
-        $caAnnuelTvaRegime = $bonCommande->client?->usesCaAnnuelTvaRegime() ?? false;
-        $totals = CommercialDocumentTotalsService::computeTotals($rows, 0, 0, 0, 0, 0, 20, $caAnnuelTvaRegime);
-        $bonCommande->update([
-            'montant_ht' => $totals['amount_ht'],
-            'montant_ttc' => $totals['amount_ttc'],
-        ]);
+        $this->totals->synchronize($bonCommande);
     }
 
     private function formatQtyLabel(float $qty): string

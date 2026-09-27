@@ -1,5 +1,7 @@
 # API mobile laboratoire / terrain (implémentation s2gBot)
 
+Pour le calendrier, les tâches, les informations client/chantier, le matériel et les notes de frais de l'application terrain, voir [le contrat API mobile terrain](api-mobile-terrain-v1.md).
+
 Ce document résume ce qui est **branché dans Laravel** ; le détail fonctionnel reste aligné sur le cahier des charges mobile (chemins, JSON, Bearer).
 
 ## Routes existantes (déjà en place)

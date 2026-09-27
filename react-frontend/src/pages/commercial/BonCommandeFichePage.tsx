@@ -3,7 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { bonsCommandeApi, ordresMissionApi, type BonCommandeLigne } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import StatusChangeModal from '../../components/StatusChangeModal'
 import CommercialDocumentActions from '../../components/crm/CommercialDocumentActions'
+import { commercialDocumentStatusOptions } from '../../lib/commercialDocumentActionConfig'
 import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
 import StatusBadge, { bonCommandeStatutBadgeProps, bonLivraisonStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
@@ -11,16 +13,29 @@ import { useAuth } from '../../contexts/AuthContext'
 import ExtrafieldsForm from '../../components/module/ExtrafieldsForm'
 import EntityAttachmentsPanel from '../../components/attachments/EntityAttachmentsPanel'
 import ClientContactPicker from '../../components/clients/ClientContactPicker'
+import CentreGroupField from '../../components/centres/CentreGroupField'
 import {
   buildBcLigneDisplayRows,
   filterForfaitBcLigneIds,
   filterForfaitBcLignes,
   isForfaitBcJalon,
+  isNonBillableForfaitBcLigne,
   resolveDevisDisplayMeta,
   resolveQuantiteDevis,
 } from '../../lib/bcLigneDisplay'
 import { formatAppDate, formatMoney, formatQuantity, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
+const omProgressLabels: Record<string, string> = {
+  a_planifier: 'À planifier',
+  planification_en_cours: 'Planification en cours',
+  planifie: 'Planifié',
+  a_replanifier: 'À replanifier',
+  replanifie: 'Replanifié',
+  en_cours: 'En cours',
+  freeze: 'Freeze',
+  attente_validation: 'Attente validation',
+  cloture: 'Clôturé',
+}
 
 function qtyInputFromApi(q: string | number | null | undefined): string {
   if (q == null || q === '') return '0'
@@ -65,12 +80,10 @@ function applyMassQtyToLignes(
 type BcJalonQtyMassProps = {
   jalonLabel: string
   value: string
-  lineCount: number
   onChange: (value: string) => void
-  onApply: () => void
 }
 
-function BcJalonQtyMass({ jalonLabel, value, lineCount, onChange, onApply }: BcJalonQtyMassProps) {
+function BcJalonQtyMass({ jalonLabel, value, onChange }: BcJalonQtyMassProps) {
   return (
     <div className="bc-jalon-qty-mass">
       <label className="bc-jalon-qty-mass__field">
@@ -86,14 +99,7 @@ function BcJalonQtyMass({ jalonLabel, value, lineCount, onChange, onApply }: BcJ
           aria-label={`Quantité en masse pour le jalon ${jalonLabel}`}
         />
       </label>
-      <button
-        type="button"
-        className="btn btn-secondary btn-sm bc-jalon-qty-mass__apply"
-        disabled={!value.trim() || lineCount === 0}
-        onClick={onApply}
-      >
-        Appliquer ({lineCount})
-      </button>
+      <span className="bc-jalon-qty-mass__hint">Jalon et lignes</span>
     </div>
   )
 }
@@ -108,9 +114,11 @@ export default function BonCommandeFichePage() {
 
   const [notes, setNotes] = useState('')
   const [contactId, setContactId] = useState<number | null>(null)
+  const [centreGroupId, setCentreGroupId] = useState<number | undefined>(undefined)
   const [qtyEdits, setQtyEdits] = useState<Record<number, string>>({})
   const [prixEdits, setPrixEdits] = useState<Record<number, string>>({})
-  const [confirmAction, setConfirmAction] = useState<'confirmer' | 'bl' | null>(null)
+  const [confirmAction, setConfirmAction] = useState<'confirmer' | null>(null)
+  const [statusOpen, setStatusOpen] = useState(false)
   const [planningToast, setPlanningToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
   const [jalonMassQty, setJalonMassQty] = useState<Record<string, string>>({})
 
@@ -124,6 +132,7 @@ export default function BonCommandeFichePage() {
     if (!bc) return
     setNotes(typeof bc.notes === 'string' ? bc.notes : '')
     setContactId(bc.contact_id ?? null)
+    setCentreGroupId(bc.lab_centre_group_id ?? undefined)
   }, [bc?.id])
 
   const serverLignesKey = useMemo(
@@ -155,7 +164,12 @@ export default function BonCommandeFichePage() {
   }, [bc?.id, serverLignesKey])
 
   const mutUpdate = useMutation({
-    mutationFn: () => bonsCommandeApi.update(bcId, { notes: notes || undefined, contact_id: contactId }),
+    mutationFn: () =>
+      bonsCommandeApi.update(bcId, {
+        notes: notes || undefined,
+        contact_id: contactId,
+        lab_centre_group_id: centreGroupId ?? null,
+      }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
     },
@@ -189,8 +203,8 @@ export default function BonCommandeFichePage() {
 
   const mutQuantites = useMutation({
     mutationFn: async (edits: { qty: Record<number, string>; prix: Record<number, string> }) => {
-      if (!forfaitLignes.length) return
-      for (const l of forfaitLignes) {
+      if (!bc?.lignes?.length) return
+      for (const l of bc.lignes) {
         const body: { quantite?: number; prix_unitaire_ht?: number } = {}
         const rawQty = edits.qty[l.id]
         if (rawQty !== undefined) {
@@ -230,12 +244,32 @@ export default function BonCommandeFichePage() {
     },
   })
 
-  const mutBl = useMutation({
-    mutationFn: () => bonsCommandeApi.transformerBl(bcId),
-    onSuccess: (bl) => {
-      setConfirmAction(null)
+  const mutSaveBc = useMutation({
+    mutationFn: async () => {
+      await mutQuantites.mutateAsync({ qty: qtyEdits, prix: prixEdits })
+      return bonsCommandeApi.update(bcId, {
+        notes,
+        contact_id: contactId,
+        lab_centre_group_id: centreGroupId ?? null,
+        statut: bc?.statut === 'confirme' ? 'en_cours' : bc?.statut,
+      })
+    },
+    onSuccess: () => {
+      setPlanningToast({ message: 'Bon de commande enregistré — statut En cours.', variant: 'success' })
       void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
-      if (bl?.id) navigate(`/bons-livraison/${bl.id}`)
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+    },
+    onError: (err) => {
+      setPlanningToast({ message: toastErrorMessage(err, "Échec de l'enregistrement du bon de commande."), variant: 'error' })
+    },
+  })
+
+  const mutStatus = useMutation({
+    mutationFn: (statut: string) => bonsCommandeApi.update(bcId, { statut }),
+    onSuccess: () => {
+      setStatusOpen(false)
+      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
     },
   })
 
@@ -243,11 +277,12 @@ export default function BonCommandeFichePage() {
     mutationFn: () => ordresMissionApi.generateFromBC(bcId),
     onSuccess: (created) => {
       setPlanningToast({
-        message: `${created.length} ordre(s) de mission généré(s) — visible(s) dans OdM terrain, tâches et planning.`,
+        message: `${created.length} ordre(s) de mission disponible(s). Les quantités déjà couvertes ne sont pas recréées.`,
         variant: 'success',
       })
       void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
       void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
     },
     onError: (err) => {
       setPlanningToast({
@@ -264,14 +299,17 @@ export default function BonCommandeFichePage() {
     [bc?.lignes],
   )
 
-  function applyJalonMassQty(jalonId: string, ligneIds: number[]) {
+  function applyJalonMassQty(rawMassQty: string, ligneIds: number[], forfaitLigneId?: number) {
     const editableIds = filterForfaitBcLigneIds(ligneIds, ligneById, devisDisplayMeta)
-    const lignes = editableIds
+    const targetIds = forfaitLigneId == null
+      ? editableIds
+      : [forfaitLigneId, ...editableIds]
+    const lignes = targetIds
       .map((id) => ligneById.get(id))
       .filter((l): l is BonCommandeLigne => l != null)
     applyMassQtyToLignes(
       lignes,
-      jalonMassQty[jalonId] ?? '',
+      rawMassQty,
       setQtyEdits,
       () => setPlanningToast({ message: 'Quantité en masse invalide.', variant: 'error' }),
       () => mutQuantites.reset(),
@@ -282,8 +320,8 @@ export default function BonCommandeFichePage() {
     [bc?.lignes, devisDisplayMeta],
   )
   const qtyDirty = useMemo(() => {
-    if (!forfaitLignes.length) return false
-    return forfaitLignes.some((l) => {
+    if (!bc?.lignes?.length) return false
+    return (bc.lignes ?? []).some((l) => {
       const rawQty = qtyEdits[l.id]
       if (rawQty !== undefined) {
         const n = Number(String(rawQty).replace(',', '.'))
@@ -298,12 +336,13 @@ export default function BonCommandeFichePage() {
       }
       return false
     })
-  }, [forfaitLignes, qtyEdits, prixEdits])
+  }, [bc?.lignes, qtyEdits, prixEdits])
   const previewTotals = useMemo(() => {
     if (!bc?.lignes?.length) return null
     let ht = 0
     let tva = 0
     for (const l of bc.lignes) {
+      if (isNonBillableForfaitBcLigne(l, devisDisplayMeta)) continue
       const rawQty = qtyEdits[l.id]
       const rawPrix = prixEdits[l.id]
       const qty =
@@ -324,7 +363,7 @@ export default function BonCommandeFichePage() {
       tva: Math.round(tva * 100) / 100,
       ttc: Math.round((ht + tva) * 100) / 100,
     }
-  }, [bc?.lignes, qtyEdits, prixEdits])
+  }, [bc?.lignes, devisDisplayMeta, qtyEdits, prixEdits])
   const bls = bc?.bons_livraison ?? []
   const statutBadge = useMemo(
     () => (bc ? bonCommandeStatutBadgeProps(bc.statut) : null),
@@ -374,7 +413,7 @@ export default function BonCommandeFichePage() {
 
   const isAdmin = user?.role === 'lab_admin'
   const canConfirmer = lab && bc.statut === 'brouillon'
-  const canGenerateBl = lab && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
+  const canSaveBc = lab && (bc.statut === 'confirme' || bc.statut === 'en_cours')
   const canGenerateOm = lab && isAdmin && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
   const hasBonLivraison = (bc.bons_livraison?.length ?? 0) > 0
   const canEditQuantites = lab && forfaitLignes.length > 0 && bc.statut !== 'annule'
@@ -422,9 +461,27 @@ export default function BonCommandeFichePage() {
       subtitle={
         <span className="bc-fiche__subtitle">
           {statutBadge ? (
-            <StatusBadge variant={statutBadge.variant} size="sm">
-              {statutBadge.label}
-            </StatusBadge>
+            lab && bc.statut !== 'annule' ? (
+              <button
+                type="button"
+                className="bc-fiche__status-trigger"
+                onClick={() => setStatusOpen(true)}
+                aria-label={`Modifier le statut du bon de commande : ${statutBadge.label}`}
+                title="Modifier le statut"
+              >
+                <StatusBadge variant={statutBadge.variant} size="sm">{statutBadge.label}</StatusBadge>
+              </button>
+            ) : (
+              <StatusBadge variant={statutBadge.variant} size="sm">{statutBadge.label}</StatusBadge>
+            )
+          ) : null}
+          {bc.avancement_om ? (
+            <span className={`bc-fiche__om-progress bc-fiche__om-progress--${bc.avancement_om.statut}`}>
+              OM : {omProgressLabels[bc.avancement_om.statut] ?? bc.avancement_om.statut}
+              {bc.avancement_om.total > 0
+                ? ` · ${bc.avancement_om.cloturees}/${bc.avancement_om.total} tâches clôturées`
+                : ' · aucune tâche créée'}
+            </span>
           ) : null}
           {bc.client?.name ? (
             <Link to={`/clients/${bc.client_id}`} className="link-inline">
@@ -440,7 +497,7 @@ export default function BonCommandeFichePage() {
               Dossier #{bc.dossier_id}
             </Link>
           )}
-          {bc.dossier?.centre_group ? (
+          {bc.centre_group ?? bc.dossier?.centre_group ? (
             <span
               style={{
                 background: 'var(--color-accent-soft, #e8f4fd)',
@@ -451,7 +508,7 @@ export default function BonCommandeFichePage() {
                 fontWeight: 600,
               }}
             >
-              {bc.dossier.centre_group.name}
+              {(bc.centre_group ?? bc.dossier?.centre_group)?.name}
             </span>
           ) : null}
         </span>
@@ -467,6 +524,45 @@ export default function BonCommandeFichePage() {
               isLab={lab}
               isAdmin={isAdmin}
               hasBonLivraison={hasBonLivraison}
+              hideStatusButton
+              beforeDangerActions={
+                <>
+                  {canConfirmer ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => setConfirmAction('confirmer')}
+                      disabled={mutConfirmer.isPending}
+                    >
+                      Confirmer le BC
+                    </button>
+                  ) : null}
+                  {canSaveBc ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm bc-fiche__save-btn"
+                      onClick={() => mutSaveBc.mutate()}
+                      disabled={mutSaveBc.isPending || mutQuantites.isPending}
+                    >
+                      {mutSaveBc.isPending ? 'Enregistrement…' : 'Enregistrer'}
+                    </button>
+                  ) : null}
+                  {canGenerateOm ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setPlanningToast(null)
+                        mutGenerateOm.mutate()
+                      }}
+                      disabled={mutGenerateOm.isPending || mutSaveBc.isPending || qtyDirty}
+                      title={qtyDirty ? "Enregistrer les quantités avant de générer les OM" : undefined}
+                    >
+                      {mutGenerateOm.isPending ? 'Génération OdM…' : 'Générer tous les OM possibles'}
+                    </button>
+                  ) : null}
+                </>
+              }
               onDeleted={() => navigate('/bons-commande')}
               onStatusChanged={() => {
                 void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
@@ -475,44 +571,6 @@ export default function BonCommandeFichePage() {
                 void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
               }}
             />
-            {canConfirmer ? (
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => setConfirmAction('confirmer')}
-                disabled={mutConfirmer.isPending}
-              >
-                Confirmer le BC
-              </button>
-            ) : null}
-            {canGenerateBl ? (
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setConfirmAction('bl')}
-                disabled={mutBl.isPending}
-              >
-                Générer un BL
-              </button>
-            ) : null}
-            {canGenerateOm ? (
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  setPlanningToast(null)
-                  mutGenerateOm.mutate()
-                }}
-                disabled={mutGenerateOm.isPending}
-              >
-                {mutGenerateOm.isPending ? 'Génération OdM…' : 'Générer OdM terrain'}
-              </button>
-            ) : null}
-            {canGenerateOm ? (
-              <Link to={`/ordres-mission?bon_commande_id=${bc.id}`} className="btn btn-secondary btn-sm">
-                Voir OdM
-              </Link>
-            ) : null}
           </div>
         ) : null
       }
@@ -610,10 +668,10 @@ export default function BonCommandeFichePage() {
                       <tr>
                         <th scope="col">Libellé</th>
                         <th scope="col" className="data-table__num">
-                          Qté devis
+                          Qté BC
                         </th>
                         <th scope="col" className="data-table__num">
-                          Qté BC
+                          Réf. devis
                         </th>
                         <th scope="col" className="data-table__num">
                           PU HT ({MONEY_UNIT_LABEL})
@@ -638,6 +696,17 @@ export default function BonCommandeFichePage() {
                             canEditQuantites &&
                             isForfaitBcJalon(row.jalonId, devisDisplayMeta) &&
                             editableJalonIds.length > 0
+                          const fl = row.forfaitLigne
+                          const flRawQty = fl ? (qtyEdits[fl.id] ?? qtyInputFromApi(fl.quantite)) : null
+                          const flRawPrix = fl ? (prixEdits[fl.id] ?? prixInputFromApi(fl.prix_unitaire_ht)) : null
+                          const flPreviewQty = flRawQty != null ? Number(String(flRawQty).replace(',', '.')) : 0
+                          const flPreviewPrix = flRawPrix != null ? Number(String(flRawPrix).replace(',', '.')) : 0
+                          const flMontant = fl
+                            ? (Number.isFinite(flPreviewQty) && Number.isFinite(flPreviewPrix)
+                              ? Math.round(flPreviewQty * flPreviewPrix * 100) / 100
+                              : Number(fl.montant_ht))
+                            : null
+                          const flMaxDevis = fl ? resolveQuantiteDevis(fl) : null
                           return (
                             <tr key={row.key} className="bc-lignes-table__jalon">
                               <td className="bc-lignes-table__jalon-label">
@@ -648,23 +717,75 @@ export default function BonCommandeFichePage() {
                                   </>
                                 ) : null}
                                 {row.label}
-                              </td>
-                              <td className="data-table__num bc-lignes-table__qty-devis" aria-hidden="true">
-                                —
-                              </td>
-                              <td colSpan={4} className="data-table__num bc-lignes-table__jalon-mass">
+                                {fl?.om_quantites && Object.entries(fl.om_quantites).map(([type, covered]) => (
+                                  <span key={type} className="bc-lignes-table__om-badge">
+                                    OM {type === 'technicien' ? 'terrain' : type === 'ingenieur' ? 'ingénieur' : 'labo'} :{' '}
+                                    {formatQuantity(covered)}/{formatQuantity(fl.quantite)}
+                                  </span>
+                                ))}
                                 {showJalonMassQty ? (
-                                  <BcJalonQtyMass
-                                    jalonLabel={row.label}
-                                    value={jalonMassQty[row.jalonId] ?? ''}
-                                    lineCount={editableJalonIds.length}
-                                    onChange={(value) =>
-                                      setJalonMassQty((prev) => ({ ...prev, [row.jalonId]: value }))
-                                    }
-                                    onApply={() => applyJalonMassQty(row.jalonId, row.ligneIds)}
-                                  />
+                                  <div style={{ marginTop: '0.4rem' }}>
+                                    <BcJalonQtyMass
+                                      jalonLabel={row.label}
+                                      value={jalonMassQty[row.jalonId] ?? ''}
+                                      onChange={(value) => {
+                                        setJalonMassQty((prev) => ({ ...prev, [row.jalonId]: value }))
+                                        applyJalonMassQty(value, row.ligneIds, row.forfaitLigne?.id)
+                                      }}
+                                    />
+                                  </div>
                                 ) : null}
                               </td>
+                              {fl && flRawQty != null && flRawPrix != null ? (
+                                <>
+                                  <td className="data-table__num bc-lignes-table__qty-cell">
+                                    {canEditQuantites ? (
+                                      <input
+                                        type="number"
+                                        className="bc-lignes-table__qty-input"
+                                        min={0}
+                                        step="any"
+                                        inputMode="decimal"
+                                        value={flRawQty}
+                                        onChange={(e) => {
+                                          mutQuantites.reset()
+                                          setQtyEdits((s) => ({ ...s, [fl.id]: e.target.value }))
+                                        }}
+                                        aria-label={`Quantité pour ${row.label}`}
+                                      />
+                                    ) : formatQuantity(fl.quantite)}
+                                  </td>
+                                  <td className="data-table__num bc-lignes-table__qty-devis">
+                                    {flMaxDevis != null ? formatQuantity(flMaxDevis) : '—'}
+                                  </td>
+                                  <td className="data-table__num bc-lignes-table__prix-cell">
+                                    {canEditQuantites ? (
+                                      <input
+                                        type="number"
+                                        className="bc-lignes-table__qty-input"
+                                        min={0}
+                                        step="any"
+                                        inputMode="decimal"
+                                        value={flRawPrix}
+                                        onChange={(e) => {
+                                          mutQuantites.reset()
+                                          setPrixEdits((s) => ({ ...s, [fl.id]: e.target.value }))
+                                        }}
+                                        aria-label={`Prix pour ${row.label}`}
+                                      />
+                                    ) : formatMoney(Number(fl.prix_unitaire_ht))}
+                                  </td>
+                                  <td className="data-table__num bc-lignes-table__tva-cell">
+                                    {Number(fl.tva_rate) > 0 ? `${Number(fl.tva_rate)} %` : '—'}
+                                  </td>
+                                  <td className="data-table__num">{formatMoney(flMontant ?? 0)}</td>
+                                </>
+                              ) : (
+                                <>
+                                  <td colSpan={4} />
+                                  <td />
+                                </>
+                              )}
                             </tr>
                           )
                         }
@@ -684,35 +805,36 @@ export default function BonCommandeFichePage() {
                             key={row.key}
                             className={row.nested ? 'bc-lignes-table__product--nested' : undefined}
                           >
-                            <td>{l.libelle}</td>
-                            <td className="data-table__num bc-lignes-table__qty-devis">
-                              {maxDevis != null ? formatQuantity(maxDevis) : '—'}
+                            <td>
+                              {l.libelle}
+                              {l.om_quantites && Object.entries(l.om_quantites).map(([type, covered]) => (
+                                <span key={type} className="bc-lignes-table__om-badge">
+                                  OM {type === 'technicien' ? 'terrain' : type === 'ingenieur' ? 'ingénieur' : 'labo'} :{' '}
+                                  {formatQuantity(covered)}/{formatQuantity(l.quantite)}
+                                </span>
+                              ))}
                             </td>
                             <td className="data-table__num bc-lignes-table__qty-cell">
                               {canEditQty ? (
-                                <div className="bc-lignes-table__qty-editor">
-                                  <input
-                                    type="number"
-                                    className="bc-lignes-table__qty-input"
-                                    min={0}
-                                    step="any"
-                                    inputMode="decimal"
-                                    value={rawQty}
-                                    onChange={(e) => {
-                                      mutQuantites.reset()
-                                      setQtyEdits((s) => ({ ...s, [l.id]: e.target.value }))
-                                    }}
-                                    aria-label={`Quantité BC pour ${l.libelle}`}
-                                  />
-                                  {maxDevis != null ? (
-                                    <span className="bc-lignes-table__qty-cap text-muted">
-                                      devis : {formatQuantity(maxDevis)}
-                                    </span>
-                                  ) : null}
-                                </div>
+                                <input
+                                  type="number"
+                                  className="bc-lignes-table__qty-input"
+                                  min={0}
+                                  step="any"
+                                  inputMode="decimal"
+                                  value={rawQty}
+                                  onChange={(e) => {
+                                    mutQuantites.reset()
+                                    setQtyEdits((s) => ({ ...s, [l.id]: e.target.value }))
+                                  }}
+                                  aria-label={`Quantité BC pour ${l.libelle}`}
+                                />
                               ) : (
                                 formatQuantity(l.quantite)
                               )}
+                            </td>
+                            <td className="data-table__num bc-lignes-table__qty-devis">
+                              {maxDevis != null ? formatQuantity(maxDevis) : '—'}
                             </td>
                             <td className="data-table__num bc-lignes-table__prix-cell">
                               {canEditQty ? (
@@ -808,6 +930,27 @@ export default function BonCommandeFichePage() {
 
             {lab ? (
               <section className="card bc-fiche__aside-panel">
+                <h2 className="ds-form-section__title">Centre</h2>
+                <CentreGroupField
+                  id="bc-centre-field"
+                  value={centreGroupId}
+                  onChange={(id) => setCentreGroupId(id)}
+                />
+                <div className="bc-fiche__aside-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => mutUpdate.mutate()}
+                    disabled={mutUpdate.isPending}
+                  >
+                    {mutUpdate.isPending ? 'Enregistrement…' : 'Enregistrer le centre'}
+                  </button>
+                </div>
+              </section>
+            ) : null}
+
+            {lab ? (
+              <section className="card bc-fiche__aside-panel">
                 <h2 className="ds-form-section__title">Notes internes</h2>
                 <label className="form-group">
                   Notes laboratoire
@@ -850,14 +993,6 @@ export default function BonCommandeFichePage() {
                     )
                   })}
                 </ul>
-                {mutBl.data?.id ? (
-                  <p className="text-muted bc-fiche__bl-created">
-                    Dernier BL créé :{' '}
-                    <Link to={`/bons-livraison/${mutBl.data.id}`} className="link-inline">
-                      {mutBl.data.numero}
-                    </Link>
-                  </p>
-                ) : null}
               </section>
             ) : null}
 
@@ -881,6 +1016,18 @@ export default function BonCommandeFichePage() {
         </div>
       </div>
 
+      {statusOpen ? (
+        <StatusChangeModal
+          title={`Statut — ${bc.numero}`}
+          initialValue={bc.statut}
+          options={commercialDocumentStatusOptions('bon_commande')}
+          isPending={mutStatus.isPending}
+          error={mutStatus.isError ? (mutStatus.error as Error).message : null}
+          onClose={() => setStatusOpen(false)}
+          onSave={(next) => mutStatus.mutate(next)}
+        />
+      ) : null}
+
       {confirmAction === 'confirmer' ? (
         <ConfirmDialog
           title="Confirmer le bon de commande"
@@ -896,24 +1043,6 @@ export default function BonCommandeFichePage() {
           onConfirm={() => mutConfirmer.mutate()}
           onCancel={() => {
             if (!mutConfirmer.isPending) setConfirmAction(null)
-          }}
-        />
-      ) : null}
-
-      {confirmAction === 'bl' ? (
-        <ConfirmDialog
-          title="Générer un bon de livraison"
-          message={
-            <>
-              Créer un bon de livraison (BLC) à partir du BC <strong>{bc.numero}</strong> ?
-            </>
-          }
-          confirmLabel="Générer le BL"
-          loading={mutBl.isPending}
-          error={mutBl.isError ? (mutBl.error as Error).message : null}
-          onConfirm={() => mutBl.mutate()}
-          onCancel={() => {
-            if (!mutBl.isPending) setConfirmAction(null)
           }}
         />
       ) : null}

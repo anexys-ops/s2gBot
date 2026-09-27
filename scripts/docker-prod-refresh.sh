@@ -93,7 +93,13 @@ for attempt in $(seq 1 "$build_attempts"); do
 done
 
 echo "=== 5/7 Démarrage app + web ==="
-"${DC[@]}" up -d app web
+if ! "${DC[@]}" up -d app web; then
+  echo "❌ Démarrage app/web échoué. État des conteneurs :" >&2
+  "${DC[@]}" ps >&2 || true
+  echo "--- Dernières lignes du conteneur app ---" >&2
+  "${DC[@]}" logs --tail=120 app >&2 || true
+  exit 1
+fi
 
 echo "=== 6/7 Attente du conteneur app puis migrations + config Laravel ==="
 # migrate --force : appliqué ici (complète docker-entrypoint au boot) — ne pas retirer (déploiement / prod).

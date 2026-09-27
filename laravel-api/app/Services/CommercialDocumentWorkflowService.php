@@ -7,6 +7,7 @@ use App\Models\BonCommandeLigne;
 use App\Models\BonLivraison;
 use App\Models\BonLivraisonLigne;
 use App\Models\DocumentSequence;
+use App\Models\Dossier;
 use App\Models\Quote;
 use App\Models\QuoteLine;
 use App\Models\User;
@@ -16,7 +17,8 @@ use Illuminate\Support\Facades\DB;
 class CommercialDocumentWorkflowService
 {
     public function __construct(
-        private readonly DocumentSequenceService $sequences
+        private readonly DocumentSequenceService $sequences,
+        private readonly BonCommandeTotalsService $bonCommandeTotals,
     ) {}
 
     public function createBonCommandeFromQuote(Quote $quote, User $user): BonCommande
@@ -37,10 +39,14 @@ class CommercialDocumentWorkflowService
                 ClientFilialeResolver::codeForQuote($quote),
             );
 
+            $centreGroupId = $quote->lab_centre_group_id
+                ?: Dossier::query()->whereKey($quote->dossier_id)->value('lab_centre_group_id');
+
             $bc = BonCommande::query()->create([
                 'numero' => $numero,
                 'quote_id' => $quote->id,
                 'dossier_id' => $quote->dossier_id,
+                'lab_centre_group_id' => $centreGroupId ?: null,
                 'client_id' => $quote->client_id,
                 'contact_id' => $quote->contact_id,
                 'statut' => BonCommande::STATUT_BROUILLON,
@@ -116,6 +122,8 @@ class CommercialDocumentWorkflowService
             $meta['bon_commande_ids'] = array_values(array_unique([...$existingIds, $bc->id]));
             $meta['transforme_bc_at'] = now()->toIso8601String();
             $quote->update(['meta' => $meta]);
+
+            $this->bonCommandeTotals->synchronize($bc);
 
             return $bc->load('lignes');
         });

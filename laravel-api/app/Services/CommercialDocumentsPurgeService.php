@@ -61,6 +61,11 @@ class CommercialDocumentsPurgeService
      */
     private function purgePlanningMissionTasks(bool $dryRun, array &$counts): void
     {
+        $counts['planning_events (mission tasks)'] = $this->deleteTable(
+            'planning_events',
+            $dryRun,
+            fn ($q) => $q->whereNotNull('mission_task_id')
+        );
         $counts['planning_humans (mission tasks)'] = $this->deleteTable(
             'planning_humans',
             $dryRun,
@@ -84,6 +89,8 @@ class CommercialDocumentsPurgeService
                 ->count();
             if (! $dryRun && $counts['materiel_affectations (ordre_mission_id nulled)'] > 0) {
                 DB::table('materiel_affectations')->whereNotNull('ordre_mission_id')->update(['ordre_mission_id' => null]);
+                DB::table('planning_events')->where('source_type', 'materiel_affectation')
+                    ->whereNotNull('ordre_mission_id')->update(['ordre_mission_id' => null]);
             }
         }
 

@@ -7,10 +7,12 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   missionTasksApi,
+  taskTestFormsApi,
   type ActionMeasureConfig,
   type MissionTask,
 } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import TaskTestFormResults from '../../components/tasks/TaskTestFormResults'
 import { taskDisplayName } from './TerrainTasksHistoryPanel'
 import {
   MESURE_STATUT_META,
@@ -188,8 +190,18 @@ function TaskMeasureDetail({ task, onClose }: { task: MissionTask; onClose: () =
     }
     return existing
   })
-  const [activeTab, setActiveTab] = useState<'geotechnique' | 'graphique' | 'data'>('geotechnique')
+  const [activeTab, setActiveTab] = useState<'geotechnique' | 'graphique' | 'data' | 'essais'>('geotechnique')
   const qc = useQueryClient()
+  const { data: taskForms } = useQuery({
+    queryKey: ['task-test-forms', task.id],
+    queryFn: () => taskTestFormsApi.list(task.id),
+  })
+  const openFormPhoto = async (photoId: number) => {
+    const blob = await taskTestFormsApi.photo(photoId)
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank', 'noopener,noreferrer')
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  }
 
   const configs = measureConfigs(task)
   const { geotechnique, graphique, data: dataFields } = categorizeMeasureConfigs(configs)
@@ -242,11 +254,12 @@ function TaskMeasureDetail({ task, onClose }: { task: MissionTask; onClose: () =
 
       <div className="terrain-mesures-detail__meta">
         <StatutBadge statut={statut} />
-        <ProgressBar pct={progress.pct} complete={progress.pct === 100} />
-        <span className="text-muted">
-          {progress.filled}/{progress.total} champs remplis
-          {progress.required > 0 && ` (${progress.requiredFilled}/${progress.required} obligatoires)`}
-        </span>
+        {progress.total > 0 && <><ProgressBar pct={progress.pct} complete={progress.pct === 100} />
+          <span className="text-muted">
+            {progress.filled}/{progress.total} champs remplis
+            {progress.required > 0 && ` (${progress.requiredFilled}/${progress.required} obligatoires)`}
+          </span></>}
+        {(task.test_forms_count ?? taskForms?.forms.length ?? 0) > 0 && <span className="text-muted">{task.test_forms_count ?? taskForms?.forms.length} formulaire(s) d’essai</span>}
         {task.started_at && (
           <span className="text-muted">Démarrée {formatDateTime(task.started_at)}</span>
         )}
@@ -323,6 +336,7 @@ function TaskMeasureDetail({ task, onClose }: { task: MissionTask; onClose: () =
           ['geotechnique', 'Géotechnique', geotechnique.length],
           ['graphique', 'Graphiques & fichiers', graphique.length],
           ['data', 'Données (app / manuel)', dataFields.length],
+          ['essais', 'Essais et résultats', taskForms?.forms?.length ?? 0],
         ] as const).map(([id, label, count]) => (
           <button
             key={id}
@@ -382,6 +396,10 @@ function TaskMeasureDetail({ task, onClose }: { task: MissionTask; onClose: () =
           )}
         </>
       )}
+
+      {activeTab === 'essais' && <section className="card" style={{ padding: '1rem' }}>
+        <TaskTestFormResults forms={taskForms?.forms ?? []} onOpenPhoto={(photoId) => void openFormPhoto(photoId)} />
+      </section>}
 
       {editable && configs.length > 0 && (
         <form
@@ -490,7 +508,7 @@ function DossierRecapRow({
             <td>{formatDate(task.planned_date ?? task.due_date)}</td>
             <td>{task.assignedUser?.name ?? '—'}</td>
             <td>
-              <ProgressBar pct={p.pct} complete={p.pct === 100} />
+              {p.total > 0 ? <ProgressBar pct={p.pct} complete={p.pct === 100} /> : <span className="text-muted">{task.test_forms_count ?? 0} formulaire(s) d’essai</span>}
             </td>
             <td><StatutBadge statut={statut} /></td>
             <td className="terrain-mesures-table__chevron">→</td>
@@ -563,7 +581,7 @@ export default function TerrainMesuresPage() {
         title="Mesures terrain"
         subtitle={selectedTask.ordreMissionLigne?.ordreMission?.dossier?.reference ?? 'Détail tâche'}
       >
-        <TaskMeasureDetail task={selectedTask} onClose={closeTask} />
+        <TaskMeasureDetail key={selectedTask.id} task={selectedTask} onClose={closeTask} />
       </ModuleEntityShell>
     )
   }

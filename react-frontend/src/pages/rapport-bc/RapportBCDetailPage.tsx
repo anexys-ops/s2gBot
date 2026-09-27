@@ -111,6 +111,11 @@ export default function RapportBCDetailPage() {
     },
   })
 
+  const addMeasurementsPdfMut = useMutation({
+    mutationFn: (taskId: number) => rapportBCApi.addTaskMeasurementsPdf(rapportId, taskId),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['rapport-bc', rapportId] }),
+  })
+
   const deleteVersionMut = useMutation({
     mutationFn: (versionId: number) => rapportBCApi.deleteVersion(rapportId, versionId),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['rapport-bc', rapportId] }),
@@ -309,12 +314,14 @@ export default function RapportBCDetailPage() {
           {recap && recap.taches.length === 0 && <div style={{ color: '#9ca3af', fontSize: '0.85rem' }}>Aucune tâche sélectionnée.</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {recap?.taches.map((t: RapportBCTask) => (
-              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', padding: '4px 0', borderBottom: '1px solid #f3f4f6' }}>
+              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: '0.85rem', padding: '4px 0', borderBottom: '1px solid #f3f4f6' }}>
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.libelle ?? `Tâche #${t.id}`}</span>
                 <TaskStatutBadge statut={t.statut} />
+                {(t.measurements_count ?? 0) > 0 && <button type="button" className="btn btn-secondary btn-sm" disabled={addMeasurementsPdfMut.isPending} onClick={() => addMeasurementsPdfMut.mutate(t.id)} title="Créer un PDF des mesures de cette tâche et l’ajouter aux versions du rapport">Ajouter les mesures PDF</button>}
               </div>
             ))}
           </div>
+          {addMeasurementsPdfMut.isError && <p className="error">{(addMeasurementsPdfMut.error as Error).message}</p>}
           {recap && (
             <div style={{ marginTop: 12, fontSize: '0.78rem', color: '#6b7280', borderTop: '1px solid #e5e7eb', paddingTop: 8 }}>
               {Object.entries(recap.bc_statuts).map(([s, count]) => (

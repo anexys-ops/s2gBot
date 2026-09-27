@@ -6,6 +6,7 @@ import {
   filterForfaitBcLignes,
   isForfaitBcJalon,
   isForfaitBcLigne,
+  isNonBillableForfaitBcLigne,
   qtyExceedsDevis,
   resolveDevisDisplayMeta,
 } from './bcLigneDisplay'
@@ -90,6 +91,17 @@ describe('forfait bc lignes', () => {
     }
     const lignes = [line(1, 101, 0), line(2, 200, 1), line(3, null, 2)]
     expect(filterForfaitBcLignes(lignes, meta).map((l) => l.id)).toEqual([1])
+  })
+
+  it('excludes forfait detail lines from BC totals', () => {
+    const meta = {
+      devis_jalons: [
+        { id: 'acier', libelle: 'Essais sur aciers', mode: 'forfait', product_ref_article_ids: [101] },
+      ],
+    }
+    expect(isNonBillableForfaitBcLigne(line(1, 101, 0), meta)).toBe(true)
+    expect(isNonBillableForfaitBcLigne(line(2, 202, 1), meta)).toBe(false)
+    expect(isNonBillableForfaitBcLigne(line(3, null, 2), meta)).toBe(false)
   })
 })
 

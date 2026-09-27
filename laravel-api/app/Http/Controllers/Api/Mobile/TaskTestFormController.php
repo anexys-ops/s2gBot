@@ -27,43 +27,76 @@ class TaskTestFormController extends Controller
         private readonly DynamicTestFormService $dynamicForms,
     ) {}
 
-    /** Liste tous les formulaires d'essai (tous chantiers/tâches), pour le suivi labo. */
+    /**
+     * Liste toutes les paires (tâche, essai assigné à son produit) pour le suivi labo —
+     * y compris les essais pas encore commencés (aucun TaskTestForm créé), avec un statut
+     * virtuel "not_started" côté frontend, sinon on ne verrait que les essais déjà touchés
+     * au moins une fois (via l'appli mobile ou ce même écran).
+     */
     public function indexAll(Request $request): JsonResponse
     {
         abort_unless($request->user()->isLab() || $request->user()->canValidateStatus(), 403);
         $data = $request->validate([
-            'status' => 'nullable|in:draft,submitted,correction_requested,validated',
+            'status' => 'nullable|in:not_started,draft,submitted,correction_requested,validated',
             'context' => 'nullable|in:terrain,ingenieur,labo',
             'page' => 'nullable|integer|min:1',
         ]);
 
-        $query = TaskTestForm::query()
-            ->with([
-                'testType:id,name,norm,context',
-                'missionTask:id,unique_number,assigned_user_id,ordre_mission_ligne_id',
-                'missionTask.assignedUser:id,name',
-                'missionTask.ordreMissionLigne:id,ordre_mission_id',
-                'missionTask.ordreMissionLigne.ordreMission:id,client_id,site_id,dossier_id',
-                'missionTask.ordreMissionLigne.ordreMission.client:id,name',
-                'missionTask.ordreMissionLigne.ordreMission.site:id,name',
-                'missionTask.ordreMissionLigne.ordreMission.dossier:id,reference',
-            ])
-            ->when($data['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
-            ->when($data['context'] ?? null, fn ($q, $context) => $q->whereHas('testType', fn ($qq) => $qq->where('context', $context)))
-            ->orderByDesc('updated_at');
+        $pairs = DB::table('article_test_type as att')
+            ->join('ordre_mission_lignes as oml', function ($join) {
+                $join->on('oml.ref_article_id', '=', 'att.ref_article_id')
+                    ->where(function ($q) {
+                        $q->whereColumn('oml.article_action_id', 'att.article_action_id')
+                            ->orWhereNull('att.article_action_id');
+                    });
+            })
+            ->join('mission_tasks as mt', 'mt.ordre_mission_ligne_id', '=', 'oml.id')
+            ->join('ordres_mission as om', 'om.id', '=', 'oml.ordre_mission_id')
+            ->join('test_types as tt', 'tt.id', '=', 'att.test_type_id')
+            ->leftJoin('task_test_forms as ttf', function ($join) {
+                $join->on('ttf.mission_task_id', '=', 'mt.id')->on('ttf.test_type_id', '=', 'att.test_type_id');
+            })
+            ->whereNull('mt.deleted_at')
+            ->where(function ($q) {
+                $q->whereNull('tt.context')
+                    ->orWhere(fn ($q2) => $q2->where('tt.context', 'terrain')->where('om.type', 'technicien'))
+                    ->orWhere(fn ($q2) => $q2->where('tt.context', 'ingenieur')->where('om.type', 'ingenieur'))
+                    ->orWhere(fn ($q2) => $q2->where('tt.context', 'labo')->where('om.type', 'labo'));
+            })
+            ->when($data['context'] ?? null, fn ($q, $context) => $q->where('tt.context', $context))
+            ->when(($data['status'] ?? null) === 'not_started', fn ($q) => $q->whereNull('ttf.id'))
+            ->when(in_array($data['status'] ?? null, ['draft', 'submitted', 'correction_requested', 'validated'], true),
+                fn ($q) => $q->where('ttf.status', $data['status']))
+            ->selectRaw('mt.id as task_id, att.test_type_id, ttf.id as form_id, ttf.status as form_status, COALESCE(ttf.updated_at, mt.updated_at) as sort_date')
+            ->distinct()
+            ->orderByDesc('sort_date');
 
-        $forms = $query->paginate(30, page: $data['page'] ?? 1);
+        $page = $data['page'] ?? 1;
+        $perPage = 30;
+        $total = (clone $pairs)->get()->count();
+        $rows = $pairs->forPage($page, $perPage)->get();
 
-        $forms->getCollection()->transform(function (TaskTestForm $form) {
-            $task = $form->missionTask;
+        $taskIds = $rows->pluck('task_id')->unique()->values();
+        $typeIds = $rows->pluck('test_type_id')->unique()->values();
+
+        $tasks = MissionTask::query()->whereIn('id', $taskIds)->with([
+            'assignedUser:id,name',
+            'ordreMissionLigne:id,ordre_mission_id',
+            'ordreMissionLigne.ordreMission:id,client_id,site_id,dossier_id',
+            'ordreMissionLigne.ordreMission.client:id,name',
+            'ordreMissionLigne.ordreMission.site:id,name',
+            'ordreMissionLigne.ordreMission.dossier:id,reference',
+        ])->get()->keyBy('id');
+        $types = TestType::query()->whereIn('id', $typeIds)->get(['id', 'name', 'norm', 'context'])->keyBy('id');
+
+        $items = $rows->map(function ($row) use ($tasks, $types) {
+            $task = $tasks->get($row->task_id);
             $om = $task?->ordreMissionLigne?->ordreMission;
 
             return [
-                'id' => $form->id,
-                'status' => $form->status,
-                'submitted_at' => $form->submitted_at,
-                'updated_at' => $form->updated_at,
-                'test_type' => $form->testType?->only(['id', 'name', 'norm', 'context']),
+                'id' => $row->form_id ?? "pending-{$row->task_id}-{$row->test_type_id}",
+                'status' => $row->form_status ?? 'not_started',
+                'test_type' => $types->get($row->test_type_id)?->only(['id', 'name', 'norm', 'context']),
                 'task' => $task ? [
                     'id' => $task->id,
                     'unique_number' => $task->unique_number,
@@ -72,10 +105,17 @@ class TaskTestFormController extends Controller
                 'client' => $om?->client?->name,
                 'chantier' => $om?->site?->name,
                 'dossier' => $om?->dossier?->reference,
+                'updated_at' => $row->sort_date,
             ];
-        });
+        })->values();
 
-        return response()->json($forms);
+        return response()->json([
+            'data' => $items,
+            'current_page' => $page,
+            'last_page' => (int) max(1, ceil($total / $perPage)),
+            'per_page' => $perPage,
+            'total' => $total,
+        ]);
     }
 
     public function index(Request $request, MissionTask $task): JsonResponse

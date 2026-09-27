@@ -25,7 +25,21 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
     enabled: bcId > 0,
   })
 
-  const jalons = data?.jalons ?? []
+  const allLignes = data?.jalons ?? []
+
+  const groupedByJalon = useMemo(() => {
+    const groups: Record<string, typeof allLignes> = {}
+    allLignes.forEach(ligne => {
+      const jalonName = ligne.libelle || 'Sans jalon'
+      if (!groups[jalonName]) groups[jalonName] = []
+      groups[jalonName].push(ligne)
+    })
+    return Object.entries(groups).map(([name, lignes]) => ({
+      name,
+      lignes,
+      id: `jalon-${name}`,
+    }))
+  }, [allLignes])
 
   useEffect(() => {
     const container = scrollContainerRef.current
@@ -33,16 +47,16 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
 
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container
-      if (scrollHeight - scrollTop - clientHeight < 200 && displayCount < jalons.length) {
-        setDisplayCount(prev => Math.min(prev + 10, jalons.length))
+      if (scrollHeight - scrollTop - clientHeight < 200 && displayCount < groupedByJalon.length) {
+        setDisplayCount(prev => Math.min(prev + 10, groupedByJalon.length))
       }
     }
 
     container.addEventListener('scroll', handleScroll)
     return () => container.removeEventListener('scroll', handleScroll)
-  }, [displayCount, jalons.length])
+  }, [displayCount, groupedByJalon.length])
 
-  const displayedJalons = jalons.slice(0, displayCount)
+  const displayedJalons = groupedByJalon.slice(0, displayCount)
 
   const generateMut = useMutation({
     mutationFn: () => {
@@ -109,7 +123,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
     )
   }
 
-  if (jalons.length === 0) {
+  if (allLignes.length === 0) {
     return (
       <Modal title="Générer ordres de mission — Sélection des jalons" onClose={onClose}>
         <p className="text-muted">Ce bon de commande ne contient aucune ligne.</p>
@@ -121,62 +135,36 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
     <Modal size="xl" title="Générer ordres de mission — Sélection des jalons" onClose={() => { if (!generateMut.isPending) onClose() }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {/* Liste des jalons dépliables */}
-        <div ref={scrollContainerRef} style={{ maxHeight: '600px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {displayedJalons.map((jalon) => {
-            const isExpanded = expandedJalons.has(jalon.id)
-            const selectedQty = selections.get(jalon.id) ?? 0
-            const isSelected = selectedQty > 0
-            const canSelect = jalon.quantite_restante > 0
+        <div ref={scrollContainerRef} style={{ maxHeight: '600px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {displayedJalons.map((jalonGroup) => {
+            const isJalonExpanded = expandedJalons.has(jalonGroup.id)
+            const jalonTotalQty = jalonGroup.lignes.reduce((sum, l) => sum + (selections.get(l.id) ?? 0), 0)
+            const jalonQtyBc = jalonGroup.lignes.reduce((sum, l) => sum + l.quantite_totale, 0)
+            const jalonQtyOm = jalonGroup.lignes.reduce((sum, l) => sum + l.quantite_generee, 0)
+            const jalonSelected = jalonTotalQty > 0
 
             return (
-              <div
-                key={jalon.id}
-                style={{
-                  borderRadius: 6,
-                  border: `1px solid ${isSelected ? '#3b82f6' : '#e5e7eb'}`,
-                  background: isSelected ? '#eff6ff' : '#f9fafb',
-                }}
-              >
-                {/* En-tête jalon */}
+              <div key={jalonGroup.id}>
+                {/* NIVEAU 1: JALON */}
                 <div
                   style={{
-                    width: '100%',
+                    borderRadius: 6,
+                    border: `1px solid ${jalonSelected ? '#3b82f6' : '#e5e7eb'}`,
+                    background: jalonSelected ? '#eff6ff' : '#f9fafb',
                     padding: '0.75rem',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.75rem',
                     justifyContent: 'space-between',
-                    textAlign: 'left',
                     minHeight: '55px',
                     boxSizing: 'border-box',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
-                    {/* Checkbox */}
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          updateQuantite(jalon.id, 1)
-                          toggleJalon(jalon.id)
-                        } else {
-                          updateQuantite(jalon.id, 0)
-                        }
-                      }}
-                      style={{
-                        width: '1.2rem',
-                        height: '1.2rem',
-                        cursor: 'pointer',
-                        flexShrink: 0,
-                        accentColor: '#3b82f6',
-                      }}
-                    />
-
                     {/* Expand button */}
                     <button
                       type="button"
-                      onClick={() => toggleJalon(jalon.id)}
+                      onClick={() => toggleJalon(jalonGroup.id)}
                       style={{
                         background: 'transparent',
                         border: 'none',
@@ -191,92 +179,111 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}
-                      title={isExpanded ? 'Replier' : 'Déplie'}
                     >
-                      {isExpanded ? '▼' : '▶'}
+                      {isJalonExpanded ? '▼' : '▶'}
                     </button>
-
-                    {/* Jalon info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#1f2937' }}>
-                        {jalon.article ? (
-                          <>
-                            <span style={{ color: '#6b7280', fontSize: '0.85rem' }}>
-                              [{jalon.article.code}]
-                            </span>{' '}
-                            {jalon.article.libelle}
-                          </>
-                        ) : (
-                          jalon.libelle
-                        )}
+                      <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1f2937' }}>
+                        📋 {jalonGroup.name}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                        BC: <strong>{formatQuantity(jalon.quantite_totale)}</strong> • OM: <strong>{formatQuantity(jalon.quantite_generee ?? 0)}</strong> • Reste: <strong style={{ color: canSelect ? '#dc2626' : '#9ca3af' }}>{formatQuantity(jalon.quantite_restante)}</strong>
+                        BC: <strong>{formatQuantity(jalonQtyBc)}</strong> • OM: <strong>{formatQuantity(jalonQtyOm)}</strong> • Reste: <strong>{formatQuantity(Math.max(0, jalonQtyBc - jalonQtyOm))}</strong>
                       </div>
                     </div>
                   </div>
-
-                  {isSelected && (
+                  {jalonSelected && (
                     <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#3b82f6', whiteSpace: 'nowrap' }}>
-                      ✓ {formatQuantity(selectedQty)}
+                      ✓ {formatQuantity(jalonTotalQty)}
                     </span>
                   )}
                 </div>
 
-                {/* Contenu dépliable */}
-                {isExpanded && (
-                  <div style={{ padding: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid #e5e7eb', background: '#fafbfc' }}>
-                    <div style={{ marginBottom: '1rem' }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 500, color: '#374151', marginBottom: '0.5rem' }}>
-                        📦 {jalon.article?.libelle || 'Article'}
-                      </div>
-                      <div style={{ fontSize: '0.8rem', color: '#6b7280', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                        <div>BC: {formatQuantity(jalon.quantite_totale)}</div>
-                        <div>OM: {formatQuantity(jalon.quantite_generee ?? 0)}</div>
-                        <div style={{ gridColumn: '1 / -1' }}>Disponible: <strong style={{ color: '#10b981' }}>{formatQuantity(jalon.quantite_restante)}</strong></div>
-                      </div>
-                    </div>
+                {/* NIVEAU 2: PRODUITS DU JALON */}
+                {isJalonExpanded && (
+                  <div style={{ marginTop: '0.5rem', paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {jalonGroup.lignes.map((ligne) => {
+                      const selectedQty = selections.get(ligne.id) ?? 0
+                      const isLineSelected = selectedQty > 0
+                      const canSelect = ligne.quantite_restante > 0
 
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#374151' }}>
-                        Quantité à générer
-                      </span>
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <input
-                          type="number"
-                          min={0}
-                          max={jalon.quantite_restante}
-                          value={selectedQty}
-                          onChange={(e) => updateQuantite(jalon.id, Number(e.target.value) || 0)}
-                          placeholder="0"
+                      return (
+                        <div
+                          key={ligne.id}
                           style={{
-                            flex: 1,
-                            padding: '0.5rem 0.75rem',
                             borderRadius: 4,
-                            border: '1px solid #d1d5db',
-                            fontSize: '0.9rem',
-                            fontFamily: 'inherit',
+                            border: `1px solid ${isLineSelected ? '#10b981' : '#d1d5db'}`,
+                            background: isLineSelected ? '#f0fdf4' : '#ffffff',
+                            padding: '0.6rem 0.75rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            justifyContent: 'space-between',
                           }}
-                        />
-                        <span style={{ fontSize: '0.8rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
-                          / {formatQuantity(jalon.quantite_restante)}
-                        </span>
-                      </div>
-                    </label>
-
-                    {selectedQty > 0 && (
-                      <div style={{ marginTop: '0.75rem', padding: '0.5rem', borderRadius: 3, background: '#dcfce7', fontSize: '0.8rem', color: '#166534', fontWeight: 500 }}>
-                        ✓ Inclus dans la génération
-                      </div>
-                    )}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                            {/* Checkbox */}
+                            <input
+                              type="checkbox"
+                              checked={isLineSelected}
+                              onChange={(e) => {
+                                updateQuantite(ligne.id, e.target.checked ? 1 : 0)
+                              }}
+                              style={{
+                                width: '1.1rem',
+                                height: '1.1rem',
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                                accentColor: '#10b981',
+                              }}
+                            />
+                            {/* Produit info */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 500, fontSize: '0.9rem', color: '#1f2937' }}>
+                                {ligne.article ? (
+                                  <>
+                                    <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>
+                                      [{ligne.article.code}]
+                                    </span>{' '}
+                                    {ligne.article.libelle}
+                                  </>
+                                ) : (
+                                  'Article'
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.15rem' }}>
+                                BC: {formatQuantity(ligne.quantite_totale)} | OM: {formatQuantity(ligne.quantite_generee ?? 0)} | Dispo: <strong style={{ color: canSelect ? '#dc2626' : '#9ca3af' }}>{formatQuantity(ligne.quantite_restante)}</strong>
+                              </div>
+                            </div>
+                          </div>
+                          {/* Champ quantité */}
+                          <input
+                            type="number"
+                            min={0}
+                            max={ligne.quantite_restante}
+                            value={selectedQty}
+                            onChange={(e) => updateQuantite(ligne.id, Number(e.target.value) || 0)}
+                            placeholder="0"
+                            style={{
+                              width: '60px',
+                              padding: '0.4rem 0.5rem',
+                              borderRadius: 3,
+                              border: '1px solid #d1d5db',
+                              fontSize: '0.85rem',
+                              fontFamily: 'inherit',
+                              textAlign: 'center',
+                            }}
+                          />
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
             )
           })}
-          {displayCount < jalons.length && (
+          {displayCount < groupedByJalon.length && (
             <div style={{ textAlign: 'center', padding: '1rem', fontSize: '0.8rem', color: '#6b7280' }}>
-              ↓ Scroll pour charger {jalons.length - displayCount} jalon{jalons.length - displayCount > 1 ? 's' : ''} supplémentaire{jalons.length - displayCount > 1 ? 's' : ''}
+              ↓ Scroll pour charger {groupedByJalon.length - displayCount} jalon{groupedByJalon.length - displayCount > 1 ? 's' : ''} supplémentaire{groupedByJalon.length - displayCount > 1 ? 's' : ''}
             </div>
           )}
         </div>

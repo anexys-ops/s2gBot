@@ -1,3 +1,4 @@
+import SearchableSelect from '../ds/SearchableSelect'
 import { formatTechnicienOption, type TechnicienOption } from '../../lib/userRolePresentation'
 
 export type PlanningMassActionsBarProps = {
@@ -58,17 +59,27 @@ export default function PlanningMassActionsBar({
         {showAssignee ? (
           <label className="planning-mass-actions__field">
             <span>{assigneeLabel}</span>
-            <select
-              value={assigneeId === '' ? '' : String(assigneeId)}
-              onChange={(e) => onAssigneeChange(e.target.value === '' ? '' : Number(e.target.value))}
-            >
-              <option value="">— Ne pas modifier —</option>
-              {assignees.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {formatTechnicienOption(u)}
-                </option>
-              ))}
-            </select>
+            {assignees.length > 5 ? (
+              <SearchableSelect
+                options={assignees.map((u) => ({ id: u.id, label: formatTechnicienOption(u) }))}
+                value={assigneeId}
+                onChange={(val) => onAssigneeChange(val === '' ? '' : Number(val))}
+                placeholder="Rechercher une personne…"
+                emptyLabel="— Ne pas modifier —"
+              />
+            ) : (
+              <select
+                value={assigneeId === '' ? '' : String(assigneeId)}
+                onChange={(e) => onAssigneeChange(e.target.value === '' ? '' : Number(e.target.value))}
+              >
+                <option value="">— Ne pas modifier —</option>
+                {assignees.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {formatTechnicienOption(u)}
+                  </option>
+                ))}
+              </select>
+            )}
           </label>
         ) : null}
         <label className="planning-mass-actions__field">

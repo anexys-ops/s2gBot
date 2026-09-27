@@ -7,6 +7,7 @@ const FIELD_TYPES: Array<{ value: TestTypeFormField['type']; label: string }> = 
   { value: 'text', label: 'Champ texte' }, { value: 'number', label: 'Champ nombre' },
   { value: 'date', label: 'Date' }, { value: 'select', label: 'Liste de choix' },
   { value: 'checkboxes', label: 'Cases à cocher' }, { value: 'boolean', label: 'Oui / non' },
+  { value: 'duration', label: 'Durée' }, { value: 'time', label: 'Heure' },
   { value: 'photo', label: 'Photo' }, { value: 'table', label: 'Tableau' },
   { value: 'formula', label: 'Case calculée' },
 ]

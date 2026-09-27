@@ -99,12 +99,12 @@ export type MobileTask = {
 export type FormField = {
   key: string;
   label: string;
-  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'photo' | 'checkboxes' | 'table' | 'formula';
+  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'duration' | 'time' | 'photo' | 'checkboxes' | 'table' | 'formula';
   required: boolean;
   unit?: string;
   options?: string[];
   formula?: string;
-  columns?: Array<Omit<FormField, 'columns' | 'type'> & { type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'formula' }>;
+  columns?: Array<Omit<FormField, 'columns' | 'type'> & { type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'duration' | 'time' | 'formula' }>;
 };
 
 export type TaskForm = {

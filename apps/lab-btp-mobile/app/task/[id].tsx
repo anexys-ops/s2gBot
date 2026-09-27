@@ -17,8 +17,9 @@ function AnswerInput({ field, value, editable, onChange }: { field: FormField; v
     const selected = Array.isArray(value) && value.includes(option);
     return <Pressable key={option} disabled={!editable} style={[styles.option, selected && styles.optionSelected]} onPress={() => onChange(selected ? (value as string[]).filter((item) => item !== option) : [...(Array.isArray(value) ? value : []), option])}><Text>{selected ? '☑ ' : '☐ '}{option}</Text></Pressable>;
   })}</View>;
+  const placeholder = field.type === 'date' ? 'AAAA-MM-JJ' : field.type === 'time' ? 'HH:MM' : field.type === 'duration' ? 'HH:MM (durée)' : field.label;
   return <TextInput style={styles.input} editable={editable} value={value == null ? '' : String(value)}
-    placeholder={field.type === 'date' ? 'AAAA-MM-JJ' : field.label} keyboardType={field.type === 'number' ? 'decimal-pad' : 'default'}
+    placeholder={placeholder} keyboardType={field.type === 'number' ? 'decimal-pad' : 'default'}
     onChangeText={(text) => onChange(field.type === 'number' ? text.replace(',', '.') : text)} />;
 }
 

@@ -3155,7 +3155,7 @@ export interface TestType {
 export interface TestTypeFormField {
   key: string
   label: string
-  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'photo' | 'checkboxes' | 'table' | 'formula'
+  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'duration' | 'time' | 'photo' | 'checkboxes' | 'table' | 'formula'
   required: boolean
   unit?: string
   options?: string[]
@@ -3165,7 +3165,7 @@ export interface TestTypeFormField {
 }
 
 export interface TestTypeFormColumn extends Omit<TestTypeFormField, 'columns' | 'type'> {
-  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'formula'
+  type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'duration' | 'time' | 'formula'
 }
 
 export interface FormOptionList { id: number; name: string; options: string[] }

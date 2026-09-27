@@ -228,6 +228,8 @@ class TaskTestFormController extends Controller
             'number', 'formula' => is_numeric($value),
             'boolean' => is_bool($value),
             'date' => is_string($value) && (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $value),
+            'time' => is_string($value) && (bool) preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $value),
+            'duration' => is_string($value) && (bool) preg_match('/^\d{1,3}:[0-5]\d$/', $value),
             'select' => is_string($value) && in_array($value, $field['options'] ?? [], true),
             'checkboxes' => is_array($value) && array_is_list($value)
                 && count($value) === count(array_unique($value))

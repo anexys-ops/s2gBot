@@ -3216,9 +3216,9 @@ export const taskTestFormsApi = {
     return api<LaravelPaginator<LaboTaskTestFormRow>>(`/mobile/task-forms${s ? `?${s}` : ''}`)
   },
   save: (taskId: number, typeId: number, answers: Record<string, unknown>) =>
-    api(`/mobile/task-forms/tasks/${taskId}/types/${typeId}`, { method: 'PUT', body: JSON.stringify({ answers }) }),
+    api<{ answers: Record<string, unknown> }>(`/mobile/task-forms/tasks/${taskId}/types/${typeId}`, { method: 'PUT', body: JSON.stringify({ answers }) }),
   submit: (taskId: number, typeId: number) =>
-    api(`/mobile/task-forms/tasks/${taskId}/types/${typeId}/submit`, { method: 'POST' }),
+    api<{ answers: Record<string, unknown> }>(`/mobile/task-forms/tasks/${taskId}/types/${typeId}/submit`, { method: 'POST' }),
   uploadPhoto: async (taskId: number, typeId: number, fieldKey: string, file: File) => {
     const data = new FormData()
     data.append('field_key', fieldKey)

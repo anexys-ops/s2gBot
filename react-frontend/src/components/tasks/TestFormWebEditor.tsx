@@ -65,11 +65,14 @@ export default function TestFormWebEditor({ taskId, typeId, fields, initialAnswe
 
   const setValue = (key: string, value: unknown) => setAnswers((current) => ({ ...current, [key]: value }))
 
-  const run = async (action: () => Promise<unknown>, successMessage: string) => {
+  const run = async (action: () => Promise<{ answers: Record<string, unknown> } | unknown>, successMessage: string) => {
     setBusy(true)
     setError(null)
     try {
-      await action()
+      const result = await action()
+      if (result && typeof result === 'object' && 'answers' in result) {
+        setAnswers((result as { answers: Record<string, unknown> }).answers)
+      }
       setMessage(successMessage)
       onChanged?.()
     } catch (e) {

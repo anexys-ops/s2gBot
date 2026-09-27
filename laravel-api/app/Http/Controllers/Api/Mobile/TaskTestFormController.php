@@ -52,11 +52,14 @@ class TaskTestFormController extends Controller
             })
             ->join('mission_tasks as mt', 'mt.ordre_mission_ligne_id', '=', 'oml.id')
             ->join('ordres_mission as om', 'om.id', '=', 'oml.ordre_mission_id')
+            ->join('ref_articles as ra', 'ra.id', '=', 'att.ref_article_id')
             ->join('test_types as tt', 'tt.id', '=', 'att.test_type_id')
             ->leftJoin('task_test_forms as ttf', function ($join) {
                 $join->on('ttf.mission_task_id', '=', 'mt.id')->on('ttf.test_type_id', '=', 'att.test_type_id');
             })
             ->whereNull('mt.deleted_at')
+            ->whereNull('om.deleted_at')
+            ->whereNull('ra.deleted_at')
             ->where(function ($q) {
                 $q->whereNull('tt.context')
                     ->orWhere(fn ($q2) => $q2->where('tt.context', 'terrain')->where('om.type', 'technicien'))

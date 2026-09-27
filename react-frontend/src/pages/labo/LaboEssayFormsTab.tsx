@@ -26,7 +26,7 @@ function EssayFormDetail({ row, onClose }: { row: LaboTaskTestFormRow; onClose: 
   const form = data?.forms.find((f) => f.test_type.id === typeId)
   const editable = row.status === 'draft' || row.status === 'correction_requested' || row.status === 'not_started'
 
-  return <Modal title={row.test_type?.name ?? 'Essai'} onClose={onClose} size="wide">
+  return <Modal title={row.test_type?.name ?? 'Essai'} onClose={onClose} size="xl">
     {isLoading ? <p className="text-muted">Chargement…</p> : !form ? (
       <p className="error">Ce formulaire n’est plus disponible pour cette tâche (produit non affecté à cet essai, ou tâche introuvable).</p>
     ) : editable ? (
@@ -77,15 +77,14 @@ export default function LaboEssayFormsTab() {
     {rows.length > 0 ? <div className="card" style={{ overflow: 'auto' }}>
       <table className="data-table data-table--compact">
         <thead><tr>
-          <th>Essai</th><th>Tâche</th><th>Client</th><th>Chantier</th><th>Dossier</th><th>Technicien</th><th>Statut</th><th>Mis à jour</th>
+          <th>Essai</th><th>Tâche</th><th>N° FOLD</th><th>N° PV</th><th>Technicien</th><th>Statut</th><th>Mis à jour</th>
         </tr></thead>
         <tbody>
           {rows.map((row) => <tr key={row.id} tabIndex={0} role="button" style={{ cursor: 'pointer' }} onClick={() => setSelected(row)}>
             <td>{row.test_type?.name ?? '—'}</td>
             <td>{row.task?.unique_number ?? '—'}</td>
-            <td>{row.client ?? '—'}</td>
-            <td>{row.chantier ?? '—'}</td>
-            <td>{row.dossier ?? '—'}</td>
+            <td>{row.fold_numbers?.length ? row.fold_numbers.join(', ') : '—'}</td>
+            <td>{row.pv_numbers?.length ? row.pv_numbers.join(', ') : '—'}</td>
             <td>{row.task?.assigned_user ?? '—'}</td>
             <td>{STATUS_LABELS[row.status] ?? row.status}</td>
             <td>{formatAppDate(row.updated_at)}</td>

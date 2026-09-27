@@ -3200,9 +3200,8 @@ export interface LaboTaskTestFormRow {
   updated_at: string
   test_type: { id: number; name: string; norm?: string | null; context?: string | null } | null
   task: { id: number; unique_number?: string | null; assigned_user?: string | null } | null
-  client?: string | null
-  chantier?: string | null
-  dossier?: string | null
+  fold_numbers?: string[]
+  pv_numbers?: string[]
 }
 
 export const taskTestFormsApi = {

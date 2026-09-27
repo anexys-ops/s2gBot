@@ -81,17 +81,12 @@ class TaskTestFormController extends Controller
 
         $tasks = MissionTask::query()->whereIn('id', $taskIds)->with([
             'assignedUser:id,name',
-            'ordreMissionLigne:id,ordre_mission_id',
-            'ordreMissionLigne.ordreMission:id,client_id,site_id,dossier_id',
-            'ordreMissionLigne.ordreMission.client:id,name',
-            'ordreMissionLigne.ordreMission.site:id,name',
-            'ordreMissionLigne.ordreMission.dossier:id,reference',
+            'samples:id,fold_number',
         ])->get()->keyBy('id');
         $types = TestType::query()->whereIn('id', $typeIds)->get(['id', 'name', 'norm', 'context'])->keyBy('id');
 
         $items = $rows->map(function ($row) use ($tasks, $types) {
             $task = $tasks->get($row->task_id);
-            $om = $task?->ordreMissionLigne?->ordreMission;
 
             return [
                 'id' => $row->form_id ?? "pending-{$row->task_id}-{$row->test_type_id}",
@@ -102,9 +97,8 @@ class TaskTestFormController extends Controller
                     'unique_number' => $task->unique_number,
                     'assigned_user' => $task->assignedUser?->name,
                 ] : null,
-                'client' => $om?->client?->name,
-                'chantier' => $om?->site?->name,
-                'dossier' => $om?->dossier?->reference,
+                'fold_numbers' => $task?->samples->pluck('fold_number')->filter()->values() ?? [],
+                'pv_numbers' => $task?->pv_numbers ?? [],
                 'updated_at' => $row->sort_date,
             ];
         })->values();

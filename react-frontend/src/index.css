@@ -11242,6 +11242,38 @@ a.catalogue-tree__link-article:hover {
   font-size: 0.85rem;
 }
 
+.test-form-web-editor {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.test-form-web-editor .form-group {
+  border-left: 3px solid #93c5fd;
+  background: #f8fafc;
+  border-radius: 0 8px 8px 0;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 0.65rem;
+}
+
+.test-form-web-editor .form-group:focus-within {
+  border-left-color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.test-form-web-editor table.data-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.test-form-web-editor table.data-table thead th {
+  background: #eaf1fa;
+  color: #183654;
+}
+
+.test-form-web-editor table.data-table td input,
+.test-form-web-editor table.data-table td select {
+  min-width: 90px;
+}
+
 .task-test-form-fill__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

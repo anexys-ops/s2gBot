@@ -11838,6 +11838,33 @@ a.catalogue-tree__link-article:hover {
   font-weight: 400;
 }
 
+.mission-task-list__produit-row th {
+  padding: 0.4rem 0.9rem 0.4rem 2.25rem;
+  background: #f4f6f2;
+  color: #3c5a3c;
+  text-align: left;
+  font-weight: 600;
+}
+
+.mission-task-list__produit-row span {
+  font-weight: 400;
+}
+
+.mission-task-list__toggle {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0 0.5rem 0 0;
+  margin-right: 0.4rem;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: inherit;
+}
+
+.mission-task-list__toggle:hover {
+  opacity: 0.7;
+}
+
 @media (max-width: 1150px) {
   .mission-task-list__search-filters {
     grid-template-columns: repeat(3, minmax(0, 1fr));

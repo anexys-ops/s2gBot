@@ -96,7 +96,8 @@ function taskLabel(task: MissionTask): string {
   return ligne?.articleAction?.libelle || ligne?.libelle || ligne?.article?.libelle || 'Tâche sans libellé'
 }
 
-type TaskJalonGroup = { key: string; label: string; tasks: MissionTask[] }
+type TaskProduitGroup = { key: string; label: string; tasks: MissionTask[] }
+type TaskJalonGroup = { key: string; label: string; produits: TaskProduitGroup[]; count: number }
 type TaskDossierGroup = {
   key: string
   reference: string
@@ -106,7 +107,13 @@ type TaskDossierGroup = {
   count: number
 }
 
-function groupTasksByDossierAndJalon(tasks: MissionTask[]): TaskDossierGroup[] {
+function taskProduitLabel(task: MissionTask): string {
+  const article = task.ordreMissionLigne?.article
+  if (article) return article.code ? `${article.code} — ${article.libelle}` : article.libelle
+  return taskLabel(task)
+}
+
+function groupTasksByDossierJalonProduit(tasks: MissionTask[]): TaskDossierGroup[] {
   const dossiers = new Map<string, TaskDossierGroup>()
   for (const task of tasks) {
     const om = task.ordreMissionLigne?.ordreMission
@@ -132,18 +139,32 @@ function groupTasksByDossierAndJalon(tasks: MissionTask[]): TaskDossierGroup[] {
       jalonGroup = {
         key: jalonKey,
         label: jalon ? `${jalon.code ? `${jalon.code} — ` : ''}${jalon.label}` : 'Tâches sans jalon',
-        tasks: [],
+        produits: [],
+        count: 0,
       }
       group.jalons.push(jalonGroup)
     }
-    jalonGroup.tasks.push(task)
+    const article = task.ordreMissionLigne?.article
+    const produitKey = article?.id ? `article-${article.id}` : (taskProduitLabel(task) || 'sans-produit')
+    let produitGroup = jalonGroup.produits.find((item) => item.key === produitKey)
+    if (!produitGroup) {
+      produitGroup = { key: produitKey, label: taskProduitLabel(task), tasks: [] }
+      jalonGroup.produits.push(produitGroup)
+    }
+    produitGroup.tasks.push(task)
+    jalonGroup.count += 1
     group.count += 1
   }
   return [...dossiers.values()]
     .sort((a, b) => a.reference.localeCompare(b.reference, 'fr', { numeric: true }))
     .map((group) => ({
       ...group,
-      jalons: group.jalons.sort((a, b) => a.label.localeCompare(b.label, 'fr', { numeric: true })),
+      jalons: group.jalons
+        .sort((a, b) => a.label.localeCompare(b.label, 'fr', { numeric: true }))
+        .map((jalon) => ({
+          ...jalon,
+          produits: jalon.produits.sort((a, b) => a.label.localeCompare(b.label, 'fr', { numeric: true })),
+        })),
     }))
 }
 
@@ -357,6 +378,19 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [selectedTask, setSelectedTask] = useState<MissionTask | null>(null)
+  const [closedDossiers, setClosedDossiers] = useState<Set<string>>(new Set())
+  const [openedGroups, setOpenedGroups] = useState<Set<string>>(new Set())
+
+  const toggleDossier = (key: string) => setClosedDossiers((prev) => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    return next
+  })
+  const toggleGroup = (key: string) => setOpenedGroups((prev) => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    return next
+  })
 
   const { data: tasks = [], isLoading, error } = useQuery({
     queryKey: ['mission-tasks-list', context],
@@ -417,7 +451,7 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
     ].filter(Boolean).join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('fr')
     return searchable.includes(query)
   }), [tasks, statusFilter, clientFilter, technicianFilter, dateFrom, dateTo, search])
-  const grouped = useMemo(() => groupTasksByDossierAndJalon(displayed), [displayed])
+  const grouped = useMemo(() => groupTasksByDossierJalonProduit(displayed), [displayed])
 
   return (
     <ModuleEntityShell
@@ -506,58 +540,105 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                 {displayed.length === 0 ? (
                   <tr><td colSpan={6} className="text-muted">Aucune tâche pour ce filtre.</td></tr>
                 ) : null}
-                {grouped.flatMap((dossier) => [
-                  <tr key={dossier.key} className="mission-task-list__dossier-row">
-                    <th colSpan={6} scope="rowgroup">
-                      <span className="mission-task-list__dossier-title">{dossier.reference}</span>
-                      <span>{dossier.client}</span>
-                      <span>{dossier.site}</span>
-                      <strong>{dossier.count} tâche{dossier.count > 1 ? 's' : ''}</strong>
-                    </th>
-                  </tr>,
-                  ...dossier.jalons.flatMap((jalon) => [
-                    <tr key={`${dossier.key}-${jalon.key}`} className="mission-task-list__jalon-row">
-                      <th colSpan={6} scope="rowgroup">{jalon.label} <span>· {jalon.tasks.length} tâche{jalon.tasks.length > 1 ? 's' : ''}</span></th>
+                {grouped.flatMap((dossier) => {
+                  const dossierOpen = !closedDossiers.has(dossier.key)
+                  return [
+                    <tr key={dossier.key} className="mission-task-list__dossier-row">
+                      <th colSpan={6} scope="rowgroup">
+                        <button
+                          type="button"
+                          className="mission-task-list__toggle"
+                          onClick={() => toggleDossier(dossier.key)}
+                          aria-expanded={dossierOpen}
+                          aria-label={dossierOpen ? 'Replier le dossier' : 'Déplier le dossier'}
+                        >
+                          {dossierOpen ? '▾' : '▸'}
+                        </button>
+                        <span className="mission-task-list__dossier-title">{dossier.reference}</span>
+                        <span>{dossier.client}</span>
+                        <span>{dossier.site}</span>
+                        <strong>{dossier.count} tâche{dossier.count > 1 ? 's' : ''}</strong>
+                      </th>
                     </tr>,
-                    ...jalon.tasks.map((task) => {
-                  const om = task.ordreMissionLigne?.ordreMission
-                  const statut = getTaskStatutMeta(task.statut)
-                  const plannedDate = taskReferenceDate(task)
-                  return (
-                    <tr
-                      key={task.id}
-                      className="mission-task-list__row"
-                      tabIndex={0}
-                      role="button"
-                      aria-label={`Modifier ${task.unique_number ?? `la tâche ${task.id}`}`}
-                      onClick={() => setSelectedTask(task)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault()
-                          setSelectedTask(task)
-                        }
-                      }}
-                    >
-                      <td>
-                        <strong>{task.unique_number ?? `TSK-${task.id}`}</strong>
-                        {om ? <div className="text-muted mission-task-list__sub">{om.numero}</div> : null}
-                      </td>
-                      <td>
-                        <div className="mission-task-list__task">{taskLabel(task)}</div>
-                      </td>
-                      <td>{task.assignedUser?.name ?? <span className="text-muted">Non assigné</span>}</td>
-                      <td>
-                        <span className="mission-task-list__status" style={{ color: statut.color, background: statut.bg }}>
-                          {statut.label}
-                        </span>
-                      </td>
-                      <td>{plannedDate ? formatAppDate(plannedDate) : <span className="text-muted">—</span>}</td>
-                      <td><DelayCell task={task} /></td>
-                    </tr>
-                  )
-                    }),
-                  ]),
-                ])}
+                    ...(dossierOpen ? dossier.jalons.flatMap((jalon) => {
+                      const jalonGroupKey = `${dossier.key}-${jalon.key}`
+                      const jalonOpen = openedGroups.has(jalonGroupKey)
+                      return [
+                        <tr key={jalonGroupKey} className="mission-task-list__jalon-row">
+                          <th colSpan={6} scope="rowgroup">
+                            <button
+                              type="button"
+                              className="mission-task-list__toggle"
+                              onClick={() => toggleGroup(jalonGroupKey)}
+                              aria-expanded={jalonOpen}
+                              aria-label={jalonOpen ? 'Replier le jalon' : 'Déplier le jalon'}
+                            >
+                              {jalonOpen ? '▾' : '▸'}
+                            </button>
+                            {jalon.label} <span>· {jalon.count} tâche{jalon.count > 1 ? 's' : ''}</span>
+                          </th>
+                        </tr>,
+                        ...(jalonOpen ? jalon.produits.flatMap((produit) => {
+                          const produitGroupKey = `${jalonGroupKey}-${produit.key}`
+                          const produitOpen = openedGroups.has(produitGroupKey)
+                          return [
+                            <tr key={produitGroupKey} className="mission-task-list__produit-row">
+                              <th colSpan={6} scope="rowgroup">
+                                <button
+                                  type="button"
+                                  className="mission-task-list__toggle"
+                                  onClick={() => toggleGroup(produitGroupKey)}
+                                  aria-expanded={produitOpen}
+                                  aria-label={produitOpen ? 'Replier le produit' : 'Déplier le produit'}
+                                >
+                                  {produitOpen ? '▾' : '▸'}
+                                </button>
+                                {produit.label} <span>· {produit.tasks.length} tâche{produit.tasks.length > 1 ? 's' : ''}</span>
+                              </th>
+                            </tr>,
+                            ...(produitOpen ? produit.tasks.map((task) => {
+                              const om = task.ordreMissionLigne?.ordreMission
+                              const statut = getTaskStatutMeta(task.statut)
+                              const plannedDate = taskReferenceDate(task)
+                              return (
+                                <tr
+                                  key={task.id}
+                                  className="mission-task-list__row"
+                                  tabIndex={0}
+                                  role="button"
+                                  aria-label={`Modifier ${task.unique_number ?? `la tâche ${task.id}`}`}
+                                  onClick={() => setSelectedTask(task)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault()
+                                      setSelectedTask(task)
+                                    }
+                                  }}
+                                >
+                                  <td>
+                                    <strong>{task.unique_number ?? `TSK-${task.id}`}</strong>
+                                    {om ? <div className="text-muted mission-task-list__sub">{om.numero}</div> : null}
+                                  </td>
+                                  <td>
+                                    <div className="mission-task-list__task">{taskLabel(task)}</div>
+                                  </td>
+                                  <td>{task.assignedUser?.name ?? <span className="text-muted">Non assigné</span>}</td>
+                                  <td>
+                                    <span className="mission-task-list__status" style={{ color: statut.color, background: statut.bg }}>
+                                      {statut.label}
+                                    </span>
+                                  </td>
+                                  <td>{plannedDate ? formatAppDate(plannedDate) : <span className="text-muted">—</span>}</td>
+                                  <td><DelayCell task={task} /></td>
+                                </tr>
+                              )
+                            }) : []),
+                          ]
+                        }) : []),
+                      ]
+                    }) : []),
+                  ]
+                })}
               </tbody>
             </table>
           </div>

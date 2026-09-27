@@ -693,19 +693,21 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                   return [
                     <tr key={dossier.key} className="mission-task-list__dossier-row">
                       <th colSpan={6} scope="rowgroup">
-                        <button
-                          type="button"
-                          className="mission-task-list__toggle"
-                          onClick={() => toggleDossier(dossier.key)}
-                          aria-expanded={dossierOpen}
-                          aria-label={dossierOpen ? 'Replier le dossier' : 'Déplier le dossier'}
-                        >
-                          {dossierOpen ? '▾' : '▸'}
-                        </button>
-                        <span className="mission-task-list__dossier-title">{dossier.reference}</span>
-                        <span className="mission-task-list__dossier-client" title={dossier.client}>{dossier.client}</span>
-                        <span className="mission-task-list__dossier-site" title={dossier.site}>{dossier.site}</span>
-                        <strong className="mission-task-list__dossier-count">{dossier.count} tâche{dossier.count > 1 ? 's' : ''}</strong>
+                        <div className="mission-task-list__group-row-inner">
+                          <button
+                            type="button"
+                            className="mission-task-list__toggle"
+                            onClick={() => toggleDossier(dossier.key)}
+                            aria-expanded={dossierOpen}
+                            aria-label={dossierOpen ? 'Replier le dossier' : 'Déplier le dossier'}
+                          >
+                            {dossierOpen ? '▾' : '▸'}
+                          </button>
+                          <span className="mission-task-list__dossier-title">{dossier.reference}</span>
+                          <span className="mission-task-list__dossier-client" title={dossier.client}>{dossier.client}</span>
+                          <span className="mission-task-list__dossier-site" title={dossier.site}>{dossier.site}</span>
+                          <strong className="mission-task-list__dossier-count">{dossier.count} tâche{dossier.count > 1 ? 's' : ''}</strong>
+                        </div>
                       </th>
                     </tr>,
                     ...(dossierOpen ? dossier.jalons.flatMap((jalon) => {
@@ -714,17 +716,19 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                       return [
                         <tr key={jalonGroupKey} className="mission-task-list__jalon-row">
                           <th colSpan={6} scope="rowgroup">
-                            <button
-                              type="button"
-                              className="mission-task-list__toggle"
-                              onClick={() => toggleGroup(jalonGroupKey)}
-                              aria-expanded={jalonOpen}
-                              aria-label={jalonOpen ? 'Replier le jalon' : 'Déplier le jalon'}
-                            >
-                              {jalonOpen ? '▾' : '▸'}
-                            </button>
-                            <span className="mission-task-list__jalon-label" title={jalon.label}>{jalon.label}</span>
-                            <span className="mission-task-list__jalon-count">· {jalon.count} tâche{jalon.count > 1 ? 's' : ''}</span>
+                            <div className="mission-task-list__group-row-inner">
+                              <button
+                                type="button"
+                                className="mission-task-list__toggle"
+                                onClick={() => toggleGroup(jalonGroupKey)}
+                                aria-expanded={jalonOpen}
+                                aria-label={jalonOpen ? 'Replier le jalon' : 'Déplier le jalon'}
+                              >
+                                {jalonOpen ? '▾' : '▸'}
+                              </button>
+                              <span className="mission-task-list__jalon-label" title={jalon.label}>{jalon.label}</span>
+                              <span className="mission-task-list__jalon-count">· {jalon.count} tâche{jalon.count > 1 ? 's' : ''}</span>
+                            </div>
                           </th>
                         </tr>,
                         ...(jalonOpen ? jalon.produits.flatMap((produit) => {
@@ -733,17 +737,19 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                           return [
                             <tr key={produitGroupKey} className="mission-task-list__produit-row">
                               <th colSpan={6} scope="rowgroup">
-                                <button
-                                  type="button"
-                                  className="mission-task-list__toggle"
-                                  onClick={() => toggleGroup(produitGroupKey)}
-                                  aria-expanded={produitOpen}
-                                  aria-label={produitOpen ? 'Replier le produit' : 'Déplier le produit'}
-                                >
-                                  {produitOpen ? '▾' : '▸'}
-                                </button>
-                                <span className="mission-task-list__jalon-label" title={produit.label}>{produit.label}</span>
-                                <span className="mission-task-list__jalon-count">· {produit.tasks.length} tâche{produit.tasks.length > 1 ? 's' : ''}</span>
+                                <div className="mission-task-list__group-row-inner">
+                                  <button
+                                    type="button"
+                                    className="mission-task-list__toggle"
+                                    onClick={() => toggleGroup(produitGroupKey)}
+                                    aria-expanded={produitOpen}
+                                    aria-label={produitOpen ? 'Replier le produit' : 'Déplier le produit'}
+                                  >
+                                    {produitOpen ? '▾' : '▸'}
+                                  </button>
+                                  <span className="mission-task-list__jalon-label" title={produit.label}>{produit.label}</span>
+                                  <span className="mission-task-list__jalon-count">· {produit.tasks.length} tâche{produit.tasks.length > 1 ? 's' : ''}</span>
+                                </div>
                               </th>
                             </tr>,
                             ...(produitOpen ? produit.tasks.map((task) => {

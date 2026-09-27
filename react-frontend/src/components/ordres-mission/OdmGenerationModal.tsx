@@ -183,11 +183,24 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                       {isJalonExpanded ? '▼' : '▶'}
                     </button>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1f2937' }}>
+                      <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1f2937', marginBottom: '0.4rem' }}>
                         📋 {jalonGroup.name}
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                        BC: <strong>{formatQuantity(jalonQtyBc)}</strong> • OM: <strong>{formatQuantity(jalonQtyOm)}</strong> • Reste: <strong>{formatQuantity(Math.max(0, jalonQtyBc - jalonQtyOm))}</strong> {jalonTotalQty > 0 && <span style={{ color: '#3b82f6', fontWeight: 600 }}> → À générer: {formatQuantity(jalonTotalQty)}</span>}
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.75rem', background: '#e5e7eb', padding: '0.25rem 0.5rem', borderRadius: 3, color: '#374151' }}>
+                          BC: <strong>{formatQuantity(jalonQtyBc)}</strong>
+                        </span>
+                        <span style={{ fontSize: '0.75rem', background: '#dbeafe', padding: '0.25rem 0.5rem', borderRadius: 3, color: '#1e40af' }}>
+                          OM: <strong>{formatQuantity(jalonQtyOm)}</strong>
+                        </span>
+                        <span style={{ fontSize: '0.75rem', background: '#fee2e2', padding: '0.25rem 0.5rem', borderRadius: 3, color: '#7f1d1d' }}>
+                          Reste: <strong>{formatQuantity(Math.max(0, jalonQtyBc - jalonQtyOm))}</strong>
+                        </span>
+                        {jalonTotalQty > 0 && (
+                          <span style={{ fontSize: '0.75rem', background: '#cffafe', padding: '0.25rem 0.5rem', borderRadius: 3, color: '#0e7490', fontWeight: 600 }}>
+                            → À générer: {formatQuantity(jalonTotalQty)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

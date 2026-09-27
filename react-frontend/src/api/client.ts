@@ -3565,10 +3565,10 @@ export const ordresMissionApi = {
     api<void>(`/ordres-mission/${id}`, { method: 'DELETE' }),
   getBonCommandeLignesForGeneration: (bcId: number) =>
     api<{ bon_commande_id: number; jalons: OdmJalon[]; devis_display_meta?: EntityMetaPayload | null }>(`/bons-commande/${bcId}/ordres-mission-jalons`),
-  generateFromBC: (bcId: number, selectedLineIds?: number[]) =>
+  generateFromBC: (bcId: number, lignes?: Array<{ id: number; quantite: number }>) =>
     api<OrdreMission[]>(
       `/bons-commande/${bcId}/generate-ordres-mission`,
-      { method: 'POST', body: selectedLineIds ? JSON.stringify({ bon_commande_ligne_ids: selectedLineIds }) : undefined }
+      { method: 'POST', body: lignes ? JSON.stringify({ lignes }) : undefined }
     ),
   createLigne: (
     omId: number,
@@ -3666,7 +3666,9 @@ export interface MissionTask {
   received_quantity?: number
   remaining_quantity?: number
   is_conform?: boolean | null
+  no_fold_required?: boolean
   jalon_context?: { id: string; label: string; code?: string | null } | null
+  samples?: MissionTaskSample[]
   assignedUser?: { id: number; name: string; email?: string }
   ordreMissionLigne?: OrdreMissionLigne & {
     ordreMission?: OrdreMission
@@ -3675,6 +3677,18 @@ export interface MissionTask {
   }
   measures?: TaskMeasure[]
   result?: TaskResult | null
+}
+
+export interface MissionTaskSample {
+  id: number
+  fold_number?: string | null
+  transco_number?: string | null
+  description?: string | null
+  sample_type?: string | null
+  received_at?: string | null
+  task_id?: number | null
+  bon_commande_ligne_id?: number | null
+  pivot?: { forced?: boolean }
 }
 
 type MissionTaskApiRaw = Record<string, unknown>
@@ -3815,6 +3829,15 @@ export const missionTasksApi = {
   validate: async (id: number, body: { is_conform: boolean; value_final?: number; conclusion?: string; observations?: string; rapport_path?: string }) =>
     normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}/validate`, { method: 'POST', body: JSON.stringify(body) })),
   delete: (id: number) => api<void>(`/mission-tasks/${id}`, { method: 'DELETE' }),
+  availableSamples: (id: number, force?: boolean) =>
+    api<MissionTaskSample[]>(`/mission-tasks/${id}/available-samples${force ? '?force=1' : ''}`),
+  attachSamples: async (id: number, sampleIds: number[], forced?: boolean) =>
+    normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}/samples`, {
+      method: 'POST',
+      body: JSON.stringify({ sample_ids: sampleIds, forced: forced || undefined }),
+    })),
+  detachSample: async (id: number, sampleId: number) =>
+    normalizeMissionTask(await api<MissionTaskApiRaw>(`/mission-tasks/${id}/samples/${sampleId}`, { method: 'DELETE' })),
 }
 
 // ── Planning & Stock ───────────────────────────────────────────────────────

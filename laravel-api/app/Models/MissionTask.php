@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -54,6 +55,7 @@ class MissionTask extends Model
         'quantity_count',
         'reception_generated_at',
         'is_conform',
+        'no_fold_required',
     ];
 
     protected $casts = [
@@ -66,7 +68,16 @@ class MissionTask extends Model
         'quantity_count'  => 'integer',
         'reception_generated_at' => 'datetime',
         'is_conform'     => 'boolean',
+        'no_fold_required' => 'boolean',
     ];
+
+    /** Prélèvements (FOLD) rattachés à cette tâche labo pour travailler dessus. */
+    public function samples(): BelongsToMany
+    {
+        return $this->belongsToMany(Sample::class, 'mission_task_samples')
+            ->withPivot('forced')
+            ->withTimestamps();
+    }
 
     protected static function booted(): void
     {

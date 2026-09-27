@@ -75,8 +75,8 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
       if (selections.size === 0) {
         throw new Error('Sélectionnez au moins un produit pour générer.')
       }
-      const selectedLineIds = Array.from(selections.keys())
-      return ordresMissionApi.generateFromBC(bcId, selectedLineIds)
+      const lignes = Array.from(selections.entries()).map(([id, quantite]) => ({ id, quantite }))
+      return ordresMissionApi.generateFromBC(bcId, lignes)
     },
     onSuccess: () => {
       setToast({ message: 'Ordres de mission générées avec succès!', variant: 'success' })

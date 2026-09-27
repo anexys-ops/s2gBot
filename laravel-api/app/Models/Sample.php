@@ -6,6 +6,7 @@ use App\Models\Catalogue\Article;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Sample extends Model
@@ -139,6 +140,14 @@ class Sample extends Model
     public function task(): BelongsTo
     {
         return $this->belongsTo(MissionTask::class, 'task_id');
+    }
+
+    /** Tâches labo qui utilisent ce FOLD pour leurs essais (peut être plusieurs). */
+    public function labTasks(): BelongsToMany
+    {
+        return $this->belongsToMany(MissionTask::class, 'mission_task_samples')
+            ->withPivot('forced')
+            ->withTimestamps();
     }
 
     public function product(): BelongsTo

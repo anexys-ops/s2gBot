@@ -9,7 +9,6 @@ use App\Models\BonCommandeLigne;
 use App\Models\Catalogue\Article;
 use App\Models\ExpenseLine;
 use App\Models\MissionTask;
-use App\Models\OdmJalonQuantityGenerated;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
 use App\Services\ExpenseReportService;
@@ -108,14 +107,33 @@ class OrdreMissionController extends Controller
             ], 422);
         }
 
-        // Valider les IDs de lignes sélectionnées
+        // Valider les IDs de lignes sélectionnées, avec quantité optionnelle par ligne.
+        // Format accepté :
+        //   - 'lignes' => [{ id, quantite }, ...]  (nouveau : quantité respectée telle quelle)
+        //   - 'bon_commande_ligne_ids' => [id, ...] (historique : génère tout le reste dispo)
         $selectedLineIds = null;
-        if ($request->has('bon_commande_ligne_ids')) {
+        $requestedQuantities = null;
+
+        if ($request->has('lignes')) {
+            $validated = $request->validate([
+                'lignes' => 'required|array|min:1',
+                'lignes.*.id' => 'required|integer|exists:bons_commande_lignes,id',
+                'lignes.*.quantite' => 'required|numeric|min:0.000001',
+            ])['lignes'];
+
+            $selectedLineIds = array_map(static fn (array $row) => (int) $row['id'], $validated);
+            $requestedQuantities = [];
+            foreach ($validated as $row) {
+                $requestedQuantities[(int) $row['id']] = (float) $row['quantite'];
+            }
+        } elseif ($request->has('bon_commande_ligne_ids')) {
             $selectedLineIds = $request->validate([
                 'bon_commande_ligne_ids' => 'required|array',
                 'bon_commande_ligne_ids.*' => 'integer|exists:bons_commande_lignes,id',
             ])['bon_commande_ligne_ids'];
+        }
 
+        if ($selectedLineIds !== null) {
             // Vérifier que les lignes appartiennent au BC
             $validIds = BonCommandeLigne::query()
                 ->where('bon_commande_id', $bonCommande->id)
@@ -132,26 +150,13 @@ class OrdreMissionController extends Controller
             $selectedLineIds = $validIds;
         }
 
-        $orders = $this->generator->generate($bonCommande, $request->user(), $selectedLineIds);
+        $orders = $this->generator->generate($bonCommande, $request->user(), $selectedLineIds, $requestedQuantities);
 
         if ($orders === []) {
             return response()->json([
-                'message' => 'Aucun ordre de mission généré : les lignes sélectionnées ne contiennent aucune ligne éligible (actions catalogue, déclencheurs OdM ou lignes avec libellé).',
+                'message' => 'Aucun ordre de mission généré : les lignes sélectionnées ne contiennent aucune ligne éligible (actions catalogue, déclencheurs OdM ou lignes avec libellé) ou la quantité demandée est déjà entièrement couverte.',
                 'data' => [],
             ], 422);
-        }
-
-        // Mettre à jour le tracking des quantités générées
-        if ($selectedLineIds) {
-            foreach ($selectedLineIds as $lineId) {
-                $ligne = BonCommandeLigne::query()->find($lineId);
-                if ($ligne) {
-                    OdmJalonQuantityGenerated::query()->updateOrCreate(
-                        ['bon_commande_ligne_id' => $lineId],
-                        ['quantite_generee' => \DB::raw("COALESCE(quantite_generee, 0) + {$ligne->quantite}")]
-                    );
-                }
-            }
         }
 
         return response()->json($orders, 201);
@@ -176,10 +181,17 @@ class OrdreMissionController extends Controller
             ->orderBy('ordre')
             ->get();
 
-        // Charger les quantités déjà générées
-        $generatedQties = OdmJalonQuantityGenerated::query()
+        // Quantités déjà générées : calculées en direct depuis les lignes d'OM réellement
+        // créées (hors OM annulés), pour rester toujours synchronisées — y compris après
+        // une suppression de ligne/OM, sans compteur séparé à décrémenter manuellement.
+        $generatedQties = OrdreMissionLigne::query()
             ->whereIn('bon_commande_ligne_id', $lignes->pluck('id'))
-            ->pluck('quantite_generee', 'bon_commande_ligne_id');
+            ->whereHas('ordreMission', fn ($q) => $q
+                ->where('bon_commande_id', $bonCommande->id)
+                ->where('statut', '!=', OrdreMission::STATUT_ANNULE))
+            ->selectRaw('bon_commande_ligne_id, SUM(quantite) as total')
+            ->groupBy('bon_commande_ligne_id')
+            ->pluck('total', 'bon_commande_ligne_id');
 
         $jalons = $lignes->map(function (BonCommandeLigne $ligne) use ($generatedQties) {
             $quantiteGeneree = (float) ($generatedQties[$ligne->id] ?? 0);

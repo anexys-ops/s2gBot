@@ -35,10 +35,19 @@ class OrdreMissionFromBonCommandeService
     /** @var array<int>|null Les IDs de BonCommandeLigne à inclure (null = tous) */
     private ?array $onlyLineIds = null;
 
-    /** @return list<OrdreMission> */
-    public function generate(BonCommande $bc, User $actor, ?array $onlyLineIds = null): array
+    /** @var array<int, float>|null Quantité demandée par BonCommandeLigne id (null = pas de plafond, comportement historique) */
+    private ?array $requestedQuantities = null;
+
+    /**
+     * @param array<int, float>|null $requestedQuantities Quantité à générer par BonCommandeLigne id.
+     *        Plafonne ce qui reste réellement disponible (ne permet jamais d'en générer plus que le BC n'en prévoit).
+     *        Si une ligne sélectionnée n'a pas d'entrée ici, on génère tout son reste (comportement historique).
+     * @return list<OrdreMission>
+     */
+    public function generate(BonCommande $bc, User $actor, ?array $onlyLineIds = null, ?array $requestedQuantities = null): array
     {
         $this->onlyLineIds = $onlyLineIds;
+        $this->requestedQuantities = $requestedQuantities;
         $bc->load([
             'lignes.article.actions',
             'lignes.article.sectionProducts.productArticle.actions',
@@ -176,6 +185,9 @@ class OrdreMissionFromBonCommandeService
         return $entries->flatMap(function (array $entry) use (&$remaining, $key, $unitsForEntry): array {
             $id = $key($entry['ligne'], $entry['action']);
             $quantity = min($unitsForEntry($entry['ligne'], $entry['action']), max(0, $remaining[$id]));
+            if ($this->requestedQuantities !== null && array_key_exists($entry['ligne']->id, $this->requestedQuantities)) {
+                $quantity = min($quantity, max(0, (float) $this->requestedQuantities[$entry['ligne']->id]));
+            }
             $remaining[$id] -= $quantity;
 
             $tasks = [];

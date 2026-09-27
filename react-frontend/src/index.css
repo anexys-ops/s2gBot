@@ -12035,6 +12035,22 @@ a.catalogue-tree__link-article:hover {
   background: color-mix(in srgb, var(--color-primary) 18%, transparent);
 }
 
+.mission-task-modal__badge--pickable {
+  border: 1px dashed var(--color-primary);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.mission-task-modal__badge--pickable:hover,
+.mission-task-modal__badge--pickable:focus-visible {
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+}
+
+.mission-task-modal__badge--pickable:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .mission-task-modal__pv-entry {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

@@ -720,6 +720,46 @@ class OrdreMissionFromBonCommandeTest extends TestCase
     /**
      * @return array{0: BonCommande, 1: User, 2?: User}
      */
+    public function test_generate_respects_requested_partial_quantity_and_frees_up_on_delete(): void
+    {
+        [$bc, $lab] = $this->seedBcWithTechnicienAction();
+        $ligne = $bc->lignes()->firstOrFail();
+        $ligne->update(['quantite' => 8]);
+
+        // Demande 3 sur 8 disponibles : ne doit générer que 3, pas la totalité.
+        $this->actingAs($lab, 'sanctum')->postJson(
+            "/api/bons-commande/{$bc->id}/generate-ordres-mission",
+            ['lignes' => [['id' => $ligne->id, 'quantite' => 3]]],
+        )->assertCreated();
+        $this->assertSame(3, OrdreMissionLigne::query()->where('bon_commande_ligne_id', $ligne->id)->count());
+
+        // Le modal de génération doit refléter 3 générés / 5 restants (pas 8/0).
+        $jalons = $this->actingAs($lab, 'sanctum')
+            ->getJson("/api/bons-commande/{$bc->id}/ordres-mission-jalons")
+            ->assertOk()
+            ->json('jalons');
+        $row = collect($jalons)->firstWhere('id', $ligne->id);
+        $this->assertEquals(3, $row['quantite_generee']);
+        $this->assertEquals(5, $row['quantite_restante']);
+
+        // Redemander plus que le reste (10) doit être plafonné au reste réel du BC (5), pas généré tel quel.
+        $this->actingAs($lab, 'sanctum')->postJson(
+            "/api/bons-commande/{$bc->id}/generate-ordres-mission",
+            ['lignes' => [['id' => $ligne->id, 'quantite' => 10]]],
+        )->assertCreated();
+        $this->assertSame(8, OrdreMissionLigne::query()->where('bon_commande_ligne_id', $ligne->id)->count());
+
+        // Supprimer 2 lignes d'OM générées doit libérer la quantité correspondante dans le modal.
+        OrdreMissionLigne::query()->where('bon_commande_ligne_id', $ligne->id)->limit(2)->get()->each->delete();
+        $jalonsAfterDelete = $this->actingAs($lab, 'sanctum')
+            ->getJson("/api/bons-commande/{$bc->id}/ordres-mission-jalons")
+            ->assertOk()
+            ->json('jalons');
+        $rowAfterDelete = collect($jalonsAfterDelete)->firstWhere('id', $ligne->id);
+        $this->assertEquals(6, $rowAfterDelete['quantite_generee']);
+        $this->assertEquals(2, $rowAfterDelete['quantite_restante']);
+    }
+
     private function seedBcWithTechnicienAction(
         string $statut = BonCommande::STATUT_EN_COURS,
         bool $withAction = true,

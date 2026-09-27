@@ -14,6 +14,7 @@ use App\Models\TaskMeasure;
 use App\Models\TaskResult;
 use App\Services\TaskFormAssignmentService;
 use App\Services\MissionTaskStatusService;
+use App\Services\DevisJalonResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +26,136 @@ class MissionTaskController extends Controller
     public function __construct(
         private readonly TaskFormAssignmentService $formAssignments,
         private readonly MissionTaskStatusService $statusSync,
+        private readonly DevisJalonResolver $jalonResolver,
     ) {}
+
+    /** Ajoute N jours ouvrés (saute samedi/dimanche) à une date. */
+    private function addBusinessDays(\Carbon\Carbon $date, int $days): \Carbon\Carbon
+    {
+        $result = $date->copy();
+        while ($days > 0) {
+            $result->addDay();
+            if (! $result->isWeekend()) {
+                $days--;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * BonCommandeLigne ids partageant le jalon devis de la ligne d'OM de $task
+     * (ou toutes les lignes du BC si $force).
+     *
+     * @return list<int>
+     */
+    private function siblingBonCommandeLigneIds(MissionTask $task, bool $force): array
+    {
+        $ligne = $task->ordreMissionLigne()->with('ordreMission.bonCommande')->first();
+        $bc = $ligne?->ordreMission?->bonCommande;
+        if (! $ligne || ! $bc) {
+            return [];
+        }
+
+        $bcLigne = BonCommandeLigne::query()->find($ligne->bon_commande_ligne_id);
+        if ($force || ! $bcLigne?->ref_article_id) {
+            return BonCommandeLigne::query()->where('bon_commande_id', $bc->id)->pluck('id')->all();
+        }
+
+        $refIds = $this->jalonResolver->siblingRefArticleIds($bc, (int) $bcLigne->ref_article_id);
+
+        return BonCommandeLigne::query()
+            ->where('bon_commande_id', $bc->id)
+            ->whereIn('ref_article_id', $refIds)
+            ->pluck('id')
+            ->all();
+    }
+
+    private const SAMPLE_USABLE_STATUSES = [
+        Sample::STATUS_RECEPTIONNE,
+        Sample::STATUS_IMPRIME,
+        Sample::STATUS_EN_ESSAI,
+        Sample::STATUS_TERMINE,
+        Sample::STATUS_STOCKE,
+        Sample::STATUS_ARCHIVE,
+    ];
+
+    /** Liste les FOLD disponibles pour rattacher à une tâche labo. */
+    public function availableSamples(Request $request, int $id): JsonResponse
+    {
+        $task = MissionTask::findOrFail($id);
+        $force = $request->boolean('force');
+
+        $ligneIds = $this->siblingBonCommandeLigneIds($task, $force);
+        if ($ligneIds === []) {
+            return response()->json([]);
+        }
+
+        $terrainTaskIds = MissionTask::query()
+            ->whereHas('ordreMissionLigne', fn ($q) => $q->whereIn('bon_commande_ligne_id', $ligneIds))
+            ->pluck('id');
+
+        $samples = Sample::query()
+            ->whereIn('task_id', $terrainTaskIds)
+            ->whereIn('status', self::SAMPLE_USABLE_STATUSES)
+            ->with(['labTasks:id,unique_number'])
+            ->orderBy('fold_number')
+            ->get(['id', 'fold_number', 'transco_number', 'description', 'sample_type', 'received_at', 'task_id', 'bon_commande_ligne_id']);
+
+        return response()->json($samples);
+    }
+
+    /** Rattache un ou plusieurs FOLD (samples) à une tâche labo. */
+    public function attachSamples(Request $request, int $id): JsonResponse
+    {
+        $task = MissionTask::findOrFail($id);
+        $data = $request->validate([
+            'sample_ids' => 'required|array|min:1',
+            'sample_ids.*' => 'integer|exists:samples,id',
+            'forced' => 'sometimes|boolean',
+        ]);
+        $forced = (bool) ($data['forced'] ?? false);
+
+        if (! $forced) {
+            $allowedLigneIds = $this->siblingBonCommandeLigneIds($task, false);
+            $allowedTerrainTaskIds = MissionTask::query()
+                ->whereHas('ordreMissionLigne', fn ($q) => $q->whereIn('bon_commande_ligne_id', $allowedLigneIds))
+                ->pluck('id');
+            $invalid = Sample::query()
+                ->whereIn('id', $data['sample_ids'])
+                ->whereNotIn('task_id', $allowedTerrainTaskIds)
+                ->exists();
+            if ($invalid) {
+                return response()->json([
+                    'message' => 'Un des FOLD sélectionnés n\'appartient pas au même jalon. Cochez "Forcer" pour l\'autoriser quand même.',
+                ], 422);
+            }
+        }
+
+        foreach ($data['sample_ids'] as $sampleId) {
+            $task->samples()->syncWithoutDetaching([$sampleId => ['forced' => $forced]]);
+        }
+
+        // Première planification automatique : lendemain ouvré de la réception la plus tardive,
+        // uniquement si aucune date n'a déjà été fixée (manuellement ou par un attachement précédent).
+        if (! $task->planned_date) {
+            $lastReceivedAt = $task->samples()->max('received_at');
+            if ($lastReceivedAt) {
+                $task->update(['planned_date' => $this->addBusinessDays(\Carbon\Carbon::parse($lastReceivedAt), 1)]);
+            }
+        }
+
+        return response()->json($task->fresh(['samples', 'assignedUser:id,name']));
+    }
+
+    /** Détache un FOLD d'une tâche labo. */
+    public function detachSample(Request $request, int $id, int $sampleId): JsonResponse
+    {
+        $task = MissionTask::findOrFail($id);
+        $task->samples()->detach($sampleId);
+
+        return response()->json($task->fresh(['samples', 'assignedUser:id,name']));
+    }
 
     private function optionalQueryString(Request $request, string $key): ?string
     {
@@ -114,10 +244,21 @@ class MissionTaskController extends Controller
             'notes'            => 'nullable|string',
             'started_at'       => 'nullable|date',
             'completed_at'     => 'nullable|date',
+            'no_fold_required' => 'sometimes|boolean',
         ]);
 
         if (($data['statut'] ?? null) === MissionTask::STATUT_VALIDATED && $this->formAssignments->hasPendingForms($task)) {
             throw ValidationException::withMessages(['statut' => 'Les formulaires affectés à cette tâche doivent être validés avant sa clôture.']);
+        }
+
+        if (isset($data['statut']) && $data['statut'] !== MissionTask::STATUT_TODO) {
+            $noFoldRequired = $data['no_fold_required'] ?? $task->no_fold_required;
+            $om = $task->ordreMissionLigne()->with('ordreMission')->first()?->ordreMission;
+            if ($om?->type === OrdreMission::TYPE_LABO && ! $noFoldRequired && $task->samples()->count() === 0) {
+                throw ValidationException::withMessages([
+                    'statut' => 'Rattachez au moins un FOLD à cette tâche (ou cochez "pas de FOLD nécessaire") avant de l\'avancer.',
+                ]);
+            }
         }
 
         // Auto-timestamps sur changements de statut

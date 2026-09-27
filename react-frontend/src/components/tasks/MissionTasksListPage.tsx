@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { missionTasksApi, planningTerrainApi, taskTestFormsApi, type MissionTask } from '../../api/client'
+import { missionTasksApi, planningTerrainApi, taskTestFormsApi, type MissionTask, type MissionTaskSample } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import ModuleEntityShell from '../module/ModuleEntityShell'
 import Modal from '../Modal'
@@ -197,6 +197,45 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
   const [message, setMessage] = useState('')
   const [correctionNotes, setCorrectionNotes] = useState<Record<number, string>>({})
   const [activeTab, setActiveTab] = useState<'suivi' | 'essais'>('suivi')
+  const [localSamples, setLocalSamples] = useState<MissionTaskSample[]>(task.samples ?? [])
+  const [noFoldRequired, setNoFoldRequired] = useState(task.no_fold_required ?? false)
+  const [foldForce, setFoldForce] = useState(false)
+  const [foldDraft, setFoldDraft] = useState('')
+
+  const { data: availableSamples = [] } = useQuery({
+    queryKey: ['available-samples', task.id, foldForce],
+    queryFn: () => missionTasksApi.availableSamples(task.id, foldForce),
+    enabled: context === 'labo',
+  })
+
+  const attachedIds = useMemo(() => new Set(localSamples.map((s) => s.id)), [localSamples])
+  const filteredAvailable = useMemo(() => {
+    const term = foldDraft.trim().toLowerCase()
+    if (!term) return availableSamples
+    return availableSamples.filter((s) =>
+      s.fold_number?.toLowerCase().includes(term) || s.transco_number?.toLowerCase().includes(term))
+  }, [availableSamples, foldDraft])
+
+  const attachSample = useMutation({
+    mutationFn: (sampleId: number) => missionTasksApi.attachSamples(task.id, [sampleId], foldForce),
+    onSuccess: async (updated) => {
+      setLocalSamples(updated.samples ?? [])
+      setFoldDraft('')
+      await refresh()
+    },
+  })
+  const detachSample = useMutation({
+    mutationFn: (sampleId: number) => missionTasksApi.detachSample(task.id, sampleId),
+    onSuccess: async (updated) => {
+      setLocalSamples(updated.samples ?? [])
+      await refresh()
+    },
+  })
+  const noFoldMut = useMutation({
+    mutationFn: (value: boolean) => missionTasksApi.update(task.id, { no_fold_required: value }),
+    onSuccess: async () => { await refresh() },
+  })
+  const hasFoldCoverage = noFoldRequired || localSamples.length > 0
 
   const { data: taskForms } = useQuery({
     queryKey: ['task-test-forms', task.id],
@@ -270,7 +309,7 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
     },
   })
 
-  const error = save.error || closeReception.error || duplicate.error
+  const error = save.error || closeReception.error || duplicate.error || attachSample.error || detachSample.error
   const pvCount = normalizePvNumbers([...pvNumbers, pvDraft]).length
   const maxQuantity = task.reception_generated_at ? (task.quantity_count ?? 1) : (task.remaining_quantity ?? task.ordered_quantity ?? 1)
 
@@ -300,10 +339,17 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
         </label>
         <label>Statut
           <select value={statut} onChange={(event) => setStatut(event.target.value as MissionTask['statut'])}>
-            {TASK_FILTERS.flatMap((filter) => filter.statuts).filter((value, index, all) => all.indexOf(value) === index).map((value) => (
-              <option key={value} value={value}>{getTaskStatutMeta(value as MissionTask['statut']).label}</option>
-            ))}
+            {TASK_FILTERS.flatMap((filter) => filter.statuts).filter((value, index, all) => all.indexOf(value) === index)
+              .filter((value) => context !== 'labo' || hasFoldCoverage || value === 'todo' || value === task.statut)
+              .map((value) => (
+                <option key={value} value={value}>{getTaskStatutMeta(value as MissionTask['statut']).label}</option>
+              ))}
           </select>
+          {context === 'labo' && !hasFoldCoverage ? (
+            <span className="text-muted" style={{ color: '#b45309' }}>
+              Rattachez un FOLD (ou cochez « pas de FOLD nécessaire ») pour pouvoir avancer cette tâche.
+            </span>
+          ) : null}
         </label>
         <label>Unité de quantité
           <span className="mission-task-modal__unit">
@@ -349,6 +395,76 @@ function TaskEditModal({ task, context, onClose }: { task: MissionTask; context:
           <span className="text-muted">{pvCount} numéro{pvCount !== 1 ? 's' : ''} de PV saisi{pvCount !== 1 ? 's' : ''}</span>
         </label>
       </div>
+      {context === 'labo' ? (
+        <div className="mission-task-modal__grid" style={{ marginTop: '0.75rem' }}>
+          <label className="mission-task-modal__pv" style={{ gridColumn: '1 / -1' }}>
+            FOLD (prélèvements) à travailler
+            {localSamples.length > 0 ? (
+              <span className="mission-task-modal__badges" aria-label="FOLD rattachés">
+                {localSamples.map((s) => (
+                  <span key={s.id} className="mission-task-modal__badge">
+                    {s.fold_number ?? s.transco_number ?? `#${s.id}`}
+                    <button
+                      type="button"
+                      aria-label={`Détacher ${s.fold_number ?? s.id}`}
+                      disabled={detachSample.isPending}
+                      onClick={() => detachSample.mutate(s.id)}
+                    >×</button>
+                  </span>
+                ))}
+              </span>
+            ) : (
+              <span className="text-muted">Aucun FOLD rattaché pour l'instant.</span>
+            )}
+
+            <span className="mission-task-modal__pv-entry" style={{ marginTop: '0.5rem' }}>
+              <input
+                type="text"
+                value={foldDraft}
+                onChange={(event) => setFoldDraft(event.target.value)}
+                placeholder="Rechercher un FOLD…"
+              />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 400 }}>
+                <input type="checkbox" checked={foldForce} onChange={(event) => setFoldForce(event.target.checked)} />
+                Forcer (autres jalons)
+              </label>
+            </span>
+
+            <span className="mission-task-modal__badges" aria-label="FOLD disponibles" style={{ marginTop: '0.4rem' }}>
+              {filteredAvailable.filter((s) => !attachedIds.has(s.id)).map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className="mission-task-modal__badge mission-task-modal__badge--pickable"
+                  disabled={attachSample.isPending}
+                  onClick={() => attachSample.mutate(s.id)}
+                  title={s.received_at ? `Réceptionné le ${formatAppDate(s.received_at)}` : undefined}
+                >
+                  + {s.fold_number ?? s.transco_number ?? `#${s.id}`}
+                </button>
+              ))}
+              {filteredAvailable.length === 0 ? (
+                <span className="text-muted">
+                  {foldForce ? 'Aucun FOLD disponible.' : "Aucun FOLD réceptionné pour ce jalon — cochez « Forcer » pour choisir dans un autre jalon."}
+                </span>
+              ) : null}
+            </span>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.5rem', fontWeight: 400 }}>
+              <input
+                type="checkbox"
+                checked={noFoldRequired}
+                disabled={noFoldMut.isPending}
+                onChange={(event) => {
+                  setNoFoldRequired(event.target.checked)
+                  noFoldMut.mutate(event.target.checked)
+                }}
+              />
+              Pas de FOLD nécessaire pour cette tâche
+            </label>
+          </label>
+        </div>
+      ) : null}
       {message ? <p className="success">{message}</p> : null}
       {error ? <p className="error">{(error as Error).message}</p> : null}
       <div className="mission-task-modal__actions">

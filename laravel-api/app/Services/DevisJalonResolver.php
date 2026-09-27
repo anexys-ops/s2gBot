@@ -13,14 +13,25 @@ class DevisJalonResolver
 {
     /**
      * IDs d'articles (ref_article_id) partageant le même jalon devis que $refArticleId,
-     * lui-même inclus. Retourne [$refArticleId] si aucune structure de jalon ne le contient
-     * (ligne autonome, ou BC sans devis structuré).
+     * lui-même inclus.
+     * - Si le BC n'a AUCUNE structure de jalons (devis absent, non structuré, ou BC créé
+     *   sans devis) : retourne null — impossible de distinguer des jalons, donc pas de
+     *   restriction possible (l'appelant doit alors élargir à tout le BC plutôt que de
+     *   se limiter à tort au seul article de départ, ce qui exclurait quasi toujours les
+     *   FOLD terrain, dont l'article diffère de celui de la tâche labo).
+     * - Si des jalons existent mais qu'aucun ne contient $refArticleId (ligne autonome
+     *   dans un devis structuré) : retourne [$refArticleId] — la restriction est ici
+     *   volontaire et significative.
      *
-     * @return list<int>
+     * @return list<int>|null
      */
-    public function siblingRefArticleIds(BonCommande $bc, int $refArticleId): array
+    public function siblingRefArticleIds(BonCommande $bc, int $refArticleId): ?array
     {
         $jalons = $bc->quote?->meta['devis_jalons'] ?? [];
+        if ($jalons === []) {
+            return null;
+        }
+
         foreach ($jalons as $jalon) {
             $refs = array_map('intval', $jalon['product_ref_article_ids'] ?? []);
             if (in_array($refArticleId, $refs, true)) {

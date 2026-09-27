@@ -63,6 +63,11 @@ class MissionTaskController extends Controller
         }
 
         $refIds = $this->jalonResolver->siblingRefArticleIds($bc, (int) $bcLigne->ref_article_id);
+        if ($refIds === null) {
+            // Pas de structure de jalons sur ce BC : impossible de restreindre sans risquer
+            // d'exclure à tort les FOLD terrain (article différent) — on élargit à tout le BC.
+            return BonCommandeLigne::query()->where('bon_commande_id', $bc->id)->pluck('id')->all();
+        }
 
         return BonCommandeLigne::query()
             ->where('bon_commande_id', $bc->id)

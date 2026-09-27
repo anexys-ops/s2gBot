@@ -11,11 +11,6 @@ type Props = {
   onSuccess: () => void
 }
 
-type Selection = {
-  bon_commande_ligne_id: number
-  quantite_a_generer: number
-}
-
 export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) {
   const qc = useQueryClient()
   const [selections, setSelections] = useState<Map<number, number>>(new Map())
@@ -35,12 +30,8 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
       if (selections.size === 0) {
         throw new Error('Sélectionnez au moins un produit pour générer.')
       }
-      const selectionsArray = Array.from(selections.entries())
-        .map(([bon_commande_ligne_id, quantite_a_generer]) => ({
-          bon_commande_ligne_id,
-          quantite_a_generer,
-        }))
-      return ordresMissionApi.generateFromBC(bcId, undefined, selectionsArray)
+      const selectedLineIds = Array.from(selections.keys())
+      return ordresMissionApi.generateFromBC(bcId, selectedLineIds)
     },
     onSuccess: () => {
       setToast({ message: 'Ordres de mission générées avec succès!', variant: 'success' })

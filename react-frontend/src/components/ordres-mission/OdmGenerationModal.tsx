@@ -161,6 +161,31 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
+                    {/* Checkbox sélectionner tout le jalon */}
+                    <input
+                      type="checkbox"
+                      checked={jalonSelected}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          // Sélectionner tous les produits du jalon avec quantité 1
+                          jalonGroup.lignes.forEach((ligne) => {
+                            updateQuantite(ligne.id, 1)
+                          })
+                        } else {
+                          // Déselectionner tous les produits du jalon
+                          jalonGroup.lignes.forEach((ligne) => {
+                            updateQuantite(ligne.id, 0)
+                          })
+                        }
+                      }}
+                      style={{
+                        width: '1.2rem',
+                        height: '1.2rem',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        accentColor: '#3b82f6',
+                      }}
+                    />
                     {/* Expand button */}
                     <button
                       type="button"

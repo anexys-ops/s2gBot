@@ -26,7 +26,9 @@ function EssayFormDetail({ row, onClose }: { row: LaboTaskTestFormRow; onClose: 
   const editable = row.status === 'draft' || row.status === 'correction_requested'
 
   return <Modal title={row.test_type?.name ?? 'Essai'} onClose={onClose} size="wide">
-    {isLoading || !form ? <p className="text-muted">Chargement…</p> : editable ? (
+    {isLoading ? <p className="text-muted">Chargement…</p> : !form ? (
+      <p className="error">Ce formulaire n’est plus disponible pour cette tâche (produit non affecté à cet essai, ou tâche introuvable).</p>
+    ) : editable ? (
       <TestFormWebEditor
         taskId={taskId!}
         typeId={typeId!}

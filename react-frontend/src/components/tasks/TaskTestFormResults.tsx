@@ -1,12 +1,29 @@
-import type { TaskTestFormSummary } from '../../api/client'
+import { useState } from 'react'
+import { taskTestFormsApi, type TaskTestFormSummary } from '../../api/client'
 import type { ReactNode } from 'react'
 
-export default function TaskTestFormResults({ forms, onOpenPhoto, renderActions }: {
+export default function TaskTestFormResults({ forms, taskId, onOpenPhoto, renderActions }: {
   forms: TaskTestFormSummary[]
+  taskId?: number
   onOpenPhoto?: (photoId: number) => void
   renderActions?: (form: TaskTestFormSummary) => ReactNode
 }) {
+  const [downloading, setDownloading] = useState<string | null>(null)
+
   if (forms.length === 0) return <p className="text-muted">Aucun formulaire d’essai associé à cette tâche.</p>
+
+  const downloadReport = async (typeId: number, format: 'docx' | 'xlsx') => {
+    if (!taskId) return
+    const key = `${typeId}-${format}`
+    setDownloading(key)
+    try {
+      await taskTestFormsApi.downloadReport(taskId, typeId, format)
+    } catch (error) {
+      window.alert((error as Error).message)
+    } finally {
+      setDownloading(null)
+    }
+  }
 
   return <div className="task-test-results">
     {forms.map((form) => <section key={form.test_type.id} className="task-test-results__form">
@@ -23,6 +40,14 @@ export default function TaskTestFormResults({ forms, onOpenPhoto, renderActions 
         </dd></div>
       })}</dl> : <p className="text-muted">Le formulaire n’a pas encore été rempli.</p>}
       {form.submission?.photos?.map((photo) => onOpenPhoto ? <button key={photo.id} type="button" className="btn btn-secondary btn-sm" onClick={() => onOpenPhoto(photo.id)}>Voir la photo : {photo.original_name}</button> : <span key={photo.id}>{photo.original_name}</span>)}
+      {form.submission && taskId ? <div className="crud-actions">
+        <button type="button" className="btn btn-secondary btn-sm" disabled={downloading === `${form.test_type.id}-docx`} onClick={() => void downloadReport(form.test_type.id, 'docx')}>
+          {downloading === `${form.test_type.id}-docx` ? 'Génération…' : '📄 Rapport Word'}
+        </button>
+        <button type="button" className="btn btn-secondary btn-sm" disabled={downloading === `${form.test_type.id}-xlsx`} onClick={() => void downloadReport(form.test_type.id, 'xlsx')}>
+          {downloading === `${form.test_type.id}-xlsx` ? 'Génération…' : '📊 Rapport Excel'}
+        </button>
+      </div> : null}
       {renderActions?.(form)}
     </section>)}
   </div>

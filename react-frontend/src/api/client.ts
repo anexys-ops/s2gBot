@@ -3204,6 +3204,19 @@ export const taskTestFormsApi = {
     if (!response.ok) throw new Error('Photo indisponible')
     return response.blob()
   },
+  downloadReport: async (taskId: number, typeId: number, format: 'docx' | 'xlsx') => {
+    const token = getToken()
+    const res = await fetch(`${API_BASE}/mobile/task-forms/tasks/${taskId}/types/${typeId}/report.${format}`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    })
+    if (res.status === 401) handleApiUnauthorized(`/mobile/task-forms/tasks/${taskId}/types/${typeId}/report.${format}`, Boolean(token))
+    if (!res.ok) throw new Error('Téléchargement du rapport impossible')
+    const disposition = res.headers.get('content-disposition') ?? ''
+    const match = /filename="([^"]+)"/.exec(disposition)
+    const filename = match?.[1] ?? `rapport.${format}`
+    const blob = await res.blob()
+    pdfApi.downloadBlob(blob, filename)
+  },
 }
 
 export interface OrderItem {

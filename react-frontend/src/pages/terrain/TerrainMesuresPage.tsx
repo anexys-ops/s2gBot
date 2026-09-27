@@ -398,7 +398,7 @@ function TaskMeasureDetail({ task, onClose }: { task: MissionTask; onClose: () =
       )}
 
       {activeTab === 'essais' && <section className="card" style={{ padding: '1rem' }}>
-        <TaskTestFormResults forms={taskForms?.forms ?? []} onOpenPhoto={(photoId) => void openFormPhoto(photoId)} />
+        <TaskTestFormResults forms={taskForms?.forms ?? []} taskId={task.id} onOpenPhoto={(photoId) => void openFormPhoto(photoId)} />
       </section>}
 
       {editable && configs.length > 0 && (

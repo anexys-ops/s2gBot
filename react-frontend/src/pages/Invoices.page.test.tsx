@@ -24,7 +24,7 @@ describe('Invoices', () => {
     vi.spyOn(api.moduleSettingsApi, 'get').mockResolvedValue({ module_key: 'invoices', settings: {} })
     vi.spyOn(api.clientsApi, 'list').mockResolvedValue([])
     vi.spyOn(api.invoicesApi, 'list').mockResolvedValue(emptyPaginator as never)
-    vi.spyOn(api.ordersApi, 'list').mockResolvedValue({ data: [] } as never)
+    vi.spyOn(api.invoicesApi, 'eligibleBonsCommande').mockResolvedValue({ data: [] })
 
     render(
       <QueryClientProvider client={client}>
@@ -39,7 +39,7 @@ describe('Invoices', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /factures/i })).toBeInTheDocument()
     })
-    expect(await screen.findByText(/aucune facture/i)).toBeInTheDocument()
+    expect(await screen.findByText(/aucune facture ne correspond aux filtres/i)).toBeInTheDocument()
   })
 
   it('passe le filtre statut envoyée à list()', async () => {
@@ -49,7 +49,7 @@ describe('Invoices', () => {
     const listSpy = vi.spyOn(api.invoicesApi, 'list').mockResolvedValue(emptyPaginator as never)
     vi.spyOn(api.moduleSettingsApi, 'get').mockResolvedValue({ module_key: 'invoices', settings: {} })
     vi.spyOn(api.clientsApi, 'list').mockResolvedValue([])
-    vi.spyOn(api.ordersApi, 'list').mockResolvedValue({ data: [] } as never)
+    vi.spyOn(api.invoicesApi, 'eligibleBonsCommande').mockResolvedValue({ data: [] })
 
     render(
       <QueryClientProvider client={client}>

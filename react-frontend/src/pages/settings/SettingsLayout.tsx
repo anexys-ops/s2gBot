@@ -1,12 +1,13 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import PageBackNav from '../../components/PageBackNav'
 import { useAuth } from '../../contexts/AuthContext'
-import { canManageGroups, canManageUsers } from '../../lib/settingsAccess'
+import { canManageGroups, canManageUsers, canViewMonitoringLogs } from '../../lib/settingsAccess'
 
 export default function SettingsLayout() {
   const { user } = useAuth()
   const showUsers = canManageUsers(user)
   const showGroups = canManageGroups(user)
+  const showLogs = canViewMonitoringLogs(user)
 
   return (
     <div className="settings-layout">
@@ -29,6 +30,14 @@ export default function SettingsLayout() {
         >
           Sécurité &amp; API
         </NavLink>
+        {showLogs ? (
+          <NavLink
+            to="/settings/journaux"
+            className={({ isActive }) => `settings-layout__tab${isActive ? ' settings-layout__tab--active' : ''}`}
+          >
+            Journaux
+          </NavLink>
+        ) : null}
         <NavLink
           to="/settings/charte"
           className={({ isActive }) => `settings-layout__tab${isActive ? ' settings-layout__tab--active' : ''}`}

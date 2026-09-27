@@ -43,17 +43,11 @@ function metaForPath(pathname: string): PageMeta {
       subtitle: 'Suivi des écarts ISO 17025, actions correctives et indicateurs d’ouverture / clôture.',
       crumb: 'Non-conformités',
     }
-  if (pathname.includes('/modeles-rapports-pdf'))
-    return {
-      title: 'Modèles PDF — rapports d’essais',
-      subtitle: 'Modèle par défaut utilisé lors de la génération depuis une commande.',
-      crumb: 'Modèles PDF rapports',
-    }
   if (pathname.includes('/modeles-documents-pdf'))
     return {
       title: 'Modèles PDF — devis & factures',
-      subtitle: 'Modèle par défaut par type de document et mise en page (logo, signature, champs).',
-      crumb: 'Modèles PDF documents',
+      subtitle: 'Types de PDF existants, modèle par défaut, et affichage Total HT / TVA / TTC.',
+      crumb: 'Modèles PDF devis/factures',
     }
   if (pathname.includes('/pdf'))
     return {
@@ -70,7 +64,8 @@ function metaForPath(pathname: string): PageMeta {
   if (pathname.includes('/configuration'))
     return {
       title: 'Configuration',
-      subtitle: 'Champs personnalisés par module (extrafields) et valeurs des listes déroulantes (TVA, statuts…).',
+      subtitle:
+        'Champs personnalisés, listes déroulantes et catalogue produits S2G (jalons & produits — CRUD admin).',
       crumb: 'Configuration',
     }
   return {
@@ -82,6 +77,10 @@ function metaForPath(pathname: string): PageMeta {
 
 function isProlabOffresPath(pathname: string): boolean {
   return pathname.startsWith('/back-office/offres')
+}
+
+function isConfigModulePath(pathname: string): boolean {
+  return pathname.includes('/configuration') || pathname.includes('/modeles-documents-pdf')
 }
 
 export default function BackOfficeLayout() {
@@ -99,35 +98,29 @@ export default function BackOfficeLayout() {
     { to: '/back-office/offres', label: 'Offres (devis)', end: true as const },
   ]
 
+  const configTabs = [
+    ...(canAppConfig ? [{ to: '/back-office/configuration', label: 'Modules', end: true as const }] : []),
+    ...(isAdmin
+      ? [{ to: '/back-office/modeles-documents-pdf', label: 'PDF devis/factures', end: true as const }]
+      : []),
+  ]
+
   const toolsTabs = [
     { to: '/back-office/granulometrie', label: 'Granulométrie', end: true as const },
     { to: '/back-office/cadrage', label: 'Cadrage (S0)', end: true as const },
     { to: '/back-office/exemples-calculs', label: 'Calculs BTP', end: true as const },
     { to: '/back-office/journal-audit', label: 'Journal d’audit', end: true as const },
     { to: '/back-office/non-conformites', label: 'Non-conformités', end: true as const },
-    { to: '/clients', label: 'Clients' },
-    { to: '/sites', label: 'Chantiers' },
-    ...(isLab
-      ? [
-          { to: '/back-office/pdf', label: 'Création PDF', end: true as const },
-          { to: '/back-office/mails', label: 'Mails', end: true as const },
-        ]
-      : []),
-    ...(isAdmin
-      ? [
-          { to: '/back-office/modeles-rapports-pdf', label: 'Modèles PDF rapports', end: true as const },
-          { to: '/back-office/modeles-documents-pdf', label: 'Modèles PDF devis/factures', end: true as const },
-        ]
-      : []),
-    ...(canAppConfig ? [{ to: '/back-office/configuration', label: 'Configuration', end: true as const }] : []),
+    ...(isLab ? [{ to: '/back-office/mails', label: 'Mails', end: true as const }] : []),
   ]
 
-  const tabs = onCatalogue ? catalogueTabs : toolsTabs
+  const onConfigModule = isConfigModulePath(pathname)
+  const tabs = onCatalogue ? catalogueTabs : onConfigModule ? configTabs : toolsTabs
 
   const tabsAccessory = onCatalogue ? (
     <span className="back-office-tabs-accessory">
       <span className="back-office-tabs-accessory__label">Outils & configuration</span>
-      <Link to="/back-office/granulometrie">Granulométrie, audit, clients, PDF…</Link>
+      <Link to="/back-office/granulometrie">Granulométrie, audit, mails…</Link>
     </span>
   ) : (
     <span className="back-office-tabs-accessory">
@@ -148,7 +141,13 @@ export default function BackOfficeLayout() {
         { label: 'Laboratoire', to: '/labo' },
         { label: meta.crumb },
       ]}
-      moduleBarLabel={onCatalogue ? 'Catalogue (PROLAB) & offres' : 'Laboratoire — Configuration et outils'}
+      moduleBarLabel={
+        onCatalogue
+          ? 'Catalogue (PROLAB) & offres'
+          : onConfigModule
+            ? 'Configuration — modules & PDF'
+            : 'Laboratoire — Outils'
+      }
       title={meta.title}
       subtitle={meta.subtitle}
       tabs={tabs}

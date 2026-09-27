@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { clientsApi, type Client } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
-import Modal from '../components/Modal'
-import ListTableToolbar from '../components/ListTableToolbar'
+import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
+import { ListTablePanelHeader } from '../components/ListTablePanel'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
-import ClientMoroccoFormFields from '../components/clients/ClientMoroccoFormFields'
+import ClientFormModal from '../components/clients/ClientFormModal'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
+import Toast, { toastErrorMessage, type ToastVariant } from '../components/Toast'
+import TableRowActions from '../components/TableRowActions'
+import ConfirmDialog from '../components/ConfirmDialog'
+import { shouldIgnoreTableRowClick } from '../lib/tableRowInteraction'
 
 function parseCapital(v: Client['capital_social']): number | undefined {
   if (v === undefined || v === null || v === '') return undefined
@@ -17,6 +21,7 @@ function parseCapital(v: Client['capital_social']): number | undefined {
 }
 
 const emptyForm: Partial<Client> = {
+  currency_code: 'MAD',
   name: '',
   address: '',
   city: '',
@@ -26,6 +31,7 @@ const emptyForm: Partial<Client> = {
   whatsapp: '',
   siret: '',
   ice: '',
+  ca_annuel_tva_regime: false,
   rc: '',
   patente: '',
   if_number: '',
@@ -47,7 +53,9 @@ const VIEW_LABELS: Record<ViewFilter, string> = {
 
 export default function Clients() {
   const { user } = useAuth()
-  const isAdmin = user?.role === 'lab_admin'
+  const isAdmin =
+    user?.role === 'lab_admin' ||
+    (user?.effective_permissions ?? []).includes('clients.write')
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const queryClient = useQueryClient()
   const location = useLocation()
@@ -58,6 +66,10 @@ export default function Clients() {
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all')
+  const [page, setPage] = useState(1)
+  const perPage = 20
+  const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null)
   const { visible, toggle } = usePersistedColumnVisibility('clients', {
     name: true,
     email: true,
@@ -65,14 +77,26 @@ export default function Clients() {
     city: true,
     ice: true,
     siret: false,
+    created: false,
     commercial: true,
     actions: true,
   })
 
-  const { data: clients, isLoading, error } = useQuery({
-    queryKey: ['clients', debouncedSearch],
-    queryFn: () => clientsApi.list({ search: debouncedSearch.trim() || undefined }),
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['clients', 'paginated', debouncedSearch, viewFilter, page, perPage],
+    queryFn: () =>
+      clientsApi.listPaginated({
+        search: debouncedSearch.trim() || undefined,
+        view: viewFilter,
+        page,
+        per_page: perPage,
+      }),
+    placeholderData: keepPreviousData,
   })
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, viewFilter])
 
   useEffect(() => {
     const st = location.state as { openCreate?: boolean } | null
@@ -84,12 +108,20 @@ export default function Clients() {
     }
   }, [location.state, navigate, isAdmin])
 
+  const showToast = (message: string, variant: ToastVariant) => {
+    setToast({ message, variant })
+  }
+
   const createMut = useMutation({
     mutationFn: (body: Partial<Client>) => clientsApi.create(body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       setModal(null)
       setForm(emptyForm)
+      showToast('Client créé avec succès.', 'success')
+    },
+    onError: (err) => {
+      showToast(toastErrorMessage(err, 'Échec de la création du client.'), 'error')
     },
   })
 
@@ -100,12 +132,19 @@ export default function Clients() {
       setModal(null)
       setEditingId(null)
       setForm(emptyForm)
+      showToast('Client mis à jour avec succès.', 'success')
+    },
+    onError: (err) => {
+      showToast(toastErrorMessage(err, 'Échec de la mise à jour du client.'), 'error')
     },
   })
 
   const deleteMut = useMutation({
     mutationFn: (id: number) => clientsApi.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clients'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] })
+      setClientToDelete(null)
+    },
   })
 
   const openCreate = () => {
@@ -126,6 +165,7 @@ export default function Clients() {
       whatsapp: c.whatsapp ?? '',
       siret: c.siret ?? '',
       ice: c.ice ?? '',
+      ca_annuel_tva_regime: Boolean(c.ca_annuel_tva_regime),
       rc: c.rc ?? '',
       patente: c.patente ?? '',
       if_number: c.if_number ?? '',
@@ -156,20 +196,20 @@ export default function Clients() {
     }
   }
 
-  const rawList = Array.isArray(clients) ? clients : []
+  const list = data?.data ?? []
+  const total = data?.total ?? 0
+  const lastPage = data?.last_page ?? 1
+  const currentPage = data?.current_page ?? page
 
-  const list = useMemo(() => {
-    return rawList.filter((c) => {
-      if (viewFilter === 'with_siret') return !!(c.siret && String(c.siret).trim())
-      if (viewFilter === 'with_ice') return !!(c.ice && String(c.ice).trim())
-      if (viewFilter === 'missing_email') return !c.email?.trim()
-      if (viewFilter === 'missing_phone') return !c.phone?.trim()
-      if (viewFilter === 'missing_ice') return !(c.ice && String(c.ice).trim())
-      return true
-    })
-  }, [rawList, viewFilter])
+  const hasActiveFilters = debouncedSearch.trim() !== '' || viewFilter !== 'all'
 
-  if (isLoading) {
+  const clearAllFilters = () => {
+    setSearchInput('')
+    setViewFilter('all')
+    setPage(1)
+  }
+
+  if (isLoading && !data) {
     return (
       <ModuleEntityShell
         breadcrumbs={[
@@ -211,9 +251,18 @@ export default function Clients() {
       ]}
       moduleBarLabel="Tiers — Clients"
       title="Clients"
-      subtitle={`${list.length} fiche(s) affichée(s) sur ${rawList.length} chargée(s)`}
+      subtitle={
+        total > 0
+          ? `${total} client(s) — page ${currentPage} / ${lastPage}`
+          : 'Aucun client pour cette vue'
+      }
       actions={
         <>
+          {isLab && (
+            <Link to="/clients/contacts" className="btn btn-secondary btn-sm">
+              Contacts clients
+            </Link>
+          )}
           {isAdmin && (
             <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
               Nouveau client
@@ -224,7 +273,10 @@ export default function Clients() {
     >
       <ListTableToolbar
         searchValue={searchInput}
-        onSearchChange={setSearchInput}
+        onSearchChange={(v) => {
+          setSearchInput(v)
+          setPage(1)
+        }}
         searchPlaceholder="Nom, email, ICE, RC, ville…"
         columns={[
           { id: 'name', label: 'Nom' },
@@ -233,15 +285,22 @@ export default function Clients() {
           { id: 'city', label: 'Ville' },
           { id: 'ice', label: 'ICE' },
           { id: 'siret', label: 'SIRET / autre' },
+          { id: 'created', label: 'Date de création' },
           ...(isLab ? [{ id: 'commercial', label: 'Commerce (fiche)' }] : []),
           ...(isAdmin ? [{ id: 'actions', label: 'Actions' }] : []),
         ]}
         visibleColumns={visible}
         onToggleColumn={toggle}
         extra={
-          <label style={{ minWidth: 200, margin: 0 }}>
+          <label>
             <span className="filter-label">Vue (filtre liste)</span>
-            <select value={viewFilter} onChange={(e) => setViewFilter(e.target.value as ViewFilter)}>
+            <select
+              value={viewFilter}
+              onChange={(e) => {
+                setViewFilter(e.target.value as ViewFilter)
+                setPage(1)
+              }}
+            >
               {(Object.keys(VIEW_LABELS) as ViewFilter[]).map((k) => (
                 <option key={k} value={k}>
                   {VIEW_LABELS[k]}
@@ -250,8 +309,51 @@ export default function Clients() {
             </select>
           </label>
         }
+        footer={
+          hasActiveFilters ? (
+            <>
+              <span className="list-table-toolbar__footer-label">Filtres actifs</span>
+              {debouncedSearch.trim() !== '' && (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">Recherche : « {debouncedSearch.trim()} »</span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => {
+                      setSearchInput('')
+                      setPage(1)
+                    }}
+                    aria-label="Retirer la recherche"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {viewFilter !== 'all' && (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">{VIEW_LABELS[viewFilter]}</span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => {
+                      setViewFilter('all')
+                      setPage(1)
+                    }}
+                    aria-label="Retirer le filtre vue"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              <button type="button" className="btn btn-secondary btn-sm" onClick={clearAllFilters}>
+                Tout effacer
+              </button>
+            </>
+          ) : undefined
+        }
       />
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title="Clients" count={list.length} />
         <div className="table-wrap">
           <table className="data-table data-table--compact">
             <thead>
@@ -262,6 +364,7 @@ export default function Clients() {
               {visible.city !== false && <th>Ville</th>}
               {visible.ice !== false && <th>ICE</th>}
               {visible.siret !== false && <th>SIRET / autre</th>}
+              {visible.created !== false && <th>Création</th>}
               {isLab && visible.commercial !== false && <th>Commerce</th>}
               {isAdmin && visible.actions !== false && <th className="data-table__actions">Actions</th>}
             </tr>
@@ -272,9 +375,9 @@ export default function Clients() {
                 key={c.id}
                 className="table-row-link"
                 onClick={(e) => {
-                  const t = e.target as HTMLElement
-                  if (t.closest('a, button')) return
-                  navigate(`/clients/${c.id}/fiche`)
+                  if (shouldIgnoreTableRowClick(e.target)) return
+                  if (isAdmin) openEdit(c)
+                  else navigate(`/clients/${c.id}/fiche`)
                 }}
               >
                 {visible.name !== false && (
@@ -298,6 +401,9 @@ export default function Clients() {
                 {visible.city !== false && <td>{c.city?.trim() ? c.city : '—'}</td>}
                 {visible.ice !== false && <td>{c.ice?.trim() ? c.ice : '—'}</td>}
                 {visible.siret !== false && <td>{c.siret?.trim() ? c.siret : '—'}</td>}
+                {visible.created !== false && (
+                  <td>{c.created_at ? new Date(c.created_at).toLocaleDateString('fr-FR') : '—'}</td>
+                )}
                 {isLab && visible.commercial !== false && (
                   <td>
                     <Link className="btn btn-secondary btn-sm" to={`/clients/${c.id}/commerce`} onClick={(e) => e.stopPropagation()}>
@@ -307,28 +413,10 @@ export default function Clients() {
                 )}
                 {isAdmin && visible.actions !== false && (
                   <td className="data-table__actions" onClick={(e) => e.stopPropagation()}>
-                    <div className="data-table__actions-inner">
-                      <button
-                        type="button"
-                        className="ds-icon-btn"
-                        title="Modifier"
-                        aria-label="Modifier le client"
-                        onClick={() => openEdit(c)}
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        type="button"
-                        className="ds-icon-btn ds-icon-btn--danger"
-                        title="Supprimer définitivement"
-                        aria-label="Supprimer définitivement le client"
-                        onClick={() => {
-                          if (window.confirm(`Supprimer le client « ${c.name} » ?`)) deleteMut.mutate(c.id)
-                        }}
-                      >
-                        🗑️
-                      </button>
-                    </div>
+                    <TableRowActions
+                      deleteLabel="Supprimer définitivement le client"
+                      onDelete={() => setClientToDelete(c)}
+                    />
                   </td>
                 )}
               </tr>
@@ -337,37 +425,46 @@ export default function Clients() {
           </table>
         </div>
         {!list.length && <p style={{ padding: '1rem' }}>Aucun client pour cette vue.</p>}
+        <PaginationBar page={currentPage} lastPage={lastPage} onPage={setPage} />
       </div>
 
       {modal && (
-        <Modal title={modal === 'create' ? 'Nouveau client' : 'Modifier le client'} onClose={() => setModal(null)}>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>Nom *</label>
-              <input value={form.name ?? ''} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
-            </div>
-            <div className="form-group">
-              <label>Adresse (rue, quartier…)</label>
-              <input value={form.address ?? ''} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label>Email</label>
-              <input type="email" value={form.email ?? ''} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-            </div>
-            <ClientMoroccoFormFields form={form} setForm={setForm} />
-            {(createMut.isError || updateMut.isError) && (
-              <p className="error">{(createMut.error || updateMut.error)?.message}</p>
-            )}
-            <div className="crud-actions" style={{ marginTop: '1rem' }}>
-              <button type="submit" className="btn btn-primary" disabled={createMut.isPending || updateMut.isPending}>
-                Enregistrer
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>
-                Annuler
-              </button>
-            </div>
-          </form>
-        </Modal>
+        <ClientFormModal
+          mode={modal}
+          form={form}
+          setForm={setForm}
+          onSubmit={handleSubmit}
+          onClose={() => setModal(null)}
+          isPending={createMut.isPending || updateMut.isPending}
+          errorMessage={
+            createMut.isError || updateMut.isError
+              ? ((createMut.error ?? updateMut.error) as Error).message
+              : null
+          }
+        />
+      )}
+      {toast && (
+        <Toast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} />
+      )}
+      {clientToDelete && (
+        <ConfirmDialog
+          title="Supprimer le client"
+          message={
+            <>
+              Supprimer définitivement le client <strong>« {clientToDelete.name} »</strong> ?
+              <br />
+              Cette action est irréversible.
+            </>
+          }
+          confirmLabel="Supprimer"
+          variant="danger"
+          loading={deleteMut.isPending}
+          error={deleteMut.isError ? (deleteMut.error as Error).message : null}
+          onConfirm={() => deleteMut.mutate(clientToDelete.id)}
+          onCancel={() => {
+            if (!deleteMut.isPending) setClientToDelete(null)
+          }}
+        />
       )}
     </ModuleEntityShell>
   )

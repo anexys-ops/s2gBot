@@ -7,11 +7,17 @@ import {
   type BonCommande,
   type BonCommandeLigne,
 } from '../../api/client'
+import { bonCommandeStatutBadgeProps } from '../../components/ds/StatusBadge'
+import StatusBadge from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import PlanningMassActionsBar from '../../components/planning/PlanningMassActionsBar'
 import { useAuth } from '../../contexts/AuthContext'
+import { dateInputFromApi, toLocalDateInput } from '../../lib/appLocale'
+import { applyMassToLineIds, toggleAllSelection } from '../../lib/planningMassApply'
+import { formatTechnicienOption } from '../../lib/userRolePresentation'
 
 function toYmd(d: Date) {
-  return d.toISOString().slice(0, 10)
+  return toLocalDateInput(d)
 }
 
 function addDays(d: Date, n: number) {
@@ -47,12 +53,22 @@ function affectationOnDay(
   day: Date
 ): boolean {
   const t = ymdLocal(day)
-  const ds = String(a.date_debut).slice(0, 10)
-  const de = String(a.date_fin).slice(0, 10)
+  const ds = dateInputFromApi(a.date_debut)
+  const de = dateInputFromApi(a.date_fin)
   return t >= ds && t <= de
 }
 
 const isLab = (role?: string) => role === 'lab_admin' || role === 'lab_technician'
+
+function formatBcPlanningOption(bc: BonCommande): string {
+  const statut = bonCommandeStatutBadgeProps(bc.statut).label
+  const client = bc.client?.name ? ` — ${bc.client.name}` : ''
+  return `${bc.numero} (${statut})${client}`
+}
+
+function handleDebutCascade(debut: string, setFin: (value: string) => void) {
+  setFin(debut)
+}
 
 export default function PlanningTechniciensPage() {
   const { user } = useAuth()
@@ -72,6 +88,10 @@ export default function PlanningTechniciensPage() {
   const [unposDebugMap, setUnposDebugMap] = useState<Record<number, string>>({})
   const [unposFinMap, setUnposFinMap] = useState<Record<number, string>>({})
   const [unposNotesMap, setUnposNotesMap] = useState<Record<number, string>>({})
+  const [selectedUnposIds, setSelectedUnposIds] = useState<Set<number>>(new Set())
+  const [massUserId, setMassUserId] = useState<number | ''>('')
+  const [massDebut, setMassDebut] = useState(() => toYmd(new Date()))
+  const [massFin, setMassFin] = useState(() => toYmd(new Date()))
 
   const { data: affectations, isLoading, error } = useQuery({
     queryKey: ['planning-terrain', from, to, userFilter],
@@ -90,8 +110,8 @@ export default function PlanningTechniciensPage() {
   })
 
   const { data: bonsListe } = useQuery({
-    queryKey: ['bons-commande', 'all-planning'],
-    queryFn: () => bonsCommandeApi.list(),
+    queryKey: ['bons-commande', 'planning'],
+    queryFn: () => bonsCommandeApi.list({ planning: true }),
   })
 
   const bcs: BonCommande[] = bonsListe ?? []
@@ -106,7 +126,7 @@ export default function PlanningTechniciensPage() {
   )
 
   const unpositionedLignes = useMemo(() => {
-    const all: (BonCommandeLigne & { bc_id: number; bc_numero: string; dossier_id: number })[] = []
+    const all: (BonCommandeLigne & { bc_id: number; bc_numero: string; bc_statut: string; dossier_id: number })[] = []
     for (const bc of bcs) {
       if (unposBcFilter !== '' && bc.id !== unposBcFilter) continue
       for (const ligne of bc.lignes ?? []) {
@@ -115,6 +135,7 @@ export default function PlanningTechniciensPage() {
             ...ligne,
             bc_id: bc.id,
             bc_numero: bc.numero,
+            bc_statut: bc.statut,
             dossier_id: bc.dossier_id,
           })
         }
@@ -164,6 +185,52 @@ export default function PlanningTechniciensPage() {
     },
   })
 
+  const bulkCreateUnposMut = useMutation({
+    mutationFn: async (ligneIds: number[]) => {
+      for (const ligneId of ligneIds) {
+        const userId = unposUserIdMap[ligneId]
+        if (userId === '' || userId === undefined) continue
+        await planningTerrainApi.create({
+          bon_commande_ligne_id: ligneId,
+          user_id: userId,
+          date_debut: unposDebugMap[ligneId] || massDebut,
+          date_fin: unposFinMap[ligneId] || massFin,
+          notes: unposNotesMap[ligneId] || undefined,
+        })
+      }
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['planning-terrain'] })
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+      setUnposUserIdMap({})
+      setUnposDebugMap({})
+      setUnposFinMap({})
+      setUnposNotesMap({})
+      setSelectedUnposIds(new Set())
+    },
+  })
+
+  function applyMassToUnpositioned() {
+    const targetIds =
+      selectedUnposIds.size > 0 ? [...selectedUnposIds] : unpositionedLignes.map((l) => l.id)
+    applyMassToLineIds(targetIds, {
+      assigneeId: massUserId,
+      dateDebut: massDebut,
+      dateFin: massFin,
+      setAssignee: (id, userId) => setUnposUserIdMap((m) => ({ ...m, [id]: userId })),
+      setDateDebut: (id, value) => setUnposDebugMap((m) => ({ ...m, [id]: value })),
+      setDateFin: (id, value) => setUnposFinMap((m) => ({ ...m, [id]: value })),
+    })
+  }
+
+  const bulkCreateTargets = useMemo(() => {
+    const pool =
+      selectedUnposIds.size > 0
+        ? unpositionedLignes.filter((l) => selectedUnposIds.has(l.id))
+        : unpositionedLignes
+    return pool.filter((l) => unposUserIdMap[l.id] !== '' && unposUserIdMap[l.id] !== undefined)
+  }, [unpositionedLignes, selectedUnposIds, unposUserIdMap])
+
   return (
     <ModuleEntityShell
       shellClassName="module-shell--crm"
@@ -182,7 +249,8 @@ export default function PlanningTechniciensPage() {
             Lignes non affectées
           </h2>
           <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-            Lignes de BC sans affectation terrain. Assignez un technicien et des dates pour créer l'affectation.
+            Lignes de BC sans affectation terrain (y compris BC en brouillon). Assignez un technicien et des dates pour
+            créer l'affectation.
           </p>
           <div style={{ marginBottom: '0.75rem' }}>
             <label>
@@ -195,7 +263,7 @@ export default function PlanningTechniciensPage() {
                 <option value="">Tous</option>
                 {bcs.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.numero} (dossier #{b.dossier_id})
+                    {formatBcPlanningOption(b)}
                   </option>
                 ))}
               </select>
@@ -205,11 +273,60 @@ export default function PlanningTechniciensPage() {
             <p className="text-muted">Aucune ligne non affectée.</p>
           )}
           {unpositionedLignes.length > 0 && (
+            <>
+              <PlanningMassActionsBar
+                assignees={techniciens ?? []}
+                assigneeId={massUserId}
+                onAssigneeChange={setMassUserId}
+                dateDebut={massDebut}
+                onDateDebutChange={setMassDebut}
+                dateFin={massFin}
+                onDateFinChange={setMassFin}
+                onApply={applyMassToUnpositioned}
+                applyLabel="Appliquer aux lignes"
+                selectedCount={selectedUnposIds.size > 0 ? selectedUnposIds.size : unpositionedLignes.length}
+                totalCount={unpositionedLignes.length}
+                hint="Cochez des lignes ou laissez la sélection vide pour cibler toutes les lignes visibles."
+              />
+              <div className="planning-mass-actions__save-row">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  disabled={bulkCreateUnposMut.isPending || bulkCreateTargets.length === 0}
+                  onClick={() => bulkCreateUnposMut.mutate(bulkCreateTargets.map((l) => l.id))}
+                >
+                  {bulkCreateUnposMut.isPending
+                    ? 'Création…'
+                    : `Créer les affectations (${bulkCreateTargets.length})`}
+                </button>
+              </div>
+            </>
+          )}
+          {unpositionedLignes.length > 0 && (
             <div className="table-wrap">
               <table className="data-table data-table--compact" style={{ width: '100%' }}>
                 <thead>
                   <tr>
+                    <th style={{ width: 36 }}>
+                      <input
+                        type="checkbox"
+                        aria-label="Tout sélectionner"
+                        checked={
+                          unpositionedLignes.length > 0 && selectedUnposIds.size === unpositionedLignes.length
+                        }
+                        onChange={(e) =>
+                          setSelectedUnposIds(
+                            toggleAllSelection(
+                              selectedUnposIds,
+                              unpositionedLignes.map((l) => l.id),
+                              e.target.checked,
+                            ),
+                          )
+                        }
+                      />
+                    </th>
                     <th>BC</th>
+                    <th>Statut BC</th>
                     <th>Ligne</th>
                     <th>Technicien</th>
                     <th>Début</th>
@@ -222,9 +339,26 @@ export default function PlanningTechniciensPage() {
                   {unpositionedLignes.map((ligne) => (
                     <tr key={ligne.id}>
                       <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedUnposIds.has(ligne.id)}
+                          onChange={(e) => {
+                            setSelectedUnposIds((prev) => {
+                              const next = new Set(prev)
+                              if (e.target.checked) next.add(ligne.id)
+                              else next.delete(ligne.id)
+                              return next
+                            })
+                          }}
+                        />
+                      </td>
+                      <td>
                         <Link to={`/bons-commande/${ligne.bc_id}`} className="link-inline">
                           {ligne.bc_numero}
                         </Link>
+                      </td>
+                      <td>
+                        <StatusBadge {...bonCommandeStatutBadgeProps(ligne.bc_statut)} />
                       </td>
                       <td>{ligne.libelle}</td>
                       <td>
@@ -241,7 +375,7 @@ export default function PlanningTechniciensPage() {
                           <option value="">—</option>
                           {techniciens?.map((t) => (
                             <option key={t.id} value={t.id}>
-                              {t.name}
+                              {formatTechnicienOption(t)}
                             </option>
                           )) ?? null}
                         </select>
@@ -250,12 +384,17 @@ export default function PlanningTechniciensPage() {
                         <input
                           type="date"
                           value={unposDebugMap[ligne.id] || toYmd(new Date())}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const debut = e.target.value
                             setUnposDebugMap((m) => ({
                               ...m,
-                              [ligne.id]: e.target.value,
+                              [ligne.id]: debut,
                             }))
-                          }
+                            setUnposFinMap((m) => ({
+                              ...m,
+                              [ligne.id]: debut,
+                            }))
+                          }}
                           style={{ width: '100%' }}
                         />
                       </td>
@@ -306,11 +445,11 @@ export default function PlanningTechniciensPage() {
               </table>
             </div>
           )}
-          {createUnposMut.isError && (
+          {createUnposMut.isError || bulkCreateUnposMut.isError ? (
             <p className="error" style={{ marginTop: '0.75rem' }}>
-              {(createUnposMut.error as Error).message}
+              {((bulkCreateUnposMut.error ?? createUnposMut.error) as Error).message}
             </p>
-          )}
+          ) : null}
         </section>
       )}
 
@@ -347,7 +486,7 @@ export default function PlanningTechniciensPage() {
             {lab
               ? (techniciens ?? []).map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name}
+                    {formatTechnicienOption(t)}
                   </option>
                 ))
               : null}
@@ -446,7 +585,7 @@ export default function PlanningTechniciensPage() {
                   return (
                     <tr key={a.id}>
                       <td>
-                        {String(a.date_debut).slice(0, 10)} → {String(a.date_fin).slice(0, 10)}
+                        {dateInputFromApi(a.date_debut)} → {dateInputFromApi(a.date_fin)}
                       </td>
                       <td>{a.user?.name ?? `Utilisateur #${a.user_id}`}</td>
                       <td>
@@ -500,8 +639,9 @@ export default function PlanningTechniciensPage() {
             Nouvelle affectation
           </h2>
           <p className="text-muted" style={{ fontSize: '0.9rem' }}>
-            Choisissez un bon de commande, une ligne de produit, puis le technicien et les dates d'intervention. Les
-            dates d'affectation doivent rester dans la période prévue sur la ligne (défini sur la fiche BC).
+            Choisissez un bon de commande (brouillon, confirmé ou en cours), une ligne de produit, puis le technicien
+            et les dates d'intervention. Les dates d'affectation doivent rester dans la période prévue sur la ligne
+            (défini sur la fiche BC).
           </p>
           <div style={{ display: 'grid', gap: '0.75rem', marginTop: '0.75rem' }}>
             <label>
@@ -514,7 +654,7 @@ export default function PlanningTechniciensPage() {
                 <option value="">—</option>
                 {techniciens.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name}
+                    {formatTechnicienOption(t)}
                   </option>
                 ))}
               </select>
@@ -532,7 +672,7 @@ export default function PlanningTechniciensPage() {
                 <option value="">—</option>
                 {bcs.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.numero} (dossier #{b.dossier_id})
+                    {formatBcPlanningOption(b)}
                   </option>
                 ))}
               </select>
@@ -559,7 +699,11 @@ export default function PlanningTechniciensPage() {
                 <input
                   type="date"
                   value={newDebut}
-                  onChange={(e) => setNewDebut(e.target.value)}
+                  onChange={(e) => {
+                    const debut = e.target.value
+                    setNewDebut(debut)
+                    handleDebutCascade(debut, setNewFin)
+                  }}
                   style={{ display: 'block', marginTop: 4 }}
                 />
               </label>

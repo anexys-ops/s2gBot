@@ -28,6 +28,7 @@ use App\Services\DocumentStatusService;
 use App\Support\ActivityChangeTracker;
 use App\Support\AgencyAccess;
 use App\Support\ClientContactDocument;
+use App\Support\PermissionCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -129,7 +130,8 @@ class QuoteController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        $u = $request->user();
+        if (! $u->isLab() && ! $u->hasCapability(PermissionCatalog::COMMERCIAL_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -255,7 +257,8 @@ class QuoteController extends Controller
 
     public function update(Request $request, Quote $quote): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        $u = $request->user();
+        if (! $u->isLab() && ! $u->hasCapability(PermissionCatalog::COMMERCIAL_WRITE)) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 

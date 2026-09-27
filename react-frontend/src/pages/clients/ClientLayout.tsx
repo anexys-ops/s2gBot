@@ -81,6 +81,7 @@ export default function ClientLayout() {
     { to: `${base}/fiche`, label: 'Fiche', end: true as const },
     ...(isLab ? [{ to: `${base}/commerce`, label: 'Commerce & adresses' as const }] : []),
     ...(isLab ? [{ to: `${base}/documents`, label: 'Documents' as const }] : []),
+    ...(isAdmin ? [{ to: `${base}/agences`, label: 'Agences' as const }] : []),
     ...(isLab ? [{ to: `${base}/extrafields`, label: 'Champs personnalisés' as const }] : []),
   ]
 
@@ -113,6 +114,11 @@ export default function ClientLayout() {
           <Link to="/clients" className="btn btn-secondary btn-sm page-action-back">
             ← Liste clients
           </Link>
+          {isLab && (
+            <Link to={`/clients/contacts?client=${clientId}`} className="btn btn-secondary btn-sm">
+              Contacts
+            </Link>
+          )}
           {isAdmin && (
             <button type="button" className="btn btn-primary btn-sm" onClick={onNew}>
               Nouveau

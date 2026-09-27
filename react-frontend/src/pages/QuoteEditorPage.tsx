@@ -1,10 +1,15 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import PageBackNav from '../components/PageBackNav'
 import Modal from '../components/Modal'
+import CommercialDocumentActions from '../components/crm/CommercialDocumentActions'
+import ModuleEntityShell from '../components/module/ModuleEntityShell'
+import StatusBadge, { quoteStatutBadgeProps } from '../components/ds/StatusBadge'
 import { type QuoteFormState, type QuoteLineDraft, type ContextMode } from '../components/quotes/QuoteFormFields'
 import QuoteWizard from '../components/quotes/wizard/QuoteWizard'
+import S2gCataloguePickerModal from '../components/quotes/S2gCataloguePickerModal'
+import S2gAppendArticlesModal from '../components/quotes/S2gAppendArticlesModal'
 import {
   quotesApi,
   clientsApi,
@@ -23,18 +28,30 @@ import {
 } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
-import { formatMoney } from '../lib/appLocale'
-import { computeQuoteFormDocumentTotals, sumFraisSupplementairesTtc } from '../lib/quoteTotals'
+import { dateInputFromApi, formatMoney, todayLocalDateInput } from '../lib/appLocale'
+import { computeQuoteFormDocumentTotals, quoteFormPricingLines, lineLockedByForfaitJalon, sumFraisSupplementairesTtc } from '../lib/quoteTotals'
 import {
   getEffectiveDevisParcours,
-  buildDefaultDevisParcours,
   lineKeyForRow,
   filterDevisParcoursRemoveLigne,
-  normalizeDevisParcoursInMeta,
+  filterDevisParcoursRemoveJalon,
+  reconcileDevisParcoursOnLoad,
 } from '../lib/devisParcours'
+import { buildQuoteApiBody } from '../lib/quoteFormApi'
+import {
+  lineFromS2gProduct,
+  newDevisJalonId,
+  newDevisLineRowKey,
+  restoreS2gJalonLineLinks,
+} from '../lib/s2gDevisCatalogue'
+import {
+  clearedForfaitJalonPricing,
+  DEFAULT_FORFAIT_DESIGNATION,
+  sumForfaitJalonsHt,
+} from '../lib/quoteForfaitJalon'
 
 function newLineRowKey() {
-  return `L-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+  return newDevisLineRowKey()
 }
 
 function emptyLine(defaultTva: number): QuoteLineDraft {
@@ -42,6 +59,7 @@ function emptyLine(defaultTva: number): QuoteLineDraft {
     row_key: newLineRowKey(),
     description: '',
     quantity: 1,
+    unite: 'U',
     unit_price: 0,
     tva_rate: defaultTva,
     discount_percent: 0,
@@ -55,9 +73,10 @@ function emptyForm(): QuoteFormState {
     contextMode: 'client',
     client_id: 0,
     contact_id: undefined,
+    filiale_agency_id: undefined,
     site_id: undefined,
     dossier_id: undefined,
-    quote_date: new Date().toISOString().slice(0, 10),
+    quote_date: todayLocalDateInput(),
     order_date: '',
     site_delivery_date: '',
     valid_until: '',
@@ -80,78 +99,27 @@ function inferContextMode(quote: { dossier_id?: number | null; site_id?: number 
   return 'client'
 }
 
-function toApiBody(form: QuoteFormState): QuoteCreateBody {
-  const defaultTva = form.tva_rate ?? 20
-  const lines = form.lines
-    .filter((l) => l.description.trim().length > 0 && l.quantity > 0)
-    .map((l) => {
-      const row: QuoteCreateBody['lines'][number] = {
-        description: l.description.trim(),
-        quantity: l.quantity,
-        unit_price: l.unit_price,
-        tva_rate: l.tva_rate ?? defaultTva,
-        discount_percent: l.discount_percent ?? 0,
-      }
-      if (l.commercial_offering_id) row.commercial_offering_id = l.commercial_offering_id
-      if (l.ref_article_id) row.ref_article_id = l.ref_article_id
-      if (l.ref_package_id) row.ref_package_id = l.ref_package_id
-      if (l.commercial_offering_id || l.ref_article_id || l.ref_package_id) {
-        row.type_ligne = 'catalogue'
-      }
-      return row
-    })
-
-  const meta: EntityMetaPayload = { ...form.meta }
-  if (meta.devis_jalons && meta.devis_jalons.length === 0) delete meta.devis_jalons
-  if (meta.tarif_global_hors_lignes_ht == null) delete meta.tarif_global_hors_lignes_ht
-  if (meta.frais_supplementaires && meta.frais_supplementaires.length === 0) delete meta.frais_supplementaires
-  if (meta.ligne_masque_prix_pdf && !meta.ligne_masque_prix_pdf.some(Boolean)) delete meta.ligne_masque_prix_pdf
-  normalizeDevisParcoursInMeta(form.lines, meta.devis_jalons, meta)
-  if (meta.devis_parcours && meta.devis_parcours.length === 0) delete meta.devis_parcours
-  const hasMeta = Object.keys(meta).length > 0
-
-  return {
-    client_id: form.client_id,
-    contact_id: form.contact_id,
-    site_id: form.site_id,
-    dossier_id: form.dossier_id,
-    quote_date: form.quote_date,
-    order_date: form.order_date || undefined,
-    site_delivery_date: form.site_delivery_date || undefined,
-    valid_until: form.valid_until || undefined,
-    tva_rate: form.tva_rate,
-    discount_percent: form.discount_percent,
-    discount_amount: form.discount_amount,
-    shipping_amount_ht: form.shipping_amount_ht,
-    shipping_tva_rate: form.shipping_tva_rate,
-    travel_fee_ht: form.travel_fee_ht,
-    travel_fee_tva_rate: form.travel_fee_tva_rate,
-    apply_site_travel: form.apply_site_travel,
-    billing_address_id: form.billing_address_id,
-    delivery_address_id: form.delivery_address_id,
-    pdf_template_id: form.pdf_template_id,
-    notes: form.notes,
-    lines,
-    meta: hasMeta ? meta : undefined,
-  }
-}
-
 export default function QuoteEditorPage() {
   const { quoteId } = useParams<{ quoteId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const justCreatedNumber = (location.state as { quoteCreated?: string } | null)?.quoteCreated ?? null
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
+  const isAdmin = user?.role === 'lab_admin'
   const editingNumericId = quoteId && quoteId !== 'nouveau' ? Number(quoteId) : null
   const isCreate = editingNumericId === null || Number.isNaN(editingNumericId)
 
   const [form, setForm] = useState<QuoteFormState>(emptyForm)
-  const [createdQuote, setCreatedQuote] = useState<{ id: number; number: string } | null>(null)
   const [wizardStep, setWizardStep] = useState<number | null>(null)
   type LineOrJalon = { target: 'line'; index: number } | { target: 'jalon'; jalonIndex: number }
   const [catalogPick, setCatalogPick] = useState<LineOrJalon | null>(null)
   const [prolabPick, setProlabPick] = useState<LineOrJalon | null>(null)
+  const [s2gPickOpen, setS2gPickOpen] = useState(false)
+  const [s2gAppendJalonId, setS2gAppendJalonId] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [catalogSearch, setCatalogSearch] = useState('')
   const [prolabFamilleId, setProlabFamilleId] = useState<number | ''>('')
   const catalogDebounced = useDebouncedValue(catalogSearch, 250)
@@ -244,24 +212,8 @@ export default function QuoteEditorPage() {
 
   useEffect(() => {
     if (!quote || isCreate) return
-    if (quote.status !== 'draft') {
-      navigate('/devis', { replace: true })
-      return
-    }
     const ql = quote.quote_lines ?? []
     const defaultTva = Number(quote.tva_rate ?? 20)
-    const lines: QuoteLineDraft[] = ql.map((l) => ({
-      row_key: l.id != null ? `line-${l.id}` : newLineRowKey(),
-      commercial_offering_id: l.commercial_offering_id ?? undefined,
-      ref_article_id: l.ref_article_id ?? undefined,
-      ref_package_id: l.ref_package_id ?? undefined,
-      description: l.description,
-      quantity: l.quantity,
-      unit_price: Number(l.unit_price),
-      tva_rate: Number(l.tva_rate ?? quote.tva_rate ?? 20),
-      discount_percent: Number(l.discount_percent ?? 0),
-      part_of_package: false,
-    }))
     const baseMeta: EntityMetaPayload = { ...((quote.meta as EntityMetaPayload) ?? {}) }
     const devisJalons = (baseMeta.devis_jalons ?? []).map((j, i) => ({
       ...j,
@@ -269,20 +221,55 @@ export default function QuoteEditorPage() {
       ref_article_id: j.ref_article_id ?? null,
       commercial_offering_id: j.commercial_offering_id ?? null,
     }))
+    const rawLines: QuoteLineDraft[] = ql.map((l) => ({
+      row_key: l.id != null ? `line-${l.id}` : newLineRowKey(),
+      commercial_offering_id: l.commercial_offering_id ?? undefined,
+      ref_article_id: l.ref_article_id ?? undefined,
+      ref_package_id: l.ref_package_id ?? undefined,
+      description: l.description,
+      quantity: l.quantity,
+      unite: (l.unite ?? '').trim() || 'U',
+      unit_price: Number(l.unit_price),
+      tva_rate: Number(l.tva_rate ?? quote.tva_rate ?? 20),
+      discount_percent: Number(l.discount_percent ?? 0),
+      part_of_package: false,
+    }))
     baseMeta.devis_jalons = devisJalons
-    if (!baseMeta.devis_parcours || baseMeta.devis_parcours.length === 0) {
-      baseMeta.devis_parcours = buildDefaultDevisParcours(lines, devisJalons)
+    const withParcours = reconcileDevisParcoursOnLoad(rawLines, baseMeta)
+    const restored = restoreS2gJalonLineLinks(rawLines, withParcours)
+    let lines = restored.lines
+    const meta = restored.meta
+    if (meta.mode_devis === 'forfait') {
+      lines = lines.map((l) => (l.quantity === 1 ? l : { ...l, quantity: 1 }))
+      const existingGlobal = Number(meta.tarif_global_hors_lignes_ht)
+      const jalonsTotal = sumForfaitJalonsHt(meta.devis_jalons)
+      if (!(Number.isFinite(existingGlobal) && existingGlobal > 0) && jalonsTotal > 0) {
+        meta.tarif_global_hors_lignes_ht = jalonsTotal
+      }
+      meta.tarif_global_designation =
+        (meta.tarif_global_designation ?? '').trim() || DEFAULT_FORFAIT_DESIGNATION
+      meta.tarif_global_quantity = Math.max(1, Math.round(Number(meta.tarif_global_quantity) || 1))
+      const ht = Math.max(0, Number(meta.tarif_global_hors_lignes_ht) || 0)
+      if (meta.tarif_global_prix_unitaire_ht == null && ht > 0) {
+        meta.tarif_global_prix_unitaire_ht =
+          Math.round((ht / meta.tarif_global_quantity) * 100) / 100
+      }
+      meta.tarif_global_unite = (meta.tarif_global_unite ?? '').trim() || 'F'
+      meta.devis_jalons = (meta.devis_jalons ?? []).map((j) => clearedForfaitJalonPricing(j))
+      delete meta.ligne_masque_prix_pdf
     }
     setForm({
       contextMode: inferContextMode(quote),
       client_id: quote.client_id,
       contact_id: quote.contact_id ?? undefined,
+      filiale_agency_id:
+        typeof meta.filiale_agency_id === 'number' ? meta.filiale_agency_id : undefined,
       site_id: quote.site_id,
       dossier_id: quote.dossier_id ?? undefined,
-      quote_date: quote.quote_date?.slice(0, 10) ?? '',
-      order_date: quote.order_date?.slice(0, 10) ?? '',
-      site_delivery_date: quote.site_delivery_date?.slice(0, 10) ?? '',
-      valid_until: quote.valid_until?.slice(0, 10) ?? '',
+      quote_date: dateInputFromApi(quote.quote_date) || todayLocalDateInput(),
+      order_date: dateInputFromApi(quote.order_date),
+      site_delivery_date: dateInputFromApi(quote.site_delivery_date),
+      valid_until: dateInputFromApi(quote.valid_until),
       tva_rate: defaultTva,
       discount_percent: Number(quote.discount_percent ?? 0),
       discount_amount: Number(quote.discount_amount ?? 0),
@@ -296,16 +283,24 @@ export default function QuoteEditorPage() {
       pdf_template_id: quote.pdf_template_id,
       notes: quote.notes ?? '',
       lines,
-      meta: baseMeta,
+      meta,
     })
-  }, [quote, isCreate, navigate])
+  }, [quote, isCreate])
+
+  const isReadOnly = !isCreate && quote != null && quote.status !== 'draft'
 
   const createMutation = useMutation({
     mutationFn: (body: QuoteCreateBody) => quotesApi.create(body),
-    onSuccess: (quote) => {
+    onSuccess: (created) => {
+      if (!created?.id) {
+        setSubmitError('Réponse serveur inattendue après création du devis.')
+        return
+      }
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
-      setCreatedQuote({ id: quote.id, number: quote.number })
-      setWizardStep(6)
+      navigate(`/devis/${created.id}/editer`, {
+        replace: true,
+        state: { quoteCreated: created.number },
+      })
     },
   })
 
@@ -335,33 +330,52 @@ export default function QuoteEditorPage() {
     return { ht: form.travel_fee_ht ?? 0, tva: form.travel_fee_tva_rate ?? 20 }
   }, [allSites, form.apply_site_travel, form.site_id, form.travel_fee_ht, form.travel_fee_tva_rate])
 
-  const documentTotals = useMemo(
-    () =>
-      computeQuoteFormDocumentTotals(
-        form.lines,
-        form.tva_rate ?? 20,
-        form.discount_percent ?? 0,
-        form.discount_amount ?? 0,
-        form.shipping_amount_ht ?? 0,
-        form.shipping_tva_rate ?? 20,
-        travelForTotals.ht,
-        travelForTotals.tva,
-      ),
-    [
+  const selectedClient = useMemo(
+    () => clients.find((c) => c.id === form.client_id),
+    [clients, form.client_id],
+  )
+  const caAnnuelTvaRegime = Boolean(selectedClient?.ca_annuel_tva_regime)
+
+  const documentTotals = useMemo(() => {
+    const defaultTva = form.tva_rate ?? 20
+    const isForfait = form.meta?.mode_devis === 'forfait'
+    const forfaitHt = Math.max(0, Number(form.meta?.tarif_global_hors_lignes_ht ?? 0))
+    const linesForTotals = quoteFormPricingLines(
       form.lines,
-      form.tva_rate,
-      form.discount_percent,
-      form.discount_amount,
-      form.shipping_amount_ht,
-      form.shipping_tva_rate,
+      form.meta?.devis_jalons,
+      defaultTva,
+      isForfait,
+      forfaitHt,
+    )
+    return computeQuoteFormDocumentTotals(
+      linesForTotals,
+      defaultTva,
+      form.discount_percent ?? 0,
+      form.discount_amount ?? 0,
+      form.shipping_amount_ht ?? 0,
+      form.shipping_tva_rate ?? 20,
       travelForTotals.ht,
       travelForTotals.tva,
-    ],
-  )
+      caAnnuelTvaRegime,
+    )
+  }, [
+    form.lines,
+    form.meta?.devis_jalons,
+    form.meta?.mode_devis,
+    form.meta?.tarif_global_hors_lignes_ht,
+    form.tva_rate,
+    form.discount_percent,
+    form.discount_amount,
+    form.shipping_amount_ht,
+    form.shipping_tva_rate,
+    travelForTotals.ht,
+    travelForTotals.tva,
+    caAnnuelTvaRegime,
+  ])
 
   const metaFraisTtc = useMemo(
-    () => sumFraisSupplementairesTtc(form.meta.frais_supplementaires),
-    [form.meta.frais_supplementaires],
+    () => sumFraisSupplementairesTtc(form.meta.frais_supplementaires, caAnnuelTvaRegime),
+    [form.meta.frais_supplementaires, caAnnuelTvaRegime],
   )
 
   const addLine = () => {
@@ -382,10 +396,16 @@ export default function QuoteEditorPage() {
   }
 
   const updateLine = (index: number, field: keyof QuoteLineDraft, value: string | number | null | boolean) => {
-    setForm((f) => ({
-      ...f,
-      lines: f.lines.map((l, i) => (i === index ? { ...l, [field]: value } : l)),
-    }))
+    setForm((f) => {
+      const moneyLocked =
+        f.meta?.mode_devis === 'forfait' ||
+        lineLockedByForfaitJalon(f.lines[index], index, f.meta?.devis_jalons)
+      if (moneyLocked && (field === 'quantity' || field === 'unit_price' || field === 'discount_percent' || field === 'tva_rate')) {
+        return f
+      }
+      const nextLines = f.lines.map((l, i) => (i === index ? { ...l, [field]: value } : l))
+      return { ...f, lines: nextLines }
+    })
   }
 
   const removeLine = (index: number) => {
@@ -408,9 +428,217 @@ export default function QuoteEditorPage() {
         } else {
           delete meta.devis_parcours
         }
+        if (meta.devis_jalons?.length) {
+          const removedRefId = removed?.ref_article_id
+          meta.devis_jalons = meta.devis_jalons.map((j) => {
+            const nextKeys = (j.product_line_keys ?? []).filter((k) => k !== lineKey)
+            const nextRefs =
+              removedRefId != null
+                ? (j.product_ref_article_ids ?? []).filter((id) => id !== removedRefId)
+                : j.product_ref_article_ids
+            return {
+              ...j,
+              product_line_keys: nextKeys,
+              product_ref_article_ids: nextRefs,
+            }
+          })
+        }
       }
       return { ...f, lines: nextLines, meta }
     })
+  }
+
+  const removeJalon = (jalonId: string) => {
+    setForm((f) => {
+      const jalon = (f.meta.devis_jalons ?? []).find((j) => j.id === jalonId)
+      const childKeys = new Set(jalon?.product_line_keys ?? [])
+      const keysToRemove = new Set<string>(childKeys)
+      const nextLines = f.lines.filter((l, i) => {
+        const key = lineKeyForRow(l, i)
+        if (l.parent_jalon_id === jalonId) {
+          keysToRemove.add(key)
+          return false
+        }
+        if (childKeys.has(key)) return false
+        return true
+      })
+      const prevM = f.meta.ligne_masque_prix_pdf
+      const keptIndices: number[] = []
+      f.lines.forEach((l, i) => {
+        const key = lineKeyForRow(l, i)
+        if (!keysToRemove.has(key) && l.parent_jalon_id !== jalonId) keptIndices.push(i)
+      })
+      const nextM = prevM ? keptIndices.map((i) => prevM[i] ?? false) : undefined
+      const meta: EntityMetaPayload = {
+        ...f.meta,
+        devis_jalons: (f.meta.devis_jalons ?? []).filter((j) => j.id !== jalonId),
+      }
+      if (nextM && nextM.length > 0) {
+        if (nextM.some(Boolean)) meta.ligne_masque_prix_pdf = nextM
+        else delete meta.ligne_masque_prix_pdf
+      }
+      const p = f.meta.devis_parcours ?? getEffectiveDevisParcours(f.lines, f.meta)
+      let nextP = filterDevisParcoursRemoveJalon(p, jalonId)
+      for (const key of keysToRemove) {
+        nextP = filterDevisParcoursRemoveLigne(nextP, key)
+      }
+      if (nextP.length > 0) meta.devis_parcours = nextP
+      else delete meta.devis_parcours
+      if (meta.devis_jalons?.length === 0) delete meta.devis_jalons
+      return { ...f, lines: nextLines, meta }
+    })
+  }
+
+  async function applyS2gCataloguePick(result: {
+    jalon: RefArticleRow
+    products: Array<Pick<RefArticleRow, 'id' | 'code' | 'libelle' | 'prix_unitaire_ht' | 'tva_rate' | 'unite'>>
+  }) {
+    const { jalon: art, products } = result
+    if (!products.length) {
+      throw new Error('Sélectionnez au moins un article.')
+    }
+    const defaultTva = form.tva_rate ?? 20
+    const targetJalonId = s2gAppendJalonId
+
+    if (targetJalonId) {
+      setForm((f) => {
+        const list = [...(f.meta.devis_jalons ?? [])]
+        const idx = list.findIndex((j) => j.id === targetJalonId)
+        if (idx < 0) return f
+        const existing = list[idx]
+        const existingKeys = [...(existing.product_line_keys ?? [])]
+        const existingRefs = new Set(existing.product_ref_article_ids ?? [])
+        f.lines.forEach((line) => {
+          if (line.parent_jalon_id === targetJalonId && line.ref_article_id != null) {
+            existingRefs.add(line.ref_article_id)
+          }
+        })
+        const freshProducts = products.filter((p) => !existingRefs.has(p.id))
+        if (freshProducts.length === 0) return f
+
+        const isForfaitDoc = f.meta?.mode_devis === 'forfait' || existing.mode === 'forfait'
+        const childLines: QuoteLineDraft[] = freshProducts.map((p) => {
+          const line = lineFromS2gProduct(p, targetJalonId, defaultTva)
+          return isForfaitDoc && line.quantity !== 1 ? { ...line, quantity: 1 } : line
+        })
+        const productLineKeys = childLines.map((l) => l.row_key!).filter(Boolean)
+        const productRefIds = childLines
+          .map((l) => l.ref_article_id)
+          .filter((id): id is number => id != null)
+
+        list[idx] = {
+          ...existing,
+          product_line_keys: [...existingKeys, ...productLineKeys],
+          product_ref_article_ids: [...(existing.product_ref_article_ids ?? []), ...productRefIds],
+        }
+
+        const nextLines = [...f.lines, ...childLines]
+        const base =
+          f.meta.devis_parcours && f.meta.devis_parcours.length > 0
+            ? [...f.meta.devis_parcours]
+            : getEffectiveDevisParcours(f.lines, f.meta)
+        const jalonPos = base.findIndex((item) => item.kind === 'jalon' && item.id === targetJalonId)
+        const newParcoursItems = productLineKeys.map((id) => ({ kind: 'ligne' as const, id }))
+        const previousKeySet = new Set(existingKeys)
+        let nextParcours = base
+        if (jalonPos >= 0) {
+          let insertAt = jalonPos + 1
+          while (
+            insertAt < nextParcours.length &&
+            nextParcours[insertAt].kind === 'ligne' &&
+            previousKeySet.has(nextParcours[insertAt].id)
+          ) {
+            insertAt++
+          }
+          nextParcours = [
+            ...nextParcours.slice(0, insertAt),
+            ...newParcoursItems,
+            ...nextParcours.slice(insertAt),
+          ]
+        } else {
+          nextParcours = [
+            ...nextParcours,
+            { kind: 'jalon' as const, id: targetJalonId },
+            ...newParcoursItems,
+          ]
+        }
+
+        return {
+          ...f,
+          lines: nextLines,
+          meta: {
+            ...f.meta,
+            devis_jalons: list,
+            devis_parcours: nextParcours,
+          },
+        }
+      })
+      return
+    }
+
+    const jalonId = newDevisJalonId()
+    const childLines: QuoteLineDraft[] = products.map((p) => lineFromS2gProduct(p, jalonId, defaultTva))
+    const productLineKeys = childLines.map((l) => l.row_key!).filter(Boolean)
+    const productRefIds = childLines
+      .map((l) => l.ref_article_id)
+      .filter((id): id is number => id != null)
+
+    setForm((f) => {
+      const isForfait = f.meta?.mode_devis === 'forfait'
+      const newJalon = {
+        id: jalonId,
+        libelle: art.libelle,
+        ref_article_id: art.id,
+        commercial_offering_id: null,
+        s2g_code: art.code,
+        product_line_keys: productLineKeys,
+        product_ref_article_ids: productRefIds,
+      }
+      const addedLines = isForfait
+        ? childLines.map((l) => (l.quantity === 1 ? l : { ...l, quantity: 1 }))
+        : childLines
+      const nextLines = [...f.lines, ...addedLines]
+      const base =
+        f.meta.devis_parcours && f.meta.devis_parcours.length > 0
+          ? f.meta.devis_parcours
+          : getEffectiveDevisParcours(f.lines, f.meta)
+      const nextParcours = [
+        ...base,
+        { kind: 'jalon' as const, id: jalonId },
+        ...addedLines.map((l) => ({ kind: 'ligne' as const, id: l.row_key! })),
+      ]
+      const meta = {
+        ...f.meta,
+        devis_jalons: [...(f.meta.devis_jalons ?? []), newJalon],
+        devis_parcours: nextParcours,
+      }
+      return {
+        ...f,
+        lines: nextLines,
+        meta,
+      }
+    })
+  }
+
+  function openS2gCatalog(jalonId?: string) {
+    if (isReadOnly) return
+    if (jalonId) {
+      const jalon = form.meta.devis_jalons?.find((j) => j.id === jalonId)
+      if (!jalon?.ref_article_id) {
+        setSubmitError(
+          'Ce jalon n’est pas lié au catalogue S2G : impossible d’y ajouter des articles depuis le catalogue.',
+        )
+        return
+      }
+    }
+    setSubmitError(null)
+    setS2gAppendJalonId(jalonId ?? null)
+    setS2gPickOpen(true)
+  }
+
+  function closeS2gCatalog() {
+    setS2gPickOpen(false)
+    setS2gAppendJalonId(null)
   }
 
   function applyOfferingToLine(index: number, o: CommercialOffering) {
@@ -424,6 +652,7 @@ export default function QuoteEditorPage() {
               ref_article_id: undefined,
               ref_package_id: undefined,
               description: o.name,
+              unite: (l.unite ?? '').trim() || 'U',
               unit_price: Number(o.sale_price_ht),
               tva_rate: Number(o.default_tva_rate),
             }
@@ -460,6 +689,7 @@ export default function QuoteEditorPage() {
               ref_package_id: undefined,
               ref_article_id: art.id,
               description: art.libelle,
+              unite: (art.unite ?? '').trim() || 'U',
               unit_price: Number(art.prix_unitaire_ht),
               tva_rate: Number(art.tva_rate),
             }
@@ -487,37 +717,22 @@ export default function QuoteEditorPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (form.client_id <= 0) return
-    const body = toApiBody(form)
+    if (isReadOnly) return
+    setSubmitError(null)
+    if (form.client_id <= 0) {
+      setSubmitError('Sélectionnez un client avant d’enregistrer le devis.')
+      return
+    }
+    const body = buildQuoteApiBody(form)
+    const hasJalons = (body.meta?.devis_jalons ?? []).length > 0
+    if (body.lines.length === 0 && !hasJalons) {
+      setSubmitError('Ajoutez au moins un jalon ou un produit S2G (étape Lignes).')
+      return
+    }
     if (isCreate) {
-      createMutation.mutate({
-        ...body,
-        valid_until: form.valid_until || undefined,
-        order_date: form.order_date || undefined,
-        site_delivery_date: form.site_delivery_date || undefined,
-        site_id: form.site_id || undefined,
-        dossier_id: form.dossier_id,
-        billing_address_id: form.billing_address_id || undefined,
-        delivery_address_id: form.delivery_address_id || undefined,
-        pdf_template_id: form.pdf_template_id || undefined,
-        apply_site_travel: form.apply_site_travel || undefined,
-      })
+      createMutation.mutate(body)
     } else if (editingNumericId) {
-      updateMutation.mutate({
-        id: editingNumericId,
-        body: {
-          ...body,
-          valid_until: form.valid_until || undefined,
-          order_date: form.order_date || undefined,
-          site_delivery_date: form.site_delivery_date || undefined,
-          site_id: form.site_id || undefined,
-          dossier_id: form.dossier_id,
-          billing_address_id: form.billing_address_id || undefined,
-          delivery_address_id: form.delivery_address_id || undefined,
-          pdf_template_id: form.pdf_template_id || undefined,
-          apply_site_travel: form.apply_site_travel || undefined,
-        },
-      })
+      updateMutation.mutate({ id: editingNumericId, body })
     }
   }
 
@@ -530,6 +745,20 @@ export default function QuoteEditorPage() {
     return f?.articles?.filter((a) => a.actif) ?? []
   }, [prolabFamilleId, prolabFamilles])
 
+  const addLineFromCommercialCatalog = () => {
+    const idx = form.lines.length
+    addLine()
+    setCatalogPick({ target: 'line', index: idx })
+    setCatalogSearch('')
+  }
+
+  const addLineFromProlabCatalog = () => {
+    const idx = form.lines.length
+    addLine()
+    setProlabPick({ target: 'line', index: idx })
+    setProlabFamilleId('')
+  }
+
   if (!isLab) {
     return (
       <div className="container">
@@ -540,26 +769,70 @@ export default function QuoteEditorPage() {
 
   if (!isCreate && loadingQuote) {
     return (
-      <div className="container">
-        <p>Chargement du devis…</p>
-      </div>
+      <ModuleEntityShell
+        shellClassName="module-shell--crm"
+        breadcrumbs={[
+          { label: 'Accueil', to: '/' },
+          { label: 'Devis', to: '/devis' },
+          { label: 'Chargement…' },
+        ]}
+        moduleBarLabel="Commercial — Devis"
+        title="Chargement du devis…"
+      >
+        <p className="text-muted">Chargement du devis…</p>
+      </ModuleEntityShell>
     )
   }
 
-  return (
-    <div className="container quote-editor-page">
-      <PageBackNav back={{ to: '/devis', label: 'Liste des devis' }} />
-      <h1>{isCreate ? 'Nouveau devis' : `Modifier le devis ${quote?.number ?? ''}`}</h1>
-      <p className="text-muted" style={{ maxWidth: '48rem' }}>
-        Aucune ligne d’article au départ. Le <strong>contexte</strong> (client, chantier, dates, contact, modèle PDF) est
-        en tête. Les onglets <strong>Lignes, Frais, Tarif & conditions, Aperçu</strong> regroupent l’édition. Les totaux
-        (alignés recalcul serveur) et l’enregistrement restent en barre basse.
-      </p>
+  const pageTitle = isCreate
+    ? 'Nouveau devis'
+    : isReadOnly
+      ? `Consulter le devis ${quote?.number ?? ''}`
+      : `Modifier le devis ${quote?.number ?? ''}`
 
-      <form
-        onSubmit={handleSubmit}
-        className="card quote-editor-page__form"
-      >
+  const selectedDossier = form.dossier_id ? dossiers.find((d) => d.id === form.dossier_id) : undefined
+
+  const pageSubtitle = isReadOnly ? (
+    <span className="bc-fiche__subtitle">
+      {quote ? (
+        <StatusBadge variant={quoteStatutBadgeProps(quote.status).variant} size="sm">
+          {quoteStatutBadgeProps(quote.status).label}
+        </StatusBadge>
+      ) : null}
+      {selectedDossier?.centre_group ? (
+        <span
+          style={{
+            background: 'var(--color-accent-soft, #e8f4fd)',
+            color: 'var(--color-accent, #0a6bbf)',
+            borderRadius: '0.3rem',
+            padding: '0.1rem 0.5rem',
+            fontSize: '0.8rem',
+            fontWeight: 600,
+          }}
+        >
+          {selectedDossier.centre_group.name}
+        </span>
+      ) : null}
+      <span className="text-muted">
+        Consultation seule — repassez en <strong>brouillon</strong> pour modifier les lignes et le tarif.
+      </span>
+    </span>
+  ) : isCreate ? (
+    'Assistant en 5 étapes : contexte, dates, informations, lignes catalogue S2G, puis tarif et enregistrement.'
+  ) : (
+    'Modifiez le devis brouillon via l’assistant (lignes S2G, tarif, conditions).'
+  )
+
+  const editorContent = (
+    <>
+      {justCreatedNumber && !isCreate ? (
+        <p className="quote-editor-page__success" role="status">
+          Devis <strong>{justCreatedNumber}</strong> créé avec succès. Vous pouvez le modifier ou l’envoyer depuis cette
+          fiche.
+        </p>
+      ) : null}
+
+      <form onSubmit={handleSubmit} className="card quote-editor-page__form">
         <QuoteWizard
           form={form}
           setForm={setForm}
@@ -577,24 +850,85 @@ export default function QuoteEditorPage() {
           isCreate={isCreate}
           isSubmitting={createMutation.isPending || updateMutation.isPending}
           submitLabel={isCreate ? 'Créer le devis' : 'Enregistrer'}
+          readOnly={isReadOnly}
           onCancel={() => navigate('/devis')}
-          createdQuote={createdQuote}
+          createdQuote={null}
           onOpenCommercialCatalog={(i) => {
+            if (isReadOnly) return
             setCatalogPick({ target: 'line', index: i })
             setCatalogSearch('')
           }}
           onOpenProlabCatalog={(i) => {
+            if (isReadOnly) return
             setProlabPick({ target: 'line', index: i })
             setProlabFamilleId('')
           }}
+          onOpenS2gCatalog={isReadOnly ? undefined : () => openS2gCatalog()}
+          onAddArticlesToJalon={isReadOnly ? undefined : (jalonId) => openS2gCatalog(jalonId)}
+          onRemoveJalon={removeJalon}
+          onAddFromCommercialCatalog={isReadOnly ? undefined : addLineFromCommercialCatalog}
+          onAddFromProlabCatalog={isReadOnly ? undefined : addLineFromProlabCatalog}
           wizardStep={wizardStep}
           onWizardStepChange={setWizardStep}
         />
 
-        {(createMutation.isError || updateMutation.isError) && (
-          <p className="error" style={{ marginTop: '1rem' }}>{((createMutation.error ?? updateMutation.error) as Error).message}</p>
+        {(submitError || createMutation.isError || updateMutation.isError) && (
+          <p className="error" style={{ marginTop: '1rem' }}>
+            {submitError ?? ((createMutation.error ?? updateMutation.error) as Error).message}
+          </p>
         )}
       </form>
+
+      {s2gPickOpen && !s2gAppendJalonId && (
+        <S2gCataloguePickerModal
+          onClose={closeS2gCatalog}
+          onPick={async (result) => {
+            try {
+              await applyS2gCataloguePick(result)
+              setSubmitError(null)
+            } catch (err) {
+              setSubmitError(err instanceof Error ? err.message : 'Impossible d’ajouter depuis le catalogue S2G.')
+              throw err
+            }
+          }}
+        />
+      )}
+
+      {s2gPickOpen &&
+        s2gAppendJalonId &&
+        (() => {
+          const j = form.meta.devis_jalons?.find((x) => x.id === s2gAppendJalonId)
+          if (!j?.ref_article_id) return null
+          const childKeys = new Set(j.product_line_keys ?? [])
+          const exclude = new Set<number>()
+          form.lines.forEach((line, index) => {
+            const key = lineKeyForRow(line, index)
+            const belongsToJalon =
+              line.parent_jalon_id === s2gAppendJalonId || childKeys.has(key)
+            if (belongsToJalon && line.ref_article_id != null) {
+              exclude.add(line.ref_article_id)
+            }
+          })
+          return (
+            <S2gAppendArticlesModal
+              libelle={j.libelle}
+              refArticleId={j.ref_article_id}
+              excludeProductIds={[...exclude]}
+              onClose={closeS2gCatalog}
+              onPick={async (result) => {
+                try {
+                  await applyS2gCataloguePick(result)
+                  setSubmitError(null)
+                } catch (err) {
+                  setSubmitError(
+                    err instanceof Error ? err.message : 'Impossible d’ajouter depuis le catalogue S2G.',
+                  )
+                  throw err
+                }
+              }}
+            />
+          )
+        })()}
 
       {catalogPick !== null && (
         <Modal
@@ -682,6 +1016,53 @@ export default function QuoteEditorPage() {
           )}
         </Modal>
       )}
-    </div>
+    </>
+  )
+
+  if (isCreate) {
+    return (
+      <div className="container quote-editor-page">
+        <PageBackNav back={{ to: '/devis', label: 'Liste des devis' }} />
+        <h1>{pageTitle}</h1>
+        <p className="text-muted" style={{ maxWidth: '48rem' }}>
+          {typeof pageSubtitle === 'string' ? pageSubtitle : null}
+        </p>
+        {editorContent}
+      </div>
+    )
+  }
+
+  return (
+    <ModuleEntityShell
+      shellClassName="module-shell--crm"
+      breadcrumbs={[
+        { label: 'Accueil', to: '/' },
+        { label: 'Devis', to: '/devis' },
+        { label: quote?.number ?? `#${editingNumericId}` },
+      ]}
+      moduleBarLabel="Commercial — Devis"
+      title={pageTitle}
+      subtitle={pageSubtitle}
+      actions={
+        quote ? (
+          <CommercialDocumentActions
+            documentType="quote"
+            entityId={quote.id}
+            entityLabel={quote.number}
+            status={quote.status}
+            isLab={isLab}
+            isAdmin={isAdmin}
+            quoteForEmail={quote}
+            onDeleted={() => navigate('/devis')}
+            onDuplicated={(newId) => navigate(`/devis/${newId}/editer`)}
+            onStatusChanged={() => {
+              void queryClient.invalidateQueries({ queryKey: ['quote', editingNumericId] })
+            }}
+          />
+        ) : null
+      }
+    >
+      <div className="quote-editor-page">{editorContent}</div>
+    </ModuleEntityShell>
   )
 }

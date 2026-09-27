@@ -51,6 +51,7 @@ class Quote extends Model
         'agency_id',
         'site_id',
         'dossier_id',
+        'lab_centre_group_id',
         'quote_date',
         'order_date',
         'site_delivery_date',
@@ -80,10 +81,10 @@ class Quote extends Model
     protected function casts(): array
     {
         return [
-            'quote_date' => 'date',
-            'order_date' => 'date',
-            'site_delivery_date' => 'date',
-            'valid_until' => 'date',
+            'quote_date' => 'date:Y-m-d',
+            'order_date' => 'date:Y-m-d',
+            'site_delivery_date' => 'date:Y-m-d',
+            'valid_until' => 'date:Y-m-d',
             'amount_ht' => 'decimal:2',
             'amount_ttc' => 'decimal:2',
             'exchange_rate' => 'decimal:6',
@@ -124,6 +125,11 @@ class Quote extends Model
     public function dossier(): BelongsTo
     {
         return $this->belongsTo(Dossier::class, 'dossier_id');
+    }
+
+    public function centreGroup(): BelongsTo
+    {
+        return $this->belongsTo(LabCentreGroup::class, 'lab_centre_group_id');
     }
 
     public function billingAddress(): BelongsTo

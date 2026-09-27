@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ArticleAction;
 use App\Models\BonCommande;
+use App\Models\BonCommandeLigne;
 use App\Models\Catalogue\Article;
 use App\Models\ExpenseLine;
 use App\Models\MissionTask;
+use App\Models\OdmJalonQuantityGenerated;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
 use App\Services\ExpenseReportService;
@@ -104,16 +106,105 @@ class OrdreMissionController extends Controller
             ], 422);
         }
 
-        $orders = $this->generator->generate($bonCommande, $request->user());
+        // Valider les IDs de lignes sélectionnées
+        $selectedLineIds = null;
+        if ($request->has('bon_commande_ligne_ids')) {
+            $selectedLineIds = $request->validate([
+                'bon_commande_ligne_ids' => 'required|array',
+                'bon_commande_ligne_ids.*' => 'integer|exists:bons_commande_lignes,id',
+            ])['bon_commande_ligne_ids'];
+
+            // Vérifier que les lignes appartiennent au BC
+            $validIds = BonCommandeLigne::query()
+                ->where('bon_commande_id', $bonCommande->id)
+                ->whereIn('id', $selectedLineIds)
+                ->pluck('id')
+                ->toArray();
+
+            if (count($validIds) !== count($selectedLineIds)) {
+                return response()->json([
+                    'message' => 'Certaines lignes sélectionnées n\'appartiennent pas à ce bon de commande.',
+                ], 422);
+            }
+
+            $selectedLineIds = $validIds;
+        }
+
+        $orders = $this->generator->generate($bonCommande, $request->user(), $selectedLineIds);
 
         if ($orders === []) {
             return response()->json([
-                'message' => 'Aucun ordre de mission généré : le bon de commande ne contient aucune ligne éligible (actions catalogue, déclencheurs OdM ou lignes avec libellé).',
+                'message' => 'Aucun ordre de mission généré : les lignes sélectionnées ne contiennent aucune ligne éligible (actions catalogue, déclencheurs OdM ou lignes avec libellé).',
                 'data' => [],
             ], 422);
         }
 
+        // Mettre à jour le tracking des quantités générées
+        if ($selectedLineIds) {
+            foreach ($selectedLineIds as $lineId) {
+                $ligne = BonCommandeLigne::query()->find($lineId);
+                if ($ligne) {
+                    OdmJalonQuantityGenerated::query()->updateOrCreate(
+                        ['bon_commande_ligne_id' => $lineId],
+                        ['quantite_generee' => \DB::raw("COALESCE(quantite_generee, 0) + {$ligne->quantite}")]
+                    );
+                }
+            }
+        }
+
         return response()->json($orders, 201);
+    }
+
+    /**
+     * Récupère les jalons (BonCommandeLignes) d'un BC avec quantités restantes à générer.
+     * Agrège par produit pour chaque jalon.
+     */
+    public function getBonCommandeLignesForGeneration(Request $request, BonCommande $bonCommande): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if (! AgencyAccess::userMayAccessBonCommande($request->user(), $bonCommande)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $lignes = BonCommandeLigne::query()
+            ->where('bon_commande_id', $bonCommande->id)
+            ->with('article:id,code,libelle')
+            ->orderBy('ordre')
+            ->get();
+
+        // Charger les quantités déjà générées
+        $generatedQties = OdmJalonQuantityGenerated::query()
+            ->whereIn('bon_commande_ligne_id', $lignes->pluck('id'))
+            ->pluck('quantite_generee', 'bon_commande_ligne_id');
+
+        $jalons = $lignes->map(function (BonCommandeLigne $ligne) use ($generatedQties) {
+            $quantiteGeneree = (float) ($generatedQties[$ligne->id] ?? 0);
+            $quantiteRestante = max(0, (float) $ligne->quantite - $quantiteGeneree);
+
+            return [
+                'id' => $ligne->id,
+                'ordre' => $ligne->ordre,
+                'libelle' => $ligne->libelle,
+                'quantite_totale' => (float) $ligne->quantite,
+                'quantite_generee' => $quantiteGeneree,
+                'quantite_restante' => $quantiteRestante,
+                'article' => $ligne->article ? [
+                    'id' => $ligne->article->id,
+                    'code' => $ligne->article->code,
+                    'libelle' => $ligne->article->libelle,
+                ] : null,
+                'date_debut_prevue' => $ligne->date_debut_prevue,
+                'date_fin_prevue' => $ligne->date_fin_prevue,
+                'notes' => $ligne->notes_ligne,
+            ];
+        });
+
+        return response()->json([
+            'bon_commande_id' => $bonCommande->id,
+            'jalons' => $jalons,
+        ]);
     }
 
     public function update(Request $request, OrdreMission $ordreMission): JsonResponse

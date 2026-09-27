@@ -4,7 +4,7 @@ const TABS = [
   { to: '/rapports/compta', label: 'Comptabilité' },
   { to: '/rapports/ventes', label: 'Ventes' },
   { to: '/rapports/delai-traitement', label: 'Délais de traitement' },
-  { to: '/rapports/delai-chantier', label: 'Délais chantier' },
+  { to: '/rapports/kpi', label: 'KPI' },
 ] as const
 
 export default function ReportsLayout() {
@@ -13,7 +13,7 @@ export default function ReportsLayout() {
       <header className="reports-hub__head">
         <p className="hub-kicker">Rapports</p>
         <h1 className="reports-hub__title">Indicateurs &amp; analyses</h1>
-        <p className="reports-hub__lead">Quatre vues : comptabilité, ventes, délais laboratoire et délais chantier.</p>
+        <p className="reports-hub__lead">Quatre vues : comptabilité, ventes, délais laboratoire et tableau KPI consolidé.</p>
       </header>
       <nav className="reports-hub__tabs" aria-label="Sections rapports">
         {TABS.map((t) => (

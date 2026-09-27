@@ -19,8 +19,14 @@ const cards: Card[] = [
   {
     to: '/terrain/chantiers',
     title: 'Chantiers et carte GPS',
-    desc: 'Carte des points géolocalisés (coordonnées renseignées).',
+    desc: 'Carte interactive, filtres et accès direct au dossier chantier.',
     icon: 'map',
+  },
+  {
+    to: '/terrain/taches',
+    title: 'Tâches terrain',
+    desc: 'Tâches en cours, mesures et historique synthétique par dossier ou par jour.',
+    icon: 'trend',
   },
   {
     to: '/terrain/planning',
@@ -56,7 +62,7 @@ export default function TerrainHub() {
           Espace laboratoire (essais) →
         </Link>
         {' · '}
-        <Link to="/materiel" className="hub-footnote__link">
+        <Link to="/materiel/equipements" className="hub-footnote__link">
           Matériel →
         </Link>
       </p>

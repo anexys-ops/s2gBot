@@ -62,7 +62,7 @@ function parseAppCalendarDate(value: string | number | Date): Date | null {
     return Number.isNaN(value.getTime()) ? null : value
   }
   const s = String(value)
-  const plain = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  const plain = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (plain) {
     const y = Number(plain[1])
     const m = Number(plain[2])

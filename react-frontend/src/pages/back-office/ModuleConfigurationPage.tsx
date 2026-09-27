@@ -10,10 +10,11 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { canManageAppConfig } from '../../lib/settingsAccess'
 import Modal from '../../components/Modal'
+import ConfigCatalogueProductsPanel from '../../components/config/ConfigCatalogueProductsPanel'
+import ConfigFxRatesPanel from '../../components/config/ConfigFxRatesPanel'
+import DocumentStatusDefinitionsPanel from '../../components/config/DocumentStatusDefinitionsPanel'
 
 const ENTITY_TABS: { type: ExtrafieldEntityType; label: string }[] = [
-  { type: 'client', label: 'Clients' },
-  { type: 'site', label: 'Chantiers' },
   { type: 'article', label: 'Articles' },
   { type: 'dossier', label: 'Dossiers' },
   { type: 'quote', label: 'Devis' },
@@ -34,11 +35,10 @@ const FIELD_TYPES: { value: string; label: string }[] = [
   { value: 'select', label: 'Liste déroulante' },
 ]
 
-const ORDER_STATUSES: { value: string; label: string }[] = [
-  { value: 'draft', label: 'Brouillon' },
-  { value: 'submitted', label: 'Soumise' },
-  { value: 'in_progress', label: 'En cours' },
-  { value: 'completed', label: 'Terminée' },
+const BC_INVOICE_STATUSES: { value: string; label: string }[] = [
+  { value: 'confirme', label: 'Confirmé' },
+  { value: 'en_cours', label: 'En cours' },
+  { value: 'livre', label: 'Livré' },
 ]
 
 const MODULE_KEYS = [
@@ -46,16 +46,17 @@ const MODULE_KEYS = [
   { key: 'quotes', label: 'Devis — listes' },
   { key: 'orders', label: 'Commandes — listes' },
   { key: 'commercial_catalog', label: 'Catalogue commercial / matériel' },
+  { key: 'fx_rates', label: 'Devises & taux de change' },
 ] as const
 
-type MainTab = 'extrafields' | 'modules'
+type MainTab = 'extrafields' | 'statuses' | 'modules' | 'catalogue'
 
 export default function ModuleConfigurationPage() {
   const { user } = useAuth()
   const canConfigure = canManageAppConfig(user)
   const queryClient = useQueryClient()
   const [mainTab, setMainTab] = useState<MainTab>('extrafields')
-  const [entityTab, setEntityTab] = useState<ExtrafieldEntityType>('client')
+  const [entityTab, setEntityTab] = useState<ExtrafieldEntityType>('article')
   const [createOpen, setCreateOpen] = useState(false)
   const [editRow, setEditRow] = useState<ExtrafieldDefinitionRow | null>(null)
 
@@ -88,12 +89,30 @@ export default function ModuleConfigurationPage() {
         </button>
         <button
           type="button"
+          className={`btn btn-sm ${mainTab === 'statuses' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setMainTab('statuses')}
+        >
+          Statuts documentaires
+        </button>
+        <button
+          type="button"
           className={`btn btn-sm ${mainTab === 'modules' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setMainTab('modules')}
         >
           Listes par module
         </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${mainTab === 'catalogue' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setMainTab('catalogue')}
+        >
+          Catalogue produits
+        </button>
       </div>
+
+      {mainTab === 'catalogue' && <ConfigCatalogueProductsPanel />}
+
+      {mainTab === 'statuses' && <DocumentStatusDefinitionsPanel />}
 
       {mainTab === 'extrafields' && (
         <>
@@ -213,14 +232,13 @@ function ModuleListsSection() {
   const [ordersPriority, setOrdersPriority] = useState<string>('')
   const [linkEquipmentToProducts, setLinkEquipmentToProducts] = useState(true)
   const [showEquipmentOnQuotePdf, setShowEquipmentOnQuotePdf] = useState(true)
-
   useEffect(() => {
     if (!data?.settings) return
     const s = data.settings
     if (activeKey === 'invoices') {
       setTvaRates(((s.tva_rate_options as number[]) ?? []).join(', '))
       setTravelTva(((s.travel_tva_rate_options as number[]) ?? []).join(', '))
-      setOrderStatuses([...((s.order_picker_statuses as string[]) ?? [])])
+      setOrderStatuses([...((s.bc_picker_statuts as string[]) ?? (s.order_picker_statuses as string[]) ?? [])])
     }
     if (activeKey === 'quotes') {
       setQuotesTva(((s.tva_rate_options as number[]) ?? []).join(', '))
@@ -248,7 +266,7 @@ function ModuleListsSection() {
         return moduleSettingsApi.update('invoices', {
           tva_rate_options,
           travel_tva_rate_options,
-          order_picker_statuses: orderStatuses,
+          bc_picker_statuts: orderStatuses,
         })
       }
       if (activeKey === 'quotes') {
@@ -281,8 +299,12 @@ function ModuleListsSection() {
   return (
     <div>
       <p style={{ color: 'var(--color-muted)', maxWidth: '70ch', lineHeight: 1.5 }}>
-        Valeurs proposées dans les listes déroulantes (TVA, statuts de commandes visibles lors de la création de facture,
+        Valeurs proposées dans les listes déroulantes (TVA, statuts de bons de commande éligibles à la facturation,
         etc.). Séparez les nombres par des virgules.
+      </p>
+      <p className="module-configuration-page__hint" style={{ maxWidth: '70ch', lineHeight: 1.5 }}>
+        <strong>Devises &amp; taux de change</strong> (API Frankfurter, FCFA/XOF, actualisation forcée) : onglet dédié
+        ci-dessous.
       </p>
       <div className="module-configuration-page__entity-tabs" style={{ marginBottom: '1rem' }}>
         {MODULE_KEYS.map((m) => (
@@ -296,7 +318,9 @@ function ModuleListsSection() {
           </button>
         ))}
       </div>
-      {isLoading ? (
+      {activeKey === 'fx_rates' ? (
+        isLoading ? <p>Chargement…</p> : <ConfigFxRatesPanel />
+      ) : isLoading ? (
         <p>Chargement…</p>
       ) : (
         <div className="card">
@@ -321,9 +345,9 @@ function ModuleListsSection() {
                 />
               </div>
               <div className="form-group">
-                <label>Statuts de commande proposés pour regrouper en facture</label>
+                <label>Statuts de bon de commande proposés pour la facturation</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  {ORDER_STATUSES.map((s) => (
+                  {BC_INVOICE_STATUSES.map((s) => (
                     <label key={s.value} style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                       <input
                         type="checkbox"

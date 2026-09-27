@@ -11,6 +11,7 @@ import {
 } from '../../api/client'
 import EntityMetaCard from '../../components/module/EntityMetaCard'
 import Modal from '../../components/Modal'
+import TableRowActions from '../../components/TableRowActions'
 import { useOutletContext } from 'react-router-dom'
 import type { SiteOutletContext } from './SiteLayout'
 
@@ -37,6 +38,20 @@ function parseOptNumber(s: string): number | undefined {
   if (t === '') return undefined
   const n = Number(t)
   return Number.isFinite(n) ? n : undefined
+}
+
+function formatDepthM(v: unknown): string {
+  if (v === null || v === undefined || v === '') return '—'
+  const n = Number(v)
+  if (!Number.isFinite(n)) return String(v)
+  return n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 3 })
+}
+
+function layerThicknessM(from: unknown, to: unknown): string | null {
+  const a = Number(from)
+  const b = Number(to)
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return null
+  return (b - a).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 3 })
 }
 
 type MissionFormState = {
@@ -576,65 +591,79 @@ export default function SiteMissionsTab() {
                                     {b.notes?.trim() ? (
                                       <p style={{ fontSize: '0.85rem', marginTop: 0 }}>{b.notes}</p>
                                     ) : null}
-                                    <div className="crud-actions" style={{ marginBottom: '0.35rem' }}>
-                                      <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Couches de lithologie</h4>
-                                      {isAdmin && (
-                                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => openCreateLayer(b.id)}>
-                                          + Couche
-                                        </button>
+                                    <div className="site-missions-layers">
+                                      <div className="site-missions-subsection__header">
+                                        <h4 className="site-missions-subsection__title">Couches de lithologie</h4>
+                                        {isAdmin && (
+                                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => openCreateLayer(b.id)}>
+                                            + Couche
+                                          </button>
+                                        )}
+                                      </div>
+                                      {layersLoading ? (
+                                        <p className="site-missions-subsection__empty">Chargement…</p>
+                                      ) : !layers?.length ? (
+                                        <p className="site-missions-subsection__empty">Aucune couche.</p>
+                                      ) : (
+                                        <>
+                                          <p className="site-missions-layers__count">
+                                            {layers.length} couche{layers.length > 1 ? 's' : ''}
+                                          </p>
+                                          <div className="table-wrap site-missions-layers__table-wrap">
+                                            <table className="data-table data-table--compact site-missions-layers__table">
+                                              <thead>
+                                                <tr>
+                                                  <th className="site-missions-layers__num">Prof. haut (m)</th>
+                                                  <th className="site-missions-layers__num">Prof. bas (m)</th>
+                                                  <th className="site-missions-layers__num">Épaisseur (m)</th>
+                                                  <th>Description</th>
+                                                  <th className="site-missions-layers__num">RQD (%)</th>
+                                                  <th className="site-missions-layers__num">Ordre</th>
+                                                  {isAdmin && <th className="data-table__actions">Actions</th>}
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {layers.map((layer) => {
+                                                  const thickness = layerThicknessM(layer.depth_from_m, layer.depth_to_m)
+                                                  return (
+                                                    <tr key={layer.id}>
+                                                      <td className="site-missions-layers__num">{formatDepthM(layer.depth_from_m)}</td>
+                                                      <td className="site-missions-layers__num">{formatDepthM(layer.depth_to_m)}</td>
+                                                      <td className="site-missions-layers__num">
+                                                        {thickness != null ? (
+                                                          <span className="site-missions-layers__thickness">{thickness}</span>
+                                                        ) : (
+                                                          '—'
+                                                        )}
+                                                      </td>
+                                                      <td className="site-missions-layers__desc">
+                                                        {layer.description?.trim() ? layer.description : '—'}
+                                                      </td>
+                                                      <td className="site-missions-layers__num">
+                                                        {layer.rqd != null && layer.rqd !== '' ? formatDepthM(layer.rqd) : '—'}
+                                                      </td>
+                                                      <td className="site-missions-layers__num">{layer.sort_order ?? '—'}</td>
+                                                      {isAdmin && (
+                                                        <td className="data-table__actions">
+                                                          <TableRowActions
+                                                            editLabel="Modifier la couche"
+                                                            deleteLabel="Supprimer la couche"
+                                                            onEdit={() => openEditLayer(layer)}
+                                                            onDelete={() => {
+                                                              if (window.confirm('Supprimer cette couche ?')) layerDeleteMut.mutate(layer)
+                                                            }}
+                                                          />
+                                                        </td>
+                                                      )}
+                                                    </tr>
+                                                  )
+                                                })}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </>
                                       )}
                                     </div>
-                                    {layersLoading ? (
-                                      <p style={{ fontSize: '0.85rem' }}>Chargement…</p>
-                                    ) : !layers?.length ? (
-                                      <p style={{ fontSize: '0.85rem' }}>Aucune couche.</p>
-                                    ) : (
-                                      <table style={{ width: '100%', fontSize: '0.9rem' }}>
-                                        <thead>
-                                          <tr>
-                                            <th>Prof. haut (m)</th>
-                                            <th>Prof. bas (m)</th>
-                                            <th>Description</th>
-                                            <th>RQD</th>
-                                            <th>Ordre</th>
-                                            {isAdmin && <th>Actions</th>}
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {layers.map((layer) => (
-                                            <tr key={layer.id}>
-                                              <td>{layer.depth_from_m ?? '—'}</td>
-                                              <td>{layer.depth_to_m ?? '—'}</td>
-                                              <td>{layer.description ?? '—'}</td>
-                                              <td>{layer.rqd ?? '—'}</td>
-                                              <td>{layer.sort_order ?? '—'}</td>
-                                              {isAdmin && (
-                                                <td>
-                                                  <div className="crud-actions">
-                                                    <button
-                                                      type="button"
-                                                      className="btn btn-secondary btn-sm"
-                                                      onClick={() => openEditLayer(layer)}
-                                                    >
-                                                      Mod.
-                                                    </button>
-                                                    <button
-                                                      type="button"
-                                                      className="btn btn-secondary btn-sm btn-danger-outline"
-                                                      onClick={() => {
-                                                        if (window.confirm('Supprimer cette couche ?')) layerDeleteMut.mutate(layer)
-                                                      }}
-                                                    >
-                                                      Suppr.
-                                                    </button>
-                                                  </div>
-                                                </td>
-                                              )}
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    )}
                                   </div>
                                 )}
                               </li>

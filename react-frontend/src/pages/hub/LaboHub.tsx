@@ -88,7 +88,7 @@ export default function LaboHub() {
           Terrain (chantier) →
         </Link>
         {' · '}
-        <Link to="/materiel" className="hub-footnote__link">
+        <Link to="/materiel/equipements" className="hub-footnote__link">
           Matériel →
         </Link>
       </p>

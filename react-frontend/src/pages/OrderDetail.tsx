@@ -1,4 +1,4 @@
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import PageBackNav from '../components/PageBackNav'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -7,7 +7,7 @@ import {
   ordersApi,
   reportsApi,
   samplesApi,
-  reportPdfTemplatesApi,
+  documentPdfTemplatesApi,
   reportFormDefinitionsApi,
   type Borehole,
   type EntityMetaPayload,
@@ -17,6 +17,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useState, useEffect, useMemo } from 'react'
 import Modal from '../components/Modal'
 import type { Order, Report, Sample, SampleWriteBody } from '../api/client'
+import { formatAppDate } from '../lib/appLocale'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Brouillon',
@@ -107,7 +108,7 @@ export default function OrderDetail() {
 
   const { data: tplRes } = useQuery({
     queryKey: ['report-pdf-templates'],
-    queryFn: () => reportPdfTemplatesApi.list(),
+    queryFn: () => documentPdfTemplatesApi.list('report', true),
     enabled: !!id && id !== 'new' && isLab,
   })
 
@@ -345,7 +346,7 @@ export default function OrderDetail() {
         Client : {order.client?.name} — Chantier : {order.site?.name ?? '-'} — Statut :{' '}
         {STATUS_LABELS[order.status] ?? order.status}
       </p>
-      <p>Date : {new Date(order.order_date).toLocaleDateString('fr-FR')}</p>
+      <p>Date : {formatAppDate(order.order_date)}</p>
 
       {isLab && (
         <div className="card" style={{ marginBottom: '1rem' }}>
@@ -425,11 +426,6 @@ export default function OrderDetail() {
           <p style={{ fontSize: '0.9rem', color: 'var(--muted, #64748b)' }}>
             Choisissez un modèle PDF et un formulaire métier (données terrain). La même structure s&apos;applique à tous les services via les définitions côté API.
           </p>
-          {isAdmin && (
-            <p style={{ fontSize: '0.85rem' }}>
-              <Link to="/back-office/modeles-rapports-pdf">Configurer les modèles PDF des rapports (défaut, libellés)</Link>
-            </p>
-          )}
           <div className="form-group">
             <label>Modèle PDF</label>
             <select
@@ -482,7 +478,7 @@ export default function OrderDetail() {
           )}
           {pdfTemplates.length === 0 && (
             <p className="error" style={{ fontSize: '0.9rem' }}>
-              Aucun modèle PDF configuré (migrations / table <code>report_pdf_templates</code>).
+              Aucun modèle PDF actif (Back office → Modèles PDF → Rapports).
             </p>
           )}
           <button

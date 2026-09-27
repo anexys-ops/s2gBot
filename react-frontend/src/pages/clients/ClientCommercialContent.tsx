@@ -5,12 +5,15 @@ import {
   clientAddressesApi,
   attachmentsApi,
   commercialLinksApi,
-  pdfApi,
   type ClientAddress,
 } from '../../api/client'
+import { IconEye, QuotePdfButton } from '../../components/crm/QuoteListTableActions'
+import TableIconHeader from '../../components/TableIconHeader'
+import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
+import type { PdfGenerateType } from '../../lib/documentPdfTypes'
 import { useAuth } from '../../contexts/AuthContext'
 import { INVOICE_STATUS_LABELS, QUOTE_STATUS_LABELS } from '../../lib/commercialStatusLabels'
-import { formatMoney } from '../../lib/appLocale'
+import { formatAppDate, formatMoney } from '../../lib/appLocale'
 
 const ADDR_TYPES: Record<string, string> = {
   billing: 'Facturation',
@@ -51,6 +54,7 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
     target_id: 0,
     relation: 'related',
   })
+  const [pdfTarget, setPdfTarget] = useState<{ type: PdfGenerateType; id: number; label: string } | null>(null)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['client-commercial', id],
@@ -285,27 +289,27 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <h2 style={{ marginTop: 0 }}>Devis</h2>
-        <table>
+        <table className="data-table data-table--compact">
           <thead>
             <tr>
-              <th>N°</th>
+              <th className="data-table__code">N°</th>
               <th>Date</th>
               <th>Statut</th>
               <th>TTC</th>
-              <th>PDF</th>
+              <th className="data-table__pdf">
+                <TableIconHeader icon={<IconEye />} label="Voir le PDF" />
+              </th>
             </tr>
           </thead>
           <tbody>
             {quotes.map((q) => (
               <tr key={q.id}>
-                <td>{q.number}</td>
-                <td>{new Date(q.quote_date).toLocaleDateString('fr-FR')}</td>
+                <td className="data-table__code">{q.number}</td>
+                <td>{formatAppDate(q.quote_date)}</td>
                 <td>{q.status}</td>
                 <td>{formatMoney(Number(q.amount_ttc))}</td>
-                <td>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => pdfApi.generate('quote', q.id, q.pdf_template_id)}>
-                    Télécharger
-                  </button>
+                <td className="data-table__pdf">
+                  <QuotePdfButton onClick={() => setPdfTarget({ type: 'quote', id: q.id, label: q.number })} />
                 </td>
               </tr>
             ))}
@@ -315,31 +319,27 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <h2 style={{ marginTop: 0 }}>Factures</h2>
-        <table>
+        <table className="data-table data-table--compact">
           <thead>
             <tr>
-              <th>N°</th>
+              <th className="data-table__code">N°</th>
               <th>Date</th>
               <th>Statut</th>
               <th>TTC</th>
-              <th>PDF</th>
+              <th className="data-table__pdf">
+                <TableIconHeader icon={<IconEye />} label="Voir le PDF" />
+              </th>
             </tr>
           </thead>
           <tbody>
             {invoices.map((inv) => (
               <tr key={inv.id}>
-                <td>{inv.number}</td>
-                <td>{new Date(inv.invoice_date).toLocaleDateString('fr-FR')}</td>
+                <td className="data-table__code">{inv.number}</td>
+                <td>{formatAppDate(inv.invoice_date)}</td>
                 <td>{inv.status}</td>
                 <td>{formatMoney(Number(inv.amount_ttc))}</td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => pdfApi.generate('invoice', inv.id, inv.pdf_template_id)}
-                  >
-                    Télécharger
-                  </button>
+                <td className="data-table__pdf">
+                  <QuotePdfButton onClick={() => setPdfTarget({ type: 'invoice', id: inv.id, label: inv.number })} />
                 </td>
               </tr>
             ))}
@@ -404,6 +404,15 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
           </div>
         )}
       </div>
+
+      {pdfTarget ? (
+        <DocumentPdfPickerModal
+          documentType={pdfTarget.type}
+          documentId={pdfTarget.id}
+          documentLabel={pdfTarget.label}
+          onClose={() => setPdfTarget(null)}
+        />
+      ) : null}
     </>
   )
 }

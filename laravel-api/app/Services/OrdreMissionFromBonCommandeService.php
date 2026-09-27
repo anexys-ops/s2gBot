@@ -31,9 +31,13 @@ class OrdreMissionFromBonCommandeService
         'lignes.bonCommandeLigne:id,libelle,technicien_id,date_debut_prevue,date_fin_prevue',
     ];
 
+    /** @var array<int>|null Les IDs de BonCommandeLigne à inclure (null = tous) */
+    private ?array $onlyLineIds = null;
+
     /** @return list<OrdreMission> */
-    public function generate(BonCommande $bc, User $actor): array
+    public function generate(BonCommande $bc, User $actor, ?array $onlyLineIds = null): array
     {
+        $this->onlyLineIds = $onlyLineIds;
         $bc->load([
             'lignes.article.actions',
             'lignes.article.sectionProducts.productArticle.actions',
@@ -120,7 +124,12 @@ class OrdreMissionFromBonCommandeService
     {
         $entries = collect();
 
-        foreach ($bc->lignes as $ligne) {
+        // Filtrer les lignes si des IDs spécifiques ont été sélectionnés
+        $lignes = $this->onlyLineIds
+            ? $bc->lignes->filter(fn (BonCommandeLigne $l) => in_array($l->id, $this->onlyLineIds, true))
+            : $bc->lignes;
+
+        foreach ($lignes as $ligne) {
             $actions = $this->resolveActionsForLigne($ligne, $type);
 
             if ($actions->isNotEmpty()) {

@@ -1,3 +1,7 @@
+import { lineKeyForRow } from './devisParcours'
+import { applyCaAnnuelTvaRegime } from './caAnnuelTva'
+import { forfaitJalonTotalHt } from './quoteForfaitJalon'
+
 /**
  * Totaux devis / facture — aligné sur `CommercialDocumentTotalsService` (Laravel).
  */
@@ -24,6 +28,10 @@ export type DocumentTotalsResult = {
   document_scaled_line_tva: number
   shipping_tva: number
   travel_tva: number
+  tva_nominale?: number
+  tva_recuperable?: number
+  tva_etat?: number
+  ca_annuel_tva_regime?: boolean
 }
 
 /**
@@ -37,6 +45,7 @@ export function computeDocumentTotals(
   shippingTvaRate: number,
   travelFeeHt: number,
   travelFeeTvaRate: number,
+  caAnnuelTvaRegime = false,
 ): DocumentTotalsResult {
   let linesHt = 0
   let linesTva = 0
@@ -62,7 +71,21 @@ export function computeDocumentTotals(
   const travelTva = round2(travelHt * (trRate / 100))
 
   const totalHt = round2(afterDiscount + shippingAmountHt + travelHt)
-  const totalTva = round2(scaledTva + shipTva + travelTva)
+  const totalTvaNominal = round2(scaledTva + shipTva + travelTva)
+
+  let totalTva = totalTvaNominal
+  let tvaNominale = totalTvaNominal
+  let tvaRecuperable = 0
+  let tvaEtat = totalTvaNominal
+
+  if (caAnnuelTvaRegime) {
+    const split = applyCaAnnuelTvaRegime(totalTvaNominal)
+    totalTva = split.amount_tva
+    tvaNominale = split.tva_nominale
+    tvaRecuperable = split.tva_recuperable
+    tvaEtat = split.tva_etat
+  }
+
   const totalTtc = round2(totalHt + totalTva)
 
   return {
@@ -74,6 +97,10 @@ export function computeDocumentTotals(
     document_scaled_line_tva: scaledTva,
     shipping_tva: shipTva,
     travel_tva: travelTva,
+    tva_nominale: tvaNominale,
+    tva_recuperable: tvaRecuperable,
+    tva_etat: tvaEtat,
+    ca_annuel_tva_regime: caAnnuelTvaRegime,
   }
 }
 
@@ -87,6 +114,7 @@ export function computeQuoteFormDocumentTotals(
   shippingTvaRate: number,
   travelFeeHt: number,
   travelFeeTvaRate: number,
+  caAnnuelTvaRegime = false,
 ): DocumentTotalsResult {
   const lines = formLines.map((l) => {
     const tva = l.tva_rate ?? defaultTva
@@ -102,7 +130,97 @@ export function computeQuoteFormDocumentTotals(
     shippingTvaRate,
     travelFeeHt,
     travelFeeTvaRate,
+    caAnnuelTvaRegime,
   )
+}
+
+export function isJalonForfait(jalon: { mode?: string } | undefined | null): boolean {
+  return jalon?.mode === 'forfait'
+}
+
+type PricingLine = {
+  row_key?: string
+  parent_jalon_id?: string | null
+  quantity: number
+  unit_price: number
+  discount_percent?: number
+  tva_rate: number
+}
+
+type PricingJalon = {
+  id?: string
+  mode?: string
+  quantity?: number
+  prix_unitaire_ht?: number
+  montant_ht?: number
+  tva_rate?: number
+  product_line_keys?: string[]
+}
+
+export function forfaitJalonChildKeys(
+  lines: PricingLine[],
+  jalons: PricingJalon[] | undefined,
+): Set<string> {
+  const keys = new Set<string>()
+  for (const jalon of jalons ?? []) {
+    if (!isJalonForfait(jalon)) continue
+    for (const key of jalon.product_line_keys ?? []) keys.add(key)
+    lines.forEach((line, index) => {
+      if (jalon.id && line.parent_jalon_id === jalon.id) {
+        keys.add(lineKeyForRow(line, index))
+      }
+    })
+  }
+  return keys
+}
+
+export function lineLockedByForfaitJalon(
+  line: PricingLine,
+  index: number,
+  jalons: PricingJalon[] | undefined,
+): boolean {
+  const key = lineKeyForRow(line, index)
+  return (jalons ?? []).some(
+    (jalon) =>
+      isJalonForfait(jalon) &&
+      (line.parent_jalon_id === jalon.id || (jalon.product_line_keys ?? []).includes(key)),
+  )
+}
+
+/** Lignes HT/TVA pour les totaux — aligné sur `QuotePricingService` (Laravel). */
+export function quoteFormPricingLines(
+  formLines: PricingLine[],
+  jalons: PricingJalon[] | undefined,
+  documentTva: number,
+  isDocumentForfait: boolean,
+  documentForfaitHt: number,
+): QuoteLineTotalsInput[] {
+  if (isDocumentForfait) {
+    const ht = Math.max(0, documentForfaitHt)
+    return [{ quantity: 1, unit_price: ht, discount_percent: 0, tva_rate: documentTva }]
+  }
+
+  const skip = forfaitJalonChildKeys(formLines, jalons)
+  const lines: QuoteLineTotalsInput[] = formLines
+    .filter((line, index) => !skip.has(lineKeyForRow(line, index)))
+    .map((line) => ({
+      quantity: line.quantity,
+      unit_price: line.unit_price,
+      discount_percent: line.discount_percent,
+      tva_rate: line.tva_rate,
+    }))
+
+  for (const jalon of jalons ?? []) {
+    if (!isJalonForfait(jalon)) continue
+    lines.push({
+      quantity: 1,
+      unit_price: forfaitJalonTotalHt(jalon),
+      discount_percent: 0,
+      tva_rate: Number.isFinite(Number(jalon.tva_rate)) ? Number(jalon.tva_rate) : documentTva,
+    })
+  }
+
+  return lines
 }
 
 function round2(n: number): number {
@@ -116,13 +234,18 @@ function clamp(min: number, max: number, n: number): number {
 type FraisSupp = { montant_ht: number; tva_rate: number }
 
 /** HT + TVA (non inclus dans le recalcul API Laravel) */
-export function sumFraisSupplementairesTtc(rows: FraisSupp[] | undefined): number {
+export function sumFraisSupplementairesTtc(
+  rows: FraisSupp[] | undefined,
+  caAnnuelTvaRegime = false,
+): number {
   if (!rows?.length) return 0
   let ttc = 0
   for (const f of rows) {
     const ht = Math.max(0, f.montant_ht)
     const rate = clamp(0, 100, f.tva_rate)
-    ttc = round2(ttc + (ht + round2(ht * (rate / 100))))
+    const nominalTva = round2(ht * (rate / 100))
+    const tva = caAnnuelTvaRegime ? applyCaAnnuelTvaRegime(nominalTva).amount_tva : nominalTva
+    ttc = round2(ttc + (ht + tva))
   }
   return round2(ttc)
 }

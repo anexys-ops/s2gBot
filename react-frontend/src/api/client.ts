@@ -3245,6 +3245,19 @@ export interface ArticleEquipmentRequirement {
   equipment?: { id: number; name: string; code?: string; type?: string }
 }
 
+export interface OdmJalon {
+  id: number
+  ordre: number
+  libelle: string
+  quantite_totale: number
+  quantite_generee: number
+  quantite_restante: number
+  article?: { id: number; code: string; libelle: string } | null
+  date_debut_prevue?: string | null
+  date_fin_prevue?: string | null
+  notes?: string | null
+}
+
 export interface OrdreMissionLigne {
   id: number
   ordre_mission_id: number
@@ -3402,8 +3415,13 @@ export const ordresMissionApi = {
     api<OrdreMission>(`/ordres-mission/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) =>
     api<void>(`/ordres-mission/${id}`, { method: 'DELETE' }),
-  generateFromBC: (bcId: number) =>
-    api<OrdreMission[]>(`/bons-commande/${bcId}/generate-ordres-mission`, { method: 'POST' }),
+  getBonCommandeLignesForGeneration: (bcId: number) =>
+    api<{ bon_commande_id: number; jalons: OdmJalon[] }>(`/bons-commande/${bcId}/ordres-mission-jalons`),
+  generateFromBC: (bcId: number, selectedLineIds?: number[]) =>
+    api<OrdreMission[]>(
+      `/bons-commande/${bcId}/generate-ordres-mission`,
+      { method: 'POST', body: selectedLineIds ? JSON.stringify({ bon_commande_ligne_ids: selectedLineIds }) : undefined }
+    ),
   createLigne: (
     omId: number,
     body: {

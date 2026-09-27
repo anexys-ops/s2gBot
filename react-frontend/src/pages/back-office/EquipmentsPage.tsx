@@ -1,16 +1,26 @@
 import { useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { equipmentsApi, testTypesApi, type EquipmentRow, type TestType } from '../../api/client'
+import { equipmentsApi, type EquipmentRow } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
-import Modal from '../../components/Modal'
+import ConfirmDialog from '../../components/ConfirmDialog'
+import StatusBadge, { equipementStatutBadgeProps } from '../../components/ds/StatusBadge'
+import ListTableToolbar from '../../components/ListTableToolbar'
+import { ListTablePanelHeader } from '../../components/ListTablePanel'
+import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import EquipmentCreateModal from '../../components/materiel/EquipmentCreateModal'
+import EquipmentEditModal from '../../components/materiel/EquipmentEditModal'
+import { MATERIEL_MODULE_TABS } from '../materiel/materielModuleTabs'
 
-const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: '', label: 'Tous statuts' },
+const STATUS_OPTIONS = [
   { value: 'active', label: 'Actif' },
   { value: 'maintenance', label: 'Maintenance' },
   { value: 'retired', label: 'Retiré' },
-]
+] as const
+
+function statusLabel(value: string): string {
+  return STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value
+}
 
 function nextDueLabel(eq: EquipmentRow): string {
   const cals = eq.calibrations ?? []
@@ -20,187 +30,232 @@ function nextDueLabel(eq: EquipmentRow): string {
   return sorted[0] ? new Date(sorted[0]).toLocaleDateString('fr-FR') : '—'
 }
 
+function matchesSearch(eq: EquipmentRow, term: string): boolean {
+  if (!term) return true
+  const haystack = [
+    eq.code,
+    eq.name,
+    eq.status,
+    eq.type,
+    eq.brand,
+    eq.model,
+    eq.serial_number,
+    eq.location,
+    eq.agency?.name,
+    ...(eq.test_types?.map((t) => t.name) ?? []),
+  ]
+    .filter(Boolean)
+    .map((v) => String(v).toLowerCase())
+  return haystack.some((v) => v.includes(term))
+}
+
 export default function EquipmentsPage() {
   const { user } = useAuth()
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const isAdmin = user?.role === 'lab_admin'
   const queryClient = useQueryClient()
+  const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
-  const [dueWithin, setDueWithin] = useState<number | ''>('')
   const [createOpen, setCreateOpen] = useState(false)
-  const [form, setForm] = useState({ name: '', code: '', test_type_ids: [] as number[] })
-
-  const listParams = useMemo(() => {
-    const p: { status?: string; due_within?: number } = {}
-    if (status) p.status = status
-    if (dueWithin !== '' && dueWithin > 0) p.due_within = dueWithin
-    return p
-  }, [status, dueWithin])
+  const [editTarget, setEditTarget] = useState<EquipmentRow | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<EquipmentRow | null>(null)
 
   const { data: rows = [], isLoading, error } = useQuery({
-    queryKey: ['equipments', listParams],
-    queryFn: () => equipmentsApi.list(listParams),
+    queryKey: ['equipments', status],
+    queryFn: () => equipmentsApi.list(status ? { status } : undefined),
     enabled: isLab,
   })
 
-  const { data: testTypes = [] } = useQuery({
-    queryKey: ['test-types'],
-    queryFn: () => testTypesApi.list(),
-    enabled: isLab && createOpen,
-  })
+  const filteredRows = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    return rows.filter((eq) => matchesSearch(eq, term))
+  }, [rows, search])
 
-  const createMutation = useMutation({
-    mutationFn: () =>
-      equipmentsApi.create({
-        name: form.name.trim(),
-        code: form.code.trim(),
-        test_type_ids: form.test_type_ids,
-      }),
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => equipmentsApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipments'] })
-      setCreateOpen(false)
-      setForm({ name: '', code: '', test_type_ids: [] })
+      void queryClient.invalidateQueries({ queryKey: ['equipments'] })
+      setDeleteTarget(null)
     },
   })
+
+  const hasActiveFilters = search.trim() !== '' || status !== ''
 
   if (!isLab) {
     return <Navigate to="/" replace />
   }
 
   return (
-    <div className="design-card">
-      <p style={{ marginBottom: 8 }}>
-        <Link to="/materiel">← Matériel (vue d’ensemble)</Link>
-      </p>
-      <div className="design-card__toolbar" style={{ marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-        <label className="design-card__muted" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          Statut
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="input">
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.value || 'all'} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="design-card__muted" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          Échéance dans (j.)
-          <input
-            type="number"
-            min={1}
-            max={365}
-            className="input"
-            style={{ width: 90 }}
-            value={dueWithin}
-            onChange={(e) => {
-              const v = e.target.value
-              setDueWithin(v === '' ? '' : Math.min(365, Math.max(1, Number(v))))
-            }}
-            placeholder="ex. 30"
-          />
-        </label>
-        {isAdmin && (
-          <button type="button" className="btn btn--primary" onClick={() => setCreateOpen(true)}>
+    <ModuleEntityShell
+      breadcrumbs={[
+        { label: 'Accueil', to: '/' },
+        { label: 'Parc équipements' },
+      ]}
+      moduleBarLabel="Matériel"
+      title="Parc équipements"
+      subtitle={
+        <>
+          {filteredRows.length} équipement{filteredRows.length !== 1 ? 's' : ''}
+          {hasActiveFilters && rows.length !== filteredRows.length ? (
+            <span className="text-muted"> (sur {rows.length} chargé{rows.length !== 1 ? 's' : ''})</span>
+          ) : null}
+        </>
+      }
+      tabs={MATERIEL_MODULE_TABS}
+      actions={
+        isAdmin ? (
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setCreateOpen(true)}>
             Nouvel équipement
           </button>
-        )}
-      </div>
+        ) : undefined
+      }
+    >
+      <ListTableToolbar
+        className="materiel-equipments-toolbar"
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Code, nom, agence, type, n° série…"
+        statusValue={status}
+        onStatusChange={setStatus}
+        statusOptions={STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        footer={
+          hasActiveFilters ? (
+            <>
+              <span className="list-table-toolbar__footer-label">Filtres actifs</span>
+              {search.trim() !== '' ? (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">Recherche : « {search.trim()} »</span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => setSearch('')}
+                    aria-label="Effacer la recherche"
+                  >
+                    ×
+                  </button>
+                </span>
+              ) : null}
+              {status ? (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">{statusLabel(status)}</span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => setStatus('')}
+                    aria-label="Effacer le filtre statut"
+                  >
+                    ×
+                  </button>
+                </span>
+              ) : null}
+            </>
+          ) : null
+        }
+      />
 
-      {isLoading && <p className="design-card__muted">Chargement…</p>}
+      {isLoading && <p className="text-muted">Chargement…</p>}
       {error && <p className="error">{(error as Error).message}</p>}
       {!isLoading && !error && (
-        <div className="activity-table-wrap">
-          <table className="activity-table">
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Nom</th>
-                <th>Statut</th>
-                <th>Agence</th>
-                <th>Prochain étalonnage</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((eq) => (
-                <tr key={eq.id}>
-                  <td>
-                    <Link to={`/materiel/equipements/${eq.id}`}>{eq.code}</Link>
-                  </td>
-                  <td>{eq.name}</td>
-                  <td>{eq.status}</td>
-                  <td>{eq.agency?.name ?? '—'}</td>
-                  <td>{nextDueLabel(eq)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {rows.length === 0 && <p className="design-card__muted">Aucun équipement pour ces filtres.</p>}
+        <div className="card dossier-tab-panel dossier-tab-panel--table">
+          <ListTablePanelHeader title="Équipements" count={filteredRows.length} />
+          {filteredRows.length > 0 ? (
+            <div className="table-wrap">
+              <table className="data-table data-table--compact">
+                <thead>
+                  <tr>
+                    <th className="data-table__code">Code</th>
+                    <th>Nom</th>
+                    <th>Statut</th>
+                    <th>Agence</th>
+                    <th>Prochain étalonnage</th>
+                    <th className="materiel-equipments-table__actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRows.map((eq) => {
+                    const st = equipementStatutBadgeProps(eq.status)
+                    return (
+                      <tr key={eq.id}>
+                        <td className="data-table__code">
+                          <Link to={`/materiel/equipements/${eq.id}`} className="link-inline">
+                            <code className="code-badge">{eq.code}</code>
+                          </Link>
+                        </td>
+                        <td>{eq.name}</td>
+                        <td>
+                          <StatusBadge variant={st.variant} size="sm">
+                            {statusLabel(eq.status)}
+                          </StatusBadge>
+                        </td>
+                        <td>{eq.agency?.name ?? '—'}</td>
+                        <td>{nextDueLabel(eq)}</td>
+                        <td className="materiel-equipments-table__actions">
+                          <Link
+                            to={`/materiel/equipements/${eq.id}`}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            Fiche
+                          </Link>
+                          {isAdmin ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => setEditTarget(eq)}
+                              >
+                                Modifier
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm btn-danger-outline"
+                                title="Supprimer"
+                                onClick={() => setDeleteTarget(eq)}
+                              >
+                                Supprimer
+                              </button>
+                            </>
+                          ) : null}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="dossier-tab-empty">
+              {rows.length === 0
+                ? 'Aucun équipement enregistré.'
+                : 'Aucun équipement ne correspond à la recherche ou aux filtres.'}
+            </p>
+          )}
         </div>
       )}
 
-      {createOpen && (
-        <Modal title="Nouvel équipement" onClose={() => setCreateOpen(false)}>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (!form.name.trim() || !form.code.trim()) return
-              createMutation.mutate()
-            }}
-            className="stack"
-            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-          >
-            <label>
-              <span className="design-card__muted">Nom</span>
-              <input
-                className="input"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                required
-              />
-            </label>
-            <label>
-              <span className="design-card__muted">Code unique</span>
-              <input
-                className="input"
-                value={form.code}
-                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                required
-              />
-            </label>
-            <fieldset>
-              <legend className="design-card__muted">Types d’essai liés</legend>
-              <div style={{ maxHeight: 180, overflow: 'auto' }}>
-                {testTypes.map((t: TestType) => (
-                  <label key={t.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={form.test_type_ids.includes(t.id)}
-                      onChange={(e) => {
-                        setForm((f) => ({
-                          ...f,
-                          test_type_ids: e.target.checked
-                            ? [...f.test_type_ids, t.id]
-                            : f.test_type_ids.filter((id) => id !== t.id),
-                        }))
-                      }}
-                    />
-                    {t.name}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            {createMutation.isError && <p className="error">{(createMutation.error as Error).message}</p>}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button type="button" className="btn" onClick={() => setCreateOpen(false)}>
-                Annuler
-              </button>
-              <button type="submit" className="btn btn--primary" disabled={createMutation.isPending}>
-                Créer
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-    </div>
+      {createOpen ? <EquipmentCreateModal onClose={() => setCreateOpen(false)} /> : null}
+
+      {editTarget ? (
+        <EquipmentEditModal equipment={editTarget} onClose={() => setEditTarget(null)} />
+      ) : null}
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Supprimer l'équipement"
+          message={
+            <>
+              Supprimer définitivement <strong>{deleteTarget.code}</strong> — {deleteTarget.name} ?
+            </>
+          }
+          confirmLabel="Supprimer"
+          variant="danger"
+          loading={deleteMut.isPending}
+          error={deleteMut.isError ? (deleteMut.error as Error).message : null}
+          onConfirm={() => deleteMut.mutate(deleteTarget.id)}
+          onCancel={() => {
+            if (!deleteMut.isPending) setDeleteTarget(null)
+          }}
+        />
+      ) : null}
+    </ModuleEntityShell>
   )
 }

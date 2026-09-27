@@ -1,12 +1,24 @@
-import { Link, useOutletContext, useParams } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { dossiersApi } from '../../../api/client'
 import type { DossierFicheOutletContext } from '../DossierFichePage'
+import { ListTableFootRow, ListTablePanelHeader } from '../../../components/ListTablePanel'
+import StatusBadge, {
+  bonCommandeStatutBadgeProps,
+  bonLivraisonStatutBadgeProps,
+} from '../../../components/ds/StatusBadge'
+import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../../lib/appLocale'
+import { sumNumeric } from '../../../lib/listTableTotals'
+import { shouldIgnoreTableRowClick } from '../../../lib/tableRowInteraction'
+import DocumentPdfPickerModal from '../../../components/pdf/DocumentPdfPickerModal'
 
 export default function DossierBcBlTab() {
   const { id } = useParams<{ id: string }>()
   const dossierId = Number(id)
+  const navigate = useNavigate()
   const { dossier } = useOutletContext<DossierFicheOutletContext>()
+  const [pdfBcId, setPdfBcId] = useState<number | null>(null)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['dossier-bons', dossierId],
@@ -14,107 +26,182 @@ export default function DossierBcBlTab() {
     enabled: Number.isFinite(dossierId) && dossierId > 0,
   })
 
-  if (isLoading) {
-    return <p className="text-muted">Chargement des bons de commande et bons de livraison…</p>
-  }
-  if (error) {
-    return <p className="error">{(error as Error).message}</p>
-  }
-
   const bcs = data?.bons_commande ?? []
   const bls = data?.bons_livraison ?? []
+  const bcTotals = useMemo(
+    () => ({
+      ht: sumNumeric(bcs, (bc) => bc.montant_ht),
+      ttc: sumNumeric(bcs, (bc) => bc.montant_ttc),
+    }),
+    [bcs],
+  )
+
+  if (isLoading) {
+    return (
+      <div className="dossier-tab">
+        <p className="text-muted">Chargement des bons de commande et bons de livraison…</p>
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="dossier-tab">
+        <p className="error">{(error as Error).message}</p>
+      </div>
+    )
+  }
 
   return (
-    <div>
-      <p className="text-muted" style={{ marginBottom: '1rem' }}>
-        Bons rattachés au dossier <code>{dossier.reference}</code>. Voir aussi la{' '}
-        <Link to="/bons-commande" className="link-inline">
-          liste globale des bons de commande
-        </Link>
-        .
-      </p>
-
-      <h2 className="h2" style={{ fontSize: '1.05rem', marginTop: '0.5rem' }}>
-        Bons de commande
-      </h2>
-      {!bcs.length && <p className="text-muted">Aucun bon de commande pour ce dossier.</p>}
-      {!!bcs.length && (
-        <div className="table-wrap" style={{ marginBottom: '1.5rem' }}>
-          <table className="data-table data-table--compact" style={{ width: '100%' }}>
-            <thead>
-              <tr>
-                <th>N°</th>
-                <th>Statut</th>
-                <th>Date</th>
-                <th>Montant TTC</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {bcs.map((bc) => (
-                <tr key={bc.id}>
-                  <td>
-                    <code>{bc.numero}</code>
-                  </td>
-                  <td>{bc.statut}</td>
-                  <td>{String(bc.date_commande).slice(0, 10)}</td>
-                  <td>{bc.montant_ttc}</td>
-                  <td>
-                    <Link to={`/bons-commande/${bc.id}`} className="link-inline">
-                      Fiche
-                    </Link>
-                  </td>
+    <div className="dossier-tab">
+      <div className="card dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title="Bons de commande" count={bcs.length} />
+        <p className="dossier-tab-panel__intro" style={{ padding: '0 1.5rem', marginTop: '-0.25rem' }}>
+          Bons rattachés au dossier <code>{dossier.reference}</code>. Voir aussi la{' '}
+          <Link to="/bons-commande" className="link-inline">
+            liste globale des bons de commande
+          </Link>
+          .
+        </p>
+        {bcs.length > 0 ? (
+          <div className="table-wrap">
+            <table className="data-table data-table--compact">
+              <thead>
+                <tr>
+                  <th className="data-table__code">N°</th>
+                  <th>Statut</th>
+                  <th>Date</th>
+                  <th>Montant HT ({MONEY_UNIT_LABEL})</th>
+                  <th>Montant TTC ({MONEY_UNIT_LABEL})</th>
+                  <th style={{ width: '1%', whiteSpace: 'nowrap' }}>PDF Récap</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {bcs.map((bc) => {
+                  const st = bonCommandeStatutBadgeProps(bc.statut)
+                  return (
+                    <tr
+                      key={bc.id}
+                      className="table-row-link"
+                      onClick={(e) => {
+                        if (shouldIgnoreTableRowClick(e.target)) return
+                        navigate(`/bons-commande/${bc.id}`)
+                      }}
+                    >
+                      <td className="data-table__code">
+                        <Link to={`/bons-commande/${bc.id}`} onClick={(e) => e.stopPropagation()}>
+                          <code>{bc.numero}</code>
+                        </Link>
+                      </td>
+                      <td className="data-table__status">
+                        <StatusBadge variant={st.variant} size="sm">
+                          {st.label}
+                        </StatusBadge>
+                      </td>
+                      <td>{formatAppDate(bc.date_commande)}</td>
+                      <td className="data-table__num">{formatMoney(Number(bc.montant_ht))}</td>
+                      <td className="data-table__num">{formatMoney(Number(bc.montant_ttc))}</td>
+                      <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-secondary"
+                          title="Générer le PDF récap dossier pour ce BC"
+                          onClick={() => setPdfBcId(bc.id)}
+                        >
+                          PDF
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <ListTableFootRow
+                columns={[
+                  { id: 'number', kind: 'text' },
+                  { id: 'status', kind: 'text' },
+                  { id: 'date', kind: 'text' },
+                  { id: 'ht', kind: 'money' },
+                  { id: 'ttc', kind: 'money' },
+                  { id: 'actions', kind: 'text' },
+                ]}
+                visible={{ number: true, status: true, date: true, ht: true, ttc: true, actions: true }}
+                totals={bcTotals}
+              />
+            </table>
+          </div>
+        ) : (
+          <p className="dossier-tab-empty">Aucun bon de commande pour ce dossier.</p>
+        )}
+      </div>
 
-      <h2 className="h2" style={{ fontSize: '1.05rem' }}>
-        Bons de livraison
-      </h2>
-      {!bls.length && <p className="text-muted">Aucun bon de livraison pour ce dossier.</p>}
-      {!!bls.length && (
-        <div className="table-wrap">
-          <table className="data-table data-table--compact" style={{ width: '100%' }}>
-            <thead>
-              <tr>
-                <th>N°</th>
-                <th>Statut</th>
-                <th>Date</th>
-                <th>BC lié</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {bls.map((bl) => (
-                <tr key={bl.id}>
-                  <td>
-                    <code>{bl.numero}</code>
-                  </td>
-                  <td>{bl.statut}</td>
-                  <td>{String(bl.date_livraison).slice(0, 10)}</td>
-                  <td>
-                    {bl.bon_commande_id ? (
-                      <Link to={`/bons-commande/${bl.bon_commande_id}`} className="link-inline">
-                        #{bl.bon_commande_id}
-                      </Link>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td>
-                    <Link to={`/bons-livraison/${bl.id}`} className="link-inline">
-                      Fiche
-                    </Link>
-                  </td>
+      {pdfBcId ? (
+        <DocumentPdfPickerModal
+          documentType="purchase_order"
+          documentId={pdfBcId}
+          documentLabel={bcs.find((bc) => bc.id === pdfBcId)?.numero ?? String(pdfBcId)}
+          initialTemplateSlug="bc-recap-dossier"
+          onClose={() => setPdfBcId(null)}
+        />
+      ) : null}
+
+      <div className="card dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title="Bons de livraison" count={bls.length} />
+        {bls.length > 0 ? (
+          <div className="table-wrap">
+            <table className="data-table data-table--compact">
+              <thead>
+                <tr>
+                  <th className="data-table__code">N°</th>
+                  <th>Statut</th>
+                  <th>Date</th>
+                  <th className="data-table__code">BC lié</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {bls.map((bl) => {
+                  const st = bonLivraisonStatutBadgeProps(bl.statut)
+                  return (
+                    <tr
+                      key={bl.id}
+                      className="table-row-link"
+                      onClick={(e) => {
+                        if (shouldIgnoreTableRowClick(e.target)) return
+                        navigate(`/bons-livraison/${bl.id}`)
+                      }}
+                    >
+                      <td className="data-table__code">
+                        <Link to={`/bons-livraison/${bl.id}`} onClick={(e) => e.stopPropagation()}>
+                          <code>{bl.numero}</code>
+                        </Link>
+                      </td>
+                      <td className="data-table__status">
+                        <StatusBadge variant={st.variant} size="sm">
+                          {st.label}
+                        </StatusBadge>
+                      </td>
+                      <td>{formatAppDate(bl.date_livraison)}</td>
+                      <td className="data-table__code">
+                        {bl.bon_commande_id ? (
+                          <Link
+                            to={`/bons-commande/${bl.bon_commande_id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="link-inline"
+                          >
+                            #{bl.bon_commande_id}
+                          </Link>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="dossier-tab-empty">Aucun bon de livraison pour ce dossier.</p>
+        )}
+      </div>
     </div>
   )
 }

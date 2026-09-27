@@ -1,22 +1,35 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { bonsCommandeApi, equipmentsApi, type EquipmentRow } from '../../api/client'
+import { useQuery } from '@tanstack/react-query'
+import { bonsCommandeApi, equipmentsApi, materielAffectationsApi } from '../../api/client'
+import {
+  affectationEndDate,
+  dateInputValue,
+  daysInRange,
+  maintenanceKindLabel,
+  toLocalDateInput,
+} from '../../components/materiel/equipmentSuiviUtils'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import { MATERIEL_HOME, MATERIEL_MODULE_TABS } from './materielModuleTabs'
 
 type PlanningEvent = {
   id: string
   date: string
   title: string
   subtitle: string
-  kind: 'maintenance' | 'chantier'
-  status?: string
+  kind: 'echeance' | 'affectation' | 'chantier'
+  equipmentId?: number
   to?: string
 }
 
-function toDateInput(d: Date) {
-  return d.toISOString().slice(0, 10)
-}
+type EventKindFilter = '' | 'echeance' | 'affectation' | 'chantier'
+
+const EVENT_KIND_OPTIONS: { value: EventKindFilter; label: string }[] = [
+  { value: '', label: 'Tous les événements' },
+  { value: 'echeance', label: 'Échéances périodiques' },
+  { value: 'affectation', label: 'Affectations / utilisation' },
+  { value: 'chantier', label: 'Chantiers' },
+]
 
 function addDays(date: Date, days: number) {
   const d = new Date(date)
@@ -24,29 +37,35 @@ function addDays(date: Date, days: number) {
   return d
 }
 
-function eventDay(date: string) {
-  return String(date).slice(0, 10)
+function toMonthInput(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function shiftMonth(month: string, delta: number) {
+  const [y, m] = month.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta, 1)
+  return toMonthInput(d)
 }
 
 function monthLabel(month: string) {
   return new Date(`${month}-01T00:00:00`).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
 }
 
-function latestCalibration(eq: EquipmentRow) {
-  const cals = eq.calibrations ?? []
-  return cals.find((c) => c.next_due_date) ?? cals[0]
+function eventDay(date: string) {
+  return dateInputValue(date)
 }
 
 export default function MaterielPlanningPage() {
-  const qc = useQueryClient()
-  const today = new Date()
-  const [month, setMonth] = useState(today.toISOString().slice(0, 7))
-  const [selectedEquipmentId, setSelectedEquipmentId] = useState<number | ''>('')
-  const [statusDraft, setStatusDraft] = useState('')
-  const [locationDraft, setLocationDraft] = useState('')
+  const [month, setMonth] = useState(() => toMonthInput(new Date()))
+  const [eventKind, setEventKind] = useState<EventKindFilter>('')
+  const [calendarEquipmentId, setCalendarEquipmentId] = useState<number | ''>('')
 
-  const monthStart = `${month}-01`
-  const monthEnd = toDateInput(addDays(new Date(`${month}-01T00:00:00`), 40))
+  const calendarRange = useMemo(() => {
+    const first = new Date(`${month}-01T12:00:00`)
+    const gridStart = addDays(first, -((first.getDay() + 6) % 7))
+    const gridEnd = addDays(gridStart, 41)
+    return { from: toLocalDateInput(gridStart), to: toLocalDateInput(gridEnd) }
+  }, [month])
 
   const { data: equipments = [], isLoading: loadingEquipments } = useQuery({
     queryKey: ['equipments', 'planning'],
@@ -56,33 +75,50 @@ export default function MaterielPlanningPage() {
     queryKey: ['bons-commande', 'materiel-planning'],
     queryFn: () => bonsCommandeApi.list(),
   })
-
-  const selectedEquipment = equipments.find((eq) => eq.id === selectedEquipmentId)
-
-  const updateEquipmentMut = useMutation({
-    mutationFn: () => {
-      if (!selectedEquipment) throw new Error('Sélectionnez un matériel.')
-      return equipmentsApi.update(selectedEquipment.id, {
-        status: statusDraft || selectedEquipment.status,
-        location: locationDraft,
-      })
-    },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['equipments'] }),
+  const { data: duePlans = [], isLoading: loadingDue } = useQuery({
+    queryKey: ['equipment-maintenance-due', calendarRange.from, calendarRange.to, calendarEquipmentId],
+    queryFn: () =>
+      equipmentsApi.maintenancePlansDue({
+        from: calendarRange.from,
+        to: calendarRange.to,
+        equipment_id: calendarEquipmentId === '' ? undefined : calendarEquipmentId,
+      }),
+  })
+  const { data: affectations = [], isLoading: loadingAffect } = useQuery({
+    queryKey: ['materiel-affectations', calendarRange.from, calendarRange.to, calendarEquipmentId],
+    queryFn: () =>
+      materielAffectationsApi.list({
+        from: calendarRange.from,
+        to: calendarRange.to,
+        equipment_id: calendarEquipmentId === '' ? undefined : calendarEquipmentId,
+      }),
   })
 
-  const events = useMemo<PlanningEvent[]>(() => {
-    const maintenanceEvents = equipments.flatMap((eq) => {
-      const cal = latestCalibration(eq)
-      if (!cal?.next_due_date) return []
-      return [{
-        id: `maintenance-${eq.id}-${cal.id}`,
-        date: eventDay(cal.next_due_date),
-        title: eq.code,
-        subtitle: `Maintenance / étalonnage : ${eq.name}`,
-        kind: 'maintenance' as const,
-        status: eq.status,
-        to: `/materiel/equipements/${eq.id}`,
-      }]
+  const allEvents = useMemo<PlanningEvent[]>(() => {
+    const echeanceEvents = duePlans.map((item) => ({
+      id: `echeance-${item.plan_id}-${item.date}`,
+      date: eventDay(item.date),
+      title: item.equipment?.code ?? `#${item.equipment_id}`,
+      subtitle: `${item.label} (${maintenanceKindLabel(item.kind)})`,
+      kind: 'echeance' as const,
+      equipmentId: item.equipment_id,
+      to: `/materiel/equipements/${item.equipment_id}`,
+    }))
+
+    const affectationEvents = affectations.flatMap((a) => {
+      const end = affectationEndDate(a)
+      const days = daysInRange(a.date_debut, end)
+      return days.map((date) => ({
+        id: `affect-${a.id}-${date}`,
+        date: eventDay(date),
+        title: a.equipment?.code ?? `#${a.equipment_id}`,
+        subtitle: a.user?.name
+          ? `Utilisation — ${a.user.name}`
+          : 'Affectation matériel',
+        kind: 'affectation' as const,
+        equipmentId: a.equipment_id,
+        to: `/materiel/equipements/${a.equipment_id}`,
+      }))
     })
 
     const chantierEvents = bonsCommande.flatMap((bc) => {
@@ -96,22 +132,29 @@ export default function MaterielPlanningPage() {
           title: bc.numero,
           subtitle: `${index === 0 ? 'Début' : 'Fin'} chantier prévu : ${ligne.libelle}`,
           kind: 'chantier' as const,
-          status: bc.statut,
           to: `/bons-commande/${bc.id}`,
         }))
       })
     })
 
-    return [...maintenanceEvents, ...chantierEvents]
-      .filter((e) => e.date >= monthStart && e.date <= monthEnd)
+    return [...echeanceEvents, ...affectationEvents, ...chantierEvents]
+      .filter((e) => e.date >= calendarRange.from && e.date <= calendarRange.to)
       .sort((a, b) => a.date.localeCompare(b.date) || a.kind.localeCompare(b.kind))
-  }, [bonsCommande, equipments, monthEnd, monthStart])
+  }, [affectations, bonsCommande, calendarRange.from, calendarRange.to, duePlans])
+
+  const events = useMemo(() => {
+    return allEvents.filter((event) => {
+      if (eventKind && event.kind !== eventKind) return false
+      if (calendarEquipmentId !== '' && event.equipmentId !== calendarEquipmentId) return false
+      return true
+    })
+  }, [allEvents, calendarEquipmentId, eventKind])
 
   const days = useMemo(() => {
     const first = new Date(`${month}-01T00:00:00`)
     const start = addDays(first, -((first.getDay() + 6) % 7))
     return Array.from({ length: 42 }, (_, i) => {
-      const date = toDateInput(addDays(start, i))
+      const date = toLocalDateInput(addDays(start, i))
       return {
         date,
         inMonth: date.startsWith(month),
@@ -120,71 +163,157 @@ export default function MaterielPlanningPage() {
     })
   }, [events, month])
 
+  const hasCalendarFilters = eventKind !== '' || calendarEquipmentId !== ''
+  const calendarEquipment = equipments.find((eq) => eq.id === calendarEquipmentId)
+
+  function resetCalendarFilters() {
+    setEventKind('')
+    setCalendarEquipmentId('')
+  }
+
   return (
     <ModuleEntityShell
       breadcrumbs={[
         { label: 'Accueil', to: '/' },
-        { label: 'Matériel', to: '/materiel' },
+        { label: 'Parc équipements', to: MATERIEL_HOME },
         { label: 'Planning matériel' },
       ]}
       moduleBarLabel="Matériel"
       title="Planning matériel"
-      subtitle="Calendrier croisant les échéances de maintenance/étalonnage et les dates prévues des chantiers."
+      subtitle={
+        <>
+          {events.length} événement{events.length !== 1 ? 's' : ''} affiché{events.length !== 1 ? 's' : ''} pour{' '}
+          {monthLabel(month)}
+          {hasCalendarFilters && allEvents.length !== events.length ? (
+            <span className="text-muted"> (sur {allEvents.length} dans la période)</span>
+          ) : null}
+        </>
+      }
+      tabs={MATERIEL_MODULE_TABS}
     >
-      <div className="card materiel-planning-toolbar">
-        <label>
-          Mois
-          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-        </label>
-        <label>
-          Matériel à gérer
-          <select
-            value={selectedEquipmentId === '' ? '' : String(selectedEquipmentId)}
-            onChange={(e) => {
-              const nextId = e.target.value ? Number(e.target.value) : ''
-              const eq = equipments.find((item) => item.id === nextId)
-              setSelectedEquipmentId(nextId)
-              setStatusDraft(eq?.status ?? '')
-              setLocationDraft(eq?.location ?? '')
-            }}
-          >
-            <option value="">Choisir…</option>
-            {equipments.map((eq) => (
-              <option key={eq.id} value={eq.id}>
-                {eq.code} — {eq.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {selectedEquipment && (
-          <>
-            <label>
-              Statut
-              <select value={statusDraft} onChange={(e) => setStatusDraft(e.target.value)}>
-                <option value="active">Actif</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="retired">Retiré</option>
+      <div className="card list-table-toolbar materiel-planning-toolbar">
+        <section className="materiel-planning-toolbar__block">
+          <div className="materiel-planning-toolbar__block-head">
+            <h2 className="materiel-planning-toolbar__block-title">Affichage calendrier</h2>
+            <p className="materiel-planning-toolbar__block-hint text-muted">
+              Naviguez par mois et filtrez échéances périodiques, affectations et chantiers.
+            </p>
+          </div>
+          <div className="list-table-toolbar__row materiel-planning-toolbar__row">
+            <div className="list-table-toolbar__field materiel-planning-toolbar__month">
+              <span className="filter-label">Mois</span>
+              <div className="materiel-planning-toolbar__month-nav">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm materiel-planning-toolbar__month-btn"
+                  onClick={() => setMonth((m) => shiftMonth(m, -1))}
+                  aria-label="Mois précédent"
+                >
+                  ‹
+                </button>
+                <input
+                  type="month"
+                  className="materiel-planning-toolbar__month-input"
+                  value={month}
+                  onChange={(e) => setMonth(e.target.value)}
+                  aria-label="Mois affiché"
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm materiel-planning-toolbar__month-btn"
+                  onClick={() => setMonth((m) => shiftMonth(m, 1))}
+                  aria-label="Mois suivant"
+                >
+                  ›
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setMonth(toMonthInput(new Date()))}
+                >
+                  Aujourd&apos;hui
+                </button>
+              </div>
+            </div>
+
+            <label className="list-table-toolbar__field list-table-toolbar__status materiel-planning-toolbar__kind">
+              <span className="filter-label">Type d&apos;événement</span>
+              <select value={eventKind} onChange={(e) => setEventKind(e.target.value as EventKindFilter)}>
+                {EVENT_KIND_OPTIONS.map((o) => (
+                  <option key={o.value || 'all'} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
             </label>
-            <label>
-              Localisation
-              <input value={locationDraft} onChange={(e) => setLocationDraft(e.target.value)} placeholder="Dépôt, chantier…" />
+
+            <label className="list-table-toolbar__field materiel-planning-toolbar__equipment-filter">
+              <span className="filter-label">Équipement</span>
+              <select
+                value={calendarEquipmentId === '' ? '' : String(calendarEquipmentId)}
+                onChange={(e) => setCalendarEquipmentId(e.target.value ? Number(e.target.value) : '')}
+              >
+                <option value="">Tous les équipements</option>
+                {equipments.map((eq) => (
+                  <option key={eq.id} value={eq.id}>
+                    {eq.code} — {eq.name}
+                  </option>
+                ))}
+              </select>
             </label>
-            <button type="button" className="btn btn-primary" onClick={() => updateEquipmentMut.mutate()} disabled={updateEquipmentMut.isPending}>
-              Enregistrer matériel
-            </button>
-          </>
-        )}
+          </div>
+
+          {hasCalendarFilters ? (
+            <div className="list-table-toolbar__footer">
+              <span className="list-table-toolbar__footer-label">Filtres actifs</span>
+              {eventKind ? (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">
+                    {EVENT_KIND_OPTIONS.find((o) => o.value === eventKind)?.label}
+                  </span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => setEventKind('')}
+                    aria-label="Effacer le filtre type"
+                  >
+                    ×
+                  </button>
+                </span>
+              ) : null}
+              {calendarEquipmentId !== '' && calendarEquipment ? (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">
+                    Équipement : {calendarEquipment.code}
+                  </span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => setCalendarEquipmentId('')}
+                    aria-label="Effacer le filtre équipement"
+                  >
+                    ×
+                  </button>
+                </span>
+              ) : null}
+              <button type="button" className="btn btn-secondary btn-sm" onClick={resetCalendarFilters}>
+                Tout effacer
+              </button>
+            </div>
+          ) : null}
+        </section>
       </div>
 
-      {(loadingEquipments || loadingBc) && <p className="text-muted">Chargement du planning…</p>}
-      {updateEquipmentMut.isError && <p className="error">{(updateEquipmentMut.error as Error).message}</p>}
+      {(loadingEquipments || loadingBc || loadingDue || loadingAffect) && (
+        <p className="text-muted">Chargement du planning…</p>
+      )}
 
       <div className="card materiel-calendar">
         <div className="materiel-calendar__head">
           <h2>{monthLabel(month)}</h2>
           <div className="materiel-calendar__legend">
-            <span className="materiel-calendar__dot materiel-calendar__dot--maintenance" /> Maintenance / étalonnage
+            <span className="materiel-calendar__dot materiel-calendar__dot--echeance" /> Échéance périodique
+            <span className="materiel-calendar__dot materiel-calendar__dot--affectation" /> Affectation / utilisation
             <span className="materiel-calendar__dot materiel-calendar__dot--chantier" /> Chantier
           </div>
         </div>
@@ -211,6 +340,11 @@ export default function MaterielPlanningPage() {
             </div>
           ))}
         </div>
+        {!loadingEquipments && !loadingBc && events.length === 0 ? (
+          <p className="dossier-tab-empty materiel-calendar__empty">
+            Aucun événement ne correspond aux filtres pour ce mois.
+          </p>
+        ) : null}
       </div>
     </ModuleEntityShell>
   )

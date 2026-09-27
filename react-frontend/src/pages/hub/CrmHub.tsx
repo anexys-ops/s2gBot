@@ -80,6 +80,10 @@ export default function CrmHub() {
           Clients
         </Link>
         {' · '}
+        <Link to="/clients/contacts" className="hub-footnote__link">
+          Contacts clients
+        </Link>
+        {' · '}
         <Link to="/sites" className="hub-footnote__link">
           Chantiers
         </Link>

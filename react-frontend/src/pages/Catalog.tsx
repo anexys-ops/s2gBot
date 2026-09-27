@@ -5,9 +5,11 @@ import { useAuth } from '../contexts/AuthContext'
 import PageBackNav from '../components/PageBackNav'
 import Modal from '../components/Modal'
 import ListTableToolbar from '../components/ListTableToolbar'
+import { ListTableFootRow, ListTablePanelHeader } from '../components/ListTablePanel'
+import { sumNumeric } from '../lib/listTableTotals'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
-import { MONEY_UNIT_LABEL } from '../lib/appLocale'
+import { formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
 
 type ParamRow = { id?: number; name: string; unit: string; expected_type: string }
 
@@ -100,6 +102,11 @@ export default function Catalog() {
     )
   }, [list, needle])
 
+  const priceTotal = useMemo(
+    () => sumNumeric(filtered, (t) => t.unit_price),
+    [filtered],
+  )
+
   const closeModal = () => {
     setModal(null)
     setEditingId(null)
@@ -172,8 +179,10 @@ export default function Catalog() {
         visibleColumns={visible}
         onToggleColumn={toggle}
       />
-      <div className="card">
-        <table>
+      <div className="card dossier-tab-panel dossier-tab-panel--table">
+        <ListTablePanelHeader title="Types d'essai" count={filtered.length} />
+        <div className="table-wrap">
+        <table className="data-table data-table--compact">
           <thead>
             <tr>
               {visible.name !== false && <th>Nom</th>}
@@ -190,7 +199,7 @@ export default function Catalog() {
                 {visible.name !== false && <td>{t.name}</td>}
                 {visible.norm !== false && <td>{t.norm ?? '-'}</td>}
                 {visible.unit !== false && <td>{t.unit ?? '-'}</td>}
-                {visible.price !== false && <td>{Number(t.unit_price).toFixed(2)}</td>}
+                {visible.price !== false && <td className="data-table__num">{formatMoney(Number(t.unit_price))}</td>}
                 {visible.params !== false && <td>{t.params?.map((p) => p.name).join(', ') ?? '-'}</td>}
                 {canManageCatalog && visible.actions !== false && (
                   <td>
@@ -213,9 +222,22 @@ export default function Catalog() {
               </tr>
             ))}
           </tbody>
+          <ListTableFootRow
+            columns={[
+              { id: 'name', kind: 'text' },
+              { id: 'norm', kind: 'text' },
+              { id: 'unit', kind: 'text' },
+              { id: 'price', kind: 'money' },
+              { id: 'params', kind: 'text' },
+              ...(canManageCatalog ? [{ id: 'actions', kind: 'text' as const }] : []),
+            ]}
+            visible={{ ...visible, actions: canManageCatalog ? visible.actions : false }}
+            totals={{ price: priceTotal }}
+          />
         </table>
+        </div>
         {filtered.length === 0 && (
-          <p style={{ padding: '1rem' }}>
+          <p className="dossier-tab-empty">
             {list.length === 0
               ? 'Aucun type d’essai en base. Lancez le seed (données de démo) ou ajoutez-en un avec le bouton ci-dessus.'
               : 'Aucun résultat pour cette recherche.'}

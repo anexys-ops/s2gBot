@@ -16,7 +16,7 @@ export default function SiteLayout() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = useAuth()
-  const isAdmin = user?.role === 'lab_admin'
+  const canManage = user?.role === 'lab_admin' || user?.role === 'lab_technician'
 
   const { data: site, isLoading, error } = useQuery({
     queryKey: ['site', siteId],
@@ -82,7 +82,7 @@ export default function SiteLayout() {
     }
   }
 
-  const ctx: SiteOutletContext = { siteId, site, isAdmin }
+  const ctx: SiteOutletContext = { siteId, site, isAdmin: canManage }
 
   return (
     <ModuleEntityShell
@@ -105,17 +105,17 @@ export default function SiteLayout() {
           <Link to="/sites" className="btn btn-secondary btn-sm page-action-back">
             ← Liste chantiers
           </Link>
-          {isAdmin && (
+          {canManage && (
             <button type="button" className="btn btn-primary btn-sm" onClick={onNew}>
               Nouveau
             </button>
           )}
-          {isAdmin && (
+          {canManage && (
             <button type="button" className="btn btn-secondary btn-sm" onClick={onEdit}>
               Modifier
             </button>
           )}
-          {isAdmin && (
+          {canManage && (
             <button
               type="button"
               className="btn btn-secondary btn-sm btn-danger-outline"

@@ -4,16 +4,38 @@
  * Tableau de bord des ordres de mission (labo / technicien / ingénieur).
  * Génération depuis un bon de commande.
  */
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { bonsCommandeApi, ordresMissionApi } from '../../api/client'
+import { bonsCommandeApi, ordresMissionApi, type OrdreMission } from '../../api/client'
+import ClickableStatusBadge from '../../components/ds/ClickableStatusBadge'
+import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import StatusChangeModal from '../../components/StatusChangeModal'
+import OdmGenerationModal from '../../components/ordres-mission/OdmGenerationModal'
+import { useAuth } from '../../contexts/AuthContext'
+import { ordreMissionBonCommande, ordreMissionQuote } from '../../lib/ordreMissionDisplay'
+import { formatAppDate } from '../../lib/appLocale'
 
-const TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
-  labo:       { label: 'Laboratoire', color: '#10b981', bg: '#d1fae5' },
-  technicien: { label: 'Techniciens', color: '#f59e0b', bg: '#fef3c7' },
-  ingenieur:  { label: 'Ingénieurs',  color: '#3b82f6', bg: '#dbeafe' },
+const TYPE_ORDER = ['technicien', 'labo', 'ingenieur'] as const
+type OmType = (typeof TYPE_ORDER)[number]
+
+const TYPE_META: Record<OmType, { label: string; color: string; bg: string; short: string }> = {
+  technicien: { label: 'Techniciens (terrain)', color: '#f59e0b', bg: '#fef3c7', short: 'Terrain' },
+  labo:       { label: 'Laboratoire', color: '#10b981', bg: '#d1fae5', short: 'Labo' },
+  ingenieur:  { label: 'Ingénieurs', color: '#3b82f6', bg: '#dbeafe', short: 'Ingénierie' },
+}
+
+const CONTEXT_META: Record<string, { moduleBar: string; subtitle: string }> = {
+  terrain: { moduleBar: 'Terrain — Ordres de mission', subtitle: 'Techniciens, laboratoire et ingénierie pour un même devis / BC.' },
+  labo: { moduleBar: 'Laboratoire — Ordres de mission', subtitle: 'Techniciens, laboratoire et ingénierie pour un même devis / BC.' },
+  ingenierie: { moduleBar: 'Ingénierie — Ordres de mission', subtitle: 'Techniciens, laboratoire et ingénierie pour un même devis / BC.' },
+  default: { moduleBar: 'Ordres de mission', subtitle: 'Un OdM par type (terrain, labo, ingénieur) pour chaque bon de commande.' },
+}
+
+function parseOmType(value: string | null): OmType | '' {
+  if (value === 'technicien' || value === 'labo' || value === 'ingenieur') return value
+  return ''
 }
 
 const STATUT_META: Record<string, string> = {
@@ -24,8 +46,15 @@ const STATUT_META: Record<string, string> = {
   annule:    'Annulé',
 }
 
+const STATUTS = ['brouillon', 'planifie', 'en_cours', 'termine', 'annule'] as const
+
+const statusOptions = STATUTS.map((value) => ({ value, label: STATUT_META[value] ?? value }))
+
 function TypeBadge({ type }: { type: string }) {
-  const meta = TYPE_META[type] ?? { label: type, color: '#6b7280', bg: '#f3f4f6' }
+  const meta =
+    type in TYPE_META
+      ? TYPE_META[type as OmType]
+      : { label: type, color: '#6b7280', bg: '#f3f4f6', short: type }
   return (
     <span style={{ padding: '0.15rem 0.5rem', borderRadius: 12, fontSize: '0.78rem', fontWeight: 600, color: meta.color, background: meta.bg }}>
       {meta.label}
@@ -35,35 +64,60 @@ function TypeBadge({ type }: { type: string }) {
 
 export default function OrdresMissionPage() {
   const qc = useQueryClient()
-  const [typeFilter, setTypeFilter] = useState('')
+  const { user } = useAuth()
+  const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [statusModalOm, setStatusModalOm] = useState<{ id: number; numero: string; statut: string } | null>(null)
+  const bcFilterFromUrl = searchParams.get('bon_commande_id')
+  const contextFromUrl = searchParams.get('context') ?? 'default'
+  const typeFromUrl = parseOmType(searchParams.get('type'))
+  const [typeFilter, setTypeFilter] = useState<OmType | ''>(() => typeFromUrl)
   const [statutFilter, setStatutFilter] = useState('')
-  const [generateBcId, setGenerateBcId] = useState<number | ''>('')
-  const [showGeneratePanel, setShowGeneratePanel] = useState(false)
+  const [showGenerationModal, setShowGenerationModal] = useState(false)
+  const [selectedBcForGeneration, setSelectedBcForGeneration] = useState<number | null>(null)
+
+  useEffect(() => {
+    setTypeFilter(typeFromUrl)
+  }, [typeFromUrl])
+
+  const contextMeta = CONTEXT_META[contextFromUrl] ?? CONTEXT_META.default
+
+  function setTypeFilterAndUrl(next: OmType | '') {
+    setTypeFilter(next)
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev)
+      if (next) params.set('type', next)
+      else params.delete('type')
+      return params
+    }, { replace: true })
+  }
 
   const { data: ordres = [], isLoading } = useQuery({
-    queryKey: ['ordres-mission', typeFilter, statutFilter],
-    queryFn: () => ordresMissionApi.list({ type: typeFilter || undefined, statut: statutFilter || undefined }),
+    queryKey: ['ordres-mission', typeFilter, statutFilter, bcFilterFromUrl],
+    queryFn: () =>
+      ordresMissionApi.list({
+        type: typeFilter || undefined,
+        statut: statutFilter || undefined,
+        bon_commande_id: bcFilterFromUrl ? Number(bcFilterFromUrl) : undefined,
+      }),
     staleTime: 30_000,
   })
 
   const { data: bonsCommande = [] } = useQuery({
     queryKey: ['bons-commande', 'for-om'],
-    queryFn: () => bonsCommandeApi.list({ statut: 'confirme' }),
-    enabled: showGeneratePanel,
+    queryFn: async () => {
+      const [confirmes, enCours] = await Promise.all([
+        bonsCommandeApi.list({ statut: 'confirme' }),
+        bonsCommandeApi.list({ statut: 'en_cours' }),
+      ])
+      const byId = new Map<number, (typeof confirmes)[number]>()
+      for (const bc of [...confirmes, ...enCours]) {
+        byId.set(bc.id, bc)
+      }
+      return [...byId.values()].sort((a, b) => b.id - a.id)
+    },
+    enabled: showGenerationModal,
     staleTime: 60_000,
-  })
-
-  const generateMut = useMutation({
-    mutationFn: () => {
-      if (!generateBcId) throw new Error('Sélectionnez un bon de commande.')
-      return ordresMissionApi.generateFromBC(generateBcId as number)
-    },
-    onSuccess: (created) => {
-      void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
-      setShowGeneratePanel(false)
-      setGenerateBcId('')
-      alert(`${created.length} ordre(s) de mission générés.`)
-    },
   })
 
   const deleteMut = useMutation({
@@ -71,73 +125,172 @@ export default function OrdresMissionPage() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['ordres-mission'] }),
   })
 
-  const stats = Object.keys(TYPE_META).map((type) => ({
+  const updateStatutMut = useMutation({
+    mutationFn: ({ id, statut }: { id: number; statut: OrdreMission['statut'] }) =>
+      ordresMissionApi.update(id, { statut }),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
+      void qc.invalidateQueries({ queryKey: ['ordres-mission', vars.id] })
+      void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+      setStatusModalOm(null)
+    },
+  })
+
+  const stats = TYPE_ORDER.map((type) => ({
     type,
     total: ordres.filter((o) => o.type === type).length,
     en_cours: ordres.filter((o) => o.type === type && o.statut === 'en_cours').length,
   }))
 
+  const displayedOrdres = useMemo(() => {
+    const list = typeFilter ? ordres.filter((o) => o.type === typeFilter) : ordres
+    return [...list].sort((a, b) => {
+      const bcA = ordreMissionBonCommande(a)?.numero ?? ''
+      const bcB = ordreMissionBonCommande(b)?.numero ?? ''
+      if (bcA !== bcB) return bcB.localeCompare(bcA, 'fr')
+      const typeIdx = (t: string) => TYPE_ORDER.indexOf(t as OmType)
+      return typeIdx(a.type) - typeIdx(b.type)
+    })
+  }, [ordres, typeFilter])
+
   return (
     <ModuleEntityShell
       breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Ordres de mission' }]}
-      moduleBarLabel="Commercial — Ordres de mission"
+      moduleBarLabel={contextMeta.moduleBar}
       title="Ordres de mission"
-      subtitle={`${ordres.length} ordre(s) affiché(s)`}
+      subtitle={
+        bcFilterFromUrl
+          ? `${displayedOrdres.length} ordre(s) pour le BC #${bcFilterFromUrl} — ${contextMeta.subtitle}`
+          : `${displayedOrdres.length} ordre(s) affiché(s) — ${contextMeta.subtitle}`
+      }
       actions={
-        <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowGeneratePanel((v) => !v)}>
+        <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowGenerationModal(true)}>
           ⚡ Générer depuis BC
         </button>
       }
     >
-      {/* Stats */}
-      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+      {/* 3 sections OdM (terrain / labo / ingénieur) — un OdM par type pour le même devis */}
+      <div className="odm-type-sections" role="tablist" aria-label="Types d'ordres de mission">
         {stats.map(({ type, total, en_cours }) => {
           const meta = TYPE_META[type]
+          const active = typeFilter === type
           return (
-            <div
+            <button
               key={type}
-              style={{ flex: '1 1 150px', padding: '0.75rem 1rem', borderRadius: 8, background: meta.bg, cursor: 'pointer', border: typeFilter === type ? `2px solid ${meta.color}` : '2px solid transparent' }}
-              onClick={() => setTypeFilter(typeFilter === type ? '' : type)}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className={`odm-type-sections__card${active ? ' is-active' : ''}`}
+              style={{ ['--odm-type-color' as string]: meta.color, ['--odm-type-bg' as string]: meta.bg }}
+              onClick={() => setTypeFilterAndUrl(active ? '' : type)}
             >
-              <div style={{ fontWeight: 700, color: meta.color, fontSize: '1.4rem' }}>{total}</div>
-              <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{meta.label}</div>
-              {en_cours > 0 && <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{en_cours} en cours</div>}
-            </div>
+              <div className="odm-type-sections__count">{total}</div>
+              <div className="odm-type-sections__label">{meta.label}</div>
+              {en_cours > 0 && <div className="odm-type-sections__sub">{en_cours} en cours</div>}
+            </button>
           )
         })}
       </div>
 
-      {/* Génération depuis BC */}
-      {showGeneratePanel && (
-        <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
-          <h4 style={{ margin: '0 0 0.5rem' }}>Générer depuis un bon de commande</h4>
-          <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-            Les OMs labo / technicien / ingénieur seront créés selon les actions définies sur chaque article du BC.
-          </p>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <label style={{ flex: '1 1 280px' }}>
-              Bon de commande (confirmé)
-              <select value={generateBcId} onChange={(e) => setGenerateBcId(e.target.value ? Number(e.target.value) : '')}>
-                <option value="">Choisir…</option>
+      {/* Modal de sélection du BC */}
+      {showGenerationModal && !selectedBcForGeneration ? (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 3000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+            background: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => {
+            setShowGenerationModal(false)
+            setSelectedBcForGeneration(null)
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '520px',
+              background: '#fff',
+              borderRadius: 16,
+              padding: '1.5rem',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.1rem', fontWeight: 600 }}>
+              Sélectionner le bon de commande
+            </h2>
+            <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
+              Choisissez un bon de commande pour générer les ordres de mission.
+            </p>
+            <label style={{ display: 'block', marginBottom: '1rem' }}>
+              <select
+                value={selectedBcForGeneration ?? ''}
+                onChange={(e) => setSelectedBcForGeneration(e.target.value ? Number(e.target.value) : null)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: 6,
+                  border: '1px solid #d1d5db',
+                  fontSize: '0.95rem',
+                }}
+              >
+                <option value="">— Choisir un BC —</option>
                 {bonsCommande.map((bc) => (
-                  <option key={bc.id} value={bc.id}>{bc.numero} — {bc.client?.name ?? `#${bc.client_id}`}</option>
+                  <option key={bc.id} value={bc.id}>
+                    {bc.numero} — {bc.client?.name ?? `Client #${bc.client_id}`}
+                  </option>
                 ))}
               </select>
             </label>
-            <button type="button" className="btn btn-primary" disabled={!generateBcId || generateMut.isPending} onClick={() => generateMut.mutate()}>
-              {generateMut.isPending ? 'Génération…' : 'Générer les OMs'}
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setShowGeneratePanel(false)}>Annuler</button>
+            <div className="crud-actions" style={{ gap: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!selectedBcForGeneration}
+              >
+                Sélectionner ce BC
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowGenerationModal(false)
+                  setSelectedBcForGeneration(null)
+                }}
+              >
+                Annuler
+              </button>
+            </div>
           </div>
-          {generateMut.isError && <p className="error" style={{ marginTop: '0.5rem' }}>{(generateMut.error as Error).message}</p>}
         </div>
-      )}
+      ) : null}
+
+      {/* Modal de sélection des jalons */}
+      {showGenerationModal && selectedBcForGeneration ? (
+        <OdmGenerationModal
+          bcId={selectedBcForGeneration}
+          onClose={() => {
+            setShowGenerationModal(false)
+            setSelectedBcForGeneration(null)
+          }}
+          onSuccess={() => {
+            void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
+            void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+          }}
+        />
+      ) : null}
 
       {/* Filtres */}
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={{ flex: '1 1 160px', maxWidth: 200 }}>
-          <option value="">— Tous types —</option>
-          {Object.entries(TYPE_META).map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
+        <select value={typeFilter} onChange={(e) => setTypeFilterAndUrl(parseOmType(e.target.value || null))} style={{ flex: '1 1 160px', maxWidth: 220 }}>
+          <option value="">— Les 3 types —</option>
+          {TYPE_ORDER.map((v) => <option key={v} value={v}>{TYPE_META[v].label}</option>)}
         </select>
         <select value={statutFilter} onChange={(e) => setStatutFilter(e.target.value)} style={{ flex: '1 1 160px', maxWidth: 200 }}>
           <option value="">— Tous statuts —</option>
@@ -155,10 +308,11 @@ export default function OrdresMissionPage() {
             <table className="data-table data-table--compact">
               <thead>
                 <tr>
-                  <th>Numéro</th>
+                  <th className="data-table__code">Numéro OdM</th>
                   <th>Type</th>
                   <th>Client</th>
-                  <th>BC</th>
+                  <th className="data-table__code">Devis</th>
+                  <th className="data-table__code">BC</th>
                   <th>Statut</th>
                   <th>Date prévue</th>
                   <th>Responsable</th>
@@ -166,14 +320,58 @@ export default function OrdresMissionPage() {
                 </tr>
               </thead>
               <tbody>
-                {ordres.map((om) => (
+                {displayedOrdres.map((om) => {
+                  const bc = ordreMissionBonCommande(om)
+                  const quote = ordreMissionQuote(om)
+                  const st = ordreMissionStatutBadgeProps(om.statut)
+                  return (
                   <tr key={om.id}>
-                    <td><Link to={`/ordres-mission/${om.id}`} className="link-inline" style={{ fontWeight: 600 }}>{om.numero}</Link></td>
+                    <td className="data-table__code"><Link to={`/ordres-mission/${om.id}`} className="link-inline" style={{ fontWeight: 600 }}>{om.numero}</Link></td>
                     <td><TypeBadge type={om.type} /></td>
-                    <td>{om.client?.name ?? `#${om.client_id}`}</td>
-                    <td>{om.bonCommande && <Link to={`/bons-commande/${om.bon_commande_id}`} className="link-inline">{om.bonCommande.numero}</Link>}</td>
-                    <td><span className="badge">{STATUT_META[om.statut] ?? om.statut}</span></td>
-                    <td>{om.date_prevue ? new Date(om.date_prevue).toLocaleDateString('fr-FR') : '—'}</td>
+                    <td>
+                      {om.client_id ? (
+                        <Link to={`/clients/${om.client_id}/fiche`} className="link-inline" onClick={(e) => e.stopPropagation()}>
+                          {om.client?.name ?? `#${om.client_id}`}
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="data-table__code">
+                      {quote ? (
+                        <Link to={`/devis/${quote.id}/editer`} className="link-inline" onClick={(e) => e.stopPropagation()}>
+                          <code className="code-badge">{quote.number}</code>
+                        </Link>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                    <td className="data-table__code">
+                      {bc ? (
+                        <Link to={`/bons-commande/${bc.id}`} className="link-inline" onClick={(e) => e.stopPropagation()}>
+                          <code className="code-badge">{bc.numero}</code>
+                        </Link>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                    <td className="data-table__status">
+                      {isLab ? (
+                        <ClickableStatusBadge
+                          variant={st.variant}
+                          size="sm"
+                          ariaLabel={`Changer le statut de ${om.numero}`}
+                          onClick={() => setStatusModalOm({ id: om.id, numero: om.numero, statut: om.statut })}
+                        >
+                          {st.label}
+                        </ClickableStatusBadge>
+                      ) : (
+                        <StatusBadge variant={st.variant} size="sm">
+                          {st.label}
+                        </StatusBadge>
+                      )}
+                    </td>
+                    <td>{om.date_prevue ? formatAppDate(om.date_prevue) : '—'}</td>
                     <td>{om.responsable?.name ?? '—'}</td>
                     <td>
                       <div className="crud-actions">
@@ -185,13 +383,27 @@ export default function OrdresMissionPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
-          {ordres.length === 0 && <p style={{ padding: '1rem' }} className="text-muted">Aucun ordre de mission.</p>}
+          {displayedOrdres.length === 0 && <p style={{ padding: '1rem' }} className="text-muted">Aucun ordre de mission.</p>}
         </div>
       )}
+
+      {statusModalOm !== null ? (
+        <StatusChangeModal
+          title={`Statut — ${statusModalOm.numero}`}
+          initialValue={statusModalOm.statut}
+          options={statusOptions}
+          isPending={updateStatutMut.isPending}
+          error={updateStatutMut.isError ? (updateStatutMut.error as Error).message : null}
+          onClose={() => setStatusModalOm(null)}
+          onSave={(statut) =>
+            updateStatutMut.mutate({ id: statusModalOm.id, statut: statut as OrdreMission['statut'] })
+          }
+        />
+      ) : null}
     </ModuleEntityShell>
   )
 }

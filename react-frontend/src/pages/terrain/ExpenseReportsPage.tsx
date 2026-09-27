@@ -1,19 +1,33 @@
 /**
  * ExpenseReportsPage — Notes de frais (NDF)
- * Liste les NDF + création depuis un OM terrain/ingénieur + gestion des lignes.
  */
-import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   expenseReportsApi,
-  EXPENSE_CATEGORIES,
-  type ExpenseReport,
+  EXPENSE_PAYMENT_METHOD_LABELS,
+  EXPENSE_STATUT_LABELS,
+  EXPENSE_STATUT_OPTIONS,
+  isExpenseDeplacementLine,
   type ExpenseLine,
-  type ExpenseCategory,
+  type ExpensePaymentMethod,
+  type ExpenseReport,
+  type ExpenseReportStatut,
 } from '../../api/client'
+import ListTableToolbar, { PaginationBar } from '../../components/ListTableToolbar'
+import TableRowActions from '../../components/TableRowActions'
+import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import { QuotePdfButton } from '../../components/crm/QuoteListTableActions'
+import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
+import ExpenseLineModal from './ExpenseLineModal'
+import NdfSendEmailModal from './NdfSendEmailModal'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
+import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
+import './expense-reports.css'
 
-// ── Couleur badge statut ─────────────────────────────────────────────────────
-const STATUT_COLORS: Record<string, string> = {
+const STATUT_COLORS: Record<ExpenseReportStatut, string> = {
   brouillon: '#6b7280',
   soumis:    '#3b82f6',
   valide:    '#10b981',
@@ -21,17 +35,160 @@ const STATUT_COLORS: Record<string, string> = {
   rejete:    '#ef4444',
 }
 
-// ── Composant ligne individuelle ─────────────────────────────────────────────
+function paymentLabel(method?: ExpensePaymentMethod | null): string {
+  if (!method) return '—'
+  return EXPENSE_PAYMENT_METHOD_LABELS[method] ?? method
+}
+
+function canDeleteExpenseReport(statut: ExpenseReportStatut): boolean {
+  return statut !== 'rembourse'
+}
+
+function reportTotal(report: ExpenseReport): number {
+  if (report.total != null) return Number(report.total)
+  return (report.lines ?? []).reduce((s, l) => s + Number(l.amount), 0)
+}
+
+function lineDetailText(line: ExpenseLine): string {
+  const parts: string[] = []
+  if (line.description) parts.push(line.description)
+  if (isExpenseDeplacementLine(line)) {
+    const trajet = [line.lieu_depart, line.lieu_arrivee].filter(Boolean).join(' → ')
+    if (trajet) parts.push(trajet)
+    if (line.distance_km != null) {
+      parts.push(`${line.distance_km} km × ${line.taux_km ?? 0.401} (A/R)`)
+    }
+  }
+  return parts.join(' · ') || '—'
+}
+
+function LinesValidationBadge({ report }: { report: ExpenseReport }) {
+  const total = report.lines_count ?? report.lines?.length ?? 0
+  const validated = report.lines_validated_count
+    ?? (report.lines ?? []).filter((l) => l.is_validated).length
+
+  if (total === 0) {
+    return <span className="ndf-lines-badge ndf-lines-badge--empty">○ 0 ligne</span>
+  }
+  const allOk = validated >= total
+  const cls = allOk ? 'ndf-lines-badge--ok' : validated > 0 ? 'ndf-lines-badge--partial' : 'ndf-lines-badge--empty'
+  return (
+    <span className={`ndf-lines-badge ${cls}`} title={`${validated}/${total} lignes validées`}>
+      {allOk ? '✓' : validated > 0 ? '◐' : '○'} {validated}/{total}
+    </span>
+  )
+}
+
+function ReportContextRow({ report }: { report: ExpenseReport }) {
+  const om = report.ordre_mission
+  const dossier = om?.dossier
+  const client = om?.client
+  const site = om?.site
+  const porteur = report.user
+
+  return (
+    <div className="ndf-context-row">
+      {om ? (
+        <span className="ndf-context-chip">
+          <span className="ndf-context-chip__label">OM</span>
+          <strong>{om.unique_number ?? om.numero}</strong>
+        </span>
+      ) : porteur ? (
+        <span className="ndf-context-chip">
+          <span className="ndf-context-chip__label">Hors OM</span>
+          <strong>{porteur.name}</strong>
+        </span>
+      ) : (
+        <span className="ndf-context-chip">
+          <span className="ndf-context-chip__label">Hors OM</span>
+          <strong>Autonome</strong>
+        </span>
+      )}
+      {dossier ? (
+        <span className="ndf-context-chip">
+          <span className="ndf-context-chip__label">Dossier</span>
+          <strong>{dossier.reference ?? dossier.titre ?? `#${dossier.id}`}</strong>
+        </span>
+      ) : null}
+      {client ? (
+        <span className="ndf-context-chip">
+          <span className="ndf-context-chip__label">Client</span>
+          <strong>{client.name}</strong>
+        </span>
+      ) : null}
+      {site ? (
+        <span className="ndf-context-chip">
+          <span className="ndf-context-chip__label">Chantier</span>
+          <strong>{site.nom ?? site.name ?? `#${site.id}`}</strong>
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function ReportContextCell({ report }: { report: ExpenseReport }) {
+  const om = report.ordre_mission
+  const parts = [
+    om ? (om.unique_number ?? om.numero) : (report.user?.name ? `Hors OM · ${report.user.name}` : 'Hors OM'),
+    om?.dossier?.reference ?? om?.dossier?.titre ?? null,
+    om?.client?.name ?? null,
+    om?.site?.nom ?? om?.site?.name ?? null,
+  ].filter(Boolean)
+
+  return (
+    <div className="ndf-context-cell">
+      {parts.map((p, i) => (
+        <span key={`${p}-${i}`}>
+          {i > 0 ? <span className="ndf-context-cell__sep">·</span> : null}
+          {p}
+        </span>
+      ))}
+      {parts.length === 0 ? '—' : null}
+    </div>
+  )
+}
+
+function StatutSelect({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: ExpenseReportStatut
+  onChange: (v: ExpenseReportStatut) => void
+  disabled?: boolean
+}) {
+  return (
+    <select
+      className="ndf-statut-select"
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value as ExpenseReportStatut)}
+      style={{ color: '#fff', background: STATUT_COLORS[value], borderColor: STATUT_COLORS[value] }}
+    >
+      {EXPENSE_STATUT_OPTIONS.map((o) => (
+        <option key={o.value} value={o.value} style={{ color: '#111', background: '#fff' }}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  )
+}
+
 function LineRow({
   line,
   reportId,
   canEdit,
+  canDelete,
+  canValidate,
+  onEdit,
 }: {
   line: ExpenseLine
   reportId: number
   canEdit: boolean
+  canDelete: boolean
+  canValidate: boolean
+  onEdit: (line: ExpenseLine) => void
 }) {
-  const [editing, setEditing] = useState(false)
   const qc = useQueryClient()
 
   const deleteMut = useMutation({
@@ -39,148 +196,152 @@ function LineRow({
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['expense-report', reportId] }),
   })
 
-  if (editing) {
-    return (
-      <LineForm
-        initial={line}
-        reportId={reportId}
-        onDone={() => setEditing(false)}
-      />
-    )
-  }
+  const validateMut = useMutation({
+    mutationFn: (is_validated: boolean) =>
+      expenseReportsApi.updateLine(reportId, line.id, { is_validated }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['expense-report', reportId] }),
+  })
+
+  const downloadMut = useMutation({
+    mutationFn: () =>
+      expenseReportsApi.downloadLineReceipt(
+        reportId,
+        line.id,
+        line.receipt_filename ?? `justificatif-ligne-${line.id}`,
+      ),
+  })
+
+  const fromOm = isExpenseDeplacementLine(line)
 
   return (
-    <tr>
-      <td style={{ fontSize: '0.82rem' }}>{line.date}</td>
+    <tr className={line.is_validated ? 'ndf-line-row--validated' : ''}>
+      <td className="ndf-no-print" style={{ textAlign: 'center' }}>
+        {canValidate ? (
+          <input
+            type="checkbox"
+            className="ndf-line-valid"
+            checked={!!line.is_validated}
+            disabled={validateMut.isPending}
+            onChange={(e) => validateMut.mutate(e.target.checked)}
+            title={line.is_validated ? 'Ligne validée' : 'À valider'}
+          />
+        ) : (
+          <span className={`ndf-line-valid-icon ${line.is_validated ? 'ndf-line-valid-icon--yes' : 'ndf-line-valid-icon--no'}`}>
+            {line.is_validated ? '✓' : '○'}
+          </span>
+        )}
+      </td>
+      <td>{line.date}</td>
       <td>
         <span className="badge">{line.category}</span>
+        {fromOm ? (
+          <span className="badge" style={{ marginLeft: '0.35rem', background: '#dbeafe', color: '#1d4ed8' }}>OM</span>
+        ) : null}
       </td>
-      <td style={{ fontWeight: 600 }}>{Number(line.amount).toFixed(2)} €</td>
-      <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>{line.description || '—'}</td>
-      <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>{line.user?.name || `#${line.user_id}`}</td>
-      {canEdit && (
-        <td style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(true)}>✏️</button>
+      <td className="ndf-total-cell" style={{ fontSize: '0.9rem' }}>{formatMoney(Number(line.amount))}</td>
+      <td>{paymentLabel(line.payment_method)}</td>
+      <td className="ndf-desc-cell">{lineDetailText(line)}</td>
+      <td>
+        {line.receipt_path ? (
           <button
             type="button"
-            className="btn btn-secondary btn-sm btn-danger-outline"
-            disabled={deleteMut.isPending}
-            onClick={() => { if (window.confirm('Supprimer ?')) deleteMut.mutate() }}
-          >✕</button>
+            className="btn btn-secondary btn-sm ndf-no-print"
+            disabled={downloadMut.isPending}
+            onClick={() => downloadMut.mutate()}
+          >
+            📎 {line.receipt_filename ? line.receipt_filename.slice(0, 16) : 'PJ'}
+          </button>
+        ) : (
+          <span className="text-muted">—</span>
+        )}
+      </td>
+      <td>{line.user?.name || `#${line.user_id}`}</td>
+      {(canEdit || canDelete) && (
+        <td className="ndf-no-print">
+          <TableRowActions
+            onEdit={canEdit ? () => onEdit(line) : undefined}
+            onDelete={
+              canDelete
+                ? () => {
+                    if (window.confirm('Supprimer cette ligne ?')) deleteMut.mutate()
+                  }
+                : undefined
+            }
+            editLabel="Modifier la ligne"
+            deleteLabel="Supprimer la ligne"
+          />
         </td>
       )}
     </tr>
   )
 }
 
-// ── Formulaire ligne ─────────────────────────────────────────────────────────
-function LineForm({
-  initial,
-  reportId,
-  onDone,
-}: {
-  initial?: Partial<ExpenseLine>
-  reportId: number
-  onDone: () => void
-}) {
-  const user = { id: 1 }
-  const qc = useQueryClient()
+function PaymentSummary({ lines }: { lines: ExpenseLine[] }) {
+  const byMethod = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const line of lines) {
+      const key = line.payment_method ? EXPENSE_PAYMENT_METHOD_LABELS[line.payment_method] : 'Non renseigné'
+      map.set(key, (map.get(key) ?? 0) + Number(line.amount))
+    }
+    return [...map.entries()].sort((a, b) => b[1] - a[1])
+  }, [lines])
 
-  const [form, setForm] = useState({
-    user_id:     initial?.user_id ?? user?.id ?? 0,
-    category:    (initial?.category ?? 'Repas') as ExpenseCategory,
-    amount:      initial?.amount ?? 0,
-    date:        initial?.date ?? new Date().toISOString().slice(0, 10),
-    description: initial?.description ?? '',
-  })
-
-  const isEdit = !!initial?.id
-
-  const mut = useMutation({
-    mutationFn: () =>
-      isEdit
-        ? expenseReportsApi.updateLine(reportId, initial!.id!, form)
-        : expenseReportsApi.addLine(reportId, form),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['expense-report', reportId] })
-      onDone()
-    },
-  })
+  if (byMethod.length === 0) return null
 
   return (
-    <tr>
-      <td colSpan={6}>
-        <div
-          style={{
-            padding: '0.5rem',
-            background: 'var(--color-surface)',
-            borderRadius: 6,
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <div className="quote-form-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-            <label>
-              Date *
-              <input
-                type="date"
-                value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
-                required
-              />
-            </label>
-            <label>
-              Catégorie *
-              <select
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value as ExpenseCategory })}
-              >
-                {EXPENSE_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Montant TTC (€) *
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
-                required
-              />
-            </label>
-            <label>
-              Description
-              <input
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="Détail de la dépense"
-              />
-            </label>
-          </div>
-          <div className="crud-actions" style={{ marginTop: '0.5rem' }}>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              disabled={mut.isPending}
-              onClick={() => mut.mutate()}
-            >
-              {mut.isPending ? '…' : isEdit ? 'Enregistrer' : 'Ajouter'}
-            </button>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={onDone}>
-              Annuler
-            </button>
-          </div>
-        </div>
-      </td>
-    </tr>
+    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+      {byMethod.map(([label, total]) => (
+        <span key={label} className="badge" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+          {label} : <strong>{formatMoney(total)}</strong>
+        </span>
+      ))}
+    </div>
   )
 }
 
-// ── Détail NDF ───────────────────────────────────────────────────────────────
-function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => void }) {
-  const [addingLine, setAddingLine] = useState(false)
+function TotalHero({ total, advance }: { total: number; advance: number }) {
+  const net = Math.max(0, total - advance)
+  const hasAdvance = advance > 0
+
+  return (
+    <div className="ndf-hero-total">
+      <div className="ndf-hero-total__card ndf-hero-total__card--primary">
+        <span className="ndf-hero-total__label">Total TTC</span>
+        <span className="ndf-hero-total__value">{formatMoney(total)}</span>
+      </div>
+      <div className="ndf-hero-total__card">
+        <span className="ndf-hero-total__label">Acompte versé</span>
+        <span className="ndf-hero-total__value" style={{ color: hasAdvance ? '#059669' : 'var(--color-text-muted)' }}>
+          {hasAdvance ? formatMoney(advance) : 'Aucun'}
+        </span>
+      </div>
+      <div className="ndf-hero-total__card">
+        <span className="ndf-hero-total__label">Net à rembourser</span>
+        <span className="ndf-hero-total__value" style={{ color: '#1d4ed8' }}>
+          {formatMoney(hasAdvance ? net : total)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function ReportDetail({
+  reportId,
+  onBack,
+  onCreateNew,
+  createNewPending = false,
+}: {
+  reportId: number
+  onBack: () => void
+  onCreateNew: () => void
+  createNewPending?: boolean
+}) {
+  const [lineModal, setLineModal] = useState<'new' | ExpenseLine | null>(null)
+  const [notesDraft, setNotesDraft] = useState<string | null>(null)
+  const [privateNotesDraft, setPrivateNotesDraft] = useState<string | null>(null)
+  const [advanceDraft, setAdvanceDraft] = useState<number | null>(null)
+  const [emailOpen, setEmailOpen] = useState(false)
+  const [pdfOpen, setPdfOpen] = useState(false)
   const qc = useQueryClient()
 
   const { data: report, isLoading } = useQuery({
@@ -188,309 +349,547 @@ function ReportDetail({ reportId, onBack }: { reportId: number; onBack: () => vo
     queryFn: () => expenseReportsApi.get(reportId),
   })
 
+  const notesValue = notesDraft ?? report?.notes ?? ''
+  const privateNotesValue = privateNotesDraft ?? report?.private_notes ?? ''
+  const advanceValue = advanceDraft ?? report?.advance_amount ?? 0
+
   const updateMut = useMutation({
-    mutationFn: (statut: ExpenseReport['statut']) =>
-      expenseReportsApi.update(reportId, { statut }),
+    mutationFn: (body: Partial<Pick<ExpenseReport, 'statut' | 'notes' | 'private_notes' | 'advance_amount'>>) =>
+      expenseReportsApi.update(reportId, body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['expense-report', reportId] })
       void qc.invalidateQueries({ queryKey: ['expense-reports'] })
+      setNotesDraft(null)
+      setPrivateNotesDraft(null)
+      setAdvanceDraft(null)
     },
   })
 
-  if (isLoading || !report) return <p className="text-muted">Chargement…</p>
+  const deleteMut = useMutation({
+    mutationFn: () => expenseReportsApi.delete(reportId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['expense-reports'] })
+      onBack()
+    },
+  })
+
+  if (isLoading || !report) {
+    return (
+      <ModuleEntityShell
+        breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Notes de frais', to: '/notes-de-frais' }, { label: '…' }]}
+        moduleBarLabel="Terrain"
+        title="Note de frais"
+        subtitle="Chargement…"
+      >
+        <p className="text-muted">Chargement…</p>
+      </ModuleEntityShell>
+    )
+  }
 
   const canEdit = report.statut === 'brouillon'
+  const canDelete = canDeleteExpenseReport(report.statut)
+  const canValidate = report.statut !== 'brouillon'
+  const canDeleteLines = canDelete
   const lines = report.lines ?? []
-  const total = lines.reduce((s, l) => s + Number(l.amount), 0)
+  const total = reportTotal(report)
+  const colCount = canEdit || canDeleteLines ? 9 : 8
+
+  const notesDirty = notesDraft !== null && notesDraft !== (report.notes ?? '')
+  const privateDirty = privateNotesDraft !== null && privateNotesDraft !== (report.private_notes ?? '')
+  const advanceDirty = advanceDraft !== null && advanceDraft !== (report.advance_amount ?? 0)
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={onBack}>← Retour</button>
-        <h2 style={{ margin: 0, fontSize: '1.1rem' }}>{report.unique_number}</h2>
-        <span
-          className="badge"
-          style={{ background: STATUT_COLORS[report.statut] ?? '#6b7280', color: '#fff', fontWeight: 600 }}
-        >
-          {report.statut}
+    <ModuleEntityShell
+      breadcrumbs={[
+        { label: 'Accueil', to: '/' },
+        { label: 'Notes de frais', to: '/notes-de-frais' },
+        { label: report.unique_number },
+      ]}
+      moduleBarLabel="Terrain — Notes de frais"
+      title={report.unique_number}
+      subtitle={
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+          <StatutSelect
+            value={report.statut}
+            onChange={(statut) => updateMut.mutate({ statut })}
+            disabled={updateMut.isPending}
+          />
         </span>
-        <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: '1rem' }}>
-          Total : {total.toFixed(2)} €
-        </span>
-      </div>
-
-      <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '0.75rem' }}>
-        OM : <strong>{report.ordre_mission?.unique_number ?? report.ordre_mission?.numero}</strong>
-        {report.ordre_mission?.client && ` — ${report.ordre_mission.client.name}`}
-        {report.ordre_mission?.site && ` — ${report.ordre_mission.site.nom ?? report.ordre_mission.site.name}`}
-      </div>
-
-      {/* Actions statut */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        {report.statut === 'brouillon' && (
+      }
+      actions={
+        <div className="ndf-toolbar-actions ndf-no-print">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={onBack}>← Liste</button>
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            disabled={updateMut.isPending}
-            onClick={() => updateMut.mutate('soumis')}
+            disabled={createNewPending}
+            onClick={onCreateNew}
           >
-            Soumettre
+            {createNewPending ? 'Création…' : '+ Ajouter une note de frais'}
+          </button>
+          <QuotePdfButton onClick={() => setPdfOpen(true)} />
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEmailOpen(true)}>✉ Envoyer par mail</button>
+          {canDelete ? (
+            <TableRowActions
+              onDelete={() => {
+                const msg = report.statut === 'brouillon'
+                  ? 'Supprimer cette note de frais ?'
+                  : `Supprimer la note de frais ${report.unique_number} (statut : ${EXPENSE_STATUT_LABELS[report.statut]}) ?`
+                if (window.confirm(msg)) deleteMut.mutate()
+              }}
+              deleteLabel={`Supprimer ${report.unique_number}`}
+            />
+          ) : null}
+        </div>
+      }
+    >
+      <div className="ndf-page">
+        <div className="ndf-print-header">
+          <h1 style={{ margin: 0 }}>Note de frais {report.unique_number}</h1>
+          <p style={{ margin: '0.25rem 0 0' }}>Statut : {EXPENSE_STATUT_LABELS[report.statut]}</p>
+        </div>
+
+        <ReportContextRow report={report} />
+        <TotalHero total={total} advance={Number(advanceValue)} />
+
+        <div className="ndf-notes-grid">
+          <label>
+            Notes (partagées / comptabilité)
+            <textarea
+              value={notesValue}
+              onChange={(e) => setNotesDraft(e.target.value)}
+              readOnly={!canEdit && !canValidate}
+              rows={4}
+              placeholder="Commentaires visibles pour le traitement comptable…"
+            />
+          </label>
+          <label>
+            Note personnelle / privée
+            <textarea
+              value={privateNotesValue}
+              onChange={(e) => setPrivateNotesDraft(e.target.value)}
+              readOnly={!canEdit}
+              rows={4}
+              placeholder="Note privée — visible uniquement en interne…"
+            />
+          </label>
+          <label>
+            Acompte déjà versé ({MONEY_UNIT_LABEL})
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={advanceValue}
+              onChange={(e) => setAdvanceDraft(Number(e.target.value))}
+              readOnly={!canEdit}
+              disabled={!canEdit}
+            />
+          </label>
+        </div>
+
+        {(canEdit || canValidate) && (notesDirty || privateDirty || advanceDirty) && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm ndf-no-print"
+            style={{ marginBottom: '1rem' }}
+            disabled={updateMut.isPending}
+            onClick={() => updateMut.mutate({
+              notes: notesValue,
+              private_notes: privateNotesValue,
+              advance_amount: advanceValue,
+            })}
+          >
+            Enregistrer les notes
           </button>
         )}
-        {report.statut === 'soumis' && (
-          <>
+
+        <PaymentSummary lines={lines} />
+
+        <div className="ndf-toolbar-actions ndf-no-print">
+          {report.statut === 'brouillon' && (
             <button
               type="button"
               className="btn btn-primary btn-sm"
-              disabled={updateMut.isPending}
-              onClick={() => updateMut.mutate('valide')}
+              disabled={updateMut.isPending || lines.length === 0}
+              onClick={() => updateMut.mutate({ statut: 'soumis' })}
             >
-              ✓ Valider
+              Soumettre
             </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm btn-danger-outline"
-              disabled={updateMut.isPending}
-              onClick={() => updateMut.mutate('rejete')}
-            >
-              ✗ Rejeter
-            </button>
-          </>
-        )}
-        {report.statut === 'valide' && (
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={updateMut.isPending}
-            onClick={() => updateMut.mutate('rembourse')}
-          >
-            Marquer remboursé
-          </button>
-        )}
-      </div>
+          )}
+          {report.statut === 'soumis' && (
+            <>
+              <button type="button" className="btn btn-primary btn-sm" disabled={updateMut.isPending} onClick={() => updateMut.mutate({ statut: 'valide' })}>✓ Valider</button>
+              <button type="button" className="btn btn-secondary btn-sm btn-danger-outline" disabled={updateMut.isPending} onClick={() => updateMut.mutate({ statut: 'rejete' })}>✗ Rejeter</button>
+            </>
+          )}
+          {report.statut === 'valide' && (
+            <button type="button" className="btn btn-primary btn-sm" disabled={updateMut.isPending} onClick={() => updateMut.mutate({ statut: 'rembourse' })}>Marquer remboursé</button>
+          )}
+        </div>
 
-      {/* Lignes */}
-      <div className="table-wrap">
-        <table className="data-table data-table--compact">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Catégorie</th>
-              <th>Montant</th>
-              <th>Description</th>
-              <th>Personnel</th>
-              {canEdit && <th></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {lines.map((l) => (
-              <LineRow key={l.id} line={l} reportId={reportId} canEdit={canEdit} />
-            ))}
-            {addingLine && (
-              <LineForm reportId={reportId} onDone={() => setAddingLine(false)} />
-            )}
-            {lines.length === 0 && !addingLine && (
+        <div className="ndf-lines-toolbar ndf-no-print">
+          <h2 className="ds-form-section__title">Lignes de dépenses</h2>
+          {canEdit ? (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setLineModal('new')}>
+              + Ajouter une ligne
+            </button>
+          ) : null}
+        </div>
+
+        <div className="table-wrap">
+          <table className="data-table data-table--compact">
+            <thead>
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '1rem' }}>
-                  Aucune ligne — ajoutez des dépenses ci-dessous
-                </td>
+                <th title="Ligne validée">✓</th>
+                <th>Date</th>
+                <th>Catégorie</th>
+                <th>Montant</th>
+                <th>Paiement</th>
+                <th>Description</th>
+                <th>Justificatif</th>
+                <th>Personnel</th>
+                {(canEdit || canDeleteLines) && <th className="ndf-no-print">Actions</th>}
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {lines.map((l) => (
+                <LineRow
+                  key={l.id}
+                  line={l}
+                  reportId={reportId}
+                  canEdit={canEdit}
+                  canDelete={canDeleteLines}
+                  canValidate={canValidate}
+                  onEdit={(line) => setLineModal(line)}
+                />
+              ))}
+              {lines.length === 0 && (
+                <tr>
+                  <td colSpan={colCount} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '1.5rem' }}>
+                    Aucune ligne — ajoutez des dépenses ci-dessous
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
       </div>
 
-      {canEdit && !addingLine && (
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
-          style={{ marginTop: '0.5rem' }}
-          onClick={() => setAddingLine(true)}
-        >
-          + Ajouter une ligne
-        </button>
-      )}
-    </div>
+      {lineModal ? (
+        <ExpenseLineModal
+          reportId={reportId}
+          initial={lineModal === 'new' ? undefined : lineModal}
+          onClose={() => setLineModal(null)}
+          onSaved={() => setLineModal(null)}
+        />
+      ) : null}
+
+      {emailOpen ? <NdfSendEmailModal report={report} onClose={() => setEmailOpen(false)} /> : null}
+
+      {pdfOpen ? (
+        <DocumentPdfPickerModal
+          documentType="expense_report"
+          documentId={report.id}
+          documentLabel={report.unique_number}
+          onClose={() => setPdfOpen(false)}
+        />
+      ) : null}
+    </ModuleEntityShell>
   )
 }
 
-// ── Page principale ──────────────────────────────────────────────────────────
 export default function ExpenseReportsPage() {
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const reportId = id ? Number(id) : null
+
   const [creating, setCreating] = useState(false)
+  const [createMode, setCreateMode] = useState<'with_om' | 'without_om'>('without_om')
   const [selectedOM, setSelectedOM] = useState<number | ''>('')
+  const [searchInput, setSearchInput] = useState('')
   const [filterStatut, setFilterStatut] = useState('')
+  const [page, setPage] = useState(1)
+  const debouncedSearch = useDebouncedValue(searchInput, 300)
   const qc = useQueryClient()
 
-  const { data: reports, isLoading } = useQuery({
-    queryKey: ['expense-reports', filterStatut],
+  const { visible, toggle } = usePersistedColumnVisibility('expense-reports', {
+    number: true,
+    context: true,
+    lines: true,
+    statut: true,
+    total: true,
+    date: true,
+    actions: true,
+  })
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['expense-reports', debouncedSearch, filterStatut, page],
     queryFn: () =>
-      expenseReportsApi.list(filterStatut ? { statut: filterStatut } : undefined),
+      expenseReportsApi.list({
+        search: debouncedSearch.trim() || undefined,
+        statut: filterStatut || undefined,
+        page,
+      }),
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
   })
 
   const { data: eligibleOMs = [] } = useQuery({
     queryKey: ['expense-eligible-oms'],
     queryFn: () => expenseReportsApi.eligibleOMs(),
-    enabled: creating,
+    enabled: creating && createMode === 'with_om',
     staleTime: 60_000,
   })
 
   const createMut = useMutation({
-    mutationFn: () =>
-      expenseReportsApi.create({ ordre_mission_id: Number(selectedOM) }),
+    mutationFn: () => expenseReportsApi.create(
+      createMode === 'with_om'
+        ? { ordre_mission_id: Number(selectedOM) }
+        : {},
+    ),
     onSuccess: (report) => {
       void qc.invalidateQueries({ queryKey: ['expense-reports'] })
       setCreating(false)
       setSelectedOM('')
-      setSelectedId(report.id)
+      setCreateMode('without_om')
+      navigate(`/notes-de-frais/${report.id}`)
     },
   })
 
-  if (selectedId !== null) {
-    return <ReportDetail reportId={selectedId} onBack={() => setSelectedId(null)} />
+  const createStandaloneMut = useMutation({
+    mutationFn: () => expenseReportsApi.create({}),
+    onSuccess: (report) => {
+      void qc.invalidateQueries({ queryKey: ['expense-reports'] })
+      navigate(`/notes-de-frais/${report.id}`)
+    },
+  })
+
+  const statusMut = useMutation({
+    mutationFn: ({ id: rid, statut }: { id: number; statut: ExpenseReportStatut }) =>
+      expenseReportsApi.update(rid, { statut }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['expense-reports'] }),
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => expenseReportsApi.delete(id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['expense-reports'] }),
+  })
+
+  if (reportId && !Number.isNaN(reportId)) {
+    return (
+      <ReportDetail
+        reportId={reportId}
+        onBack={() => navigate('/notes-de-frais')}
+        onCreateNew={() => createStandaloneMut.mutate()}
+        createNewPending={createStandaloneMut.isPending}
+      />
+    )
   }
 
-  const list = reports?.data ?? []
+  const list = data?.data ?? []
+  const hasActiveFilters = searchInput.trim() !== '' || filterStatut !== ''
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <h1 style={{ margin: 0, fontSize: '1.25rem' }}>Notes de frais</h1>
+    <ModuleEntityShell
+      breadcrumbs={[{ label: 'Accueil', to: '/' }, { label: 'Notes de frais' }]}
+      moduleBarLabel="Terrain — Notes de frais"
+      title="Notes de frais"
+      subtitle="Suivi des dépenses terrain, validation des lignes et remboursements."
+      actions={
+        <div className="ndf-toolbar-actions ndf-no-print">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.print()}>🖨 Imprimer</button>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>
+            + Ajouter une note de frais
+          </button>
+        </div>
+      }
+    >
+      <div className="ndf-page">
+        <ListTableToolbar
+          searchValue={searchInput}
+          onSearchChange={(v) => { setSearchInput(v); setPage(1) }}
+          searchPlaceholder="N° NDF, OM, client, dossier, chantier…"
+          statusValue={filterStatut}
+          onStatusChange={(v) => { setFilterStatut(v); setPage(1) }}
+          statusOptions={EXPENSE_STATUT_OPTIONS}
+          columns={[
+            { id: 'number', label: 'N° NDF' },
+            { id: 'context', label: 'Contexte' },
+            { id: 'lines', label: 'Lignes validées' },
+            { id: 'statut', label: 'Statut' },
+            { id: 'total', label: 'Total TTC' },
+            { id: 'date', label: 'Créé le' },
+            { id: 'actions', label: 'Actions' },
+          ]}
+          visibleColumns={visible}
+          onToggleColumn={toggle}
+          footer={
+            hasActiveFilters ? (
+              <>
+                <span className="list-table-toolbar__footer-label">Filtres actifs</span>
+                {searchInput.trim() !== '' && (
+                  <span className="list-table-toolbar__chip">
+                    <span className="list-table-toolbar__chip-text">Recherche : « {searchInput.trim()} »</span>
+                    <button type="button" className="list-table-toolbar__chip-remove" onClick={() => setSearchInput('')}>×</button>
+                  </span>
+                )}
+                {filterStatut !== '' && (
+                  <span className="list-table-toolbar__chip">
+                    <span className="list-table-toolbar__chip-text">Statut : {EXPENSE_STATUT_LABELS[filterStatut as ExpenseReportStatut] ?? filterStatut}</span>
+                    <button type="button" className="list-table-toolbar__chip-remove" onClick={() => setFilterStatut('')}>×</button>
+                  </span>
+                )}
+              </>
+            ) : undefined
+          }
+        />
 
-        <select
-          value={filterStatut}
-          onChange={(e) => setFilterStatut(e.target.value)}
-          style={{ fontSize: '0.85rem' }}
-        >
-          <option value="">Tous statuts</option>
-          {['brouillon', 'soumis', 'valide', 'rembourse', 'rejete'].map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
+        {creating && (
+          <div className="card ndf-no-print ndf-create-card">
+            <div className="ndf-create-mode">
+              <label className={`ndf-create-mode__option${createMode === 'without_om' ? ' ndf-create-mode__option--active' : ''}`}>
+                <input
+                  type="radio"
+                  name="ndf-create-mode"
+                  checked={createMode === 'without_om'}
+                  onChange={() => setCreateMode('without_om')}
+                />
+                <span>
+                  <strong>Sans ordre de mission</strong>
+                  <small>NDF autonome (automatisation, frais divers)</small>
+                </span>
+              </label>
+              <label className={`ndf-create-mode__option${createMode === 'with_om' ? ' ndf-create-mode__option--active' : ''}`}>
+                <input
+                  type="radio"
+                  name="ndf-create-mode"
+                  checked={createMode === 'with_om'}
+                  onChange={() => setCreateMode('with_om')}
+                />
+                <span>
+                  <strong>Liée à un OM</strong>
+                  <small>Rattacher à un ordre de mission existant</small>
+                </span>
+              </label>
+            </div>
+            {createMode === 'with_om' ? (
+              <label style={{ flex: 1, minWidth: 220, marginTop: '0.75rem' }}>
+                <span className="filter-label">Ordre de mission *</span>
+                <select
+                  value={selectedOM}
+                  onChange={(e) => setSelectedOM(e.target.value === '' ? '' : Number(e.target.value))}
+                  style={{ display: 'block', width: '100%', marginTop: 4 }}
+                >
+                  <option value="">— sélectionner —</option>
+                  {eligibleOMs.map((om) => (
+                    <option key={om.id} value={om.id}>
+                      {om.unique_number ?? om.numero} — {om.type} — {(om as { client?: { name: string } }).client?.name ?? ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <p className="text-muted" style={{ margin: '0.75rem 0 0', fontSize: '0.85rem' }}>
+                La NDF sera créée pour votre compte, sans rattachement à un OM. Vous pourrez y ajouter des lignes (repas, déplacement, autres).
+              </p>
+            )}
+            <div className="crud-actions" style={{ marginTop: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={(createMode === 'with_om' && !selectedOM) || createMut.isPending}
+                onClick={() => createMut.mutate()}
+              >
+                {createMut.isPending ? '…' : 'Créer'}
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCreating(false)}>Annuler</button>
+            </div>
+          </div>
+        )}
 
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          style={{ marginLeft: 'auto' }}
-          onClick={() => setCreating(true)}
-        >
-          + Nouvelle NDF
-        </button>
+        {isLoading && !data ? <p className="text-muted">Chargement…</p> : null}
+
+        {!isLoading && list.length === 0 && (
+          <p className="text-muted" style={{ textAlign: 'center', padding: '2rem' }}>
+            {hasActiveFilters ? 'Aucune note de frais pour ces filtres' : 'Aucune note de frais'}
+          </p>
+        )}
+
+        {list.length > 0 && (
+          <>
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    {visible.number !== false && <th>N°</th>}
+                    {visible.context !== false && <th>OM · Dossier · Client · Chantier</th>}
+                    {visible.lines !== false && <th>Lignes</th>}
+                    {visible.statut !== false && <th>Statut</th>}
+                    {visible.total !== false && <th>Total TTC</th>}
+                    {visible.date !== false && <th>Créé le</th>}
+                    {visible.actions !== false && <th></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map((r) => (
+                    <tr key={r.id}>
+                      {visible.number !== false && (
+                        <td><strong>{r.unique_number}</strong></td>
+                      )}
+                      {visible.context !== false && (
+                        <td><ReportContextCell report={r} /></td>
+                      )}
+                      {visible.lines !== false && (
+                        <td><LinesValidationBadge report={r} /></td>
+                      )}
+                      {visible.statut !== false && (
+                        <td>
+                          <StatutSelect
+                            value={r.statut}
+                            onChange={(statut) => statusMut.mutate({ id: r.id, statut })}
+                            disabled={statusMut.isPending}
+                          />
+                        </td>
+                      )}
+                      {visible.total !== false && (
+                        <td className="ndf-total-cell">{formatMoney(reportTotal(r))}</td>
+                      )}
+                      {visible.date !== false && (
+                        <td style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>{r.created_at?.slice(0, 10)}</td>
+                      )}
+                      {visible.actions !== false && (
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <TableRowActions
+                            onEdit={() => navigate(`/notes-de-frais/${r.id}`)}
+                            onDelete={
+                              canDeleteExpenseReport(r.statut)
+                                ? () => {
+                                    const msg = r.statut === 'brouillon'
+                                      ? `Supprimer la note de frais ${r.unique_number} ?`
+                                      : `Supprimer ${r.unique_number} (statut : ${EXPENSE_STATUT_LABELS[r.statut]}) ?`
+                                    if (window.confirm(msg)) deleteMut.mutate(r.id)
+                                  }
+                                : undefined
+                            }
+                            editLabel={`Modifier ${r.unique_number}`}
+                            deleteLabel={`Supprimer ${r.unique_number}`}
+                          />
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <PaginationBar
+              page={data?.current_page ?? 1}
+              lastPage={data?.last_page ?? 1}
+              onPage={setPage}
+            />
+          </>
+        )}
       </div>
-
-      {/* Formulaire création */}
-      {creating && (
-        <div
-          style={{
-            padding: '0.75rem',
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 6,
-            marginBottom: '1rem',
-            display: 'flex',
-            gap: '0.75rem',
-            alignItems: 'flex-end',
-            flexWrap: 'wrap',
-          }}
-        >
-          <label style={{ flex: 1, minWidth: 200 }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>Ordre de mission *</span>
-            <select
-              value={selectedOM}
-              onChange={(e) => setSelectedOM(e.target.value === '' ? '' : Number(e.target.value))}
-              style={{ display: 'block', width: '100%', marginTop: 2 }}
-            >
-              <option value="">— sélectionner —</option>
-              {eligibleOMs.map((om) => (
-                <option key={om.id} value={om.id}>
-                  {om.unique_number ?? om.numero} — {om.type} — {(om as any).client?.name ?? ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={!selectedOM || createMut.isPending}
-            onClick={() => createMut.mutate()}
-          >
-            {createMut.isPending ? '…' : 'Créer'}
-          </button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCreating(false)}>
-            Annuler
-          </button>
-        </div>
-      )}
-
-      {isLoading && <p className="text-muted">Chargement…</p>}
-
-      {!isLoading && list.length === 0 && (
-        <p className="text-muted" style={{ textAlign: 'center', padding: '2rem' }}>
-          Aucune note de frais
-        </p>
-      )}
-
-      {list.length > 0 && (
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>N°</th>
-                <th>OM</th>
-                <th>Client</th>
-                <th>Statut</th>
-                <th>Total</th>
-                <th>Créé le</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <strong style={{ fontSize: '0.85rem' }}>{r.unique_number}</strong>
-                  </td>
-                  <td style={{ fontSize: '0.82rem' }}>
-                    {r.ordre_mission?.unique_number ?? r.ordre_mission?.numero ?? `#${r.ordre_mission_id}`}
-                  </td>
-                  <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
-                    {r.ordre_mission?.client?.name ?? '—'}
-                  </td>
-                  <td>
-                    <span
-                      className="badge"
-                      style={{
-                        background: STATUT_COLORS[r.statut] ?? '#6b7280',
-                        color: '#fff',
-                        fontWeight: 600,
-                        fontSize: '0.75rem',
-                      }}
-                    >
-                      {r.statut}
-                    </span>
-                  </td>
-                  <td style={{ fontWeight: 600 }}>
-                    {r.total !== undefined ? `${Number(r.total).toFixed(2)} €` : '—'}
-                  </td>
-                  <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
-                    {r.created_at?.slice(0, 10)}
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => setSelectedId(r.id)}
-                    >
-                      Ouvrir
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+    </ModuleEntityShell>
   )
 }

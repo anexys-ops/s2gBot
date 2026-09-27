@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Modal from '../Modal'
 import { ordresMissionApi } from '../../api/client'
@@ -16,6 +16,8 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
   const [selections, setSelections] = useState<Map<number, number>>(new Map())
   const [expandedJalons, setExpandedJalons] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
+  const [displayCount, setDisplayCount] = useState(15)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['odm-jalons-generation', bcId],
@@ -24,6 +26,23 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
   })
 
   const jalons = data?.jalons ?? []
+
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container
+      if (scrollHeight - scrollTop - clientHeight < 200 && displayCount < jalons.length) {
+        setDisplayCount(prev => Math.min(prev + 10, jalons.length))
+      }
+    }
+
+    container.addEventListener('scroll', handleScroll)
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [displayCount, jalons.length])
+
+  const displayedJalons = jalons.slice(0, displayCount)
 
   const generateMut = useMutation({
     mutationFn: () => {
@@ -102,8 +121,8 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
     <Modal size="xl" title="Générer ordres de mission — Sélection des jalons" onClose={() => { if (!generateMut.isPending) onClose() }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {/* Liste des jalons dépliables */}
-        <div style={{ maxHeight: '600px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {jalons.map((jalon) => {
+        <div ref={scrollContainerRef} style={{ maxHeight: '600px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {displayedJalons.map((jalon) => {
             const isExpanded = expandedJalons.has(jalon.id)
             const selectedQty = selections.get(jalon.id) ?? 0
             const isSelected = selectedQty > 0
@@ -113,7 +132,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
               <div
                 key={jalon.id}
                 style={{
-                  minHeight: '40px',
+                  height: '55px',
                   borderRadius: 6,
                   border: `1px solid ${isSelected ? '#3b82f6' : '#e5e7eb'}`,
                   background: isSelected ? '#eff6ff' : '#f9fafb',
@@ -205,6 +224,11 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
               </div>
             )
           })}
+          {displayCount < jalons.length && (
+            <div style={{ textAlign: 'center', padding: '1rem', fontSize: '0.8rem', color: '#6b7280' }}>
+              ↓ Scroll pour charger {jalons.length - displayCount} jalon{jalons.length - displayCount > 1 ? 's' : ''} supplémentaire{jalons.length - displayCount > 1 ? 's' : ''}
+            </div>
+          )}
         </div>
 
         {/* Résumé */}

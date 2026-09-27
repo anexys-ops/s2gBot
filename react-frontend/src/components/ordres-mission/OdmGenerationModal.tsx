@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Modal from '../Modal'
 import { ordresMissionApi } from '../../api/client'
@@ -16,6 +16,8 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
   const [selections, setSelections] = useState<Map<number, number>>(new Map())
   const [expandedJalons, setExpandedJalons] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
+  const [displayCount, setDisplayCount] = useState(15)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['odm-jalons-generation', bcId],
@@ -24,6 +26,23 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
   })
 
   const jalons = data?.jalons ?? []
+
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container
+      if (scrollHeight - scrollTop - clientHeight < 200 && displayCount < jalons.length) {
+        setDisplayCount(prev => Math.min(prev + 10, jalons.length))
+      }
+    }
+
+    container.addEventListener('scroll', handleScroll)
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [displayCount, jalons.length])
+
+  const displayedJalons = jalons.slice(0, displayCount)
 
   const generateMut = useMutation({
     mutationFn: () => {
@@ -102,8 +121,8 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
     <Modal size="xl" title="Générer ordres de mission — Sélection des jalons" onClose={() => { if (!generateMut.isPending) onClose() }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {/* Liste des jalons dépliables */}
-        <div style={{ maxHeight: '600px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {jalons.map((jalon) => {
+        <div ref={scrollContainerRef} style={{ maxHeight: '600px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {displayedJalons.map((jalon) => {
             const isExpanded = expandedJalons.has(jalon.id)
             const selectedQty = selections.get(jalon.id) ?? 0
             const isSelected = selectedQty > 0
@@ -113,22 +132,19 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
               <div
                 key={jalon.id}
                 style={{
+                  height: '55px',
                   borderRadius: 6,
                   border: `1px solid ${isSelected ? '#3b82f6' : '#e5e7eb'}`,
                   background: isSelected ? '#eff6ff' : '#f9fafb',
                   overflow: 'hidden',
                 }}
               >
-                {/* En-tête jalon (dépliable) */}
-                <button
-                  type="button"
-                  onClick={() => toggleJalon(jalon.id)}
+                {/* En-tête jalon (dépliable avec checkbox) */}
+                <div
                   style={{
                     width: '100%',
                     padding: '0.75rem',
                     background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.75rem',
@@ -137,14 +153,48 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-                    <span style={{ fontSize: '1rem', color: '#6b7280', width: '1rem', textAlign: 'center' }}>
+                    {/* Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          updateQuantite(jalon.id, 1)
+                          toggleJalon(jalon.id)
+                        } else {
+                          updateQuantite(jalon.id, 0)
+                        }
+                      }}
+                      style={{
+                        width: '1.1rem',
+                        height: '1.1rem',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
+                    />
+                    {/* Expand/collapse button */}
+                    <button
+                      type="button"
+                      onClick={() => toggleJalon(jalon.id)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        fontSize: '0.9rem',
+                        color: '#374151',
+                      }}
+                    >
                       {isExpanded ? '▼' : '▶'}
-                    </span>
-                    <div>
+                    </button>
+                    {/* Jalon info */}
+                    <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
                         {jalon.article ? (
                           <>
-                            <span style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                            <span style={{ color: '#374151', fontSize: '0.85rem' }}>
                               [{jalon.article.code}]
                             </span>{' '}
                             {jalon.article.libelle}
@@ -153,9 +203,10 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                           jalon.libelle
                         )}
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                        Total: <strong>{formatQuantity(jalon.quantite_totale)}</strong> •
-                        Reste: <strong style={{ color: canSelect ? '#ef4444' : '#6b7280' }}>{formatQuantity(jalon.quantite_restante)}</strong>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                        <div>BC: <strong style={{ color: '#1f2937' }}>{formatQuantity(jalon.quantite_totale)}</strong></div>
+                        <div>OM: <strong style={{ color: '#1f2937' }}>{formatQuantity(jalon.quantite_generee ?? 0)}</strong></div>
+                        <div>Reste: <strong style={{ color: canSelect ? '#ef4444' : '#6b7280' }}>{formatQuantity(jalon.quantite_restante)}</strong></div>
                       </div>
                     </div>
                   </div>
@@ -164,15 +215,25 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                       {selectedQty} à générer
                     </span>
                   )}
-                </button>
+                </div>
 
-                {/* Contenu dépliable - Champ de quantité */}
+                {/* Contenu dépliable - Détails et quantité */}
                 {isExpanded && (
                   <div style={{ padding: '0.75rem', paddingTop: 0, borderTop: '1px solid #e5e7eb', background: '#fafbfc' }}>
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 500, color: '#374151', marginBottom: '0.5rem' }}>
+                        Article: <span style={{ fontWeight: 600, color: '#1f2937' }}>{jalon.article?.libelle || 'N/A'}</span>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#6b7280', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                        <div>BC: {formatQuantity(jalon.quantite_totale)}</div>
+                        <div>OM: {formatQuantity(jalon.quantite_generee ?? 0)}</div>
+                        <div>Dispo: <strong style={{ color: '#10b981' }}>{formatQuantity(jalon.quantite_restante)}</strong></div>
+                      </div>
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.75rem' }}>
                       <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                         <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#374151' }}>
-                          Quantité à générer
+                          Quantité à générer en OM
                         </span>
                         <input
                           type="number"
@@ -196,7 +257,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                     </div>
                     {selectedQty > 0 && (
                       <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#10b981', fontWeight: 500 }}>
-                        ✓ Inclus dans la génération
+                        ✓ {formatQuantity(selectedQty)} sera généré en OM
                       </div>
                     )}
                   </div>
@@ -204,6 +265,11 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
               </div>
             )
           })}
+          {displayCount < jalons.length && (
+            <div style={{ textAlign: 'center', padding: '1rem', fontSize: '0.8rem', color: '#6b7280' }}>
+              ↓ Scroll pour charger {jalons.length - displayCount} jalon{jalons.length - displayCount > 1 ? 's' : ''} supplémentaire{jalons.length - displayCount > 1 ? 's' : ''}
+            </div>
+          )}
         </div>
 
         {/* Résumé */}

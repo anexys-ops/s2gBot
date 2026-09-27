@@ -5,6 +5,7 @@ import { clientsApi, sitesApi, type EntityMetaPayload, type Site } from '../../a
 import { useAuth } from '../../contexts/AuthContext'
 import EntityMetaCard from '../../components/module/EntityMetaCard'
 import Modal from '../../components/Modal'
+import AddressAutocomplete from '../../components/AddressAutocomplete'
 import type { SiteOutletContext } from './SiteLayout'
 import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import SiteMiniMap from '../../components/maps/SiteMiniMap'
@@ -186,7 +187,7 @@ export default function SiteFicheTab() {
       />
 
       {modalOpen && isAdmin && (
-        <Modal title="Modifier le chantier" onClose={() => setModalOpen(false)}>
+        <Modal title="Modifier le chantier" onClose={() => setModalOpen(false)} size="wide">
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label>Client *</label>
@@ -236,7 +237,17 @@ export default function SiteFicheTab() {
             </div>
             <div className="form-group">
               <label>Adresse</label>
-              <textarea value={form.address ?? ''} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} rows={2} />
+              <AddressAutocomplete
+                value={form.address ?? ''}
+                onChange={(address) => setForm((f) => ({ ...f, address }))}
+                onSelect={(result) => setForm((f) => ({
+                  ...f,
+                  address: result.label,
+                  latitude: result.lat != null ? String(result.lat) : (f as { latitude?: string }).latitude,
+                  longitude: result.lon != null ? String(result.lon) : (f as { longitude?: string }).longitude,
+                }))}
+                placeholder="Rue, quartier, ville…"
+              />
             </div>
             <div className="form-group">
               <label>Latitude (WGS84, optionnel — centre carte)</label>

@@ -9,6 +9,7 @@ import {
 } from '../../api/client'
 import { IconEye, QuotePdfButton } from '../../components/crm/QuoteListTableActions'
 import TableIconHeader from '../../components/TableIconHeader'
+import AddressAutocomplete from '../../components/AddressAutocomplete'
 import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
 import type { PdfGenerateType } from '../../lib/documentPdfTypes'
 import { useAuth } from '../../contexts/AuthContext'
@@ -219,10 +220,15 @@ export default function ClientCommercialContent({ clientId: id }: Props) {
             </div>
             <div className="form-group">
               <label>Ligne 1 *</label>
-              <input
-                required
+              <AddressAutocomplete
                 value={newAddr.line1 ?? ''}
-                onChange={(e) => setNewAddr((s) => ({ ...s, line1: e.target.value }))}
+                onChange={(line1) => setNewAddr((s) => ({ ...s, line1 }))}
+                onSelect={(result) => setNewAddr((s) => ({
+                  ...s,
+                  line1: [result.house_number, result.road].filter(Boolean).join(' ') || result.label,
+                  postal_code: result.postcode ?? s.postal_code,
+                  city: result.city ?? s.city,
+                }))}
               />
             </div>
             <div className="form-group">

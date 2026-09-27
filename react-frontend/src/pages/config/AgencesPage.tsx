@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { agencesApi, type Agency } from '../../api/client'
 import Modal from '../../components/Modal'
+import AddressAutocomplete from '../../components/AddressAutocomplete'
 
 function emptyForm(): Partial<Agency> & { name: string; code: string } {
   return {
@@ -215,9 +216,13 @@ export default function AgencesPage() {
             </div>
             <div className="form-group">
               <label>Adresse</label>
-              <input
+              <AddressAutocomplete
                 value={form.address ?? ''}
-                onChange={(e) => setField('address', e.target.value || null)}
+                onChange={(address) => setField('address', address || null)}
+                onSelect={(result) => {
+                  setField('address', result.label || null)
+                  if (result.city) setField('city', result.city)
+                }}
               />
             </div>
             <div className="form-group">

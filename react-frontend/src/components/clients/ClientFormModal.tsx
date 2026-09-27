@@ -2,6 +2,7 @@ import type { FormEvent } from 'react'
 import type { Client } from '../../api/client'
 import { useCurrencyCatalog } from '../../hooks/useCurrencyCatalog'
 import Modal from '../Modal'
+import AddressAutocomplete from '../AddressAutocomplete'
 import ClientMoroccoFormFields from './ClientMoroccoFormFields'
 import CentreGroupField from '../centres/CentreGroupField'
 
@@ -119,9 +120,14 @@ export default function ClientFormModal({
             </header>
             <div className="form-group client-form-modal__field client-form-modal__field--wide">
               <label>Adresse</label>
-              <input
+              <AddressAutocomplete
                 value={form.address ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                onChange={(address) => setForm((f) => ({ ...f, address }))}
+                onSelect={(result) => setForm((f) => ({
+                  ...f,
+                  address: result.label,
+                  city: result.city ?? f.city,
+                }))}
                 placeholder="Rue, quartier, zone industrielle…"
               />
             </div>

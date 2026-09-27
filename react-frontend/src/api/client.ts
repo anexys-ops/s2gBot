@@ -3774,6 +3774,20 @@ function normalizeMissionTasks(rows: MissionTaskApiRaw[]): MissionTask[] {
   return rows.map(normalizeMissionTask)
 }
 
+export type GeocodeResult = {
+  label: string
+  lat: number | null
+  lon: number | null
+  road: string | null
+  house_number: string | null
+  postcode: string | null
+  city: string | null
+}
+
+export const geocodeApi = {
+  search: (query: string) => api<GeocodeResult[]>(`/geocode/search?q=${encodeURIComponent(query)}`),
+}
+
 export const missionTasksApi = {
   list: async (params?: { assigned_user_id?: number; statut?: string; type?: string; ordre_mission_id?: number; dossier_id?: number; date_from?: string; date_to?: string }) => {
     const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''

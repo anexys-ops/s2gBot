@@ -3424,6 +3424,7 @@ export interface OrdreMissionLigne {
   equipment?: { id: number; name: string; code?: string } | null
   articleAction?: ArticleAction | null
   article?: { id: number; code: string; libelle: string; unite?: string | null } | null
+  missionTasks?: MissionTask[]
 }
 
 export interface OrdreMission {
@@ -4299,6 +4300,8 @@ export type RapportBCBonCommande = {
   statut: string
   client_id: number
   client: { id: number; name: string } | null
+  dossier_id?: number | null
+  dossier?: { id: number; reference: string } | null
   rapport_b_cs_count: number
   finished_tasks_count: number
   created_at: string

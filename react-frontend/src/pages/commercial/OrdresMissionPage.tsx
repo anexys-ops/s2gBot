@@ -14,7 +14,7 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import StatusChangeModal from '../../components/StatusChangeModal'
 import OdmGenerationModal from '../../components/ordres-mission/OdmGenerationModal'
 import { useAuth } from '../../contexts/AuthContext'
-import { ordreMissionBonCommande, ordreMissionQuote } from '../../lib/ordreMissionDisplay'
+import { ordreMissionBonCommande, ordreMissionDossier, ordreMissionDossierId } from '../../lib/ordreMissionDisplay'
 import { formatAppDate } from '../../lib/appLocale'
 
 const TYPE_ORDER = ['technicien', 'labo', 'ingenieur'] as const
@@ -311,8 +311,7 @@ export default function OrdresMissionPage() {
                   <th className="data-table__code">Numéro OdM</th>
                   <th>Type</th>
                   <th>Client</th>
-                  <th className="data-table__code">Devis</th>
-                  <th className="data-table__code">BC</th>
+                  <th className="data-table__code">Dossier</th>
                   <th>Statut</th>
                   <th>Date prévue</th>
                   <th>Responsable</th>
@@ -321,8 +320,8 @@ export default function OrdresMissionPage() {
               </thead>
               <tbody>
                 {displayedOrdres.map((om) => {
-                  const bc = ordreMissionBonCommande(om)
-                  const quote = ordreMissionQuote(om)
+                  const dossier = ordreMissionDossier(om)
+                  const dossierId = ordreMissionDossierId(om)
                   const st = ordreMissionStatutBadgeProps(om.statut)
                   return (
                   <tr key={om.id}>
@@ -338,18 +337,9 @@ export default function OrdresMissionPage() {
                       )}
                     </td>
                     <td className="data-table__code">
-                      {quote ? (
-                        <Link to={`/devis/${quote.id}/editer`} className="link-inline" onClick={(e) => e.stopPropagation()}>
-                          <code className="code-badge">{quote.number}</code>
-                        </Link>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                    </td>
-                    <td className="data-table__code">
-                      {bc ? (
-                        <Link to={`/bons-commande/${bc.id}`} className="link-inline" onClick={(e) => e.stopPropagation()}>
-                          <code className="code-badge">{bc.numero}</code>
+                      {dossier && dossierId ? (
+                        <Link to={`/dossiers/${dossierId}`} className="link-inline" onClick={(e) => e.stopPropagation()}>
+                          <code className="code-badge">{dossier.reference}</code>
                         </Link>
                       ) : (
                         <span className="text-muted">—</span>

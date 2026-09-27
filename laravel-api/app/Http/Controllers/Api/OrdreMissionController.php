@@ -34,6 +34,7 @@ class OrdreMissionController extends Controller
         'lignes.articleAction',
         'lignes.article:id,code,libelle',
         'lignes.bonCommandeLigne:id,libelle,technicien_id,date_debut_prevue,date_fin_prevue',
+        'lignes.missionTasks.samples',
     ];
 
     public function __construct(
@@ -46,7 +47,9 @@ class OrdreMissionController extends Controller
         $q = OrdreMission::with([
             'client:id,name',
             'responsable:id,name',
-            'bonCommande:id,numero,quote_id',
+            'dossier:id,reference,titre',
+            'bonCommande:id,numero,quote_id,dossier_id',
+            'bonCommande.dossier:id,reference,titre',
             'bonCommande.quote:id,number',
         ]);
 

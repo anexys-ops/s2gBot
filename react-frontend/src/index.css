@@ -11814,17 +11814,41 @@ a.catalogue-tree__link-article:hover {
   color: #183654;
   border-top: 2px solid #b6cbe4;
   text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
 }
 
 .mission-task-list__dossier-row th > span,
 .mission-task-list__dossier-row th > strong {
-  display: inline-block;
-  margin-right: 1.25rem;
+  flex-shrink: 0;
 }
 
 .mission-task-list__dossier-title {
   font-size: 0.95rem;
   font-weight: 800;
+}
+
+.mission-task-list__dossier-client {
+  max-width: 160px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mission-task-list__dossier-site {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 400;
+  color: #3f5872;
+}
+
+.mission-task-list__dossier-count {
+  white-space: nowrap;
 }
 
 .mission-task-list__jalon-row th {

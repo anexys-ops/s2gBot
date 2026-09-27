@@ -154,8 +154,8 @@ class RapportBCController extends Controller
         }
 
         $bcs = BonCommande::query()
-            ->select(['id', 'numero', 'statut', 'client_id', 'created_at'])
-            ->with(['client:id,name'])
+            ->select(['id', 'numero', 'statut', 'client_id', 'dossier_id', 'created_at'])
+            ->with(['client:id,name', 'dossier:id,reference'])
             ->withCount([
                 'rapportBCs',
                 'ordresMission as finished_tasks_count' => function ($q) {

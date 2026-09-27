@@ -9,11 +9,12 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { adminUsersApi, bonsCommandeApi, equipmentsApi, ordresMissionApi, type EquipmentRow, type OrdreMission, type OrdreMissionLigne, type User } from '../../api/client'
+import { adminUsersApi, bonsCommandeApi, equipmentsApi, ordresMissionApi, type EquipmentRow, type MissionTask, type OrdreMission, type OrdreMissionLigne, type User } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import OmExpensePanel from '../../components/ordres-mission/OmExpensePanel'
 import OmLigneAddPanel from '../../components/ordres-mission/OmLigneAddPanel'
 import OmAvailabilityPanel from '../../components/ordres-mission/OmAvailabilityPanel'
+import { TaskEditModal } from '../../components/tasks/MissionTasksListPage'
 import SaveButton from '../../components/ds/SaveButton'
 import SearchableSelect from '../../components/ds/SearchableSelect'
 import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
@@ -221,6 +222,7 @@ export default function OrdreMissionFichePage() {
   const omId = Number(id)
   const [showAddLigne, setShowAddLigne] = useState(false)
   const [deleteLigneTarget, setDeleteLigneTarget] = useState<OrdreMissionLigne | null>(null)
+  const [foldTask, setFoldTask] = useState<MissionTask | null>(null)
   const [availabilityLigneId, setAvailabilityLigneId] = useState<number | null>(null)
   const [bulkAvailability, setBulkAvailability] = useState<BulkAvailability | null>(null)
 
@@ -864,6 +866,15 @@ export default function OrdreMissionFichePage() {
                               >
                                 {isSavingThisLine ? 'Validation…' : 'Valider'}
                               </button>
+                              {om.type === 'labo' && ligne.missionTasks?.[0] ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => setFoldTask(ligne.missionTasks![0])}
+                                >
+                                  FOLD{ligne.missionTasks[0].samples?.length ? ` (${ligne.missionTasks[0].samples.length})` : ''}
+                                </button>
+                              ) : null}
                               <button
                                 type="button"
                                 className="btn btn-secondary btn-sm btn-danger-outline"
@@ -927,6 +938,17 @@ export default function OrdreMissionFichePage() {
           onConfirm={() => deleteLigneMut.mutate(deleteLigneTarget.id)}
           onCancel={() => {
             if (!deleteLigneMut.isPending) setDeleteLigneTarget(null)
+          }}
+        />
+      ) : null}
+
+      {foldTask ? (
+        <TaskEditModal
+          task={foldTask}
+          context="labo"
+          onClose={() => {
+            setFoldTask(null)
+            void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
           }}
         />
       ) : null}

@@ -182,7 +182,7 @@ function DelayCell({ task }: { task: MissionTask }) {
   return <span className="mission-task-list__delay mission-task-list__delay--ok">Dans les délais</span>
 }
 
-function TaskEditModal({ task, context, onClose }: { task: MissionTask; context: MissionTasksContext; onClose: () => void }) {
+export function TaskEditModal({ task, context, onClose }: { task: MissionTask; context: MissionTasksContext; onClose: () => void }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -678,9 +678,9 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                           {dossierOpen ? '▾' : '▸'}
                         </button>
                         <span className="mission-task-list__dossier-title">{dossier.reference}</span>
-                        <span>{dossier.client}</span>
-                        <span>{dossier.site}</span>
-                        <strong>{dossier.count} tâche{dossier.count > 1 ? 's' : ''}</strong>
+                        <span className="mission-task-list__dossier-client" title={dossier.client}>{dossier.client}</span>
+                        <span className="mission-task-list__dossier-site" title={dossier.site}>{dossier.site}</span>
+                        <strong className="mission-task-list__dossier-count">{dossier.count} tâche{dossier.count > 1 ? 's' : ''}</strong>
                       </th>
                     </tr>,
                     ...(dossierOpen ? dossier.jalons.flatMap((jalon) => {

@@ -85,7 +85,12 @@ function BcPickerModal({
               }}
             >
               <div>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#111827' }}>{bc.numero}</div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#111827' }}>
+                  {bc.numero}
+                  {bc.dossier?.reference && (
+                    <span style={{ fontWeight: 400, fontSize: '0.78rem', color: '#2563eb', marginLeft: 8 }}>{bc.dossier.reference}</span>
+                  )}
+                </div>
                 {bc.client && <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 1 }}>{bc.client.name}</div>}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>

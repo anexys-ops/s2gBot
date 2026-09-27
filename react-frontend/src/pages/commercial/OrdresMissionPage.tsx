@@ -12,6 +12,7 @@ import ClickableStatusBadge from '../../components/ds/ClickableStatusBadge'
 import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import StatusChangeModal from '../../components/StatusChangeModal'
+import OdmGenerationModal from '../../components/ordres-mission/OdmGenerationModal'
 import { useAuth } from '../../contexts/AuthContext'
 import { ordreMissionBonCommande, ordreMissionQuote } from '../../lib/ordreMissionDisplay'
 import { formatAppDate } from '../../lib/appLocale'
@@ -72,6 +73,8 @@ export default function OrdresMissionPage() {
   const typeFromUrl = parseOmType(searchParams.get('type'))
   const [typeFilter, setTypeFilter] = useState<OmType | ''>(() => typeFromUrl)
   const [statutFilter, setStatutFilter] = useState('')
+  const [showGenerationModal, setShowGenerationModal] = useState(false)
+  const [selectedBcForGeneration, setSelectedBcForGeneration] = useState<number | null>(null)
 
   useEffect(() => {
     setTypeFilter(typeFromUrl)
@@ -88,10 +91,6 @@ export default function OrdresMissionPage() {
       return params
     }, { replace: true })
   }
-  const [generateBcId, setGenerateBcId] = useState<number | ''>(() =>
-    bcFilterFromUrl && Number.isFinite(Number(bcFilterFromUrl)) ? Number(bcFilterFromUrl) : '',
-  )
-  const [showGeneratePanel, setShowGeneratePanel] = useState(false)
 
   const { data: ordres = [], isLoading } = useQuery({
     queryKey: ['ordres-mission', typeFilter, statutFilter, bcFilterFromUrl],
@@ -117,25 +116,8 @@ export default function OrdresMissionPage() {
       }
       return [...byId.values()].sort((a, b) => b.id - a.id)
     },
-    enabled: showGeneratePanel,
+    enabled: showGenerationModal,
     staleTime: 60_000,
-  })
-
-  const generateMut = useMutation({
-    mutationFn: () => {
-      if (!generateBcId) throw new Error('Sélectionnez un bon de commande.')
-      return ordresMissionApi.generateFromBC(generateBcId as number)
-    },
-    onSuccess: (created) => {
-      void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
-      void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
-      setShowGeneratePanel(false)
-      setGenerateBcId('')
-      alert(`${created.length} ordre(s) de mission générés (OdM, tâches terrain et planning).`)
-    },
-    onError: (err) => {
-      alert((err as Error).message)
-    },
   })
 
   const deleteMut = useMutation({
@@ -182,7 +164,7 @@ export default function OrdresMissionPage() {
           : `${displayedOrdres.length} ordre(s) affiché(s) — ${contextMeta.subtitle}`
       }
       actions={
-        <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowGeneratePanel((v) => !v)}>
+        <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowGenerationModal(true)}>
           ⚡ Générer depuis BC
         </button>
       }
@@ -210,33 +192,99 @@ export default function OrdresMissionPage() {
         })}
       </div>
 
-      {/* Génération depuis BC */}
-      {showGeneratePanel && (
-        <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
-          <h4 style={{ margin: '0 0 0.5rem' }}>Générer depuis un bon de commande</h4>
-          <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-            Un OdM est créé par type (terrain, labo, ingénieur) pour le même devis / BC. Les tâches sont générées
-            à partir des sous-produits du catalogue (sections OdM) et de leurs actions ; vous pourrez ensuite
-            affecter, planifier les dates et faire évoluer les statuts.
-          </p>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <label style={{ flex: '1 1 280px' }}>
-              Bon de commande (confirmé ou en cours)
-              <select value={generateBcId} onChange={(e) => setGenerateBcId(e.target.value ? Number(e.target.value) : '')}>
-                <option value="">Choisir…</option>
+      {/* Modal de sélection du BC */}
+      {showGenerationModal && !selectedBcForGeneration ? (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 3000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+            background: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => {
+            setShowGenerationModal(false)
+            setSelectedBcForGeneration(null)
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '520px',
+              background: '#fff',
+              borderRadius: 16,
+              padding: '1.5rem',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.1rem', fontWeight: 600 }}>
+              Sélectionner le bon de commande
+            </h2>
+            <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
+              Choisissez un bon de commande pour générer les ordres de mission.
+            </p>
+            <label style={{ display: 'block', marginBottom: '1rem' }}>
+              <select
+                value={selectedBcForGeneration ?? ''}
+                onChange={(e) => setSelectedBcForGeneration(e.target.value ? Number(e.target.value) : null)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: 6,
+                  border: '1px solid #d1d5db',
+                  fontSize: '0.95rem',
+                }}
+              >
+                <option value="">— Choisir un BC —</option>
                 {bonsCommande.map((bc) => (
-                  <option key={bc.id} value={bc.id}>{bc.numero} — {bc.client?.name ?? `#${bc.client_id}`}</option>
+                  <option key={bc.id} value={bc.id}>
+                    {bc.numero} — {bc.client?.name ?? `Client #${bc.client_id}`}
+                  </option>
                 ))}
               </select>
             </label>
-            <button type="button" className="btn btn-primary" disabled={!generateBcId || generateMut.isPending} onClick={() => generateMut.mutate()}>
-              {generateMut.isPending ? 'Génération…' : 'Générer les OMs'}
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setShowGeneratePanel(false)}>Annuler</button>
+            <div className="crud-actions" style={{ gap: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!selectedBcForGeneration}
+              >
+                Sélectionner ce BC
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowGenerationModal(false)
+                  setSelectedBcForGeneration(null)
+                }}
+              >
+                Annuler
+              </button>
+            </div>
           </div>
-          {generateMut.isError && <p className="error" style={{ marginTop: '0.5rem' }}>{(generateMut.error as Error).message}</p>}
         </div>
-      )}
+      ) : null}
+
+      {/* Modal de sélection des jalons */}
+      {showGenerationModal && selectedBcForGeneration ? (
+        <OdmGenerationModal
+          bcId={selectedBcForGeneration}
+          onClose={() => {
+            setShowGenerationModal(false)
+            setSelectedBcForGeneration(null)
+          }}
+          onSuccess={() => {
+            void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
+            void qc.invalidateQueries({ queryKey: ['terrain-tasks'] })
+          }}
+        />
+      ) : null}
 
       {/* Filtres */}
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>

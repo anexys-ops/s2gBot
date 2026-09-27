@@ -5,19 +5,18 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ArticleAction;
 use App\Models\BonCommande;
+use App\Models\BonCommandeLigne;
 use App\Models\Catalogue\Article;
 use App\Models\ExpenseLine;
 use App\Models\MissionTask;
+use App\Models\OdmJalonQuantityGenerated;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
-use App\Models\PlanningEquipment;
-use App\Models\PlanningHuman;
 use App\Services\ExpenseReportService;
 use App\Services\OrdreMissionFromBonCommandeService;
 use App\Support\AgencyAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class OrdreMissionController extends Controller
 {
@@ -34,7 +33,7 @@ class OrdreMissionController extends Controller
         'lignes.equipment:id,name,code',
         'lignes.articleAction',
         'lignes.article:id,code,libelle',
-        'lignes.bonCommandeLigne:id,libelle,quantite,ref_article_id,technicien_id,date_debut_prevue,date_fin_prevue',
+        'lignes.bonCommandeLigne:id,libelle,technicien_id,date_debut_prevue,date_fin_prevue',
     ];
 
     public function __construct(
@@ -107,19 +106,105 @@ class OrdreMissionController extends Controller
             ], 422);
         }
 
-        $existingIds = OrdreMission::query()->where('bon_commande_id', $bonCommande->id)->pluck('id')->all();
-        $orders = $this->generator->generate($bonCommande, $request->user());
+        // Valider les IDs de lignes sélectionnées
+        $selectedLineIds = null;
+        if ($request->has('bon_commande_ligne_ids')) {
+            $selectedLineIds = $request->validate([
+                'bon_commande_ligne_ids' => 'required|array',
+                'bon_commande_ligne_ids.*' => 'integer|exists:bons_commande_lignes,id',
+            ])['bon_commande_ligne_ids'];
+
+            // Vérifier que les lignes appartiennent au BC
+            $validIds = BonCommandeLigne::query()
+                ->where('bon_commande_id', $bonCommande->id)
+                ->whereIn('id', $selectedLineIds)
+                ->pluck('id')
+                ->toArray();
+
+            if (count($validIds) !== count($selectedLineIds)) {
+                return response()->json([
+                    'message' => 'Certaines lignes sélectionnées n\'appartiennent pas à ce bon de commande.',
+                ], 422);
+            }
+
+            $selectedLineIds = $validIds;
+        }
+
+        $orders = $this->generator->generate($bonCommande, $request->user(), $selectedLineIds);
 
         if ($orders === []) {
             return response()->json([
-                'message' => 'Aucun ordre de mission généré : le bon de commande ne contient aucune ligne éligible (actions catalogue, déclencheurs OdM ou lignes avec libellé).',
+                'message' => 'Aucun ordre de mission généré : les lignes sélectionnées ne contiennent aucune ligne éligible (actions catalogue, déclencheurs OdM ou lignes avec libellé).',
                 'data' => [],
             ], 422);
         }
 
-        $hasNewOrder = collect($orders)->contains(fn (OrdreMission $order) => ! in_array($order->id, $existingIds, true));
+        // Mettre à jour le tracking des quantités générées
+        if ($selectedLineIds) {
+            foreach ($selectedLineIds as $lineId) {
+                $ligne = BonCommandeLigne::query()->find($lineId);
+                if ($ligne) {
+                    OdmJalonQuantityGenerated::query()->updateOrCreate(
+                        ['bon_commande_ligne_id' => $lineId],
+                        ['quantite_generee' => \DB::raw("COALESCE(quantite_generee, 0) + {$ligne->quantite}")]
+                    );
+                }
+            }
+        }
 
-        return response()->json($orders, $hasNewOrder ? 201 : 200);
+        return response()->json($orders, 201);
+    }
+
+    /**
+     * Récupère les jalons (BonCommandeLignes) d'un BC avec quantités restantes à générer.
+     * Agrège par produit pour chaque jalon.
+     */
+    public function getBonCommandeLignesForGeneration(Request $request, BonCommande $bonCommande): JsonResponse
+    {
+        if (! $request->user()->isLabAdmin()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if (! AgencyAccess::userMayAccessBonCommande($request->user(), $bonCommande)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $lignes = BonCommandeLigne::query()
+            ->where('bon_commande_id', $bonCommande->id)
+            ->with('article:id,code,libelle')
+            ->orderBy('ordre')
+            ->get();
+
+        // Charger les quantités déjà générées
+        $generatedQties = OdmJalonQuantityGenerated::query()
+            ->whereIn('bon_commande_ligne_id', $lignes->pluck('id'))
+            ->pluck('quantite_generee', 'bon_commande_ligne_id');
+
+        $jalons = $lignes->map(function (BonCommandeLigne $ligne) use ($generatedQties) {
+            $quantiteGeneree = (float) ($generatedQties[$ligne->id] ?? 0);
+            $quantiteRestante = max(0, (float) $ligne->quantite - $quantiteGeneree);
+
+            return [
+                'id' => $ligne->id,
+                'ordre' => $ligne->ordre,
+                'libelle' => $ligne->libelle,
+                'quantite_totale' => (float) $ligne->quantite,
+                'quantite_generee' => $quantiteGeneree,
+                'quantite_restante' => $quantiteRestante,
+                'article' => $ligne->article ? [
+                    'id' => $ligne->article->id,
+                    'code' => $ligne->article->code,
+                    'libelle' => $ligne->article->libelle,
+                ] : null,
+                'date_debut_prevue' => $ligne->date_debut_prevue,
+                'date_fin_prevue' => $ligne->date_fin_prevue,
+                'notes' => $ligne->notes_ligne,
+            ];
+        });
+
+        return response()->json([
+            'bon_commande_id' => $bonCommande->id,
+            'jalons' => $jalons,
+        ]);
     }
 
     public function update(Request $request, OrdreMission $ordreMission): JsonResponse
@@ -137,14 +222,6 @@ class OrdreMissionController extends Controller
             'notes'               => 'nullable|string',
             'lab_centre_group_id' => 'sometimes|nullable|integer|exists:lab_centre_groups,id',
         ]);
-
-        if (($validated['statut'] ?? null) === OrdreMission::STATUT_EN_COURS && ! $ordreMission->date_debut) {
-            $validated['date_debut'] = now();
-        }
-        if (($validated['statut'] ?? null) === OrdreMission::STATUT_TERMINE) {
-            $validated['date_debut'] ??= $ordreMission->date_debut ?? now();
-            $validated['date_fin'] ??= $ordreMission->date_fin ?? now();
-        }
 
         $ordreMission->update($validated);
         $ordreMission->syncMissionTasksFromLignes();
@@ -176,7 +253,7 @@ class OrdreMissionController extends Controller
             'article_action_id' => 'nullable|exists:article_actions,id',
             'assigned_user_id' => 'nullable|exists:users,id',
             'date_prevue' => 'nullable|date',
-            'statut' => 'sometimes|in:planifie,replanifie,en_cours,freeze,annule,attente_validation,cloture,a_faire,realise',
+            'statut' => 'sometimes|in:a_faire,en_cours,realise,annule',
         ]);
 
         $libelle = trim((string) ($validated['libelle'] ?? ''));
@@ -215,14 +292,13 @@ class OrdreMissionController extends Controller
             'article_action_id' => $articleActionId,
             'libelle' => $libelle,
             'quantite' => $validated['quantite'] ?? 1,
-            'statut' => $validated['statut'] ?? 'planifie',
+            'statut' => $validated['statut'] ?? 'a_faire',
             'assigned_user_id' => $validated['assigned_user_id'] ?? null,
             'date_prevue' => $validated['date_prevue'] ?? null,
             'ordre' => $nextOrdre,
         ]);
 
         $ligne->ensureTaskExists();
-        $this->syncOrdreMissionStatusFromLignes($ordreMission);
 
         return response()->json(
             $ligne->fresh()->load(['assignedUser:id,name', 'equipment:id,name,code', 'article:id,code,libelle', 'articleAction']),
@@ -239,9 +315,7 @@ class OrdreMissionController extends Controller
         abort_if($ligne->ordre_mission_id !== $ordreMission->id, 404);
 
         $validated = $request->validate([
-            'libelle'             => 'sometimes|required|string|max:500',
-            'quantite'           => 'sometimes|numeric|min:0.001',
-            'statut'              => 'sometimes|in:planifie,replanifie,en_cours,freeze,annule,attente_validation,cloture,a_faire,realise',
+            'statut'              => 'sometimes|in:a_faire,en_cours,realise,annule',
             'assigned_user_id'    => 'nullable|exists:users,id',
             'equipment_id'        => 'nullable|exists:equipments,id',
             'date_prevue'         => 'nullable|date',
@@ -252,63 +326,9 @@ class OrdreMissionController extends Controller
 
         $ligne->update($validated);
         $ligne->refresh();
-        $task = $ligne->ensureTaskExists();
-        $this->syncTaskStatusFromLigne($ligne, $task);
-        $this->syncPlanningFromLigne($ligne, $task);
-        $this->syncOrdreMissionStatusFromLignes($ordreMission);
+        $ligne->ensureTaskExists();
 
         return response()->json($ligne->fresh()->load(['assignedUser:id,name', 'equipment:id,name,code']));
-    }
-
-    public function updateLignes(Request $request, OrdreMission $ordreMission): JsonResponse
-    {
-        if (! $request->user()->isLab()) {
-            return response()->json(['message' => 'Non autorisé'], 403);
-        }
-
-        $validated = $request->validate([
-            'lignes' => 'required|array|min:1',
-            'lignes.*.id' => 'required|integer|distinct',
-            'lignes.*.libelle' => 'sometimes|required|string|max:500',
-            'lignes.*.quantite' => 'sometimes|numeric|min:0.001',
-            'lignes.*.statut' => 'sometimes|in:planifie,replanifie,en_cours,freeze,annule,attente_validation,cloture,a_faire,realise',
-            'lignes.*.assigned_user_id' => 'sometimes|nullable|exists:users,id',
-            'lignes.*.equipment_id' => 'sometimes|nullable|exists:equipments,id',
-            'lignes.*.date_prevue' => 'sometimes|nullable|date',
-            'lignes.*.date_realisation' => 'sometimes|nullable|date',
-            'lignes.*.duree_reelle_heures' => 'sometimes|nullable|integer|min:0',
-            'lignes.*.notes' => 'sometimes|nullable|string',
-        ]);
-
-        $payloads = collect($validated['lignes'])->keyBy(fn (array $item) => (int) $item['id']);
-        $lignes = $ordreMission->lignes()
-            ->whereIn('id', $payloads->keys())
-            ->get()
-            ->keyBy('id');
-
-        abort_if($lignes->count() !== $payloads->count(), 404);
-
-        DB::transaction(function () use ($ordreMission, $payloads, $lignes) {
-            foreach ($payloads as $ligneId => $payload) {
-                /** @var OrdreMissionLigne $ligne */
-                $ligne = $lignes->get($ligneId);
-                $ligne->update(collect($payload)->except('id')->all());
-                $ligne->refresh();
-                $task = $ligne->ensureTaskExists();
-                $this->syncTaskStatusFromLigne($ligne, $task);
-                $this->syncPlanningFromLigne($ligne, $task);
-            }
-
-            $this->syncOrdreMissionStatusFromLignes($ordreMission);
-        });
-
-        return response()->json(
-            $ordreMission->lignes()
-                ->whereIn('id', $payloads->keys())
-                ->with(['assignedUser:id,name', 'equipment:id,name,code'])
-                ->orderBy('ordre')
-                ->get()
-        );
     }
 
     public function destroyLigne(Request $request, OrdreMission $ordreMission, OrdreMissionLigne $ligne): JsonResponse
@@ -323,7 +343,6 @@ class OrdreMissionController extends Controller
             $task->delete();
         });
         $ligne->delete();
-        $this->syncOrdreMissionStatusFromLignes($ordreMission);
 
         return response()->json(null, 204);
     }
@@ -335,99 +354,6 @@ class OrdreMissionController extends Controller
             OrdreMission::TYPE_INGENIEUR => 'ingenieur',
             default => 'technicien',
         };
-    }
-
-    private function syncTaskStatusFromLigne(OrdreMissionLigne $ligne, MissionTask $task): void
-    {
-        $statut = match ($ligne->statut) {
-            'en_cours' => MissionTask::STATUT_IN_PROGRESS,
-            'freeze' => MissionTask::STATUT_FROZEN,
-            'replanifie' => MissionTask::STATUT_RESCHEDULED,
-            'attente_validation', 'realise' => MissionTask::STATUT_DONE,
-            'cloture' => MissionTask::STATUT_VALIDATED,
-            'annule' => MissionTask::STATUT_REJECTED,
-            default => MissionTask::STATUT_TODO,
-        };
-
-        $updates = ['statut' => $statut];
-        if ($statut === MissionTask::STATUT_IN_PROGRESS && ! $task->started_at) {
-            $updates['started_at'] = now();
-        }
-        if ($statut === MissionTask::STATUT_DONE && ! $task->completed_at) {
-            $updates['completed_at'] = now();
-        }
-        $task->update($updates);
-    }
-
-    private function syncPlanningFromLigne(OrdreMissionLigne $ligne, MissionTask $task): void
-    {
-        $date = $ligne->date_prevue?->format('Y-m-d');
-
-        if ($ligne->assigned_user_id && $date) {
-            PlanningHuman::query()->updateOrCreate(
-                ['mission_task_id' => $task->id],
-                [
-                    'user_id' => $ligne->assigned_user_id,
-                    'date_debut' => $date,
-                    'date_fin' => $date,
-                    'type_evenement' => 'tache',
-                    'notes' => $ligne->libelle,
-                ]
-            );
-        } else {
-            PlanningHuman::query()->where('mission_task_id', $task->id)->get()->each->delete();
-        }
-
-        if ($ligne->equipment_id && $date) {
-            PlanningEquipment::query()->updateOrCreate(
-                ['mission_task_id' => $task->id],
-                [
-                    'equipment_id' => $ligne->equipment_id,
-                    'user_id' => $ligne->assigned_user_id,
-                    'date_debut' => $date,
-                    'date_fin' => $date,
-                    'type_evenement' => 'utilisation',
-                    'notes' => $ligne->libelle,
-                ]
-            );
-        } else {
-            PlanningEquipment::query()->where('mission_task_id', $task->id)->get()->each->delete();
-        }
-    }
-
-    private function syncOrdreMissionStatusFromLignes(OrdreMission $ordreMission): void
-    {
-        $lignes = $ordreMission->lignes()->get();
-        if ($lignes->isEmpty()) {
-            $ordreMission->update(['statut' => OrdreMission::STATUT_BROUILLON]);
-            return;
-        }
-
-        $now = now();
-        if ($lignes->every(fn (OrdreMissionLigne $item) => $item->statut === 'annule')) {
-            $ordreMission->update(['statut' => OrdreMission::STATUT_ANNULE]);
-            return;
-        }
-        if ($lignes->every(fn (OrdreMissionLigne $item) => in_array($item->statut, ['cloture', 'annule'], true))) {
-            $ordreMission->update([
-                'statut' => OrdreMission::STATUT_TERMINE,
-                'date_debut' => $ordreMission->date_debut ?? $now,
-                'date_fin' => $ordreMission->date_fin ?? $now,
-            ]);
-            return;
-        }
-        if ($lignes->contains(fn (OrdreMissionLigne $item) => in_array($item->statut, ['en_cours', 'freeze', 'attente_validation', 'cloture'], true))) {
-            $ordreMission->update([
-                'statut' => OrdreMission::STATUT_EN_COURS,
-                'date_debut' => $ordreMission->date_debut ?? $now,
-            ]);
-            return;
-        }
-        $active = $lignes->reject(fn (OrdreMissionLigne $item) => $item->statut === 'annule');
-        $ordreMission->update(['statut' => $active->isNotEmpty()
-            && $active->contains(fn (OrdreMissionLigne $item) => $item->assigned_user_id && $item->date_prevue)
-            ? OrdreMission::STATUT_PLANIFIE
-            : OrdreMission::STATUT_BROUILLON]);
     }
 
     public function planning(Request $request): JsonResponse

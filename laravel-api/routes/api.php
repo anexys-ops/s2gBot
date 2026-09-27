@@ -472,6 +472,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('ordres-mission/{ordre_mission}/frais', [OrdreMissionController::class, 'fraisStore']);
     Route::put('ordres-mission/{ordre_mission}/frais/{frais}', [OrdreMissionController::class, 'fraisUpdate']);
     Route::delete('ordres-mission/{ordre_mission}/frais/{frais}', [OrdreMissionController::class, 'fraisDestroy']);
+    Route::get('bons-commande/{bon_commande}/ordres-mission-jalons', [OrdreMissionController::class, 'getBonCommandeLignesForGeneration']);
     Route::post('bons-commande/{bon_commande}/generate-ordres-mission', [OrdreMissionController::class, 'generateFromBC']);
 
     // ── Notes de frais ───────────────────────────────────────────────────────

@@ -3166,6 +3166,7 @@ export interface TestTypeFormField {
   list_id?: number | null
   formula?: string
   columns?: TestTypeFormColumn[]
+  chart?: { x: string; y: string } | null
 }
 
 export interface TestTypeFormColumn extends Omit<TestTypeFormField, 'columns' | 'type'> {
@@ -3193,35 +3194,49 @@ export interface TaskTestFormSummary {
   }
 }
 
+export interface LaboTaskTestFormRow {
+  id: number
+  status: 'draft' | 'submitted' | 'correction_requested' | 'validated'
+  submitted_at: string | null
+  updated_at: string
+  test_type: { id: number; name: string; norm?: string | null; context?: string | null } | null
+  task: { id: number; unique_number?: string | null; assigned_user?: string | null } | null
+  client?: string | null
+  chantier?: string | null
+  dossier?: string | null
+}
+
 export const taskTestFormsApi = {
   list: (taskId: number) => api<{ task_id: number; forms: TaskTestFormSummary[] }>(`/mobile/task-forms/tasks/${taskId}`),
+  listAll: (params?: { status?: string; context?: string; page?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.context) q.set('context', params.context)
+    if (params?.page) q.set('page', String(params.page))
+    const s = q.toString()
+    return api<LaravelPaginator<LaboTaskTestFormRow>>(`/mobile/task-forms${s ? `?${s}` : ''}`)
+  },
   save: (taskId: number, typeId: number, answers: Record<string, unknown>) =>
-    api<NonNullable<TaskTestFormSummary['submission']>>(`/mobile/task-forms/tasks/${taskId}/types/${typeId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ answers }),
-    }),
+    api(`/mobile/task-forms/tasks/${taskId}/types/${typeId}`, { method: 'PUT', body: JSON.stringify({ answers }) }),
   submit: (taskId: number, typeId: number) =>
-    api<NonNullable<TaskTestFormSummary['submission']>>(`/mobile/task-forms/tasks/${taskId}/types/${typeId}/submit`, {
+    api(`/mobile/task-forms/tasks/${taskId}/types/${typeId}/submit`, { method: 'POST' }),
+  uploadPhoto: async (taskId: number, typeId: number, fieldKey: string, file: File) => {
+    const data = new FormData()
+    data.append('field_key', fieldKey)
+    data.append('photo', file)
+    const token = getToken()
+    const res = await fetch(`${API_BASE}/mobile/task-forms/tasks/${taskId}/types/${typeId}/photos`, {
       method: 'POST',
-    }),
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: data,
+    })
+    if (res.status === 401) handleApiUnauthorized(`/mobile/task-forms/tasks/${taskId}/types/${typeId}/photos`, Boolean(token))
+    if (!res.ok) throw await parseApiErrorResponse(res)
+    return res.json()
+  },
+  deletePhoto: (photoId: number) => api(`/mobile/task-forms/photos/${photoId}`, { method: 'DELETE' }),
   review: (taskId: number, typeId: number, decision: 'validate' | 'correction', correction_note?: string) =>
     api(`/mobile/task-forms/tasks/${taskId}/types/${typeId}/review`, { method: 'POST', body: JSON.stringify({ decision, correction_note }) }),
-  async uploadPhoto(taskId: number, typeId: number, fieldKey: string, file: File): Promise<{ id: number; field_key: string; original_name: string }> {
-    const token = getToken()
-    const fd = new FormData()
-    fd.append('field_key', fieldKey)
-    fd.append('photo', file)
-    const path = `/mobile/task-forms/tasks/${taskId}/types/${typeId}/photos`
-    const res = await fetch(`${API_BASE}${path}`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}`, Accept: 'application/json' } : { Accept: 'application/json' },
-      body: fd,
-    })
-    if (res.status === 401) handleApiUnauthorized(path, Boolean(token))
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error((data as { message?: string }).message || `Erreur ${res.status}`)
-    return data as { id: number; field_key: string; original_name: string }
-  },
   photo: async (photoId: number): Promise<Blob> => {
     const response = await fetch(`/api/mobile/task-forms/photos/${photoId}`, {
       headers: { Authorization: `Bearer ${getToken() ?? ''}`, Accept: 'image/*' },

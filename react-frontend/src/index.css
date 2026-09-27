@@ -12053,19 +12053,22 @@ a.catalogue-tree__link-article:hover {
 /* Largeurs fixes : évite qu'une ligne d'en-tête (chantier au libellé très
    long) ne fasse exploser la largeur de toutes les colonnes du tableau
    (table-layout: auto dimensionne chaque colonne sur son contenu le plus
-   large, tous rows confondus). */
-.mission-task-list__table th:nth-child(1),
-.mission-task-list__table td:nth-child(1) { width: 14%; }
-.mission-task-list__table th:nth-child(2),
-.mission-task-list__table td:nth-child(2) { width: 30%; }
-.mission-task-list__table th:nth-child(3),
-.mission-task-list__table td:nth-child(3) { width: 18%; }
-.mission-task-list__table th:nth-child(4),
-.mission-task-list__table td:nth-child(4) { width: 14%; }
-.mission-task-list__table th:nth-child(5),
-.mission-task-list__table td:nth-child(5) { width: 14%; }
-.mission-task-list__table th:nth-child(6),
-.mission-task-list__table td:nth-child(6) { width: 10%; }
+   large, tous rows confondus). Scopé à thead th : les lignes dossier/jalon/
+   produit du tbody n'ont qu'un seul <th colspan="6"> — matché à tort par
+   :nth-child(1) si on ne restreint pas au thead, ce qui le clampait à 14%
+   et masquait tout son contenu derrière l'ellipsis. */
+.mission-task-list__table thead th:nth-child(1),
+.mission-task-list__table tbody td:nth-child(1) { width: 14%; }
+.mission-task-list__table thead th:nth-child(2),
+.mission-task-list__table tbody td:nth-child(2) { width: 30%; }
+.mission-task-list__table thead th:nth-child(3),
+.mission-task-list__table tbody td:nth-child(3) { width: 18%; }
+.mission-task-list__table thead th:nth-child(4),
+.mission-task-list__table tbody td:nth-child(4) { width: 14%; }
+.mission-task-list__table thead th:nth-child(5),
+.mission-task-list__table tbody td:nth-child(5) { width: 14%; }
+.mission-task-list__table thead th:nth-child(6),
+.mission-task-list__table tbody td:nth-child(6) { width: 10%; }
 
 .mission-task-list__table td {
   overflow: hidden;

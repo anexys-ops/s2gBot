@@ -536,6 +536,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::prefix('mobile/task-forms')->group(function () {
+        Route::get('/', [TaskTestFormController::class, 'indexAll']);
         Route::get('tasks/{task}', [TaskTestFormController::class, 'index'])->whereNumber('task');
         Route::put('tasks/{task}/types/{testType}', [TaskTestFormController::class, 'save'])->whereNumber('task')->whereNumber('testType');
         Route::post('tasks/{task}/types/{testType}/submit', [TaskTestFormController::class, 'submit'])->whereNumber('task')->whereNumber('testType');

@@ -123,6 +123,20 @@ export default function TestFormFieldsEditor({ fields, onChange, lists }: {
           {column.type === 'select' ? <Choices field={column} lists={lists} onChange={(next) => update(index, { ...field, columns: field.columns?.map((item, i) => i === columnIndex ? next as TestTypeFormColumn : item) })} /> : null}
         </div>)}
         <button type="button" className="btn btn-secondary btn-sm" onClick={() => update(index, { ...field, columns: [...(field.columns ?? []), { key: '', label: '', type: 'text', required: false }] })}>+ Colonne</button>
+        {(field.columns ?? []).length >= 2 ? <div className="test-form-editor__chart">
+          <label>Courbe — Axe X
+            <select value={field.chart?.x ?? ''} onChange={(event) => update(index, { ...field, chart: event.target.value ? { x: event.target.value, y: field.chart?.y ?? '' } : null })}>
+              <option value="">Pas de courbe</option>
+              {(field.columns ?? []).map((column) => <option key={column.key} value={column.key}>{column.label || column.key}</option>)}
+            </select>
+          </label>
+          {field.chart?.x ? <label>Courbe — Axe Y
+            <select value={field.chart?.y ?? ''} onChange={(event) => update(index, { ...field, chart: { x: field.chart?.x ?? '', y: event.target.value } })}>
+              <option value="">Choisir…</option>
+              {(field.columns ?? []).map((column) => <option key={column.key} value={column.key}>{column.label || column.key}</option>)}
+            </select>
+          </label> : null}
+        </div> : null}
       </div> : null}
     </div>)}
     <div className="test-form-editor__add">

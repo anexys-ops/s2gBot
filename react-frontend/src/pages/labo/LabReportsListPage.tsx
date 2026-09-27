@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { labReportsApi, type LabReport } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { formatAppDate } from '../../lib/appLocale'
+import LaboEssayFormsTab from './LaboEssayFormsTab'
 
 const STATUS_META: Record<
   LabReport['status'],
@@ -36,6 +37,7 @@ function StatusBadge({ status }: { status: LabReport['status'] }) {
 }
 
 export default function LabReportsListPage() {
+  const [tab, setTab] = useState<'rapports' | 'formulaires'>('rapports')
   const [statusFilter, setStatusFilter] = useState('')
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -66,30 +68,38 @@ export default function LabReportsListPage() {
       ]}
       moduleBarLabel="Laboratoire — Rapports"
       title="Rapports d'essais"
-      subtitle={`${reports.length} rapport${reports.length !== 1 ? 's' : ''}`}
+      subtitle={tab === 'rapports' ? `${reports.length} rapport${reports.length !== 1 ? 's' : ''}` : undefined}
       actions={
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ fontSize: '0.85rem' }}
-          >
-            <option value="">— Tous statuts —</option>
-            {Object.entries(STATUS_META).map(([k, v]) => (
-              <option key={k} value={k}>{v.label}</option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={createMut.isPending}
-            onClick={() => createMut.mutate()}
-          >
-            {createMut.isPending ? 'Création…' : '+ Nouveau rapport'}
-          </button>
-        </div>
+        tab === 'rapports' ? (
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{ fontSize: '0.85rem' }}
+            >
+              <option value="">— Tous statuts —</option>
+              {Object.entries(STATUS_META).map(([k, v]) => (
+                <option key={k} value={k}>{v.label}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={createMut.isPending}
+              onClick={() => createMut.mutate()}
+            >
+              {createMut.isPending ? 'Création…' : '+ Nouveau rapport'}
+            </button>
+          </div>
+        ) : undefined
       }
     >
+      <div className="mission-task-list__filters" style={{ marginBottom: '1rem' }}>
+        <button type="button" className={`mission-task-list__filter${tab === 'rapports' ? ' is-active' : ''}`} onClick={() => setTab('rapports')}>Rapports</button>
+        <button type="button" className={`mission-task-list__filter${tab === 'formulaires' ? ' is-active' : ''}`} onClick={() => setTab('formulaires')}>Formulaires d'essai</button>
+      </div>
+
+      {tab === 'formulaires' ? <LaboEssayFormsTab /> : <>
       {isLoading && <p className="text-muted">Chargement…</p>}
 
       {!isLoading && reports.length === 0 && (
@@ -159,6 +169,7 @@ export default function LabReportsListPage() {
           </table>
         </div>
       )}
+      </>}
     </ModuleEntityShell>
   )
 }

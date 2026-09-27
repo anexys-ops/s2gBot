@@ -99,10 +99,10 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
   }
 
   return (
-    <Modal title="Générer ordres de mission — Sélection des jalons" onClose={() => { if (!generateMut.isPending) onClose() }}>
+    <Modal size="xl" title="Générer ordres de mission — Sélection des jalons" onClose={() => { if (!generateMut.isPending) onClose() }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {/* Liste des jalons dépliables */}
-        <div style={{ maxHeight: '450px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div style={{ maxHeight: '600px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {jalons.map((jalon) => {
             const isExpanded = expandedJalons.has(jalon.id)
             const selectedQty = selections.get(jalon.id) ?? 0

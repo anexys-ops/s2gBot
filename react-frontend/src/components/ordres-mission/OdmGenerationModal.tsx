@@ -1,9 +1,10 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Modal from '../Modal'
-import { ordresMissionApi } from '../../api/client'
+import { ordresMissionApi, type OdmJalon } from '../../api/client'
 import Toast, { toastErrorMessage, type ToastVariant } from '../Toast'
 import { formatQuantity } from '../../lib/appLocale'
+import { buildBcLigneDisplayRows } from '../../lib/bcLigneDisplay'
 
 type Props = {
   bcId: number
@@ -14,7 +15,7 @@ type Props = {
 export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) {
   const qc = useQueryClient()
   const [selections, setSelections] = useState<Map<number, number>>(new Map())
-  const [expandedJalons, setExpandedJalons] = useState<Set<number>>(new Set())
+  const [expandedJalonKeys, setExpandedJalonKeys] = useState<Set<string>>(new Set())
   const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
   const [displayCount, setDisplayCount] = useState(15)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -26,20 +27,31 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
   })
 
   const allLignes = data?.jalons ?? []
+  const lignesById = useMemo(() => new Map(allLignes.map((l) => [l.id, l])), [allLignes])
 
-  const groupedByJalon = useMemo(() => {
-    const groups: Record<string, typeof allLignes> = {}
-    allLignes.forEach(ligne => {
-      const jalonName = ligne.libelle || 'Sans jalon'
-      if (!groups[jalonName]) groups[jalonName] = []
-      groups[jalonName].push(ligne)
-    })
-    return Object.entries(groups).map(([name, lignes], idx) => ({
-      name,
-      lignes,
-      id: idx, // Use index as numeric ID
-    }))
-  }, [allLignes])
+  // Regroupe par jalon devis (product_ref_article_ids), comme le PDF BC/devis —
+  // PAS par texte de libellé : une même action ("Déplacement de technicien"...)
+  // revient dans plusieurs jalons différents avec des quantités différentes.
+  const displayRows = useMemo(
+    () => buildBcLigneDisplayRows<OdmJalon>(allLignes, data?.devis_display_meta),
+    [allLignes, data?.devis_display_meta],
+  )
+
+  type TopRow =
+    | { kind: 'jalon'; id: string; label: string; code?: string | null; childIds: number[] }
+    | { kind: 'product'; id: string; ligne: OdmJalon }
+
+  const topRows: TopRow[] = useMemo(
+    () =>
+      displayRows
+        .filter((row) => row.type === 'jalon_header' || !row.nested)
+        .map((row) =>
+          row.type === 'jalon_header'
+            ? { kind: 'jalon' as const, id: row.key, label: row.label, code: row.code, childIds: row.ligneIds }
+            : { kind: 'product' as const, id: row.key, ligne: row.ligne },
+        ),
+    [displayRows],
+  )
 
   useEffect(() => {
     const container = scrollContainerRef.current
@@ -47,16 +59,16 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
 
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container
-      if (scrollHeight - scrollTop - clientHeight < 200 && displayCount < groupedByJalon.length) {
-        setDisplayCount(prev => Math.min(prev + 10, groupedByJalon.length))
+      if (scrollHeight - scrollTop - clientHeight < 200 && displayCount < topRows.length) {
+        setDisplayCount(prev => Math.min(prev + 10, topRows.length))
       }
     }
 
     container.addEventListener('scroll', handleScroll)
     return () => container.removeEventListener('scroll', handleScroll)
-  }, [displayCount, groupedByJalon.length])
+  }, [displayCount, topRows.length])
 
-  const displayedJalons = groupedByJalon.slice(0, displayCount)
+  const displayedRows = topRows.slice(0, displayCount)
 
   const generateMut = useMutation({
     mutationFn: () => {
@@ -84,18 +96,17 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
     return Array.from(selections.values()).reduce((sum, qty) => sum + qty, 0)
   }, [selections])
 
-  const toggleJalon = (jalonId: number) => {
-    const next = new Set(expandedJalons)
-    if (next.has(jalonId)) {
-      next.delete(jalonId)
-    } else {
-      next.add(jalonId)
-    }
-    setExpandedJalons(next)
+  const toggleJalon = (key: string) => {
+    setExpandedJalonKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
   const updateQuantite = (ligneId: number, qty: number) => {
-    const ligne = allLignes.find((l) => l.id === ligneId)
+    const ligne = lignesById.get(ligneId)
     if (!ligne) return
 
     setSelections((prev) => {
@@ -110,19 +121,21 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
     })
   }
 
-  // Distribue une quantité totale sur les lignes d'un jalon (par ordre, jusqu'au max de chacune)
-  const applyJalonTotal = (lignes: typeof allLignes, totalQty: number) => {
+  // Applique la MÊME quantité à chaque ligne du jalon (ce ne sont pas des parts
+  // d'un total à répartir : chaque ligne est une action répétée N fois, comme
+  // le jalon lui-même — cf. la structure du BDC, pas une addition de lignes).
+  const applyJalonQty = (childIds: number[], qty: number) => {
     setSelections((prev) => {
       const next = new Map(prev)
-      let remaining = Math.max(0, totalQty)
-      for (const ligne of lignes) {
-        const take = Math.max(0, Math.min(remaining, ligne.quantite_restante))
-        if (take > 0) {
-          next.set(ligne.id, take)
+      for (const id of childIds) {
+        const ligne = lignesById.get(id)
+        if (!ligne) continue
+        const capped = Math.max(0, Math.min(qty, ligne.quantite_restante))
+        if (capped > 0) {
+          next.set(id, capped)
         } else {
-          next.delete(ligne.id)
+          next.delete(id)
         }
-        remaining -= take
       }
       return next
     })
@@ -157,15 +170,88 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {/* Liste des jalons dépliables */}
         <div ref={scrollContainerRef} style={{ maxHeight: '600px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {displayedJalons.map((jalonGroup) => {
-            const isJalonExpanded = expandedJalons.has(jalonGroup.id)
-            const jalonTotalQty = jalonGroup.lignes.reduce((sum, l) => sum + (selections.get(l.id) ?? 0), 0)
-            const jalonQtyBc = jalonGroup.lignes.reduce((sum, l) => sum + l.quantite_totale, 0)
-            const jalonQtyOm = jalonGroup.lignes.reduce((sum, l) => sum + l.quantite_generee, 0)
+          {displayedRows.map((row) => {
+            if (row.kind === 'product') {
+              const ligne = row.ligne
+              const selectedQty = selections.get(ligne.id) ?? 0
+              const isLineSelected = selectedQty > 0
+              const canSelect = ligne.quantite_restante > 0
+
+              return (
+                <div
+                  key={row.id}
+                  style={{
+                    borderRadius: 6,
+                    border: `1px solid ${isLineSelected ? '#10b981' : '#e5e7eb'}`,
+                    background: isLineSelected ? '#f0fdf4' : '#f9fafb',
+                    padding: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    justifyContent: 'space-between',
+                    minHeight: '55px',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={isLineSelected}
+                      onChange={(e) => updateQuantite(ligne.id, e.target.checked ? Math.max(0, ligne.quantite_restante) : 0)}
+                      style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer', flexShrink: 0, accentColor: '#10b981' }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#1f2937' }}>
+                        {ligne.article ? (
+                          <>
+                            <span style={{ color: '#6b7280', fontSize: '0.85rem' }}>[{ligne.article.code}]</span>{' '}
+                            {ligne.article.libelle}
+                          </>
+                        ) : (
+                          ligne.libelle
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '0.4rem' }}>
+                        <span style={{ fontSize: '0.75rem', background: '#e5e7eb', padding: '0.25rem 0.5rem', borderRadius: 3, color: '#374151' }}>
+                          BC: <strong>{formatQuantity(ligne.quantite_totale)}</strong>
+                        </span>
+                        <span style={{ fontSize: '0.75rem', background: '#dbeafe', padding: '0.25rem 0.5rem', borderRadius: 3, color: '#1e40af' }}>
+                          OM: <strong>{formatQuantity(ligne.quantite_generee)}</strong>
+                        </span>
+                        <span style={{ fontSize: '0.75rem', background: '#fee2e2', padding: '0.25rem 0.5rem', borderRadius: 3, color: canSelect ? '#7f1d1d' : '#9ca3af' }}>
+                          Reste: <strong>{formatQuantity(ligne.quantite_restante)}</strong>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+                    <input
+                      type="number"
+                      min={0}
+                      max={ligne.quantite_restante}
+                      value={selectedQty}
+                      onChange={(e) => updateQuantite(ligne.id, Number(e.target.value) || 0)}
+                      placeholder="0"
+                      style={{ width: '70px', padding: '0.4rem 0.5rem', borderRadius: 3, border: `1px solid ${isLineSelected ? '#10b981' : '#d1d5db'}`, fontSize: '0.9rem', fontFamily: 'inherit', textAlign: 'center', fontWeight: 600 }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>/ {formatQuantity(ligne.quantite_restante)}</span>
+                  </div>
+                </div>
+              )
+            }
+
+            // row.kind === 'jalon' : quantité = celle de la ligne représentative (BDC),
+            // JAMAIS la somme des lignes du jalon (elles partagent la même quantité).
+            const isJalonExpanded = expandedJalonKeys.has(row.id)
+            const refLigne = lignesById.get(row.childIds[0])
+            const jalonQtyBc = refLigne?.quantite_totale ?? 0
+            const jalonQtyOm = refLigne?.quantite_generee ?? 0
+            const jalonQtyReste = refLigne?.quantite_restante ?? 0
+            const jalonTotalQty = refLigne ? (selections.get(refLigne.id) ?? 0) : 0
             const jalonSelected = jalonTotalQty > 0
 
             return (
-              <div key={jalonGroup.id}>
+              <div key={row.id}>
                 {/* NIVEAU 1: JALON */}
                 <div
                   style={{
@@ -182,17 +268,11 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
-                    {/* Checkbox sélectionner tout le jalon (quantité max disponible) */}
+                    {/* Checkbox sélectionner tout le jalon (même quantité sur chaque produit) */}
                     <input
                       type="checkbox"
                       checked={jalonSelected}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          applyJalonTotal(jalonGroup.lignes, Math.max(0, jalonQtyBc - jalonQtyOm))
-                        } else {
-                          applyJalonTotal(jalonGroup.lignes, 0)
-                        }
-                      }}
+                      onChange={(e) => applyJalonQty(row.childIds, e.target.checked ? jalonQtyReste : 0)}
                       style={{
                         width: '1.2rem',
                         height: '1.2rem',
@@ -204,7 +284,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                     {/* Expand button */}
                     <button
                       type="button"
-                      onClick={() => toggleJalon(jalonGroup.id)}
+                      onClick={() => toggleJalon(row.id)}
                       style={{
                         background: 'transparent',
                         border: 'none',
@@ -224,7 +304,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                     </button>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1f2937', marginBottom: '0.4rem' }}>
-                        📋 {jalonGroup.name}
+                        📋 {row.label}{row.code ? <span style={{ color: '#9ca3af', fontWeight: 400, fontSize: '0.8rem' }}> [{row.code}]</span> : null}
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.75rem', background: '#e5e7eb', padding: '0.25rem 0.5rem', borderRadius: 3, color: '#374151' }}>
@@ -234,7 +314,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                           OM: <strong>{formatQuantity(jalonQtyOm)}</strong>
                         </span>
                         <span style={{ fontSize: '0.75rem', background: '#fee2e2', padding: '0.25rem 0.5rem', borderRadius: 3, color: '#7f1d1d' }}>
-                          Reste: <strong>{formatQuantity(Math.max(0, jalonQtyBc - jalonQtyOm))}</strong>
+                          Reste: <strong>{formatQuantity(jalonQtyReste)}</strong>
                         </span>
                         {jalonTotalQty > 0 && (
                           <span style={{ fontSize: '0.75rem', background: '#cffafe', padding: '0.25rem 0.5rem', borderRadius: 3, color: '#0e7490', fontWeight: 600 }}>
@@ -248,11 +328,11 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                     <input
                       type="number"
                       min={0}
-                      max={Math.max(0, jalonQtyBc - jalonQtyOm)}
+                      max={jalonQtyReste}
                       value={jalonTotalQty}
-                      onChange={(e) => applyJalonTotal(jalonGroup.lignes, Number(e.target.value) || 0)}
+                      onChange={(e) => applyJalonQty(row.childIds, Number(e.target.value) || 0)}
                       placeholder="0"
-                      title="Quantité totale à générer pour ce jalon (répartie sur les produits)"
+                      title="Quantité à générer pour ce jalon (appliquée à chaque produit du jalon)"
                       style={{
                         width: '70px',
                         padding: '0.4rem 0.5rem',
@@ -266,7 +346,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                       }}
                     />
                     <span style={{ fontSize: '0.75rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
-                      / {formatQuantity(Math.max(0, jalonQtyBc - jalonQtyOm))}
+                      / {formatQuantity(jalonQtyReste)}
                     </span>
                   </div>
                 </div>
@@ -274,7 +354,9 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                 {/* NIVEAU 2: PRODUITS DU JALON */}
                 {isJalonExpanded && (
                   <div style={{ marginTop: '0.5rem', paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    {jalonGroup.lignes.map((ligne) => {
+                    {row.childIds.map((childId) => {
+                      const ligne = lignesById.get(childId)
+                      if (!ligne) return null
                       const selectedQty = selections.get(ligne.id) ?? 0
                       const isLineSelected = selectedQty > 0
                       const canSelect = ligne.quantite_restante > 0
@@ -299,7 +381,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                               type="checkbox"
                               checked={isLineSelected}
                               onChange={(e) => {
-                                updateQuantite(ligne.id, e.target.checked ? 1 : 0)
+                                updateQuantite(ligne.id, e.target.checked ? Math.max(0, ligne.quantite_restante) : 0)
                               }}
                               style={{
                                 width: '1.1rem',
@@ -320,7 +402,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                                     {ligne.article.libelle}
                                   </>
                                 ) : (
-                                  'Article'
+                                  ligne.libelle
                                 )}
                               </div>
                               <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.15rem' }}>
@@ -354,9 +436,9 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
               </div>
             )
           })}
-          {displayCount < groupedByJalon.length && (
+          {displayCount < topRows.length && (
             <div style={{ textAlign: 'center', padding: '1rem', fontSize: '0.8rem', color: '#6b7280' }}>
-              ↓ Scroll pour charger {groupedByJalon.length - displayCount} jalon{groupedByJalon.length - displayCount > 1 ? 's' : ''} supplémentaire{groupedByJalon.length - displayCount > 1 ? 's' : ''}
+              ↓ Scroll pour charger {topRows.length - displayCount} élément{topRows.length - displayCount > 1 ? 's' : ''} supplémentaire{topRows.length - displayCount > 1 ? 's' : ''}
             </div>
           )}
         </div>

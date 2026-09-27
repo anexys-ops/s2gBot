@@ -12,6 +12,8 @@ type Props = {
   placeholder?: string
   emptyLabel?: string
   className?: string
+  disabled?: boolean
+  onOpen?: () => void
 }
 
 export default function SearchableSelect({
@@ -21,6 +23,8 @@ export default function SearchableSelect({
   placeholder = 'Rechercher…',
   emptyLabel = 'Non assigné',
   className = '',
+  disabled = false,
+  onOpen,
 }: Props) {
   const [searchTerm, setSearchTerm] = useState('')
   const [isOpen, setIsOpen] = useState(false)
@@ -59,20 +63,25 @@ export default function SearchableSelect({
       {/* Trigger button */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        disabled={disabled}
+        onClick={() => {
+          if (!isOpen) onOpen?.()
+          setIsOpen(!isOpen)
+        }}
         style={{
           width: '100%',
           padding: '0.5rem 0.75rem',
           borderRadius: 4,
           border: '1px solid #d1d5db',
-          background: 'white',
-          cursor: 'pointer',
+          background: disabled ? '#f3f4f6' : 'white',
+          cursor: disabled ? 'not-allowed' : 'pointer',
           textAlign: 'left',
           fontSize: '0.9rem',
           color: value ? '#1f2937' : '#9ca3af',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          opacity: disabled ? 0.7 : 1,
         }}
       >
         <span>{selectedOption?.label || emptyLabel}</span>

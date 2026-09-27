@@ -3394,6 +3394,7 @@ export interface OdmJalon {
   id: number
   ordre: number
   libelle: string
+  ref_article_id?: number | null
   quantite_totale: number
   quantite_generee: number
   quantite_restante: number
@@ -3563,7 +3564,7 @@ export const ordresMissionApi = {
   delete: (id: number) =>
     api<void>(`/ordres-mission/${id}`, { method: 'DELETE' }),
   getBonCommandeLignesForGeneration: (bcId: number) =>
-    api<{ bon_commande_id: number; jalons: OdmJalon[] }>(`/bons-commande/${bcId}/ordres-mission-jalons`),
+    api<{ bon_commande_id: number; jalons: OdmJalon[]; devis_display_meta?: EntityMetaPayload | null }>(`/bons-commande/${bcId}/ordres-mission-jalons`),
   generateFromBC: (bcId: number, selectedLineIds?: number[]) =>
     api<OrdreMission[]>(
       `/bons-commande/${bcId}/generate-ordres-mission`,

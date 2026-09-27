@@ -189,6 +189,7 @@ class OrdreMissionController extends Controller
                 'id' => $ligne->id,
                 'ordre' => $ligne->ordre,
                 'libelle' => $ligne->libelle,
+                'ref_article_id' => $ligne->ref_article_id,
                 'quantite_totale' => (float) $ligne->quantite,
                 'quantite_generee' => $quantiteGeneree,
                 'quantite_restante' => $quantiteRestante,
@@ -203,9 +204,12 @@ class OrdreMissionController extends Controller
             ];
         });
 
+        $devisMeta = $bonCommande->quote?->meta;
+
         return response()->json([
             'bon_commande_id' => $bonCommande->id,
             'jalons' => $jalons,
+            'devis_display_meta' => is_array($devisMeta) ? $devisMeta : null,
         ]);
     }
 

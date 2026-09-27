@@ -15,6 +15,7 @@ import OmExpensePanel from '../../components/ordres-mission/OmExpensePanel'
 import OmLigneAddPanel from '../../components/ordres-mission/OmLigneAddPanel'
 import OmAvailabilityPanel from '../../components/ordres-mission/OmAvailabilityPanel'
 import SaveButton from '../../components/ds/SaveButton'
+import SearchableSelect from '../../components/ds/SearchableSelect'
 import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import CentreGroupField from '../../components/centres/CentreGroupField'
@@ -782,44 +783,41 @@ export default function OrdreMissionFichePage() {
                             />
                           ) : ordreMissionLigneQuantite(ligne, bcLignesById)}
                         </td>
-                        <td>
-                          <select
+                        <td style={{ minWidth: 160 }}>
+                          <SearchableSelect
+                            options={users.map((u) => ({ id: u.id, label: u.name }))}
                             value={draft.assigned_user_id ?? ''}
-                            onFocus={() => {
+                            disabled={saveMut.isPending || isSavingThisLine}
+                            onOpen={() => {
                               setBulkAvailability(null)
                               setAvailabilityLigneId(ligne.id)
                             }}
-                            onChange={(e) => {
+                            onChange={(val) => {
                               updateLigneDraft(ligne.id, {
-                                assigned_user_id: e.target.value ? Number(e.target.value) : null,
+                                assigned_user_id: val ? Number(val) : null,
                               })
                               setBulkAvailability(null)
                               setAvailabilityLigneId(ligne.id)
                             }}
-                            disabled={saveMut.isPending || isSavingThisLine}
-                            style={{ fontSize: '0.82rem', minWidth: 120 }}
-                          >
-                            <option value="">—</option>
-                            {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                          </select>
+                            placeholder="Rechercher une personne…"
+                            emptyLabel="—"
+                          />
                         </td>
-                        <td>
+                        <td style={{ minWidth: 180 }}>
                           {isLab ? (
-                            <select
+                            <SearchableSelect
+                              options={equipments.map((equipment) => ({
+                                id: equipment.id,
+                                label: [equipment.code, equipment.name].filter(Boolean).join(' — '),
+                              }))}
                               value={draft.equipment_id ?? ''}
-                              onChange={(event) => updateLigneDraft(ligne.id, {
-                                equipment_id: event.target.value ? Number(event.target.value) : null,
-                              })}
                               disabled={saveMut.isPending || isSavingThisLine}
-                              style={{ fontSize: '0.82rem', minWidth: 140 }}
-                            >
-                              <option value="">— Aucun —</option>
-                              {equipments.map((equipment) => (
-                                <option key={equipment.id} value={equipment.id}>
-                                  {[equipment.code, equipment.name].filter(Boolean).join(' — ')}
-                                </option>
-                              ))}
-                            </select>
+                              onChange={(val) => updateLigneDraft(ligne.id, {
+                                equipment_id: val ? Number(val) : null,
+                              })}
+                              placeholder="Rechercher un équipement…"
+                              emptyLabel="— Aucun —"
+                            />
                           ) : ligne.equipment ? (
                             <Link to={`/materiel/equipements/${ligne.equipment.id}`} className="link-inline">
                               {[ligne.equipment.code, ligne.equipment.name].filter(Boolean).join(' — ')}

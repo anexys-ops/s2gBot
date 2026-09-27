@@ -16,12 +16,19 @@ const RENDERERS: Record<string, SectionComponent> = {
   'ESS-SOL-003': AtterbergSection,
   'ESS-SOL-004': AtterbergSection,
   'ESS-SOL-005': TeneurEauSection,
+  'ESS-SOL-008': ProctorSection,
   'ESS-SOL-009': ProctorSection,
+  'ESS-SOL-010': CbrSection,
   'ESS-SOL-011': CbrSection,
+  'ESS-BET-001': BetonCompressionSection,
   'ESS-BET-002': BetonCompressionSection,
+  'ESS-BET-003': BetonCompressionSection,
   'ESS-BET-004': SlumpSection,
+  'ESS-BET-014': GranulometrieSection,
   'ESS-INS-004': PressiometreSection,
   'ESS-INS-001': PandaSection,
+  'ESS-INS-002': PandaSection,
+  'ESS-INS-011': PandaSection,
 }
 
 type Props = {

@@ -11,10 +11,12 @@ export default function TaskTestFormResults({ forms, onOpenPhoto, renderActions 
   return <div className="task-test-results">
     {forms.map((form) => <section key={form.test_type.id} className="task-test-results__form">
       <h3>{form.test_type.name} <small>· {form.submission?.status ?? 'À remplir'}</small></h3>
+      {form.test_type.norm ? <p className="text-muted">Norme : {form.test_type.norm}</p> : null}
+      {form.test_type.description ? <p className="text-muted">{form.test_type.description}</p> : null}
       {form.submission?.correction_note ? <p>Correction demandée : {form.submission.correction_note}</p> : null}
       {form.submission ? <dl>{form.form_fields.filter((field) => field.type !== 'photo').map((field) => {
         const value = form.submission?.answers?.[field.key]
-        return <div key={field.key}><dt>{field.label}</dt><dd>
+        return <div key={field.key}><dt>{field.label}{field.help ? <div className="text-muted mission-task-list__sub">{field.help}</div> : null}</dt><dd>
           {field.type === 'table' && Array.isArray(value) ? <div className="table-wrap"><table className="data-table data-table--compact"><thead><tr>{field.columns?.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead><tbody>
             {value.map((row: Record<string, unknown>, index: number) => <tr key={index}>{field.columns?.map((column) => <td key={column.key}>{String(row[column.key] ?? '—')}</td>)}</tr>)}
           </tbody></table></div> : typeof value === 'boolean' ? (value ? 'Oui' : 'Non') : Array.isArray(value) ? value.join(', ') : String(value ?? '—')}{field.unit ? ` ${field.unit}` : ''}

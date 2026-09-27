@@ -68,10 +68,12 @@ function FormCard({ taskId, form, canReview, onChanged }: { taskId: number; form
   return <View style={styles.card}>
     <Text style={styles.formTitle}>{form.test_type.name}</Text>
     {form.test_type.norm ? <Text style={styles.muted}>Norme : {form.test_type.norm}</Text> : null}
+    {form.test_type.description ? <Text style={styles.muted}>{form.test_type.description}</Text> : null}
     <Text style={styles.status}>État : {status}</Text>
     {form.submission?.correction_note ? <Text style={styles.correction}>Correction demandée : {form.submission.correction_note}</Text> : null}
     {form.form_fields.map((field) => <View key={field.key} style={styles.field}>
       <Text style={styles.label}>{field.label}{field.unit ? ` (${field.unit})` : ''}{field.required ? ' *' : ''}</Text>
+      {field.help ? <Text style={styles.muted}>{field.help}</Text> : null}
       {field.type === 'photo' ? <>
         {(form.submission?.photos ?? []).filter((photo) => photo.field_key === field.key).map((photo) => <View key={photo.id}>
           <Text style={styles.muted}>📷 {photo.original_name}</Text>

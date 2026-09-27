@@ -33,6 +33,7 @@ class TestTypeController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'norm' => 'nullable|string|max:100',
+            'description' => 'nullable|string|max:2000',
             'unit' => 'nullable|string|max:50',
             'unit_price' => 'required|numeric|min:0',
             'thresholds' => 'nullable|array',
@@ -84,6 +85,7 @@ class TestTypeController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'norm' => 'nullable|string|max:100',
+            'description' => 'nullable|string|max:2000',
             'unit' => 'nullable|string|max:50',
             'unit_price' => 'sometimes|numeric|min:0',
             'thresholds' => 'nullable|array',
@@ -216,6 +218,7 @@ class TestTypeController extends Controller
             'form_fields' => 'nullable|array',
             'form_fields.*.key' => 'required|string|alpha_dash|max:100|distinct',
             'form_fields.*.label' => 'required|string|max:255',
+            'form_fields.*.help' => 'nullable|string|max:500',
             'form_fields.*.type' => 'required|in:number,text,date,select,boolean,duration,time,photo,checkboxes,table,formula',
             'form_fields.*.required' => 'required|boolean',
             'form_fields.*.unit' => 'nullable|string|max:50',

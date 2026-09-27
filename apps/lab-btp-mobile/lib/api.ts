@@ -99,6 +99,7 @@ export type MobileTask = {
 export type FormField = {
   key: string;
   label: string;
+  help?: string;
   type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'duration' | 'time' | 'photo' | 'checkboxes' | 'table' | 'formula';
   required: boolean;
   unit?: string;
@@ -108,7 +109,7 @@ export type FormField = {
 };
 
 export type TaskForm = {
-  test_type: { id: number; name: string; norm?: string | null };
+  test_type: { id: number; name: string; norm?: string | null; description?: string | null };
   form_fields: FormField[];
   submission: null | {
     id: number;

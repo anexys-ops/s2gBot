@@ -33,7 +33,7 @@ class TaskTestFormController extends Controller
         return response()->json([
             'task_id' => $task->id,
             'forms' => $this->availableTypes($task)->map(fn (TestType $type) => [
-                'test_type' => $type->only(['id', 'name', 'norm']),
+                'test_type' => $type->only(['id', 'name', 'norm', 'description']),
                 'form_fields' => $forms->get($type->id)?->form_snapshot['fields'] ?? $this->dynamicForms->resolvedFields($type->form_fields ?? []),
                 'submission' => $forms->get($type->id),
             ])->values(),

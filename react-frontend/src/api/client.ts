@@ -1827,6 +1827,7 @@ export const testTypesApi = {
   create: (body: {
     name: string
     norm?: string
+    description?: string
     unit?: string
     unit_price: number
     thresholds?: Record<string, number>
@@ -1840,6 +1841,7 @@ export const testTypesApi = {
     body: {
       name?: string
       norm?: string
+      description?: string
       unit?: string
       unit_price?: number
       thresholds?: Record<string, number>
@@ -3143,6 +3145,7 @@ export interface TestType {
   id: number
   name: string
   norm?: string
+  description?: string
   unit?: string
   unit_price: number
   thresholds?: Record<string, number>
@@ -3155,6 +3158,7 @@ export interface TestType {
 export interface TestTypeFormField {
   key: string
   label: string
+  help?: string
   type: 'number' | 'text' | 'date' | 'select' | 'boolean' | 'duration' | 'time' | 'photo' | 'checkboxes' | 'table' | 'formula'
   required: boolean
   unit?: string
@@ -3178,7 +3182,7 @@ export const formOptionListsApi = {
 }
 
 export interface TaskTestFormSummary {
-  test_type: { id: number; name: string; norm?: string | null }
+  test_type: { id: number; name: string; norm?: string | null; description?: string | null }
   form_fields: TestTypeFormField[]
   submission: null | {
     id: number

@@ -14,6 +14,7 @@ class TestType extends Model
     protected $fillable = [
         'name',
         'norm',
+        'description',
         'unit',
         'unit_price',
         'thresholds',

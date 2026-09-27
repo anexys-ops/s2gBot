@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { sitesApi, clientsApi, type Client, type Site } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import Modal from '../components/Modal'
+import AddressAutocomplete from '../components/AddressAutocomplete'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { ListTableFootRow, ListTablePanelHeader } from '../components/ListTablePanel'
 import { sumNumeric } from '../lib/listTableTotals'
@@ -419,7 +420,12 @@ export default function Sites() {
             </div>
             <div className="form-group">
               <label>Adresse</label>
-              <textarea value={form.address ?? ''} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} rows={2} />
+              <AddressAutocomplete
+                value={form.address ?? ''}
+                onChange={(address) => setForm((f) => ({ ...f, address }))}
+                onSelect={(result) => setForm((f) => ({ ...f, address: result.label }))}
+                placeholder="Rue, quartier, ville…"
+              />
             </div>
             <div className="form-group">
               <label>Libellé frais déplacement (facture / devis)</label>

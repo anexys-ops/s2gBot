@@ -5,10 +5,12 @@
     "license": "MIT",
     "require": {
         "php": "^8.4",
+        "barryvdh/laravel-dompdf": "^2.0",
         "laravel/framework": "^11.50",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.9",
-        "barryvdh/laravel-dompdf": "^2.0"
+        "phpoffice/phpspreadsheet": "^5.10",
+        "phpoffice/phpword": "^1.4"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

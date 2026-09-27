@@ -17,8 +17,9 @@ function AnswerInput({ field, value, editable, onChange }: { field: FormField; v
     const selected = Array.isArray(value) && value.includes(option);
     return <Pressable key={option} disabled={!editable} style={[styles.option, selected && styles.optionSelected]} onPress={() => onChange(selected ? (value as string[]).filter((item) => item !== option) : [...(Array.isArray(value) ? value : []), option])}><Text>{selected ? '☑ ' : '☐ '}{option}</Text></Pressable>;
   })}</View>;
+  const placeholder = field.type === 'date' ? 'AAAA-MM-JJ' : field.type === 'time' ? 'HH:MM' : field.type === 'duration' ? 'HH:MM (durée)' : field.label;
   return <TextInput style={styles.input} editable={editable} value={value == null ? '' : String(value)}
-    placeholder={field.type === 'date' ? 'AAAA-MM-JJ' : field.label} keyboardType={field.type === 'number' ? 'decimal-pad' : 'default'}
+    placeholder={placeholder} keyboardType={field.type === 'number' ? 'decimal-pad' : 'default'}
     onChangeText={(text) => onChange(field.type === 'number' ? text.replace(',', '.') : text)} />;
 }
 
@@ -67,10 +68,12 @@ function FormCard({ taskId, form, canReview, onChanged }: { taskId: number; form
   return <View style={styles.card}>
     <Text style={styles.formTitle}>{form.test_type.name}</Text>
     {form.test_type.norm ? <Text style={styles.muted}>Norme : {form.test_type.norm}</Text> : null}
+    {form.test_type.description ? <Text style={styles.muted}>{form.test_type.description}</Text> : null}
     <Text style={styles.status}>État : {status}</Text>
     {form.submission?.correction_note ? <Text style={styles.correction}>Correction demandée : {form.submission.correction_note}</Text> : null}
     {form.form_fields.map((field) => <View key={field.key} style={styles.field}>
       <Text style={styles.label}>{field.label}{field.unit ? ` (${field.unit})` : ''}{field.required ? ' *' : ''}</Text>
+      {field.help ? <Text style={styles.muted}>{field.help}</Text> : null}
       {field.type === 'photo' ? <>
         {(form.submission?.photos ?? []).filter((photo) => photo.field_key === field.key).map((photo) => <View key={photo.id}>
           <Text style={styles.muted}>📷 {photo.original_name}</Text>

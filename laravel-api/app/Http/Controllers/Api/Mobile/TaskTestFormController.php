@@ -11,6 +11,8 @@ use App\Models\User;
 use App\Services\MissionTaskClosureService;
 use App\Services\TaskFormAssignmentService;
 use App\Services\DynamicTestFormService;
+use App\Services\TaskTestFormExcelGenerator;
+use App\Services\TaskTestFormWordGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +35,7 @@ class TaskTestFormController extends Controller
         return response()->json([
             'task_id' => $task->id,
             'forms' => $this->availableTypes($task)->map(fn (TestType $type) => [
-                'test_type' => $type->only(['id', 'name', 'norm']),
+                'test_type' => $type->only(['id', 'name', 'norm', 'description']),
                 'form_fields' => $forms->get($type->id)?->form_snapshot['fields'] ?? $this->dynamicForms->resolvedFields($type->form_fields ?? []),
                 'submission' => $forms->get($type->id),
             ])->values(),
@@ -127,6 +129,40 @@ class TaskTestFormController extends Controller
     {
         $this->authorizeTask($request, $photo->form->missionTask);
         return Storage::disk('local')->download($photo->path, $photo->original_name);
+    }
+
+    public function downloadWord(Request $request, MissionTask $task, TestType $testType, TaskTestFormWordGenerator $generator): \Illuminate\Http\Response
+    {
+        $this->authorizeTask($request, $task);
+        $form = $this->assignedForm($task, $testType);
+        [$content, $filename] = $generator->generate($form);
+
+        return response($content, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    public function downloadExcel(Request $request, MissionTask $task, TestType $testType, TaskTestFormExcelGenerator $generator): \Illuminate\Http\Response
+    {
+        $this->authorizeTask($request, $task);
+        $form = $this->assignedForm($task, $testType);
+        [$content, $filename] = $generator->generate($form);
+
+        return response($content, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    private function assignedForm(MissionTask $task, TestType $testType): TaskTestForm
+    {
+        $this->assertAssignedType($task, $testType);
+
+        return TaskTestForm::query()
+            ->where('mission_task_id', $task->id)
+            ->where('test_type_id', $testType->id)
+            ->firstOrFail();
     }
 
     public function deletePhoto(Request $request, TaskTestFormPhoto $photo): JsonResponse
@@ -228,6 +264,8 @@ class TaskTestFormController extends Controller
             'number', 'formula' => is_numeric($value),
             'boolean' => is_bool($value),
             'date' => is_string($value) && (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $value),
+            'time' => is_string($value) && (bool) preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $value),
+            'duration' => is_string($value) && (bool) preg_match('/^\d{1,3}:[0-5]\d$/', $value),
             'select' => is_string($value) && in_array($value, $field['options'] ?? [], true),
             'checkboxes' => is_array($value) && array_is_list($value)
                 && count($value) === count(array_unique($value))

@@ -49,6 +49,7 @@ export default function Catalog() {
   const [form, setForm] = useState({
     name: '',
     norm: '',
+    description: '',
     unit: '',
     unit_price: 0,
     context: 'terrain' as 'terrain' | 'ingenieur' | 'labo',
@@ -88,6 +89,7 @@ export default function Catalog() {
       const created = await testTypesApi.create({
         name: form.name,
         norm: form.norm || undefined,
+        description: form.description || undefined,
         unit: form.unit || undefined,
         unit_price: form.unit_price,
         context: form.context,
@@ -108,6 +110,7 @@ export default function Catalog() {
       await testTypesApi.update(editingId!, {
         name: form.name,
         norm: form.norm || undefined,
+        description: form.description || undefined,
         unit: form.unit || undefined,
         unit_price: form.unit_price,
         context: form.context,
@@ -157,7 +160,7 @@ export default function Catalog() {
     }
     setModal(null)
     setEditingId(null)
-    setForm({ name: '', norm: '', unit: '', unit_price: 0, context: 'terrain' })
+    setForm({ name: '', norm: '', description: '', unit: '', unit_price: 0, context: 'terrain' })
     setParamRows([{ name: '', unit: '', expected_type: 'numeric' }])
     setFormFields([])
     setAssignments([])
@@ -167,7 +170,7 @@ export default function Catalog() {
 
   const openCreate = () => {
     setEditingId(null)
-    setForm({ name: '', norm: '', unit: '', unit_price: 0, context: 'terrain' })
+    setForm({ name: '', norm: '', description: '', unit: '', unit_price: 0, context: 'terrain' })
     setParamRows([{ name: '', unit: '', expected_type: 'numeric' }])
     setFormFields([])
     setAssignments([])
@@ -180,6 +183,7 @@ export default function Catalog() {
     setForm({
       name: t.name,
       norm: t.norm ?? '',
+      description: t.description ?? '',
       unit: t.unit ?? '',
       unit_price: Number(t.unit_price),
       context: t.context ?? 'labo',
@@ -371,6 +375,15 @@ export default function Catalog() {
                 required
               />
             </div>
+              </div>
+              <div className="form-group">
+                <label>Description / objet de l’essai</label>
+                <textarea
+                  rows={3}
+                  placeholder="En quoi consiste cet essai, à quoi il sert…"
+                  value={form.description ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                />
               </div>
             </section>
             <details className="catalog-essai-form__section catalog-essai-form__details">

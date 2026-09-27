@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\DocumentStatusDefinitionController;
 use App\Http\Controllers\Api\DocumentStatusHistoryController;
 use App\Http\Controllers\Api\DossierController;
 use App\Http\Controllers\Api\EquipmentController;
+use App\Http\Controllers\Api\GeocodeController;
 use App\Http\Controllers\Api\LabCentreGroupController;
 use App\Http\Controllers\Api\EquipmentMaintenancePlanController;
 use App\Http\Controllers\Api\MaterielAffectationController;
@@ -117,6 +118,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('catalogue/arbre', CatalogueArbreController::class);
         Route::get('catalogue/qualification-tags', [QualificationTagController::class, 'index']);
         Route::get('catalogue/taches', [TacheController::class, 'index']);
+
+        Route::get('geocode/search', [GeocodeController::class, 'search'])->middleware('throttle:20,1');
 
         Route::get('dossiers', [DossierController::class, 'index']);
         Route::post('dossiers', [DossierController::class, 'store']);
@@ -538,6 +541,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('tasks/{task}/types/{testType}/submit', [TaskTestFormController::class, 'submit'])->whereNumber('task')->whereNumber('testType');
         Route::post('tasks/{task}/types/{testType}/review', [TaskTestFormController::class, 'review'])->whereNumber('task')->whereNumber('testType');
         Route::post('tasks/{task}/types/{testType}/photos', [TaskTestFormController::class, 'uploadPhoto'])->whereNumber('task')->whereNumber('testType');
+        Route::get('tasks/{task}/types/{testType}/report.docx', [TaskTestFormController::class, 'downloadWord'])->whereNumber('task')->whereNumber('testType');
+        Route::get('tasks/{task}/types/{testType}/report.xlsx', [TaskTestFormController::class, 'downloadExcel'])->whereNumber('task')->whereNumber('testType');
         Route::get('photos/{photo}', [TaskTestFormController::class, 'downloadPhoto'])->whereNumber('photo');
         Route::delete('photos/{photo}', [TaskTestFormController::class, 'deletePhoto'])->whereNumber('photo');
     });

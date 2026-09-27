@@ -7,6 +7,7 @@ const FIELD_TYPES: Array<{ value: TestTypeFormField['type']; label: string }> = 
   { value: 'text', label: 'Champ texte' }, { value: 'number', label: 'Champ nombre' },
   { value: 'date', label: 'Date' }, { value: 'select', label: 'Liste de choix' },
   { value: 'checkboxes', label: 'Cases à cocher' }, { value: 'boolean', label: 'Oui / non' },
+  { value: 'duration', label: 'Durée' }, { value: 'time', label: 'Heure' },
   { value: 'photo', label: 'Photo' }, { value: 'table', label: 'Tableau' },
   { value: 'formula', label: 'Case calculée' },
 ]
@@ -99,6 +100,9 @@ export default function TestFormFieldsEditor({ fields, onChange, lists }: {
         <label className="test-form-editor__required"><input type="checkbox" checked={field.required} onChange={(event) => update(index, { ...field, required: event.target.checked })} /> Obligatoire</label>
         <button type="button" className="btn btn-secondary btn-sm" onClick={() => onChange(fields.filter((_, itemIndex) => itemIndex !== index))}>Retirer</button>
       </div>
+      <label>Explication (aide affichée au technicien)
+        <input value={field.help ?? ''} placeholder="Ex. Mesurer au mètre ruban, arrondir au cm" onChange={(event) => update(index, { ...field, help: event.target.value })} />
+      </label>
       {['number', 'formula'].includes(field.type) ? <label>Unité <input value={field.unit ?? ''} onChange={(event) => update(index, { ...field, unit: event.target.value })} /></label> : null}
       {field.type === 'formula' ? <label>Formule * <input value={field.formula ?? ''} placeholder="longueur * largeur" onChange={(event) => update(index, { ...field, formula: event.target.value })} /><small>Utilisez les clés des champs numériques précédents, par exemple longueur * largeur.</small></label> : null}
       {['select', 'checkboxes'].includes(field.type) ? <Choices field={field} lists={lists} onChange={(next) => update(index, next as TestTypeFormField)} /> : null}

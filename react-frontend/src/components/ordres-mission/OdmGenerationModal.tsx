@@ -34,10 +34,10 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
       if (!groups[jalonName]) groups[jalonName] = []
       groups[jalonName].push(ligne)
     })
-    return Object.entries(groups).map(([name, lignes]) => ({
+    return Object.entries(groups).map(([name, lignes], idx) => ({
       name,
       lignes,
-      id: `jalon-${name}`,
+      id: idx, // Use index as numeric ID
     }))
   }, [allLignes])
 
@@ -94,15 +94,15 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
     setExpandedJalons(next)
   }
 
-  const updateQuantite = (jalonId: number, qty: number) => {
-    const jalon = jalons.find((j) => j.id === jalonId)
-    if (!jalon) return
+  const updateQuantite = (ligneId: number, qty: number) => {
+    const ligne = allLignes.find((l) => l.id === ligneId)
+    if (!ligne) return
 
     const next = new Map(selections)
-    if (qty > 0 && qty <= jalon.quantite_restante) {
-      next.set(jalonId, qty)
+    if (qty > 0 && qty <= ligne.quantite_restante) {
+      next.set(ligneId, qty)
     } else {
-      next.delete(jalonId)
+      next.delete(ligneId)
     }
     setSelections(next)
   }

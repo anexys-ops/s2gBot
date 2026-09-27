@@ -11912,6 +11912,29 @@ a.catalogue-tree__link-article:hover {
 .mission-task-list__table {
   width: 100%;
   min-width: 58rem;
+  table-layout: fixed;
+}
+
+/* Largeurs fixes : évite qu'une ligne d'en-tête (chantier au libellé très
+   long) ne fasse exploser la largeur de toutes les colonnes du tableau
+   (table-layout: auto dimensionne chaque colonne sur son contenu le plus
+   large, tous rows confondus). */
+.mission-task-list__table th:nth-child(1),
+.mission-task-list__table td:nth-child(1) { width: 14%; }
+.mission-task-list__table th:nth-child(2),
+.mission-task-list__table td:nth-child(2) { width: 30%; }
+.mission-task-list__table th:nth-child(3),
+.mission-task-list__table td:nth-child(3) { width: 18%; }
+.mission-task-list__table th:nth-child(4),
+.mission-task-list__table td:nth-child(4) { width: 14%; }
+.mission-task-list__table th:nth-child(5),
+.mission-task-list__table td:nth-child(5) { width: 14%; }
+.mission-task-list__table th:nth-child(6),
+.mission-task-list__table td:nth-child(6) { width: 10%; }
+
+.mission-task-list__table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mission-task-list__row {
@@ -11938,6 +11961,15 @@ a.catalogue-tree__link-article:hover {
 
 .mission-task-list__task {
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-task-list__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mission-task-list__status,

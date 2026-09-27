@@ -762,7 +762,7 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                                     {om ? <div className="text-muted mission-task-list__sub">{om.numero}</div> : null}
                                   </td>
                                   <td>
-                                    <div className="mission-task-list__task">{taskLabel(task)}</div>
+                                    <div className="mission-task-list__task" title={taskLabel(task)}>{taskLabel(task)}</div>
                                   </td>
                                   <td>{task.assignedUser?.name ?? <span className="text-muted">Non assigné</span>}</td>
                                   <td>

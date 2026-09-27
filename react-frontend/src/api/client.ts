@@ -3195,8 +3195,33 @@ export interface TaskTestFormSummary {
 
 export const taskTestFormsApi = {
   list: (taskId: number) => api<{ task_id: number; forms: TaskTestFormSummary[] }>(`/mobile/task-forms/tasks/${taskId}`),
+  save: (taskId: number, typeId: number, answers: Record<string, unknown>) =>
+    api<NonNullable<TaskTestFormSummary['submission']>>(`/mobile/task-forms/tasks/${taskId}/types/${typeId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ answers }),
+    }),
+  submit: (taskId: number, typeId: number) =>
+    api<NonNullable<TaskTestFormSummary['submission']>>(`/mobile/task-forms/tasks/${taskId}/types/${typeId}/submit`, {
+      method: 'POST',
+    }),
   review: (taskId: number, typeId: number, decision: 'validate' | 'correction', correction_note?: string) =>
     api(`/mobile/task-forms/tasks/${taskId}/types/${typeId}/review`, { method: 'POST', body: JSON.stringify({ decision, correction_note }) }),
+  async uploadPhoto(taskId: number, typeId: number, fieldKey: string, file: File): Promise<{ id: number; field_key: string; original_name: string }> {
+    const token = getToken()
+    const fd = new FormData()
+    fd.append('field_key', fieldKey)
+    fd.append('photo', file)
+    const path = `/mobile/task-forms/tasks/${taskId}/types/${typeId}/photos`
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}`, Accept: 'application/json' } : { Accept: 'application/json' },
+      body: fd,
+    })
+    if (res.status === 401) handleApiUnauthorized(path, Boolean(token))
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error((data as { message?: string }).message || `Erreur ${res.status}`)
+    return data as { id: number; field_key: string; original_name: string }
+  },
   photo: async (photoId: number): Promise<Blob> => {
     const response = await fetch(`/api/mobile/task-forms/photos/${photoId}`, {
       headers: { Authorization: `Bearer ${getToken() ?? ''}`, Accept: 'image/*' },
@@ -3665,6 +3690,7 @@ export interface TaskResult {
 export interface MissionTask {
   id: number
   test_forms_count?: number
+  test_forms_available_count?: number
   unique_number?: string
   ordre_mission_ligne_id: number
   assigned_user_id?: number | null

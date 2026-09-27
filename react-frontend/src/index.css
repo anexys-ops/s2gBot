@@ -11227,6 +11227,74 @@ a.catalogue-tree__link-article:hover {
   overflow-wrap: anywhere;
 }
 
+.task-test-form-fill {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.task-test-form-fill__correction {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.task-test-form-fill__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.85rem;
+}
+
+.task-test-form-fill__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.task-test-form-fill__field--table {
+  grid-column: 1 / -1;
+}
+
+.task-test-form-fill__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text-muted, #64748b);
+}
+
+.task-test-form-fill__req {
+  color: #ef4444;
+}
+
+.task-test-form-fill__unit,
+.task-test-form-fill__hint {
+  font-size: 0.72rem;
+}
+
+.task-test-form-fill__checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.task-test-form-fill__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+
+.task-test-form-fill__photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.3rem;
+}
+
 .terrain-mesures-section {
   margin-bottom: 1rem;
 }

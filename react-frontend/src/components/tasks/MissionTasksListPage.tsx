@@ -497,13 +497,19 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
       </>}
       {activeTab === 'essais' && <section className="card" style={{ padding: '1rem', marginTop: '1rem' }}>
         <h3>Formulaires d’essai et résultats</h3>
-        <TaskTestFormResults forms={taskForms?.forms ?? []} taskId={task.id} onOpenPhoto={(photoId) => void openFormPhoto(photoId)} renderActions={(form) =>
-          (user?.role === 'lab_admin' || user?.role === 'responsable') && user?.id !== task.assigned_user_id && form.submission?.status === 'submitted' ? <div className="crud-actions">
-            <input placeholder="Motif de correction" value={correctionNotes[form.test_type.id] ?? ''} onChange={(event) => setCorrectionNotes((current) => ({ ...current, [form.test_type.id]: event.target.value }))} />
-            <button type="button" className="btn btn-secondary btn-sm" disabled={review.isPending || !(correctionNotes[form.test_type.id] ?? '').trim()} onClick={() => review.mutate({ typeId: form.test_type.id, decision: 'correction', correctionNote: correctionNotes[form.test_type.id] })}>Demander correction</button>
-            <button type="button" className="btn btn-primary btn-sm" disabled={review.isPending} onClick={() => review.mutate({ typeId: form.test_type.id, decision: 'validate' })}>Valider le formulaire</button>
-          </div> : null
-        } />
+        <TaskTestFormResults
+          forms={taskForms?.forms ?? []}
+          taskId={task.id}
+          onOpenPhoto={(photoId) => void openFormPhoto(photoId)}
+          canFill={user?.id === task.assigned_user_id && !['validated', 'rejected'].includes(task.statut)}
+          renderActions={(form) =>
+            (user?.role === 'lab_admin' || user?.role === 'responsable') && user?.id !== task.assigned_user_id && form.submission?.status === 'submitted' ? <div className="crud-actions">
+              <input placeholder="Motif de correction" value={correctionNotes[form.test_type.id] ?? ''} onChange={(event) => setCorrectionNotes((current) => ({ ...current, [form.test_type.id]: event.target.value }))} />
+              <button type="button" className="btn btn-secondary btn-sm" disabled={review.isPending || !(correctionNotes[form.test_type.id] ?? '').trim()} onClick={() => review.mutate({ typeId: form.test_type.id, decision: 'correction', correctionNote: correctionNotes[form.test_type.id] })}>Demander correction</button>
+              <button type="button" className="btn btn-primary btn-sm" disabled={review.isPending} onClick={() => review.mutate({ typeId: form.test_type.id, decision: 'validate' })}>Valider le formulaire</button>
+            </div> : null
+          }
+        />
         {review.isError ? <p className="error">{(review.error as Error).message}</p> : null}
       </section>}
     </Modal>

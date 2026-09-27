@@ -11,6 +11,7 @@ import {
   type ActionMeasureConfig,
   type MissionTask,
 } from '../../api/client'
+import { useAuth } from '../../contexts/AuthContext'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import TaskTestFormResults from '../../components/tasks/TaskTestFormResults'
 import { taskDisplayName } from './TerrainTasksHistoryPanel'
@@ -191,10 +192,20 @@ function TaskMeasureDetail({ task, onClose }: { task: MissionTask; onClose: () =
     return existing
   })
   const [activeTab, setActiveTab] = useState<'geotechnique' | 'graphique' | 'data' | 'essais'>('geotechnique')
+  const { user } = useAuth()
   const qc = useQueryClient()
   const { data: taskForms } = useQuery({
     queryKey: ['task-test-forms', task.id],
     queryFn: () => taskTestFormsApi.list(task.id),
+  })
+  const [correctionNotes, setCorrectionNotes] = useState<Record<number, string>>({})
+  const review = useMutation({
+    mutationFn: ({ typeId, decision, correctionNote }: { typeId: number; decision: 'validate' | 'correction'; correctionNote?: string }) =>
+      taskTestFormsApi.review(task.id, typeId, decision, correctionNote),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['task-test-forms', task.id] })
+      await qc.invalidateQueries({ queryKey: ['terrain-measures'] })
+    },
   })
   const openFormPhoto = async (photoId: number) => {
     const blob = await taskTestFormsApi.photo(photoId)
@@ -398,7 +409,20 @@ function TaskMeasureDetail({ task, onClose }: { task: MissionTask; onClose: () =
       )}
 
       {activeTab === 'essais' && <section className="card" style={{ padding: '1rem' }}>
-        <TaskTestFormResults forms={taskForms?.forms ?? []} taskId={task.id} onOpenPhoto={(photoId) => void openFormPhoto(photoId)} />
+        <TaskTestFormResults
+          forms={taskForms?.forms ?? []}
+          taskId={task.id}
+          onOpenPhoto={(photoId) => void openFormPhoto(photoId)}
+          canFill={user?.id === task.assigned_user_id && !['validated', 'rejected'].includes(task.statut)}
+          renderActions={(form) =>
+            (user?.role === 'lab_admin' || user?.role === 'responsable') && user?.id !== task.assigned_user_id && form.submission?.status === 'submitted' ? <div className="crud-actions">
+              <input placeholder="Motif de correction" value={correctionNotes[form.test_type.id] ?? ''} onChange={(event) => setCorrectionNotes((current) => ({ ...current, [form.test_type.id]: event.target.value }))} />
+              <button type="button" className="btn btn-secondary btn-sm" disabled={review.isPending || !(correctionNotes[form.test_type.id] ?? '').trim()} onClick={() => review.mutate({ typeId: form.test_type.id, decision: 'correction', correctionNote: correctionNotes[form.test_type.id] })}>Demander correction</button>
+              <button type="button" className="btn btn-primary btn-sm" disabled={review.isPending} onClick={() => review.mutate({ typeId: form.test_type.id, decision: 'validate' })}>Valider le formulaire</button>
+            </div> : null
+          }
+        />
+        {review.isError ? <p className="error">{(review.error as Error).message}</p> : null}
       </section>}
 
       {editable && configs.length > 0 && (
@@ -508,7 +532,7 @@ function DossierRecapRow({
             <td>{formatDate(task.planned_date ?? task.due_date)}</td>
             <td>{task.assignedUser?.name ?? '—'}</td>
             <td>
-              {p.total > 0 ? <ProgressBar pct={p.pct} complete={p.pct === 100} /> : <span className="text-muted">{task.test_forms_count ?? 0} formulaire(s) d’essai</span>}
+              {p.total > 0 ? <ProgressBar pct={p.pct} complete={p.pct === 100} /> : <span className="text-muted">{task.test_forms_count ?? 0}/{task.test_forms_available_count ?? task.test_forms_count ?? 0} formulaire(s) d’essai</span>}
             </td>
             <td><StatutBadge statut={statut} /></td>
             <td className="terrain-mesures-table__chevron">→</td>

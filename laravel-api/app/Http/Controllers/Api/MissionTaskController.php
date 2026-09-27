@@ -575,8 +575,15 @@ class MissionTaskController extends Controller
                 $sq->whereIn('type', ['technicien', 'ingenieur']);
             })
             ->where(function ($query) {
+                // Un dossier apparaît ici s'il a des mesures géotechniques à saisir OU des
+                // formulaires d'essai assignés à son produit — qu'ils aient déjà été
+                // commencés (ligne testForms) ou non (ligne article.testTypes), pour ne
+                // pas masquer les tâches dont aucun formulaire n'a encore été ouvert.
                 $query->whereHas('ordreMissionLigne.articleAction.measureConfigs')
-                    ->orWhereHas('testForms');
+                    ->orWhereHas('testForms')
+                    ->orWhereHas('ordreMissionLigne.article.testTypes', function ($tq) {
+                        $tq->where(fn ($ctx) => $ctx->whereNull('test_types.context')->orWhereIn('test_types.context', ['terrain', 'ingenieur']));
+                    });
             })
             ->withCount('testForms')
             ->with([
@@ -587,6 +594,7 @@ class MissionTaskController extends Controller
                 'ordreMissionLigne.ordreMission.site:id,name',
                 'ordreMissionLigne.ordreMission.dossier:id,reference,titre,date_debut,date_fin_prevue',
                 'ordreMissionLigne.article:id,code,libelle,unite',
+                'ordreMissionLigne.article.testTypes:id,name,context',
                 'ordreMissionLigne.articleAction:id,type,libelle,duree_heures',
                 'ordreMissionLigne.articleAction.measureConfigs',
                 'measures.measureConfig',
@@ -624,7 +632,29 @@ class MissionTaskController extends Controller
             });
         }
 
-        return response()->json($q->orderBy('planned_date')->get());
+        $tasks = $q->orderBy('planned_date')->get();
+
+        // Nombre de types d'essai réellement assignables au produit/action de la
+        // ligne (contexte terrain/ingénieur), qu'un TaskTestForm existe déjà ou non
+        // — permet au front d'afficher "3 formulaire(s) d'essai" même si aucun
+        // n'a encore été ouvert depuis l'application mobile.
+        $tasks->each(function (MissionTask $task) {
+            $line = $task->ordreMissionLigne;
+            $context = match ($line?->ordreMission?->type) {
+                'technicien' => 'terrain',
+                'ingenieur' => 'ingenieur',
+                default => null,
+            };
+            $available = $line?->article?->testTypes->filter(function ($type) use ($line, $context) {
+                $actionMatches = $type->pivot->article_action_id === null || $type->pivot->article_action_id === $line->article_action_id;
+                $contextMatches = $type->context === null || $type->context === $context;
+
+                return $actionMatches && $contextMatches;
+            }) ?? collect();
+            $task->setAttribute('test_forms_available_count', $available->count());
+        });
+
+        return response()->json($tasks);
     }
 
     /**

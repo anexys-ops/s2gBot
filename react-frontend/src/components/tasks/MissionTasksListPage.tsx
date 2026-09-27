@@ -280,24 +280,36 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
     await queryClient.invalidateQueries({ queryKey: ['mission-tasks'] })
   }
 
+  // Un seul bouton "Enregistrer" : sauvegarde toujours les champs de suivi, et
+  // déclenche en plus automatiquement la clôture/préparation des étiquettes
+  // dès que des PV + une quantité valides sont saisis (plus besoin d'un
+  // second bouton "Clôturer et préparer les étiquettes").
   const save = useMutation({
-    mutationFn: () => missionTasksApi.update(task.id, {
-      assigned_user_id: assignedUserId ? Number(assignedUserId) : null,
-      planned_date: plannedDate || null,
-      statut,
-    }),
-    onSuccess: async () => { await refresh(); onClose() },
-  })
-
-  const closeReception = useMutation({
-    mutationFn: () => missionTasksApi.closeReception(task.id, {
-      pv_numbers: normalizePvNumbers([...pvNumbers, pvDraft]),
-      quantity_unit: quantityUnit.value,
-      quantity_count: Number(quantityCount),
-    }),
+    mutationFn: async () => {
+      await missionTasksApi.update(task.id, {
+        assigned_user_id: assignedUserId ? Number(assignedUserId) : null,
+        planned_date: plannedDate || null,
+        statut,
+      })
+      const pv = normalizePvNumbers([...pvNumbers, pvDraft])
+      if (!task.reception_generated_at && pv.length > 0 && Number(quantityCount) >= 1) {
+        const result = await missionTasksApi.closeReception(task.id, {
+          pv_numbers: pv,
+          quantity_unit: quantityUnit.value,
+          quantity_count: Number(quantityCount),
+        })
+        return { closed: true as const, samplesCreated: result.samples_created }
+      }
+      return { closed: false as const }
+    },
     onSuccess: async (result) => {
       await refresh()
-      setMessage(`${result.samples_created || task.quantity_count || 0} étiquette(s) transmise(s), en attente de réception au laboratoire.`)
+      setMessage(
+        result.closed
+          ? `${result.samplesCreated || task.quantity_count || 0} étiquette(s) transmise(s), en attente de réception au laboratoire.`
+          : 'Modifications enregistrées.',
+      )
+      window.setTimeout(onClose, 1200)
     },
   })
 
@@ -309,13 +321,22 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
     },
   })
 
-  const error = save.error || closeReception.error || duplicate.error || attachSample.error || detachSample.error
+  const error = save.error || duplicate.error || attachSample.error || detachSample.error
   const pvCount = normalizePvNumbers([...pvNumbers, pvDraft]).length
   const maxQuantity = task.reception_generated_at ? (task.quantity_count ?? 1) : (task.remaining_quantity ?? task.ordered_quantity ?? 1)
 
   return (
-    <Modal title={`${task.unique_number ?? `Tâche ${task.id}`} — ${taskLabel(task)}`} onClose={onClose} size="wide">
-      {task.jalon_context ? <p className="mission-task-modal__jalon">Jalon : {task.jalon_context.label}</p> : null}
+    <Modal title={`${task.unique_number ?? `Tâche ${task.id}`} — ${taskLabel(task)}`} onClose={onClose} size="xl">
+      {task.jalon_context || om ? (
+        <div className="mission-task-modal__topbar">
+          {task.jalon_context ? <p className="mission-task-modal__jalon">Jalon : {task.jalon_context.label}</p> : <span />}
+          {om ? (
+            <button type="button" onClick={() => navigate(`/ordres-mission/${om.id}`)}>
+              ↗ Ouvrir l'OM {om.numero}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="terrain-mesures-tabs" role="tablist" aria-label="Sections de la tâche">
         <button type="button" role="tab" aria-selected={activeTab === 'suivi'} className={`terrain-mesures-tab${activeTab === 'suivi' ? ' is-active' : ''}`} onClick={() => setActiveTab('suivi')}>Suivi de la tâche</button>
         <button type="button" role="tab" aria-selected={activeTab === 'essais'} className={`terrain-mesures-tab${activeTab === 'essais' ? ' is-active' : ''}`} onClick={() => setActiveTab('essais')}>Essais et résultats{taskForms?.forms?.length ? ` (${taskForms.forms.length})` : ''}</button>
@@ -468,11 +489,9 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
       {message ? <p className="success">{message}</p> : null}
       {error ? <p className="error">{(error as Error).message}</p> : null}
       <div className="mission-task-modal__actions">
-        {om ? <button type="button" className="btn btn--secondary" onClick={() => navigate(`/ordres-mission/${om.id}`)}>Ouvrir l’OM</button> : null}
         {(task.remaining_quantity ?? 0) > 0 && task.reception_generated_at ? <button type="button" className="btn btn--secondary" disabled={duplicate.isPending} onClick={() => duplicate.mutate()}>Ajouter une tâche sur le reliquat</button> : null}
-        <button type="button" className="btn btn--secondary" disabled={save.isPending} onClick={() => save.mutate()}>Enregistrer</button>
-        <button type="button" className="btn btn--primary" disabled={closeReception.isPending || pvCount === 0 || Number(quantityCount) < 1 || Boolean(task.reception_generated_at)} onClick={() => closeReception.mutate()}>
-          {task.reception_generated_at ? 'Réception déjà générée' : 'Clôturer et préparer les étiquettes'}
+        <button type="button" className="btn btn--primary" disabled={save.isPending} onClick={() => save.mutate()}>
+          {save.isPending ? 'Enregistrement…' : 'Enregistrer'}
         </button>
       </div>
       </>}

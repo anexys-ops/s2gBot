@@ -11966,11 +11966,35 @@ a.catalogue-tree__link-article:hover {
 }
 
 .mission-task-modal__jalon {
-  margin: 0 0 1rem;
+  margin: 0;
   padding: 0.65rem 0.8rem;
   border-left: 3px solid var(--color-primary);
   background: var(--color-surface-2);
   font-weight: 700;
+}
+
+.mission-task-modal__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.mission-task-modal__topbar button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mission-task-modal__topbar button:hover {
+  text-decoration: underline;
 }
 
 .mission-task-modal__grid {

@@ -13,6 +13,7 @@ use App\Models\OdmJalonQuantityGenerated;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
 use App\Services\ExpenseReportService;
+use App\Services\MissionTaskStatusService;
 use App\Services\OrdreMissionFromBonCommandeService;
 use App\Support\AgencyAccess;
 use Illuminate\Http\JsonResponse;
@@ -38,6 +39,7 @@ class OrdreMissionController extends Controller
 
     public function __construct(
         private readonly OrdreMissionFromBonCommandeService $generator,
+        private readonly MissionTaskStatusService $statusSync,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -328,7 +330,9 @@ class OrdreMissionController extends Controller
 
         $ligne->update($validated);
         $ligne->refresh();
-        $ligne->ensureTaskExists();
+        $task = $ligne->ensureTaskExists();
+        $this->statusSync->syncPlanningFromTask($task, $ligne);
+        $this->statusSync->syncOrdreMissionStatus($ordreMission);
 
         return response()->json($ligne->fresh()->load(['assignedUser:id,name', 'equipment:id,name,code']));
     }
@@ -361,8 +365,12 @@ class OrdreMissionController extends Controller
             abort_if(! $ligne, 404);
 
             $ligne->update(collect($row)->except('id')->all());
-            $ligne->ensureTaskExists();
+            $ligne->refresh();
+            $task = $ligne->ensureTaskExists();
+            $this->statusSync->syncPlanningFromTask($task, $ligne);
         }
+
+        $this->statusSync->syncOrdreMissionStatus($ordreMission);
 
         return response()->json(
             $ordreMission->lignes()

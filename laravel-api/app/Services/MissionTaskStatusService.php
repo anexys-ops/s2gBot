@@ -36,7 +36,7 @@ class MissionTaskStatusService
         $this->syncOrdreMissionStatus($ligne->ordreMission);
     }
 
-    private function syncPlanningFromTask(MissionTask $task, OrdreMissionLigne $ligne): void
+    public function syncPlanningFromTask(MissionTask $task, OrdreMissionLigne $ligne): void
     {
         $date = $task->planned_date?->format('Y-m-d');
 
@@ -72,7 +72,7 @@ class MissionTaskStatusService
         }
     }
 
-    private function syncOrdreMissionStatus(?OrdreMission $ordreMission): void
+    public function syncOrdreMissionStatus(?OrdreMission $ordreMission): void
     {
         if (! $ordreMission) {
             return;

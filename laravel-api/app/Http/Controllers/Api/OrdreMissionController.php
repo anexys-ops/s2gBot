@@ -256,6 +256,16 @@ class OrdreMissionController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
+        // Le soft delete ne déclenche aucune cascade DB (contrairement à un delete
+        // physique) : sans ça, les lignes/tâches/formulaires restent en base,
+        // orphelins, invisibles pour l'OM (masqué) mais toujours remontés par les
+        // requêtes qui interrogent directement mission_tasks/task_test_forms.
+        foreach ($ordreMission->lignes as $ligne) {
+            foreach ($ligne->missionTasks as $task) {
+                $task->delete();
+            }
+            $ligne->delete();
+        }
         $ordreMission->delete();
 
         return response()->json(null, 204);

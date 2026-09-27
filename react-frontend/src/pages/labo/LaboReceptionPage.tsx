@@ -265,8 +265,8 @@ export default function LaboReceptionPage() {
               <thead>
                 <tr>
                   <th>Produit / Essai</th>
-                  <th className="data-table__code">BC</th>
-                  <th className="data-table__reference">Chantier / Dossier</th>
+                  <th className="data-table__code">Dossier</th>
+                  <th className="data-table__reference">Chantier / BC</th>
                   <th>Tâche / Étiquettes</th>
                   <th>Technicien</th>
                   <th className="data-table__num">Réception</th>
@@ -291,9 +291,9 @@ export default function LaboReceptionPage() {
                         )}
                       </td>
                       <td className="data-table__code">
-                        {row.bon_commande ? (
-                          <Link to={`/bons-commande/${row.bon_commande.id}`} className="link-inline">
-                            {row.bon_commande.numero}
+                        {row.dossier ? (
+                          <Link to={`/dossiers/${row.dossier.id}`} className="link-inline">
+                            {row.dossier.reference}
                           </Link>
                         ) : (
                           <span className="text-muted">—</span>
@@ -304,10 +304,9 @@ export default function LaboReceptionPage() {
                       </td>
                       <td className="data-table__reference">
                         {row.chantier?.name ?? <span className="text-muted">—</span>}
-                        {row.dossier && (
+                        {row.bon_commande && (
                           <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                            {row.dossier.reference}
-                            {row.dossier.titre ? ` · ${row.dossier.titre}` : ''}
+                            <Link to={`/bons-commande/${row.bon_commande.id}`} className="link-inline">{row.bon_commande.numero}</Link>
                           </div>
                         )}
                       </td>

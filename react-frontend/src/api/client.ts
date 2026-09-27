@@ -3195,9 +3195,8 @@ export interface TaskTestFormSummary {
 }
 
 export interface LaboTaskTestFormRow {
-  id: number
-  status: 'draft' | 'submitted' | 'correction_requested' | 'validated'
-  submitted_at: string | null
+  id: number | string
+  status: 'not_started' | 'draft' | 'submitted' | 'correction_requested' | 'validated'
   updated_at: string
   test_type: { id: number; name: string; norm?: string | null; context?: string | null } | null
   task: { id: number; unique_number?: string | null; assigned_user?: string | null } | null

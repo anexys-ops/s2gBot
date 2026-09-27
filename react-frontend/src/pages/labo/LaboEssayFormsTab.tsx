@@ -7,6 +7,7 @@ import TaskTestFormResults from '../../components/tasks/TaskTestFormResults'
 import { formatAppDate } from '../../lib/appLocale'
 
 const STATUS_LABELS: Record<string, string> = {
+  not_started: 'Non commencé',
   draft: 'Brouillon',
   submitted: 'Soumis',
   correction_requested: 'Correction demandée',
@@ -23,7 +24,7 @@ function EssayFormDetail({ row, onClose }: { row: LaboTaskTestFormRow; onClose: 
   })
 
   const form = data?.forms.find((f) => f.test_type.id === typeId)
-  const editable = row.status === 'draft' || row.status === 'correction_requested'
+  const editable = row.status === 'draft' || row.status === 'correction_requested' || row.status === 'not_started'
 
   return <Modal title={row.test_type?.name ?? 'Essai'} onClose={onClose} size="wide">
     {isLoading ? <p className="text-muted">Chargement…</p> : !form ? (
@@ -46,12 +47,13 @@ function EssayFormDetail({ row, onClose }: { row: LaboTaskTestFormRow; onClose: 
 
 export default function LaboEssayFormsTab() {
   const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<LaboTaskTestFormRow | null>(null)
   const queryClient = useQueryClient()
 
   const { data: paginator, isLoading } = useQuery({
-    queryKey: ['labo-task-test-forms', statusFilter],
-    queryFn: () => taskTestFormsApi.listAll(statusFilter ? { status: statusFilter } : undefined),
+    queryKey: ['labo-task-test-forms', statusFilter, page],
+    queryFn: () => taskTestFormsApi.listAll({ ...(statusFilter ? { status: statusFilter } : {}), page }),
     staleTime: 15_000,
   })
 
@@ -61,12 +63,12 @@ export default function LaboEssayFormsTab() {
     <div className="card" style={{ padding: '0.75rem 1rem', marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
       <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', fontSize: '0.85rem' }}>
         Statut
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}>
           <option value="">— Tous statuts —</option>
           {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
       </label>
-      <span className="text-muted">{rows.length} formulaire{rows.length > 1 ? 's' : ''}</span>
+      <span className="text-muted">{paginator?.total ?? 0} formulaire{(paginator?.total ?? 0) > 1 ? 's' : ''}</span>
     </div>
 
     {isLoading ? <p className="text-muted">Chargement…</p> : null}
@@ -90,6 +92,12 @@ export default function LaboEssayFormsTab() {
           </tr>)}
         </tbody>
       </table>
+    </div> : null}
+
+    {paginator && paginator.last_page > 1 ? <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.75rem' }}>
+      <button type="button" className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← Précédent</button>
+      <span className="text-muted">Page {paginator.current_page} / {paginator.last_page}</span>
+      <button type="button" className="btn btn-secondary btn-sm" disabled={page >= paginator.last_page} onClick={() => setPage((p) => p + 1)}>Suivant →</button>
     </div> : null}
 
     {selected ? <EssayFormDetail row={selected} onClose={() => { setSelected(null); void queryClient.invalidateQueries({ queryKey: ['labo-task-test-forms'] }) }} /> : null}

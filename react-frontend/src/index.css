@@ -11690,6 +11690,42 @@ a.catalogue-tree__link-article:hover {
   font-size: 0.82rem;
 }
 
+.om-lignes-table__statut-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.om-lignes-table__row--planifie > td,
+.om-lignes-table__row--replanifie > td {
+  background: color-mix(in srgb, var(--ds-color-info, #2b6cb0) 8%, white);
+}
+
+.om-lignes-table__row--en_cours > td {
+  background: color-mix(in srgb, var(--ds-color-warning, #b7791f) 9%, white);
+}
+
+.om-lignes-table__row--attente_validation > td {
+  background: color-mix(in srgb, var(--ds-color-warning, #b7791f) 6%, white);
+}
+
+.om-lignes-table__row--cloture > td,
+.om-lignes-table__row--realise > td {
+  background: color-mix(in srgb, var(--ds-color-success, #2f855a) 8%, white);
+}
+
+.om-lignes-table__row--freeze > td,
+.om-lignes-table__row--annule > td {
+  background: #eef0f2;
+  color: #6b7686;
+}
+
+.om-lignes-table__row--freeze .om-lignes-table__actions .btn,
+.om-lignes-table__row--annule .om-lignes-table__actions .btn {
+  opacity: 0.75;
+}
+
 .om-jalon-bulk {
   display: flex;
   align-items: flex-end;

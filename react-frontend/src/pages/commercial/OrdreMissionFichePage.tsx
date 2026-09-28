@@ -17,7 +17,7 @@ import OmAvailabilityPanel from '../../components/ordres-mission/OmAvailabilityP
 import { TaskEditModal } from '../../components/tasks/MissionTasksListPage'
 import SaveButton from '../../components/ds/SaveButton'
 import SearchableSelect from '../../components/ds/SearchableSelect'
-import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
+import StatusBadge, { ligneStatutBadgeProps, ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import CentreGroupField from '../../components/centres/CentreGroupField'
 import { useAuth } from '../../contexts/AuthContext'
@@ -744,7 +744,13 @@ export default function OrdreMissionFichePage() {
                     const quantityValid = draft.quantite !== '' && Number.isFinite(quantityValue) && quantityValue > 0
                     const isSavingThisLine = saveLigneMut.isPending && saveLigneMut.variables?.ligne.id === ligne.id
                     return (
-                      <tr key={ligne.id} className={group.jalon ? 'om-lignes-table__task--nested' : undefined}>
+                      <tr
+                        key={ligne.id}
+                        className={[
+                          group.jalon ? 'om-lignes-table__task--nested' : null,
+                          `om-lignes-table__row--${ligne.statut}`,
+                        ].filter(Boolean).join(' ')}
+                      >
                         <td>
                           {isLab ? (
                             <input
@@ -841,20 +847,30 @@ export default function OrdreMissionFichePage() {
                           />
                         </td>
                         <td>
-                          <select
-                            value={draft.statut}
-                            onChange={(e) =>
-                              updateLigneDraft(ligne.id, {
-                                statut: e.target.value as LigneDraft['statut'],
-                              })
-                            }
-                            disabled={saveMut.isPending || isSavingThisLine}
-                            style={{ fontSize: '0.82rem' }}
-                          >
-                            {STATUTS_LIGNE.map((status) => (
-                              <option key={status.value} value={status.value}>{status.label}</option>
-                            ))}
-                          </select>
+                          <div className="om-lignes-table__statut-cell">
+                            {(() => {
+                              const badge = ligneStatutBadgeProps(ligne.statut)
+                              return (
+                                <StatusBadge variant={badge.variant} size="sm">
+                                  {badge.label}
+                                </StatusBadge>
+                              )
+                            })()}
+                            <select
+                              value={draft.statut}
+                              onChange={(e) =>
+                                updateLigneDraft(ligne.id, {
+                                  statut: e.target.value as LigneDraft['statut'],
+                                })
+                              }
+                              disabled={saveMut.isPending || isSavingThisLine}
+                              style={{ fontSize: '0.82rem' }}
+                            >
+                              {STATUTS_LIGNE.map((status) => (
+                                <option key={status.value} value={status.value}>{status.label}</option>
+                              ))}
+                            </select>
+                          </div>
                         </td>
                         <td style={{ fontSize: '0.8rem' }}>
                           {ligne.missionTasks?.[0] ? (

@@ -23,7 +23,19 @@ function taskDocumentText(event: PlanningEvent): string {
   const line = event.mission_task?.ordre_mission_ligne
   const om = line?.ordre_mission
   const bc = event.bon_commande_ligne?.bon_commande
-  return [om?.numero, line?.libelle, bc?.numero, event.bon_commande_ligne?.libelle].filter(Boolean).join(' ')
+  return [event.mission_task?.unique_number, om?.numero, line?.libelle, bc?.numero, event.bon_commande_ligne?.libelle].filter(Boolean).join(' ')
+}
+
+function eventClient(event: PlanningEvent): string {
+  const om = event.mission_task?.ordre_mission_ligne?.ordre_mission
+  const dossier = event.bon_commande_ligne?.bon_commande?.dossier
+  return om?.client?.name ?? dossier?.client?.name ?? '—'
+}
+
+function eventChantier(event: PlanningEvent): string {
+  const om = event.mission_task?.ordre_mission_ligne?.ordre_mission
+  const dossier = event.bon_commande_ligne?.bon_commande?.dossier
+  return om?.site?.name ?? dossier?.site?.name ?? '—'
 }
 
 export default function PlanningGlobalPage() {
@@ -33,8 +45,6 @@ export default function PlanningGlobalPage() {
   const [customTo, setCustomTo] = useState(week.to)
   const [statusFilter, setStatusFilter] = useState<PlanningStatus | ''>('')
   const [userFilter, setUserFilter] = useState('')
-  const [equipmentFilter, setEquipmentFilter] = useState('')
-  const [eventFilter, setEventFilter] = useState('')
   const [dateFilter, setDateFilter] = useState('')
   const [taskFilter, setTaskFilter] = useState('')
   const [notesFilter, setNotesFilter] = useState('')
@@ -52,8 +62,6 @@ export default function PlanningGlobalPage() {
 
   const events = useMemo(() => overview?.events ?? [], [overview?.events])
   const users = useMemo(() => [...new Map(events.filter((e) => e.user).map((e) => [e.user!.id, e.user!.name])).entries()].sort((a, b) => a[1].localeCompare(b[1])), [events])
-  const equipments = useMemo(() => [...new Map(events.filter((e) => e.equipment).map((e) => [e.equipment!.id, e.equipment!.name])).entries()].sort((a, b) => a[1].localeCompare(b[1])), [events])
-  const types = useMemo(() => [...new Set(events.map((e) => e.type_evenement))].sort(), [events])
   const statusCounts = useMemo(() => events.reduce((counts, event) => {
     const status = eventStatus(event)
     counts[status] = (counts[status] ?? 0) + 1
@@ -62,17 +70,15 @@ export default function PlanningGlobalPage() {
   const filtered = useMemo(() => events.filter((event) =>
     (!statusFilter || eventStatus(event) === statusFilter)
     && (!userFilter || event.user_id === Number(userFilter))
-    && (!equipmentFilter || event.equipment_id === Number(equipmentFilter))
-    && (!eventFilter || event.type_evenement === eventFilter)
     && (!dateFilter || (dateInputFromApi(event.date_debut) <= dateFilter && dateInputFromApi(event.date_fin) >= dateFilter))
     && matchesText(taskDocumentText(event), taskFilter)
     && matchesText(event.notes, notesFilter)
-  ), [events, statusFilter, userFilter, equipmentFilter, eventFilter, dateFilter, taskFilter, notesFilter])
+  ), [events, statusFilter, userFilter, dateFilter, taskFilter, notesFilter])
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
   const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
-  useEffect(() => setPage(1), [from, to, statusFilter, userFilter, equipmentFilter, eventFilter, dateFilter, taskFilter, notesFilter])
+  useEffect(() => setPage(1), [from, to, statusFilter, userFilter, dateFilter, taskFilter, notesFilter])
 
   function changeWeek(amount: number) {
     const monday = new Date(`${week.from}T12:00:00`)
@@ -122,36 +128,28 @@ export default function PlanningGlobalPage() {
         <div className="card table-wrap planning-global__table">
           <table className="data-table data-table--compact">
             <thead>
-              <tr><th>Période</th><th>Utilisateur</th><th>Matériel</th><th>Événement</th><th>Statut</th><th>Tâche / document</th><th>Notes</th></tr>
+              <tr><th>N° tâche</th><th>Client</th><th>Chantier</th><th>Utilisateur</th><th>Date début</th><th>Statut</th><th>Notes</th></tr>
               <tr className="planning-global__filter-row">
-                <th><input type="date" aria-label="Filtrer par date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} /></th>
+                <th><input type="search" aria-label="Rechercher une tâche" placeholder="Rechercher…" value={taskFilter} onChange={(e) => setTaskFilter(e.target.value)} /></th>
+                <th />
+                <th />
                 <th><select aria-label="Filtrer par utilisateur" value={userFilter} onChange={(e) => setUserFilter(e.target.value)}><option value="">Tous</option>{users.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></th>
-                <th><select aria-label="Filtrer par matériel" value={equipmentFilter} onChange={(e) => setEquipmentFilter(e.target.value)}><option value="">Tout</option>{equipments.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></th>
-                <th><select aria-label="Filtrer par événement" value={eventFilter} onChange={(e) => setEventFilter(e.target.value)}><option value="">Tous</option>{types.map((type) => <option key={type} value={type}>{eventLabel(type)}</option>)}</select></th>
+                <th><input type="date" aria-label="Filtrer par date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} /></th>
                 <th><select aria-label="Filtrer par statut" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as PlanningStatus | '')}><option value="">Tous</option>{(Object.keys(statusLabels) as PlanningStatus[]).map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select></th>
-                <th><input type="search" aria-label="Rechercher une tâche ou un document" placeholder="Rechercher…" value={taskFilter} onChange={(e) => setTaskFilter(e.target.value)} /></th>
                 <th><input type="search" aria-label="Rechercher dans les notes" placeholder="Rechercher…" value={notesFilter} onChange={(e) => setNotesFilter(e.target.value)} /></th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? <tr><td colSpan={7} className="text-muted">Aucun événement pour cette période et ces filtres.</td></tr> : null}
-              {visible.map((event) => {
-                const line = event.mission_task?.ordre_mission_ligne
-                const om = line?.ordre_mission
-                const bc = event.bon_commande_ligne?.bon_commande
-                return <tr key={event.id}>
-                  <td>{dateInputFromApi(event.date_debut)} → {dateInputFromApi(event.date_fin)}</td>
+              {visible.map((event, index) => {
+                const task = event.mission_task
+                return <tr key={event.id} className={index % 2 === 1 ? 'planning-global__row--alt' : undefined}>
+                  <td>{task ? <Link to={`/terrain/taches?task=${task.id}`}>{task.unique_number ?? `Tâche ${task.id}`}</Link> : <span className="text-muted">{eventLabel(event.type_evenement)}</span>}</td>
+                  <td>{eventClient(event)}</td>
+                  <td>{eventChantier(event)}</td>
                   <td>{event.user?.name ?? '—'}</td>
-                  <td>{event.equipment ? <Link to={`/materiel/equipements/${event.equipment.id}`}>{event.equipment.code ? `${event.equipment.code} — ` : ''}{event.equipment.name}</Link> : '—'}</td>
-                  <td>{eventLabel(event.type_evenement)}</td>
+                  <td>{dateInputFromApi(event.date_debut)}</td>
                   <td>{statusLabels[eventStatus(event)]}</td>
-                  <td>
-                    {om ? <><Link to={`/ordres-mission/${om.id}`}>{om.numero}</Link> — {line?.libelle}</> : null}
-                    {!om && bc ? <><Link to={`/bons-commande/${bc.id}`}>{bc.numero}</Link> — {event.bon_commande_ligne?.libelle}</> : null}
-                    {!om && !bc && event.ordre_mission_id ? <Link to={`/ordres-mission/${event.ordre_mission_id}`}>Voir l’OM</Link> : null}
-                    {!om && !bc && !event.ordre_mission_id && event.dossier_id ? <Link to={`/dossiers/${event.dossier_id}`}>Voir le dossier</Link> : null}
-                    {!om && !bc && !event.ordre_mission_id && !event.dossier_id ? '—' : null}
-                  </td>
                   <td>{event.notes ?? '—'}</td>
                 </tr>
               })}

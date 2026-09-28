@@ -54,6 +54,7 @@ class TerrainPlanningMissionTasksService
                 'ordreMissionLigne.ordreMission.client',
                 'ordreMissionLigne.ordreMission.dossier',
                 'ordreMissionLigne.ordreMission.site',
+                'samples:id,fold_number',
             ])
             ->where('statut', '!=', MissionTask::STATUT_REJECTED)
             ->whereHas('ordreMissionLigne.ordreMission', fn (Builder $q) => $q

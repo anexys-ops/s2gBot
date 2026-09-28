@@ -600,6 +600,8 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
     return searchable.includes(query)
   }), [tasks, statusFilter, clientFilter, technicianFilter, dateFrom, dateTo, search])
   const grouped = useMemo(() => groupTasksByDossierJalonProduit(displayed), [displayed])
+  const isLabo = context === 'labo'
+  const columnCount = isLabo ? 7 : 6
 
   return (
     <ModuleEntityShell
@@ -648,12 +650,14 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
         <label className="mission-task-list__search-field">Recherche
           <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tâche, dossier, client, chantier, jalon…" />
         </label>
-        <label>Client
-          <select value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
-            <option value="">Tous les clients</option>
-            {clients.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
-        </label>
+        {!isLabo ? (
+          <label>Client
+            <select value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
+              <option value="">Tous les clients</option>
+              {clients.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+          </label>
+        ) : null}
         <label>Technicien
           <select value={technicianFilter} onChange={(event) => setTechnicianFilter(event.target.value)}>
             <option value="">Tous les techniciens</option>
@@ -677,6 +681,7 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
               <thead>
                 <tr>
                   <th>N° tâche</th>
+                  {isLabo ? <th>N° FOLD / PV</th> : null}
                   <th>Tâche</th>
                   <th>Technicien assigné</th>
                   <th>Statut</th>
@@ -686,13 +691,13 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
               </thead>
               <tbody>
                 {displayed.length === 0 ? (
-                  <tr><td colSpan={6} className="text-muted">Aucune tâche pour ce filtre.</td></tr>
+                  <tr><td colSpan={columnCount} className="text-muted">Aucune tâche pour ce filtre.</td></tr>
                 ) : null}
                 {grouped.flatMap((dossier) => {
                   const dossierOpen = !closedDossiers.has(dossier.key)
                   return [
                     <tr key={dossier.key} className="mission-task-list__dossier-row">
-                      <th colSpan={6} scope="rowgroup">
+                      <th colSpan={columnCount} scope="rowgroup">
                         <div className="mission-task-list__group-row-inner">
                           <button
                             type="button"
@@ -704,8 +709,8 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                             {dossierOpen ? '▾' : '▸'}
                           </button>
                           <span className="mission-task-list__dossier-title">{dossier.reference}</span>
-                          <span className="mission-task-list__dossier-client" title={dossier.client}>{dossier.client}</span>
-                          <span className="mission-task-list__dossier-site" title={dossier.site}>{dossier.site}</span>
+                          {!isLabo ? <span className="mission-task-list__dossier-client" title={dossier.client}>{dossier.client}</span> : null}
+                          {!isLabo ? <span className="mission-task-list__dossier-site" title={dossier.site}>{dossier.site}</span> : null}
                           <strong className="mission-task-list__dossier-count">{dossier.count} tâche{dossier.count > 1 ? 's' : ''}</strong>
                         </div>
                       </th>
@@ -715,7 +720,7 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                       const jalonOpen = openedGroups.has(jalonGroupKey)
                       return [
                         <tr key={jalonGroupKey} className="mission-task-list__jalon-row">
-                          <th colSpan={6} scope="rowgroup">
+                          <th colSpan={columnCount} scope="rowgroup">
                             <div className="mission-task-list__group-row-inner">
                               <button
                                 type="button"
@@ -736,7 +741,7 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                           const produitOpen = openedGroups.has(produitGroupKey)
                           return [
                             <tr key={produitGroupKey} className="mission-task-list__produit-row">
-                              <th colSpan={6} scope="rowgroup">
+                              <th colSpan={columnCount} scope="rowgroup">
                                 <div className="mission-task-list__group-row-inner">
                                   <button
                                     type="button"
@@ -775,6 +780,12 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                                     <strong>{task.unique_number ?? `TSK-${task.id}`}</strong>
                                     {om ? <div className="text-muted mission-task-list__sub">{om.numero}</div> : null}
                                   </td>
+                                  {isLabo ? (
+                                    <td>
+                                      <div>{task.samples?.length ? task.samples.map((s) => s.fold_number).filter(Boolean).join(', ') : <span className="text-muted">—</span>}</div>
+                                      <div className="text-muted mission-task-list__sub">{task.pv_numbers?.length ? task.pv_numbers.join(', ') : '—'}</div>
+                                    </td>
+                                  ) : null}
                                   <td>
                                     <div className="mission-task-list__task" title={taskLabel(task)}>{taskLabel(task)}</div>
                                   </td>

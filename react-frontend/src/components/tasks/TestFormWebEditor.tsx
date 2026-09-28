@@ -62,6 +62,18 @@ export default function TestFormWebEditor({ taskId, typeId, fields, initialAnswe
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState<'docx' | 'xlsx' | null>(null)
+
+  const downloadReport = async (format: 'docx' | 'xlsx') => {
+    setDownloading(format)
+    try {
+      await taskTestFormsApi.downloadReport(taskId, typeId, format)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setDownloading(null)
+    }
+  }
 
   const setValue = (key: string, value: unknown) => setAnswers((current) => ({ ...current, [key]: value }))
 
@@ -120,6 +132,12 @@ export default function TestFormWebEditor({ taskId, typeId, fields, initialAnswe
         await taskTestFormsApi.save(taskId, typeId, answers)
         await taskTestFormsApi.submit(taskId, typeId)
       }, 'Formulaire soumis pour validation.')}>Soumettre</button>
+      <button type="button" className="btn btn-secondary" disabled={downloading === 'docx'} onClick={() => void downloadReport('docx')}>
+        {downloading === 'docx' ? 'Génération…' : '📄 Imprimer (Word)'}
+      </button>
+      <button type="button" className="btn btn-secondary" disabled={downloading === 'xlsx'} onClick={() => void downloadReport('xlsx')}>
+        {downloading === 'xlsx' ? 'Génération…' : '📊 Imprimer (Excel)'}
+      </button>
     </div> : null}
   </div>
 }

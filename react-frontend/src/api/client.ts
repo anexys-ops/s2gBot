@@ -4002,8 +4002,31 @@ export interface PlanningEvent {
   is_validated?: boolean
   user?: { id: number; name: string } | null
   equipment?: { id: number; name: string; code?: string } | null
-  mission_task?: { id: number; statut?: 'todo' | 'in_progress' | 'paused' | 'frozen' | 'rescheduled' | 'done' | 'validated' | 'rejected'; ordre_mission_ligne?: { id: number; libelle: string; ordre_mission?: { id: number; numero: string; bon_commande_id: number | null } | null } | null } | null
-  bon_commande_ligne?: { id: number; libelle: string; bon_commande?: { id: number; numero: string } | null } | null
+  mission_task?: {
+    id: number
+    unique_number?: string | null
+    statut?: 'todo' | 'in_progress' | 'paused' | 'frozen' | 'rescheduled' | 'done' | 'validated' | 'rejected'
+    ordre_mission_ligne?: {
+      id: number
+      libelle: string
+      ordre_mission?: {
+        id: number
+        numero: string
+        bon_commande_id: number | null
+        client?: { id: number; name: string } | null
+        site?: { id: number; name: string } | null
+      } | null
+    } | null
+  } | null
+  bon_commande_ligne?: {
+    id: number
+    libelle: string
+    bon_commande?: {
+      id: number
+      numero: string
+      dossier?: { id: number; reference: string; client?: { id: number; name: string } | null; site?: { id: number; name: string } | null } | null
+    } | null
+  } | null
 }
 
 export const planningApi = {

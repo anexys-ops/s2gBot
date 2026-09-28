@@ -499,6 +499,7 @@ class MissionTaskController extends Controller
                 'ordreMissionLigne.articleAction.measureConfigs',
                 'measures.measureConfig',
                 'result',
+                'samples:id,fold_number',
             ]);
 
         if ($uid = $request->integer('user_id')) {

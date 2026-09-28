@@ -303,7 +303,11 @@ export default function LaboReceptionPage() {
                         )}
                       </td>
                       <td className="data-table__reference">
-                        {row.chantier?.name ?? <span className="text-muted">—</span>}
+                        {row.chantier?.name ? (
+                          <span title={row.chantier.name}>
+                            {row.chantier.name.length > 32 ? `${row.chantier.name.slice(0, 32)}…` : row.chantier.name}
+                          </span>
+                        ) : <span className="text-muted">—</span>}
                         {row.bon_commande && (
                           <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
                             <Link to={`/bons-commande/${row.bon_commande.id}`} className="link-inline">{row.bon_commande.numero}</Link>

@@ -57,6 +57,8 @@ class TaskTestFormController extends Controller
             ->leftJoin('task_test_forms as ttf', function ($join) {
                 $join->on('ttf.mission_task_id', '=', 'mt.id')->on('ttf.test_type_id', '=', 'att.test_type_id');
             })
+            ->leftJoin('mission_task_samples as mts', 'mts.mission_task_id', '=', 'mt.id')
+            ->leftJoin('samples as smp', 'smp.id', '=', 'mts.sample_id')
             ->whereNull('mt.deleted_at')
             ->whereNull('om.deleted_at')
             ->whereNull('ra.deleted_at')
@@ -70,8 +72,9 @@ class TaskTestFormController extends Controller
             ->when(($data['status'] ?? null) === 'not_started', fn ($q) => $q->whereNull('ttf.id'))
             ->when(in_array($data['status'] ?? null, ['draft', 'submitted', 'correction_requested', 'validated'], true),
                 fn ($q) => $q->where('ttf.status', $data['status']))
-            ->selectRaw('mt.id as task_id, att.test_type_id, ttf.id as form_id, ttf.status as form_status, COALESCE(ttf.updated_at, mt.updated_at) as sort_date')
-            ->distinct()
+            ->selectRaw('mt.id as task_id, att.test_type_id, ttf.id as form_id, ttf.status as form_status, COALESCE(ttf.updated_at, mt.updated_at) as sort_date, MIN(smp.fold_number) as sort_fold')
+            ->groupBy('mt.id', 'att.test_type_id', 'ttf.id', 'ttf.status', 'ttf.updated_at', 'mt.updated_at')
+            ->orderByRaw('sort_fold IS NULL, sort_fold ASC')
             ->orderByDesc('sort_date');
 
         $page = $data['page'] ?? 1;

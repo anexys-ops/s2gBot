@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { taskTestFormsApi, type LaboTaskTestFormRow } from '../../api/client'
 import Modal from '../../components/Modal'
 import TestFormWebEditor from '../../components/tasks/TestFormWebEditor'
 import TaskTestFormResults from '../../components/tasks/TaskTestFormResults'
+import { useAuth } from '../../contexts/AuthContext'
 import { formatAppDate } from '../../lib/appLocale'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -15,16 +16,25 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 function EssayFormDetail({ row, onClose }: { row: LaboTaskTestFormRow; onClose: () => void }) {
+  const { user } = useAuth()
   const taskId = row.task?.id
   const typeId = row.test_type?.id
+  const [correctionNote, setCorrectionNote] = useState('')
   const { data, refetch, isLoading } = useQuery({
     queryKey: ['task-test-forms', taskId],
     queryFn: () => taskTestFormsApi.list(taskId!),
     enabled: !!taskId,
   })
 
+  const review = useMutation({
+    mutationFn: ({ decision, note }: { decision: 'validate' | 'correction'; note?: string }) =>
+      taskTestFormsApi.review(taskId!, typeId!, decision, note),
+    onSuccess: () => void refetch(),
+  })
+
   const form = data?.forms.find((f) => f.test_type.id === typeId)
   const editable = row.status === 'draft' || row.status === 'correction_requested' || row.status === 'not_started'
+  const canReview = (user?.role === 'lab_admin' || user?.role === 'responsable') && row.status === 'submitted'
 
   return <Modal title={row.test_type?.name ?? 'Essai'} onClose={onClose} size="xl">
     {isLoading ? <p className="text-muted">Chargement…</p> : !form ? (
@@ -40,7 +50,29 @@ function EssayFormDetail({ row, onClose }: { row: LaboTaskTestFormRow; onClose: 
         onChanged={() => void refetch()}
       />
     ) : (
-      <TaskTestFormResults forms={[form]} taskId={taskId} />
+      <>
+        <TaskTestFormResults forms={[form]} taskId={taskId} />
+        {canReview ? <div className="crud-actions" style={{ marginTop: '0.75rem' }}>
+          <input
+            placeholder="Motif de correction"
+            value={correctionNote}
+            onChange={(e) => setCorrectionNote(e.target.value)}
+            style={{ minWidth: 220 }}
+          />
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={review.isPending || !correctionNote.trim()}
+            onClick={() => review.mutate({ decision: 'correction', note: correctionNote })}
+          >
+            Demander correction
+          </button>
+          <button type="button" className="btn btn-primary btn-sm" disabled={review.isPending} onClick={() => review.mutate({ decision: 'validate' })}>
+            Valider le formulaire
+          </button>
+        </div> : null}
+        {review.isError ? <p className="error">{(review.error as Error).message}</p> : null}
+      </>
     )}
   </Modal>
 }

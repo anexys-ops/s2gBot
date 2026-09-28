@@ -701,6 +701,7 @@ export default function OrdreMissionFichePage() {
                 <th>Équipement</th>
                 <th>Date prévue</th>
                 <th>Statut</th>
+                <th>FOLD / PV</th>
                 {isLab ? <th className="data-table__actions">Actions</th> : null}
               </tr>
             </thead>
@@ -709,7 +710,7 @@ export default function OrdreMissionFichePage() {
                 <Fragment key={group.key}>
                   {group.jalon ? (
                     <tr className="om-lignes-table__jalon">
-                      <td colSpan={isLab ? 8 : 7}>
+                      <td colSpan={isLab ? 9 : 8}>
                         <div className="om-lignes-table__jalon-content">
                           <div className="om-lignes-table__jalon-title">
                             <span className="om-lignes-table__jalon-code">{group.jalon.code}</span>
@@ -854,6 +855,24 @@ export default function OrdreMissionFichePage() {
                               <option key={status.value} value={status.value}>{status.label}</option>
                             ))}
                           </select>
+                        </td>
+                        <td style={{ fontSize: '0.8rem' }}>
+                          {ligne.missionTasks?.[0] ? (
+                            <>
+                              <div>
+                                <strong>FOLD :</strong>{' '}
+                                {ligne.missionTasks[0].samples?.length
+                                  ? ligne.missionTasks[0].samples.map((s) => s.fold_number).filter(Boolean).join(', ')
+                                  : '—'}
+                              </div>
+                              <div>
+                                <strong>PV :</strong>{' '}
+                                {ligne.missionTasks[0].pv_numbers?.length
+                                  ? ligne.missionTasks[0].pv_numbers.join(', ')
+                                  : '—'}
+                              </div>
+                            </>
+                          ) : '—'}
                         </td>
                         {isLab ? (
                           <td className="data-table__actions">

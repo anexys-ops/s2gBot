@@ -33,7 +33,7 @@ class BonCommandeController extends Controller
     public function index(Request $request): JsonResponse
     {
         $unassignedPlanning = $request->boolean('planning_unassigned');
-        $relations = ['dossier', 'client', 'clientContact', 'quote'];
+        $relations = ['dossier.site:id,name', 'client', 'clientContact', 'quote'];
         $relations['lignes'] = $unassignedPlanning
             ? fn ($query) => $query->whereDoesntHave('planningAffectations')->orderBy('ordre')->orderBy('id')
             : fn ($query) => $query->orderBy('ordre')->orderBy('id');
@@ -68,6 +68,7 @@ class BonCommandeController extends Controller
                         $dq->where('reference', 'like', $like)
                             ->orWhere('titre', 'like', $like);
                     })
+                    ->orWhereHas('dossier.site', fn ($sq) => $sq->where('name', 'like', $like))
                     ->orWhereHas('quote', fn ($qq) => $qq->where('number', 'like', $like));
             });
         }

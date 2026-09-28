@@ -13,6 +13,7 @@ import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/S
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import StatusChangeModal from '../../components/StatusChangeModal'
 import OdmGenerationModal from '../../components/ordres-mission/OdmGenerationModal'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useAuth } from '../../contexts/AuthContext'
 import { ordreMissionBonCommande, ordreMissionDossier, ordreMissionDossierId } from '../../lib/ordreMissionDisplay'
 import { formatAppDate } from '../../lib/appLocale'
@@ -75,6 +76,8 @@ export default function OrdresMissionPage() {
   const [statutFilter, setStatutFilter] = useState('')
   const [showGenerationModal, setShowGenerationModal] = useState(false)
   const [selectedBcForGeneration, setSelectedBcForGeneration] = useState<number | null>(null)
+  const [bcSearch, setBcSearch] = useState('')
+  const debouncedBcSearch = useDebouncedValue(bcSearch, 300)
 
   useEffect(() => {
     setTypeFilter(typeFromUrl)
@@ -104,11 +107,12 @@ export default function OrdresMissionPage() {
   })
 
   const { data: bonsCommande = [] } = useQuery({
-    queryKey: ['bons-commande', 'for-om'],
+    queryKey: ['bons-commande', 'for-om', debouncedBcSearch],
     queryFn: async () => {
+      const search = debouncedBcSearch.trim() || undefined
       const [confirmes, enCours] = await Promise.all([
-        bonsCommandeApi.list({ statut: 'confirme' }),
-        bonsCommandeApi.list({ statut: 'en_cours' }),
+        bonsCommandeApi.list({ statut: 'confirme', search }),
+        bonsCommandeApi.list({ statut: 'en_cours', search }),
       ])
       const byId = new Map<number, (typeof confirmes)[number]>()
       for (const bc of [...confirmes, ...enCours]) {
@@ -209,6 +213,7 @@ export default function OrdresMissionPage() {
           onClick={() => {
             setShowGenerationModal(false)
             setSelectedBcForGeneration(null)
+            setBcSearch('')
           }}
         >
           <div
@@ -228,10 +233,27 @@ export default function OrdresMissionPage() {
             <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
               Choisissez un bon de commande pour générer les ordres de mission.
             </p>
+            <label style={{ display: 'block', marginBottom: '0.75rem' }}>
+              <input
+                type="search"
+                placeholder="Rechercher par dossier, chantier, client ou n° de BC…"
+                value={bcSearch}
+                onChange={(e) => setBcSearch(e.target.value)}
+                autoFocus
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: 6,
+                  border: '1px solid #d1d5db',
+                  fontSize: '0.95rem',
+                }}
+              />
+            </label>
             <label style={{ display: 'block', marginBottom: '1rem' }}>
               <select
                 value={selectedBcForGeneration ?? ''}
                 onChange={(e) => setSelectedBcForGeneration(e.target.value ? Number(e.target.value) : null)}
+                size={Math.min(8, Math.max(4, bonsCommande.length))}
                 style={{
                   width: '100%',
                   padding: '0.75rem',
@@ -240,10 +262,12 @@ export default function OrdresMissionPage() {
                   fontSize: '0.95rem',
                 }}
               >
-                <option value="">— Choisir un BC —</option>
+                {bonsCommande.length === 0 ? <option value="" disabled>Aucun bon de commande trouvé</option> : null}
                 {bonsCommande.map((bc) => (
                   <option key={bc.id} value={bc.id}>
                     {bc.numero} — {bc.client?.name ?? `Client #${bc.client_id}`}
+                    {bc.dossier?.reference ? ` — ${bc.dossier.reference}` : ''}
+                    {bc.dossier?.site?.name ? ` — ${bc.dossier.site.name}` : ''}
                   </option>
                 ))}
               </select>
@@ -262,6 +286,7 @@ export default function OrdresMissionPage() {
                 onClick={() => {
                   setShowGenerationModal(false)
                   setSelectedBcForGeneration(null)
+                  setBcSearch('')
                 }}
               >
                 Annuler
@@ -278,6 +303,7 @@ export default function OrdresMissionPage() {
           onClose={() => {
             setShowGenerationModal(false)
             setSelectedBcForGeneration(null)
+            setBcSearch('')
           }}
           onSuccess={() => {
             void qc.invalidateQueries({ queryKey: ['ordres-mission'] })

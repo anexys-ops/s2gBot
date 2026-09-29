@@ -256,8 +256,10 @@ class MobileTerrainApiTest extends TestCase
         $this->actingAs($user, 'sanctum')->getJson('/api/mobile/task-forms/tasks/'.$task->id)
             ->assertOk()->assertJsonCount(1, 'forms')->assertJsonPath('forms.0.test_type.id', $type->id);
         $this->putJson('/api/mission-tasks/'.$task->id, ['statut' => 'validated'])->assertUnprocessable();
-        $this->postJson('/api/mission-tasks/'.$task->id.'/validate', ['is_conform' => true])->assertUnprocessable();
-        $this->putJson($url, ['answers' => ['valeur' => 12.5]])->assertOk()->assertJsonPath('status', 'draft');
+        $this->actingAs($reviewer, 'sanctum')
+            ->postJson('/api/mission-tasks/'.$task->id.'/validate', ['is_conform' => true])->assertUnprocessable();
+        $this->actingAs($user, 'sanctum')
+            ->putJson($url, ['answers' => ['valeur' => 12.5]])->assertOk()->assertJsonPath('status', 'draft');
         $this->postJson($url.'/submit')->assertUnprocessable();
         $photoId = $this->post($url.'/photos', [
             'field_key' => 'photo', 'photo' => UploadedFile::fake()->image('chantier.jpg'),

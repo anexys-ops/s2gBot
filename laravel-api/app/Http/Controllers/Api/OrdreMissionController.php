@@ -254,7 +254,7 @@ class OrdreMissionController extends Controller
 
     public function destroy(Request $request, OrdreMission $ordreMission): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $request->user()->canValidateStatus()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -277,7 +277,7 @@ class OrdreMissionController extends Controller
 
     public function storeLigne(Request $request, OrdreMission $ordreMission): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        if (! $request->user()->canValidateStatus()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -415,7 +415,7 @@ class OrdreMissionController extends Controller
 
     public function destroyLigne(Request $request, OrdreMission $ordreMission, OrdreMissionLigne $ligne): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        if (! $request->user()->canValidateStatus()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 

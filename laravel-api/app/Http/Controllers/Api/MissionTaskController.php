@@ -242,6 +242,12 @@ class MissionTaskController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $task = MissionTask::findOrFail($id);
+        $user = $request->user();
+        $isManager = $user->canValidateStatus();
+
+        if (! $isManager && (int) $task->assigned_user_id !== (int) $user->id) {
+            return response()->json(['message' => "Non autorisé : cette tâche n'est pas la vôtre."], 403);
+        }
 
         $data = $request->validate([
             'assigned_user_id' => 'nullable|exists:users,id',
@@ -256,6 +262,16 @@ class MissionTaskController extends Controller
 
         if (($data['statut'] ?? null) === MissionTask::STATUT_VALIDATED && $task->statut !== MissionTask::STATUT_VALIDATED) {
             throw ValidationException::withMessages(['statut' => 'Utilisez le bouton "Valider la tâche" (avec la conformité) pour clôturer une tâche — pas ce sélecteur de statut.']);
+        }
+
+        if (! $isManager) {
+            $simpleStatuts = [MissionTask::STATUT_TODO, MissionTask::STATUT_IN_PROGRESS, MissionTask::STATUT_PAUSED, MissionTask::STATUT_DONE, MissionTask::STATUT_REJECTED];
+            if (isset($data['statut']) && ! in_array($data['statut'], $simpleStatuts, true)) {
+                throw ValidationException::withMessages(['statut' => 'Seul un responsable peut définir ce statut (freeze, replanification ou validation).']);
+            }
+            if (array_key_exists('assigned_user_id', $data) && (int) ($data['assigned_user_id'] ?? 0) !== (int) $task->assigned_user_id) {
+                throw ValidationException::withMessages(['assigned_user_id' => 'Seul un responsable peut réaffecter cette tâche.']);
+            }
         }
 
         if (isset($data['statut']) && $data['statut'] !== MissionTask::STATUT_TODO) {
@@ -440,6 +456,10 @@ class MissionTaskController extends Controller
     /** POST /mission-tasks/{task}/validate — valider le résultat */
     public function validate(Request $request, int $id): JsonResponse
     {
+        if (! $request->user()->canValidateStatus()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
         $task = MissionTask::findOrFail($id);
         if ($this->formAssignments->hasPendingForms($task)) {
             throw ValidationException::withMessages(['task' => 'Les formulaires affectés à cette tâche doivent être validés avant sa clôture.']);
@@ -476,8 +496,12 @@ class MissionTaskController extends Controller
     }
 
     /** DELETE /mission-tasks/{task} */
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, int $id): JsonResponse
     {
+        if (! $request->user()->canValidateStatus()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
         $task = MissionTask::findOrFail($id);
         PlanningHuman::query()->where('mission_task_id', $task->id)->delete();
         PlanningEquipment::query()->where('mission_task_id', $task->id)->delete();

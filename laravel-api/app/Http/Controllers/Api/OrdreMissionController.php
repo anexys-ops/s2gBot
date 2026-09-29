@@ -284,7 +284,7 @@ class OrdreMissionController extends Controller
             'article_action_id' => 'nullable|exists:article_actions,id',
             'assigned_user_id' => 'nullable|exists:users,id',
             'date_prevue' => 'nullable|date',
-            'statut' => 'sometimes|in:a_faire,en_cours,realise,annule',
+            'statut' => 'sometimes|in:'.implode(',', OrdreMissionLigne::STATUTS),
         ]);
 
         $libelle = trim((string) ($validated['libelle'] ?? ''));
@@ -348,7 +348,7 @@ class OrdreMissionController extends Controller
         $validated = $request->validate([
             'libelle'             => 'sometimes|string',
             'quantite'            => 'sometimes|numeric|min:0',
-            'statut'              => 'sometimes|in:a_faire,en_cours,realise,annule',
+            'statut'              => 'sometimes|in:'.implode(',', OrdreMissionLigne::STATUTS),
             'assigned_user_id'    => 'nullable|exists:users,id',
             'equipment_id'        => 'nullable|exists:equipments,id',
             'date_prevue'         => 'nullable|date',
@@ -377,7 +377,7 @@ class OrdreMissionController extends Controller
             'lignes.*.id'                    => 'required|integer',
             'lignes.*.libelle'               => 'sometimes|string',
             'lignes.*.quantite'              => 'sometimes|numeric|min:0',
-            'lignes.*.statut'                => 'sometimes|in:a_faire,en_cours,realise,annule',
+            'lignes.*.statut'                => 'sometimes|in:'.implode(',', OrdreMissionLigne::STATUTS),
             'lignes.*.assigned_user_id'      => 'nullable|exists:users,id',
             'lignes.*.equipment_id'          => 'nullable|exists:equipments,id',
             'lignes.*.date_prevue'           => 'nullable|date',

@@ -10,16 +10,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ordresMissionApi, type OrdreMission, type OrdreMissionLigne } from '../../api/client'
 import { useAuth } from '../../contexts/AuthContext'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
-import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
+import StatusBadge, { ligneStatutBadgeProps, ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
 
 const ODM_STATUTS = ['brouillon', 'planifie', 'en_cours', 'termine', 'annule'] as const
-
-const LIGNE_STATUT_META: Record<string, { label: string; color: string }> = {
-  a_faire:  { label: 'À faire',   color: '#6b7280' },
-  en_cours: { label: 'En cours',  color: '#3b82f6' },
-  realise:  { label: 'Réalisé',   color: '#10b981' },
-  annule:   { label: 'Annulé',    color: '#ef4444' },
-}
 
 function LignesRow({ om }: { om: OrdreMission }) {
   const { data: detail, isLoading } = useQuery({
@@ -53,7 +46,7 @@ function LignesRow({ om }: { om: OrdreMission }) {
   return (
     <>
       {lignes.map((ligne) => {
-        const ligneStatut = LIGNE_STATUT_META[ligne.statut] ?? { label: ligne.statut, color: '#6b7280' }
+        const ligneStatut = ligneStatutBadgeProps(ligne.statut)
         return (
           <tr key={ligne.id} style={{ background: '#f9fafb' }}>
             <td />
@@ -67,7 +60,7 @@ function LignesRow({ om }: { om: OrdreMission }) {
             </td>
             <td style={{ fontSize: '0.85rem' }}>{ligne.quantite}</td>
             <td style={{ fontSize: '0.85rem' }}>
-              <span style={{ color: ligneStatut.color, fontWeight: 600 }}>{ligneStatut.label}</span>
+              <StatusBadge variant={ligneStatut.variant} size="sm">{ligneStatut.label}</StatusBadge>
             </td>
             <td style={{ fontSize: '0.85rem' }}>{ligne.assignedUser?.name ?? '—'}</td>
             <td style={{ fontSize: '0.85rem', color: '#6b7280' }}>{ligne.notes ?? '—'}</td>

@@ -11722,6 +11722,17 @@ a.catalogue-tree__link-article:hover {
   opacity: 0.75;
 }
 
+.labo-essay-row--late > td {
+  background: color-mix(in srgb, #c53030 7%, white);
+}
+
+.labo-essay-row__late-tag {
+  color: #c53030;
+  font-weight: 700;
+  font-size: 0.72rem;
+  margin-left: 0.35rem;
+}
+
 .om-jalon-bulk {
   display: flex;
   align-items: flex-end;

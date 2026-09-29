@@ -3198,21 +3198,36 @@ export interface LaboTaskTestFormRow {
   id: number | string
   status: 'not_started' | 'draft' | 'submitted' | 'correction_requested' | 'validated'
   updated_at: string
+  ref_date?: string | null
+  is_late?: boolean
   test_type: { id: number; name: string; norm?: string | null; context?: string | null } | null
-  task: { id: number; unique_number?: string | null; assigned_user?: string | null } | null
+  task: { id: number; unique_number?: string | null; assigned_user?: string | null; assigned_user_id?: number | null } | null
   fold_numbers?: string[]
   pv_numbers?: string[]
 }
 
+export interface LaboTaskTestFormStats {
+  total: number
+  by_status: Record<'not_started' | 'draft' | 'submitted' | 'correction_requested' | 'validated', number>
+  today_total: number
+  today_started: number
+  late: number
+}
+
+export type LaboTaskTestFormListResponse = LaravelPaginator<LaboTaskTestFormRow> & { stats: LaboTaskTestFormStats }
+
 export const taskTestFormsApi = {
   list: (taskId: number) => api<{ task_id: number; forms: TaskTestFormSummary[] }>(`/mobile/task-forms/tasks/${taskId}`),
-  listAll: (params?: { status?: string; context?: string; page?: number }) => {
+  listAll: (params?: { status?: string; context?: string; user_id?: number; sort?: string; dir?: 'asc' | 'desc'; page?: number }) => {
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)
     if (params?.context) q.set('context', params.context)
+    if (params?.user_id) q.set('user_id', String(params.user_id))
+    if (params?.sort) q.set('sort', params.sort)
+    if (params?.dir) q.set('dir', params.dir)
     if (params?.page) q.set('page', String(params.page))
     const s = q.toString()
-    return api<LaravelPaginator<LaboTaskTestFormRow>>(`/mobile/task-forms${s ? `?${s}` : ''}`)
+    return api<LaboTaskTestFormListResponse>(`/mobile/task-forms${s ? `?${s}` : ''}`)
   },
   save: (taskId: number, typeId: number, answers: Record<string, unknown>) =>
     api<{ answers: Record<string, unknown> }>(`/mobile/task-forms/tasks/${taskId}/types/${typeId}`, { method: 'PUT', body: JSON.stringify({ answers }) }),

@@ -177,6 +177,9 @@ class MobileTerrainController extends Controller
             }
             $locked->update($changes);
             $statusSync->syncOrdreMissionFromTask($locked);
+            if ($data['statut'] === MissionTask::STATUT_DONE) {
+                $statusSync->autoGenerateReceptionFromMobile($locked);
+            }
         });
 
         return $this->task($request, $task->fresh());
@@ -198,11 +201,11 @@ class MobileTerrainController extends Controller
         return response()->json($this->pvNumbersPayload($task));
     }
 
-    public function addTaskPvNumber(Request $request, MissionTask $task): JsonResponse
+    public function addTaskPvNumber(Request $request, MissionTask $task, MissionTaskStatusService $statusSync): JsonResponse
     {
         $data = $this->validatePvNumber($request);
 
-        return DB::transaction(function () use ($request, $task, $data) {
+        return DB::transaction(function () use ($request, $task, $data, $statusSync) {
             $locked = MissionTask::query()->lockForUpdate()->findOrFail($task->id);
             $this->assertOwnTask($request, $locked);
             $this->assertPvNumbersEditable($locked);
@@ -211,6 +214,9 @@ class MobileTerrainController extends Controller
             if (! collect($numbers)->contains(fn (string $existing) => mb_strtolower($existing) === mb_strtolower($number))) {
                 $numbers[] = $number;
                 $locked->update(['pv_numbers' => $numbers]);
+            }
+            if ($locked->statut === MissionTask::STATUT_DONE) {
+                $statusSync->autoGenerateReceptionFromMobile($locked);
             }
 
             return response()->json($this->pvNumbersPayload($locked->fresh()));

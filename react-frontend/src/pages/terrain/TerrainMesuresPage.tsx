@@ -457,7 +457,7 @@ function DossierRecapRow({
 }) {
   const progress = dossierProgress(recap)
   const statuts = recap.tasks.map(displayMeasureStatut)
-  const hasActive = statuts.some((s) => ['todo', 'started', 'in_progress', 'paused', 'frozen'].includes(s))
+  const hasActive = statuts.some((s) => ['todo', 'started', 'in_progress', 'paused', 'frozen', 'rescheduled'].includes(s))
 
   return (
     <>
@@ -578,7 +578,7 @@ export default function TerrainMesuresPage() {
     return {
       dossiers: dossiers.length,
       tasks: tasks.length,
-      enCours: allStatuts.filter((s) => ['started', 'in_progress', 'paused', 'frozen'].includes(s)).length,
+      enCours: allStatuts.filter((s) => ['started', 'in_progress', 'paused', 'frozen', 'rescheduled'].includes(s)).length,
       aFaire: allStatuts.filter((s) => s === 'todo').length,
       terminees: allStatuts.filter((s) => s === 'done' || s === 'validated').length,
     }

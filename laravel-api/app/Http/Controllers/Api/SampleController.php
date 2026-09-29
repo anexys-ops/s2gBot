@@ -77,7 +77,7 @@ class SampleController extends Controller
             'reference' => 'sometimes|string|max:255|unique:samples,reference,'.$sample->id,
             'borehole_id' => 'nullable|exists:boreholes,id',
             'received_at' => 'nullable|date',
-            'status' => 'sometimes|in:pending,received,in_progress,tested,validated',
+            'status' => 'sometimes|in:'.implode(',', Sample::STATUSES_RECEPTION),
             'notes' => 'nullable|string',
             'depth_top_m' => 'nullable|numeric|min:0',
             'depth_bottom_m' => 'nullable|numeric|min:0',

@@ -32,7 +32,12 @@ class MissionTaskStatusService
                 MissionTask::STATUT_DONE => 'attente_validation',
                 MissionTask::STATUT_VALIDATED => 'cloture',
                 MissionTask::STATUT_REJECTED => 'annule',
-                default => 'planifie',
+                // STATUT_TODO (et tout autre cas) : "planifie" uniquement si un
+                // technicien et une date sont reellement fixes, sinon "a_faire" --
+                // sans cette condition, tout enregistrement (meme une simple note)
+                // sur une tache "todo" non assignee faisait passer la ligne a
+                // "Planifie" a tort.
+                default => ($task->assigned_user_id && $task->planned_date) ? 'planifie' : 'a_faire',
             },
         ]);
 
@@ -99,7 +104,7 @@ class MissionTaskStatusService
             ]);
             return;
         }
-        if ($lignes->contains(fn (OrdreMissionLigne $ligne) => in_array($ligne->statut, ['en_cours', 'freeze', 'attente_validation', 'cloture'], true))) {
+        if ($lignes->contains(fn (OrdreMissionLigne $ligne) => in_array($ligne->statut, ['en_cours', 'freeze', 'attente_validation', 'realise', 'cloture'], true))) {
             $ordreMission->update([
                 'statut' => OrdreMission::STATUT_EN_COURS,
                 'date_debut' => $ordreMission->date_debut ?? now(),

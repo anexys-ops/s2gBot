@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\MobileAuditLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class MobileAuditLogController extends Controller
 {
@@ -16,14 +15,6 @@ class MobileAuditLogController extends Controller
     /** POST /mobile/audit-logs — n'importe quel utilisateur authentifie journalise ses propres actions. */
     public function store(Request $request): JsonResponse
     {
-        // TEMPORAIRE — diagnostic du bug 422 signale par l'appli mobile (retirer une fois resolu).
-        Log::channel('single')->info('mobile-audit-logs.debug', [
-            'content_type' => $request->header('Content-Type'),
-            'raw_body' => $request->getContent(),
-            'parsed_all' => $request->all(),
-            'user_id' => $request->user()?->id,
-        ]);
-
         $data = $request->validate([
             'action' => 'required|string|max:64',
             'latitude' => 'nullable|numeric|between:-90,90',

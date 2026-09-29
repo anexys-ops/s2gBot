@@ -17,7 +17,7 @@ export const TASK_STATUT_META: Record<string, TaskStatutMeta> = {
   frozen:      { label: 'Freeze',    color: '#0891b2', bg: '#cffafe' },
   rescheduled: { label: 'Replanifié', color: '#2563eb', bg: '#dbeafe' },
   done:        { label: 'Attente validation', color: '#7c3aed', bg: '#ede9fe' },
-  validated:   { label: 'Clôturé',   color: '#10b981', bg: '#d1fae5' },
+  validated:   { label: 'Validé',    color: '#10b981', bg: '#d1fae5' },
   rejected:    { label: 'Annulé',    color: '#6b7280', bg: '#f3f4f6' },
 }
 
@@ -27,7 +27,7 @@ export const TASK_FILTERS = [
   { key: 'rescheduled', label: 'Replanifié', statuts: ['rescheduled'] },
   { key: 'rejected', label: 'Annulé', statuts: ['rejected'] },
   { key: 'todo', label: 'Planifié', statuts: ['todo'] },
-  { key: 'validated', label: 'Clôturé', statuts: ['validated'] },
+  { key: 'validated', label: 'Validé', statuts: ['validated'] },
   { key: 'done', label: 'Attente validation', statuts: ['done'] },
 ] as const
 

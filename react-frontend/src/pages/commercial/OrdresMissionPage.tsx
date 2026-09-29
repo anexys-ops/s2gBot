@@ -219,7 +219,10 @@ export default function OrdresMissionPage() {
           <div
             style={{
               width: '100%',
-              maxWidth: '520px',
+              maxWidth: '900px',
+              maxHeight: '85vh',
+              display: 'flex',
+              flexDirection: 'column',
               background: '#fff',
               borderRadius: 16,
               padding: '1.5rem',
@@ -249,34 +252,46 @@ export default function OrdresMissionPage() {
                 }}
               />
             </label>
-            <label style={{ display: 'block', marginBottom: '1rem' }}>
-              <select
-                value={selectedBcForGeneration ?? ''}
-                onChange={(e) => setSelectedBcForGeneration(e.target.value ? Number(e.target.value) : null)}
-                size={Math.min(8, Math.max(4, bonsCommande.length))}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: 6,
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.95rem',
-                }}
-              >
-                {bonsCommande.length === 0 ? <option value="" disabled>Aucun bon de commande trouvé</option> : null}
-                {bonsCommande.map((bc) => (
-                  <option key={bc.id} value={bc.id}>
-                    {bc.numero} — {bc.client?.name ?? `Client #${bc.client_id}`}
-                    {bc.dossier?.reference ? ` — ${bc.dossier.reference}` : ''}
-                    {bc.dossier?.site?.name ? ` — ${bc.dossier.site.name}` : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="table-wrap" style={{ flex: '1 1 auto', overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: '1rem' }}>
+              <table className="data-table data-table--compact">
+                <thead>
+                  <tr>
+                    <th>N° BC</th>
+                    <th>Client</th>
+                    <th>Dossier</th>
+                    <th>Chantier</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bonsCommande.length === 0 ? (
+                    <tr><td colSpan={4} className="text-muted" style={{ padding: '1rem', textAlign: 'center' }}>Aucun bon de commande trouvé</td></tr>
+                  ) : null}
+                  {bonsCommande.map((bc) => (
+                    <tr
+                      key={bc.id}
+                      tabIndex={0}
+                      role="button"
+                      aria-selected={selectedBcForGeneration === bc.id}
+                      className={selectedBcForGeneration === bc.id ? 'is-selected' : undefined}
+                      style={{ cursor: 'pointer', background: selectedBcForGeneration === bc.id ? '#eef2ff' : undefined }}
+                      onClick={() => setSelectedBcForGeneration(bc.id)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedBcForGeneration(bc.id) } }}
+                    >
+                      <td style={{ fontWeight: 600 }}>{bc.numero}</td>
+                      <td>{bc.client?.name ?? `Client #${bc.client_id}`}</td>
+                      <td>{bc.dossier?.reference ?? '—'}</td>
+                      <td>{bc.dossier?.site?.name ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <div className="crud-actions" style={{ gap: '0.75rem' }}>
               <button
                 type="button"
                 className="btn btn-primary"
                 disabled={!selectedBcForGeneration}
+                onClick={() => { /* la sélection d'une ligne suffit à ouvrir la fiche des jalons */ }}
               >
                 Sélectionner ce BC
               </button>

@@ -603,7 +603,7 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
   }), [tasks, statusFilter, clientFilter, technicianFilter, dateFrom, dateTo, search])
   const grouped = useMemo(() => groupTasksByDossierJalonProduit(displayed), [displayed])
   const isLabo = context === 'labo'
-  const columnCount = isLabo ? 7 : 6
+  const columnCount = 7
 
   return (
     <ModuleEntityShell
@@ -683,7 +683,7 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
               <thead>
                 <tr>
                   <th>N° tâche</th>
-                  {isLabo ? <th>N° FOLD / PV</th> : null}
+                  {isLabo ? <th>N° FOLD / PV</th> : <th>N° PV</th>}
                   <th>Tâche</th>
                   <th>Technicien assigné</th>
                   <th>Statut</th>
@@ -787,7 +787,9 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                                       <div>{task.samples?.length ? task.samples.map((s) => s.fold_number).filter(Boolean).join(', ') : <span className="text-muted">—</span>}</div>
                                       <div className="text-muted mission-task-list__sub">{task.pv_numbers?.length ? task.pv_numbers.join(', ') : '—'}</div>
                                     </td>
-                                  ) : null}
+                                  ) : (
+                                    <td>{task.pv_numbers?.length ? task.pv_numbers.join(', ') : <span className="text-muted">—</span>}</td>
+                                  )}
                                   <td>
                                     <div className="mission-task-list__task" title={taskLabel(task)}>{taskLabel(task)}</div>
                                   </td>

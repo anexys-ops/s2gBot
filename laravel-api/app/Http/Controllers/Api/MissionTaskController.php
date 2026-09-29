@@ -254,8 +254,8 @@ class MissionTaskController extends Controller
             'no_fold_required' => 'sometimes|boolean',
         ]);
 
-        if (($data['statut'] ?? null) === MissionTask::STATUT_VALIDATED && $this->formAssignments->hasPendingForms($task)) {
-            throw ValidationException::withMessages(['statut' => 'Les formulaires affectés à cette tâche doivent être validés avant sa clôture.']);
+        if (($data['statut'] ?? null) === MissionTask::STATUT_VALIDATED && $task->statut !== MissionTask::STATUT_VALIDATED) {
+            throw ValidationException::withMessages(['statut' => 'Utilisez le bouton "Valider la tâche" (avec la conformité) pour clôturer une tâche — pas ce sélecteur de statut.']);
         }
 
         if (isset($data['statut']) && $data['statut'] !== MissionTask::STATUT_TODO) {

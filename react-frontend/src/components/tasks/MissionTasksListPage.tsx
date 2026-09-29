@@ -195,6 +195,11 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
   const quantityUnit = taskQuantityUnit(task, context)
   const [quantityCount, setQuantityCount] = useState(String(task.quantity_count ?? Math.min(1, task.remaining_quantity ?? 1)))
   const [message, setMessage] = useState('')
+  const [showValidatePanel, setShowValidatePanel] = useState(false)
+  const [validateConform, setValidateConform] = useState(true)
+  const [validateValueFinal, setValidateValueFinal] = useState('')
+  const [validateConclusion, setValidateConclusion] = useState('')
+  const [validateObservations, setValidateObservations] = useState('')
   const [correctionNotes, setCorrectionNotes] = useState<Record<number, string>>({})
   const [activeTab, setActiveTab] = useState<'suivi' | 'essais'>('suivi')
   const [localSamples, setLocalSamples] = useState<MissionTaskSample[]>(task.samples ?? [])
@@ -321,7 +326,22 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
     },
   })
 
-  const error = save.error || duplicate.error || attachSample.error || detachSample.error
+  const validateTask = useMutation({
+    mutationFn: () => missionTasksApi.validate(task.id, {
+      is_conform: validateConform,
+      value_final: validateValueFinal.trim() ? Number(validateValueFinal) : undefined,
+      conclusion: validateConclusion.trim() || undefined,
+      observations: validateObservations.trim() || undefined,
+    }),
+    onSuccess: async () => {
+      await refresh()
+      setShowValidatePanel(false)
+      setMessage('Tâche validée.')
+      window.setTimeout(onClose, 1200)
+    },
+  })
+
+  const error = save.error || duplicate.error || attachSample.error || detachSample.error || validateTask.error
   const pvCount = normalizePvNumbers([...pvNumbers, pvDraft]).length
   const maxQuantity = task.reception_generated_at ? (task.quantity_count ?? 1) : (task.remaining_quantity ?? task.ordered_quantity ?? 1)
 
@@ -361,6 +381,7 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
         <label>Statut
           <select value={statut} onChange={(event) => setStatut(event.target.value as MissionTask['statut'])}>
             {TASK_FILTERS.flatMap((filter) => filter.statuts).filter((value, index, all) => all.indexOf(value) === index)
+              .filter((value) => value !== 'validated' || task.statut === 'validated')
               .filter((value) => context !== 'labo' || hasFoldCoverage || value === 'todo' || value === task.statut)
               .map((value) => (
                 <option key={value} value={value}>{getTaskStatutMeta(value as MissionTask['statut']).label}</option>
@@ -369,6 +390,11 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
           {context === 'labo' && !hasFoldCoverage ? (
             <span className="text-muted" style={{ color: '#b45309' }}>
               Rattachez un FOLD (ou cochez « pas de FOLD nécessaire ») pour pouvoir avancer cette tâche.
+            </span>
+          ) : null}
+          {task.statut !== 'validated' ? (
+            <span className="text-muted" style={{ fontSize: '0.82rem' }}>
+              Pour clôturer définitivement, utilisez « Valider la tâche » ci-dessous.
             </span>
           ) : null}
         </label>
@@ -488,10 +514,37 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
           </label>
         </div>
       ) : null}
+      {task.statut !== 'validated' && showValidatePanel ? (
+        <div className="card" style={{ padding: '0.75rem 1rem', marginBottom: '1rem' }}>
+          <h4 style={{ marginTop: 0 }}>Valider la tâche</h4>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <input type="checkbox" checked={validateConform} onChange={(event) => setValidateConform(event.target.checked)} />
+            Résultat conforme
+          </label>
+          <label>Valeur finale (optionnel)
+            <input type="text" inputMode="decimal" value={validateValueFinal} onChange={(event) => setValidateValueFinal(event.target.value.replace(',', '.'))} />
+          </label>
+          <label>Conclusion (optionnel)
+            <input type="text" value={validateConclusion} onChange={(event) => setValidateConclusion(event.target.value)} />
+          </label>
+          <label>Observations (optionnel)
+            <textarea value={validateObservations} onChange={(event) => setValidateObservations(event.target.value)} rows={2} />
+          </label>
+          <div className="crud-actions">
+            <button type="button" className="btn btn--primary" disabled={validateTask.isPending} onClick={() => validateTask.mutate()}>
+              {validateTask.isPending ? 'Validation…' : 'Confirmer la validation'}
+            </button>
+            <button type="button" className="btn btn--secondary" onClick={() => setShowValidatePanel(false)}>Annuler</button>
+          </div>
+        </div>
+      ) : null}
       {message ? <p className="success">{message}</p> : null}
       {error ? <p className="error">{(error as Error).message}</p> : null}
       <div className="mission-task-modal__actions">
         {(task.remaining_quantity ?? 0) > 0 && task.reception_generated_at ? <button type="button" className="btn btn--secondary" disabled={duplicate.isPending} onClick={() => duplicate.mutate()}>Ajouter une tâche sur le reliquat</button> : null}
+        {task.statut !== 'validated' && !showValidatePanel ? (
+          <button type="button" className="btn btn--secondary" onClick={() => setShowValidatePanel(true)}>Valider la tâche</button>
+        ) : null}
         <button type="button" className="btn btn--primary" disabled={save.isPending} onClick={() => save.mutate()}>
           {save.isPending ? 'Enregistrement…' : 'Enregistrer'}
         </button>

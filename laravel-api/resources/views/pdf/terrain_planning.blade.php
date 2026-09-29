@@ -98,7 +98,7 @@
                     @if($showFoldColumn)<td>{{ $foldNumbers !== null && $foldNumbers !== '' ? $foldNumbers : '—' }}</td>@endif
                     @if($show('show_order'))<td>{{ $order?->numero ?? '—' }}</td>@endif
                     @if($show('show_task'))<td>{{ $line?->libelle ?? '—' }}</td>@endif
-                    @if($show('show_quantity'))<td class="qty">{{ $line ? $formatQty($line->quantite) : '—' }}</td>@endif
+                    @if($show('show_quantity'))<td class="qty">{{ $line ? $formatQty($affectation->merged_quantity ?? $line->quantite) : '—' }}</td>@endif
                     @if($show('show_notes'))<td class="notes">{{ $notes !== [] ? implode("\n", $notes) : '—' }}</td>@endif
                 </tr>
             @empty

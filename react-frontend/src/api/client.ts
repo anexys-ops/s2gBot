@@ -2381,6 +2381,20 @@ export interface MonitoringSecurityRow {
   created_at: string
 }
 
+export interface MonitoringMobileAuditRow {
+  id: number
+  user_id: number | null
+  user?: { id: number; name: string; email?: string } | null
+  action: string
+  latitude?: number | null
+  longitude?: number | null
+  accuracy?: number | null
+  occurred_at: string
+  details?: Record<string, unknown> | null
+  ip_address?: string | null
+  user_agent?: string | null
+}
+
 export interface MonitoringSessionRow {
   id: number
   token_id: number
@@ -2427,6 +2441,16 @@ export const monitoringApi = {
       method: 'POST',
       body: JSON.stringify({ page }),
     }),
+  mobileAudit: (params?: { limit?: number; user_id?: number; action?: string; from?: string; to?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.limit) q.set('limit', String(params.limit))
+    if (params?.user_id) q.set('user_id', String(params.user_id))
+    if (params?.action) q.set('action', params.action)
+    if (params?.from) q.set('from', params.from)
+    if (params?.to) q.set('to', params.to)
+    const s = q.toString()
+    return api<MonitoringMobileAuditRow[]>(`/mobile/audit-logs${s ? `?${s}` : ''}`)
+  },
 }
 
 export interface StatsEssaisParType {

@@ -8,6 +8,8 @@ use App\Models\MissionTask;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
 use App\Models\OrderItem;
+use App\Models\PlanningEquipment;
+use App\Models\PlanningHuman;
 use App\Models\Sample;
 use App\Models\Sequence;
 use App\Models\TaskMeasure;
@@ -477,6 +479,8 @@ class MissionTaskController extends Controller
     public function destroy(int $id): JsonResponse
     {
         $task = MissionTask::findOrFail($id);
+        PlanningHuman::query()->where('mission_task_id', $task->id)->delete();
+        PlanningEquipment::query()->where('mission_task_id', $task->id)->delete();
         $task->delete();
 
         return response()->json(null, 204);

@@ -11,6 +11,8 @@ use App\Models\ExpenseLine;
 use App\Models\MissionTask;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
+use App\Models\PlanningEquipment;
+use App\Models\PlanningHuman;
 use App\Services\ExpenseReportService;
 use App\Services\MissionTaskStatusService;
 use App\Services\OrdreMissionFromBonCommandeService;
@@ -262,6 +264,8 @@ class OrdreMissionController extends Controller
         // requêtes qui interrogent directement mission_tasks/task_test_forms.
         foreach ($ordreMission->lignes as $ligne) {
             foreach ($ligne->missionTasks as $task) {
+                PlanningHuman::query()->where('mission_task_id', $task->id)->delete();
+                PlanningEquipment::query()->where('mission_task_id', $task->id)->delete();
                 $task->delete();
             }
             $ligne->delete();
@@ -418,6 +422,8 @@ class OrdreMissionController extends Controller
         abort_if($ligne->ordre_mission_id !== $ordreMission->id, 404);
 
         $ligne->missionTasks()->each(function (MissionTask $task) {
+            PlanningHuman::query()->where('mission_task_id', $task->id)->delete();
+            PlanningEquipment::query()->where('mission_task_id', $task->id)->delete();
             $task->delete();
         });
         $ligne->delete();

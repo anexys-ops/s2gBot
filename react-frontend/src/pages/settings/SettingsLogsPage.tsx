@@ -277,8 +277,12 @@ export default function SettingsLogsPage() {
                 <tr key={log.id}>
                   <td>{new Date(log.created_at).toLocaleString('fr-FR')}</td>
                   <td>
-                    <span className={`log-badge log-badge--${log.event_type === 'login_failed' ? 'deleted' : 'updated'}`}>
-                      {log.event_type === 'login_failed' ? 'Connexion échouée' : log.event_type}
+                    <span className={`log-badge log-badge--${log.event_type === 'login_failed' || log.event_type === 'login_throttled' ? 'deleted' : 'updated'}`}>
+                      {log.event_type === 'login_failed'
+                        ? 'Connexion échouée'
+                        : log.event_type === 'login_throttled'
+                          ? 'Connexion bloquée (trop de tentatives)'
+                          : log.event_type}
                     </span>
                   </td>
                   <td>{log.email_attempted ?? '—'}</td>

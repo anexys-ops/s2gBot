@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\BonCommande;
 use App\Models\BonCommandeLigne;
 use App\Models\MissionTask;
+use App\Models\OrdreMission;
 use App\Models\Sample;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -27,13 +28,19 @@ class LabReceptionService
         BonCommande::STATUT_EN_COURS,
     ];
 
+    /** Seules les tâches de prélèvement terrain génèrent des échantillons de réception (cf. MissionTaskController::closeReception). */
+    private function whereGeneratesReception(Builder $task): Builder
+    {
+        return $task->whereNotNull('reception_generated_at')
+            ->whereHas('ordreMissionLigne.ordreMission', fn (Builder $q) => $q->where('type', OrdreMission::TYPE_TECHNICIEN));
+    }
+
     public function eligibleLinesQuery(): Builder
     {
         return BonCommandeLigne::query()
             ->where(function (Builder $q) {
                 $q->whereNotNull('technicien_id')
-                    ->orWhereHas('ordreMissionLignes.missionTasks', fn (Builder $task) => $task
-                        ->whereNotNull('reception_generated_at'));
+                    ->orWhereHas('ordreMissionLignes.missionTasks', fn (Builder $task) => $this->whereGeneratesReception($task));
             })
             ->whereHas('bonCommande', function (Builder $q) {
                 $q->whereIn('statut', self::BC_STATUTS_ELIGIBLES);
@@ -82,8 +89,7 @@ class LabReceptionService
         $lignes = $q->orderByDesc('id')->get();
         $lineIds = $lignes->pluck('id')->all();
         $counts = $this->sampleCountsByLine($lineIds);
-        $tasks = MissionTask::query()
-            ->whereNotNull('reception_generated_at')
+        $tasks = $this->whereGeneratesReception(MissionTask::query())
             ->whereHas('ordreMissionLigne', fn (Builder $taskLine) => $taskLine
                 ->whereIn('bon_commande_ligne_id', $lineIds))
             ->with([
@@ -202,7 +208,7 @@ class LabReceptionService
         $ligne->loadMissing(['bonCommande.dossier']);
 
         $hasPreparedTask = $ligne->ordreMissionLignes()
-            ->whereHas('missionTasks', fn (Builder $task) => $task->whereNotNull('reception_generated_at'))
+            ->whereHas('missionTasks', fn (Builder $task) => $this->whereGeneratesReception($task))
             ->exists();
         if (! $ligne->technicien_id && ! $hasPreparedTask) {
             return false;

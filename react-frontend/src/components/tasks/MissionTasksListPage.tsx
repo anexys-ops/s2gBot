@@ -292,7 +292,7 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
         statut,
       })
       const pv = normalizePvNumbers([...pvNumbers, pvDraft])
-      if (!task.reception_generated_at && pv.length > 0 && Number(quantityCount) >= 1) {
+      if (context === 'terrain' && !task.reception_generated_at && pv.length > 0 && Number(quantityCount) >= 1) {
         const result = await missionTasksApi.closeReception(task.id, {
           pv_numbers: pv,
           quantity_unit: quantityUnit.value,
@@ -372,6 +372,7 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
             </span>
           ) : null}
         </label>
+        {context === 'terrain' ? <>
         <label>Unité de quantité
           <span className="mission-task-modal__unit">
             <strong>{quantityUnit.value}</strong>
@@ -415,6 +416,7 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
           ) : null}
           <span className="text-muted">{pvCount} numéro{pvCount !== 1 ? 's' : ''} de PV saisi{pvCount !== 1 ? 's' : ''}</span>
         </label>
+        </> : null}
       </div>
       {context === 'labo' ? (
         <div className="mission-task-modal__grid" style={{ marginTop: '0.75rem' }}>

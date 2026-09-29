@@ -307,6 +307,12 @@ class MissionTaskController extends Controller
                 ]);
             }
 
+            if ($ordreMission->type !== OrdreMission::TYPE_TECHNICIEN) {
+                throw ValidationException::withMessages([
+                    'quantity_count' => "Seule une tâche de prélèvement terrain peut générer des échantillons de réception. Rattachez plutôt le FOLD existant à cette tâche.",
+                ]);
+            }
+
             $existing = Sample::query()->where('task_id', $task->id)->count();
             $remaining = $this->remainingQuantity($source);
             if ($existing === 0 && (int) $data['quantity_count'] > $remaining) {

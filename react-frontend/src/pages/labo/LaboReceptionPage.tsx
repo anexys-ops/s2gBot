@@ -325,6 +325,9 @@ export default function LaboReceptionPage() {
                                 ? `${task.pending_labels} étiquette${task.pending_labels === 1 ? '' : 's'} en attente`
                                 : 'Réception traitée'}
                             </div>
+                            <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>
+                              PV : {task.pv_numbers?.length ? task.pv_numbers.join(', ') : '—'}
+                            </div>
                           </div>
                         )) : <span className="text-muted">Non générée</span>}
                       </td>
@@ -503,6 +506,11 @@ export default function LaboReceptionPage() {
                             </Link>
                           </div>
                         )}
+                        {sample.task?.pv_numbers?.length ? (
+                          <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>
+                            PV : {sample.task.pv_numbers.join(', ')}
+                          </div>
+                        ) : null}
                       </td>
                       <td style={{ fontSize: '0.85rem' }}>
                         {sample.dossier?.reference ?? '—'}
@@ -748,6 +756,7 @@ function LineSamplesHistory({
             <th>N°</th>
             <th>FOLD</th>
             <th>Transco</th>
+            <th>N° PV</th>
             <th>Statut</th>
             <th>Réception</th>
             <th>Actions</th>
@@ -763,6 +772,7 @@ function LineSamplesHistory({
               </td>
               <td style={{ fontFamily: 'monospace' }}>{s.fold_number ?? '—'}</td>
               <td style={{ fontFamily: 'monospace' }}>{s.transco_number ?? '—'}</td>
+              <td>{s.task?.pv_numbers?.length ? s.task.pv_numbers.join(', ') : '—'}</td>
               <td>{statusLabel(s.status)}</td>
               <td>{formatDateTime(s.received_at)}</td>
               <td>

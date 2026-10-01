@@ -3,10 +3,14 @@
 namespace App\Services;
 
 use App\Models\MissionTask;
+use App\Models\OrderItem;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
 use App\Models\PlanningEquipment;
 use App\Models\PlanningHuman;
+use App\Models\Sample;
+use App\Models\Sequence;
+use Illuminate\Support\Facades\Schema;
 
 class MissionTaskStatusService
 {
@@ -28,7 +32,12 @@ class MissionTaskStatusService
                 MissionTask::STATUT_DONE => 'attente_validation',
                 MissionTask::STATUT_VALIDATED => 'cloture',
                 MissionTask::STATUT_REJECTED => 'annule',
-                default => 'planifie',
+                // STATUT_TODO (et tout autre cas) : "planifie" uniquement si un
+                // technicien et une date sont reellement fixes, sinon "a_faire" --
+                // sans cette condition, tout enregistrement (meme une simple note)
+                // sur une tache "todo" non assignee faisait passer la ligne a
+                // "Planifie" a tort.
+                default => ($task->assigned_user_id && $task->planned_date) ? 'planifie' : 'a_faire',
             },
         ]);
 
@@ -95,7 +104,7 @@ class MissionTaskStatusService
             ]);
             return;
         }
-        if ($lignes->contains(fn (OrdreMissionLigne $ligne) => in_array($ligne->statut, ['en_cours', 'freeze', 'attente_validation', 'cloture'], true))) {
+        if ($lignes->contains(fn (OrdreMissionLigne $ligne) => in_array($ligne->statut, ['en_cours', 'freeze', 'attente_validation', 'realise', 'cloture'], true))) {
             $ordreMission->update([
                 'statut' => OrdreMission::STATUT_EN_COURS,
                 'date_debut' => $ordreMission->date_debut ?? now(),
@@ -107,6 +116,73 @@ class MissionTaskStatusService
             && $active->contains(fn (OrdreMissionLigne $ligne) => $ligne->assigned_user_id && $ligne->date_prevue)
             ? OrdreMission::STATUT_PLANIFIE
             : OrdreMission::STATUT_BROUILLON]);
+    }
+
+    /**
+     * Génère automatiquement 1 échantillon/FOLD de réception quand une tâche de
+     * prélèvement terrain est terminée depuis l'application mobile (le technicien
+     * n'y saisit qu'un statut + des numéros de PV, jamais de quantité d'étiquettes
+     * contrairement au BO — sans cet auto-générateur la tâche n'apparaît jamais
+     * en réception). No-op silencieux si la tâche n'est pas éligible : ne doit
+     * jamais empêcher le technicien de clôturer sa tâche sur mobile.
+     */
+    public function autoGenerateReceptionFromMobile(MissionTask $task): void
+    {
+        if ($task->reception_generated_at || empty($task->pv_numbers)) {
+            return;
+        }
+
+        $task->loadMissing(['ordreMissionLigne.ordreMission', 'ordreMissionLigne.bonCommandeLigne']);
+        $ligne = $task->ordreMissionLigne;
+        $source = $ligne?->bonCommandeLigne;
+        $ordreMission = $ligne?->ordreMission;
+        if (! $source || ! $ordreMission || $ordreMission->type !== OrdreMission::TYPE_TECHNICIEN) {
+            return;
+        }
+        if (Sample::query()->where('task_id', $task->id)->exists()) {
+            return;
+        }
+
+        $received = Sample::query()
+            ->where('bon_commande_ligne_id', $source->id)
+            ->whereNotIn('status', [Sample::STATUS_ANNULE, Sample::STATUS_REJETE])
+            ->count();
+        $remaining = max(0, (int) floor((float) $source->quantite) - $received);
+        if ($remaining < 1) {
+            return;
+        }
+
+        $quantityUnit = $task->quantity_unit ?: ($ligne?->article?->unite ?: 'point');
+        $pv = implode(', ', $task->pv_numbers);
+
+        $task->update([
+            'quantity_unit' => $quantityUnit,
+            'quantity_count' => 1,
+            'reception_generated_at' => now(),
+        ]);
+
+        $sampleData = [
+            'reference' => Sequence::next('ECH'),
+            'reception_index' => 1,
+            'reception_batch_total' => 1,
+            'dossier_id' => $ordreMission->dossier_id,
+            'mission_order_id' => $ordreMission->id,
+            'task_id' => $task->id,
+            'prepared_by_task_at' => now(),
+            'product_id' => $source->ref_article_id,
+            'bon_commande_ligne_id' => $source->id,
+            'description' => $source->libelle,
+            'sample_type' => 'autre',
+            'collected_by' => $task->assigned_user_id,
+            'collected_at' => now(),
+            'status' => Sample::STATUS_EN_TRANSIT,
+            'quantity' => 1,
+            'notes' => "PV : {$pv} · Unité : {$quantityUnit} · Généré automatiquement (clôture mobile)",
+        ];
+        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+            $sampleData['order_item_id'] = OrderItem::query()->value('id');
+        }
+        Sample::query()->create($sampleData);
     }
 
 }

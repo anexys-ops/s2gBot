@@ -17,7 +17,7 @@ import OmAvailabilityPanel from '../../components/ordres-mission/OmAvailabilityP
 import { TaskEditModal } from '../../components/tasks/MissionTasksListPage'
 import SaveButton from '../../components/ds/SaveButton'
 import SearchableSelect from '../../components/ds/SearchableSelect'
-import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
+import StatusBadge, { ligneStatutBadgeProps, ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import CentreGroupField from '../../components/centres/CentreGroupField'
 import { useAuth } from '../../contexts/AuthContext'
@@ -43,6 +43,7 @@ const TYPE_META: Record<string, { label: string; color: string }> = {
 
 const STATUTS = ['brouillon', 'planifie', 'en_cours', 'termine', 'annule'] as const
 const STATUTS_LIGNE = [
+  { value: 'a_faire', label: 'À faire' },
   { value: 'planifie', label: 'Planifié' },
   { value: 'replanifie', label: 'Replanifié' },
   { value: 'en_cours', label: 'En cours' },
@@ -701,6 +702,7 @@ export default function OrdreMissionFichePage() {
                 <th>Équipement</th>
                 <th>Date prévue</th>
                 <th>Statut</th>
+                <th>FOLD / PV</th>
                 {isLab ? <th className="data-table__actions">Actions</th> : null}
               </tr>
             </thead>
@@ -709,7 +711,7 @@ export default function OrdreMissionFichePage() {
                 <Fragment key={group.key}>
                   {group.jalon ? (
                     <tr className="om-lignes-table__jalon">
-                      <td colSpan={isLab ? 8 : 7}>
+                      <td colSpan={isLab ? 9 : 8}>
                         <div className="om-lignes-table__jalon-content">
                           <div className="om-lignes-table__jalon-title">
                             <span className="om-lignes-table__jalon-code">{group.jalon.code}</span>
@@ -743,7 +745,13 @@ export default function OrdreMissionFichePage() {
                     const quantityValid = draft.quantite !== '' && Number.isFinite(quantityValue) && quantityValue > 0
                     const isSavingThisLine = saveLigneMut.isPending && saveLigneMut.variables?.ligne.id === ligne.id
                     return (
-                      <tr key={ligne.id} className={group.jalon ? 'om-lignes-table__task--nested' : undefined}>
+                      <tr
+                        key={ligne.id}
+                        className={[
+                          group.jalon ? 'om-lignes-table__task--nested' : null,
+                          `om-lignes-table__row--${ligne.statut}`,
+                        ].filter(Boolean).join(' ')}
+                      >
                         <td>
                           {isLab ? (
                             <input
@@ -840,20 +848,48 @@ export default function OrdreMissionFichePage() {
                           />
                         </td>
                         <td>
-                          <select
-                            value={draft.statut}
-                            onChange={(e) =>
-                              updateLigneDraft(ligne.id, {
-                                statut: e.target.value as LigneDraft['statut'],
-                              })
-                            }
-                            disabled={saveMut.isPending || isSavingThisLine}
-                            style={{ fontSize: '0.82rem' }}
-                          >
-                            {STATUTS_LIGNE.map((status) => (
-                              <option key={status.value} value={status.value}>{status.label}</option>
-                            ))}
-                          </select>
+                          <div className="om-lignes-table__statut-cell">
+                            {(() => {
+                              const badge = ligneStatutBadgeProps(ligne.statut)
+                              return (
+                                <StatusBadge variant={badge.variant} size="sm">
+                                  {badge.label}
+                                </StatusBadge>
+                              )
+                            })()}
+                            <select
+                              value={draft.statut}
+                              onChange={(e) =>
+                                updateLigneDraft(ligne.id, {
+                                  statut: e.target.value as LigneDraft['statut'],
+                                })
+                              }
+                              disabled={saveMut.isPending || isSavingThisLine}
+                              style={{ fontSize: '0.82rem' }}
+                            >
+                              {STATUTS_LIGNE.map((status) => (
+                                <option key={status.value} value={status.value}>{status.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </td>
+                        <td style={{ fontSize: '0.8rem' }}>
+                          {ligne.missionTasks?.[0] ? (
+                            <>
+                              <div>
+                                <strong>FOLD :</strong>{' '}
+                                {ligne.missionTasks[0].samples?.length
+                                  ? ligne.missionTasks[0].samples.map((s) => s.fold_number).filter(Boolean).join(', ')
+                                  : '—'}
+                              </div>
+                              <div>
+                                <strong>PV :</strong>{' '}
+                                {ligne.missionTasks[0].pv_numbers?.length
+                                  ? ligne.missionTasks[0].pv_numbers.join(', ')
+                                  : '—'}
+                              </div>
+                            </>
+                          ) : '—'}
                         </td>
                         {isLab ? (
                           <td className="data-table__actions">

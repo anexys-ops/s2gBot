@@ -43,11 +43,17 @@ class DynamicTestFormService
                     if ($column['type'] === 'formula') {
                         $this->assertFormula($column['formula'] ?? '', $columns, "form_fields.$index.columns.$columnIndex.formula");
                     }
-                    $columns[$column['key']] = $column['type'];
+                    $columns[$this->normalizeKey($column['key'])] = $column['type'];
                 }
             }
-            $known[$key] = $field['type'];
+            $known[$this->normalizeKey($key)] = $field['type'];
         }
+    }
+
+    /** Les clés de champ sont comparées sans tenir compte de la casse (ex. une formule tapée "Mh2" doit trouver la clé "mh2"). */
+    private function normalizeKey(string $key): string
+    {
+        return mb_strtolower($key);
     }
 
     private function assertFormula(string $formula, array $known, string $path): void
@@ -57,7 +63,7 @@ class DynamicTestFormService
         }
         $tokens = $this->tokens($formula);
         foreach ($tokens as $token) {
-            if (preg_match('/^[a-z][a-z0-9_]*$/i', $token) && ($known[$token] ?? null) !== 'number' && ($known[$token] ?? null) !== 'formula') {
+            if (preg_match('/^[a-z][a-z0-9_]*$/i', $token) && ($known[$this->normalizeKey($token)] ?? null) !== 'number' && ($known[$this->normalizeKey($token)] ?? null) !== 'formula') {
                 throw ValidationException::withMessages([$path => 'La formule ne peut utiliser que les champs numériques précédents.']);
             }
         }

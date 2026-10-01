@@ -205,8 +205,13 @@ class PlanningController extends Controller
                 ->with([
                     'user:id,name',
                     'equipment:id,name,code',
-                    'missionTask.ordreMissionLigne.ordreMission:id,numero,bon_commande_id',
+                    'missionTask.ordreMissionLigne.ordreMission:id,numero,bon_commande_id,client_id,site_id',
+                    'missionTask.ordreMissionLigne.ordreMission.client:id,name',
+                    'missionTask.ordreMissionLigne.ordreMission.site:id,name',
                     'bonCommandeLigne.bonCommande:id,numero,dossier_id',
+                    'bonCommandeLigne.bonCommande.dossier:id,reference,client_id,site_id',
+                    'bonCommandeLigne.bonCommande.dossier.client:id,name',
+                    'bonCommandeLigne.bonCommande.dossier.site:id,name',
                 ])
                 ->orderBy('date_debut')
                 ->orderBy('id')

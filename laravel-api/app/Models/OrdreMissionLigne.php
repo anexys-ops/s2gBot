@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class OrdreMissionLigne extends Model
 {
+    /** Statuts valides — cf. migration normalize_ordre_mission_ligne_statuses (2026-09-22). */
+    public const STATUTS = ['a_faire', 'planifie', 'replanifie', 'en_cours', 'freeze', 'annule', 'attente_validation', 'cloture', 'realise'];
+
     protected $table = 'ordre_mission_lignes';
 
     protected $fillable = [

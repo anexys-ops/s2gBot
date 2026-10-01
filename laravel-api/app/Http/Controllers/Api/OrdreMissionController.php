@@ -11,6 +11,8 @@ use App\Models\ExpenseLine;
 use App\Models\MissionTask;
 use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
+use App\Models\PlanningEquipment;
+use App\Models\PlanningHuman;
 use App\Services\ExpenseReportService;
 use App\Services\MissionTaskStatusService;
 use App\Services\OrdreMissionFromBonCommandeService;
@@ -252,7 +254,7 @@ class OrdreMissionController extends Controller
 
     public function destroy(Request $request, OrdreMission $ordreMission): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $request->user()->canValidateStatus()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -262,6 +264,8 @@ class OrdreMissionController extends Controller
         // requêtes qui interrogent directement mission_tasks/task_test_forms.
         foreach ($ordreMission->lignes as $ligne) {
             foreach ($ligne->missionTasks as $task) {
+                PlanningHuman::query()->where('mission_task_id', $task->id)->delete();
+                PlanningEquipment::query()->where('mission_task_id', $task->id)->delete();
                 $task->delete();
             }
             $ligne->delete();
@@ -273,7 +277,7 @@ class OrdreMissionController extends Controller
 
     public function storeLigne(Request $request, OrdreMission $ordreMission): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        if (! $request->user()->canValidateStatus()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
@@ -284,7 +288,7 @@ class OrdreMissionController extends Controller
             'article_action_id' => 'nullable|exists:article_actions,id',
             'assigned_user_id' => 'nullable|exists:users,id',
             'date_prevue' => 'nullable|date',
-            'statut' => 'sometimes|in:a_faire,en_cours,realise,annule',
+            'statut' => 'sometimes|in:'.implode(',', OrdreMissionLigne::STATUTS),
         ]);
 
         $libelle = trim((string) ($validated['libelle'] ?? ''));
@@ -348,7 +352,7 @@ class OrdreMissionController extends Controller
         $validated = $request->validate([
             'libelle'             => 'sometimes|string',
             'quantite'            => 'sometimes|numeric|min:0',
-            'statut'              => 'sometimes|in:a_faire,en_cours,realise,annule',
+            'statut'              => 'sometimes|in:'.implode(',', OrdreMissionLigne::STATUTS),
             'assigned_user_id'    => 'nullable|exists:users,id',
             'equipment_id'        => 'nullable|exists:equipments,id',
             'date_prevue'         => 'nullable|date',
@@ -377,7 +381,7 @@ class OrdreMissionController extends Controller
             'lignes.*.id'                    => 'required|integer',
             'lignes.*.libelle'               => 'sometimes|string',
             'lignes.*.quantite'              => 'sometimes|numeric|min:0',
-            'lignes.*.statut'                => 'sometimes|in:a_faire,en_cours,realise,annule',
+            'lignes.*.statut'                => 'sometimes|in:'.implode(',', OrdreMissionLigne::STATUTS),
             'lignes.*.assigned_user_id'      => 'nullable|exists:users,id',
             'lignes.*.equipment_id'          => 'nullable|exists:equipments,id',
             'lignes.*.date_prevue'           => 'nullable|date',
@@ -411,13 +415,15 @@ class OrdreMissionController extends Controller
 
     public function destroyLigne(Request $request, OrdreMission $ordreMission, OrdreMissionLigne $ligne): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        if (! $request->user()->canValidateStatus()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
         abort_if($ligne->ordre_mission_id !== $ordreMission->id, 404);
 
         $ligne->missionTasks()->each(function (MissionTask $task) {
+            PlanningHuman::query()->where('mission_task_id', $task->id)->delete();
+            PlanningEquipment::query()->where('mission_task_id', $task->id)->delete();
             $task->delete();
         });
         $ligne->delete();

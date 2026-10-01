@@ -11243,6 +11243,38 @@ a.catalogue-tree__link-article:hover {
   font-size: 0.85rem;
 }
 
+.test-form-web-editor {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.test-form-web-editor .form-group {
+  border-left: 3px solid #93c5fd;
+  background: #f8fafc;
+  border-radius: 0 8px 8px 0;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 0.65rem;
+}
+
+.test-form-web-editor .form-group:focus-within {
+  border-left-color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.test-form-web-editor table.data-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.test-form-web-editor table.data-table thead th {
+  background: #eaf1fa;
+  color: #183654;
+}
+
+.test-form-web-editor table.data-table td input,
+.test-form-web-editor table.data-table td select {
+  min-width: 90px;
+}
+
 .task-test-form-fill__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -11657,6 +11689,49 @@ a.catalogue-tree__link-article:hover {
   width: 5.5rem;
   min-width: 5.5rem;
   font-size: 0.82rem;
+}
+
+.om-lignes-table__statut-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+/* Toute ligne deja traitee (autre que "a faire") est grisee : seul ce qui reste
+   a faire doit ressortir visuellement dans une fiche OM longue. */
+.om-lignes-table__row--planifie > td,
+.om-lignes-table__row--replanifie > td,
+.om-lignes-table__row--en_cours > td,
+.om-lignes-table__row--attente_validation > td,
+.om-lignes-table__row--freeze > td,
+.om-lignes-table__row--annule > td,
+.om-lignes-table__row--cloture > td,
+.om-lignes-table__row--realise > td {
+  background: #eef0f2;
+  color: #6b7686;
+}
+
+.om-lignes-table__row--planifie .om-lignes-table__actions .btn,
+.om-lignes-table__row--replanifie .om-lignes-table__actions .btn,
+.om-lignes-table__row--en_cours .om-lignes-table__actions .btn,
+.om-lignes-table__row--attente_validation .om-lignes-table__actions .btn,
+.om-lignes-table__row--freeze .om-lignes-table__actions .btn,
+.om-lignes-table__row--annule .om-lignes-table__actions .btn,
+.om-lignes-table__row--cloture .om-lignes-table__actions .btn,
+.om-lignes-table__row--realise .om-lignes-table__actions .btn {
+  opacity: 0.75;
+}
+
+.labo-essay-row--late > td {
+  background: color-mix(in srgb, #c53030 7%, white);
+}
+
+.labo-essay-row__late-tag {
+  color: #c53030;
+  font-weight: 700;
+  font-size: 0.72rem;
+  margin-left: 0.35rem;
 }
 
 .om-jalon-bulk {

@@ -9,7 +9,7 @@ export const statusLabels: Record<PlanningStatus, string> = {
   frozen: 'Freeze',
   rescheduled: 'Replanifié',
   done: 'Attente validation',
-  validated: 'Clôturé',
+  validated: 'Validé',
   rejected: 'Annulé',
   confirmed: 'Confirmé',
 }

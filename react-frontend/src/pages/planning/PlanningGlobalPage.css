@@ -12,3 +12,5 @@
 .planning-global__filter-row th { padding: .35rem; }
 .planning-global__filter-row input, .planning-global__filter-row select { box-sizing: border-box; width: 100%; min-width: 7rem; max-width: 18rem; font-size: .85rem; }
 .planning-global__pagination { justify-content: flex-end; margin-top: .75rem; }
+.planning-global__row--alt { background: #f4f6f8; }
+.planning-global__row--alt:hover { background: #eef1f4; }

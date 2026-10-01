@@ -13,6 +13,7 @@ import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/S
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import StatusChangeModal from '../../components/StatusChangeModal'
 import OdmGenerationModal from '../../components/ordres-mission/OdmGenerationModal'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useAuth } from '../../contexts/AuthContext'
 import { ordreMissionBonCommande, ordreMissionDossier, ordreMissionDossierId } from '../../lib/ordreMissionDisplay'
 import { formatAppDate } from '../../lib/appLocale'
@@ -75,6 +76,8 @@ export default function OrdresMissionPage() {
   const [statutFilter, setStatutFilter] = useState('')
   const [showGenerationModal, setShowGenerationModal] = useState(false)
   const [selectedBcForGeneration, setSelectedBcForGeneration] = useState<number | null>(null)
+  const [bcSearch, setBcSearch] = useState('')
+  const debouncedBcSearch = useDebouncedValue(bcSearch, 300)
 
   useEffect(() => {
     setTypeFilter(typeFromUrl)
@@ -104,11 +107,12 @@ export default function OrdresMissionPage() {
   })
 
   const { data: bonsCommande = [] } = useQuery({
-    queryKey: ['bons-commande', 'for-om'],
+    queryKey: ['bons-commande', 'for-om', debouncedBcSearch],
     queryFn: async () => {
+      const search = debouncedBcSearch.trim() || undefined
       const [confirmes, enCours] = await Promise.all([
-        bonsCommandeApi.list({ statut: 'confirme' }),
-        bonsCommandeApi.list({ statut: 'en_cours' }),
+        bonsCommandeApi.list({ statut: 'confirme', search }),
+        bonsCommandeApi.list({ statut: 'en_cours', search }),
       ])
       const byId = new Map<number, (typeof confirmes)[number]>()
       for (const bc of [...confirmes, ...enCours]) {
@@ -209,12 +213,16 @@ export default function OrdresMissionPage() {
           onClick={() => {
             setShowGenerationModal(false)
             setSelectedBcForGeneration(null)
+            setBcSearch('')
           }}
         >
           <div
             style={{
               width: '100%',
-              maxWidth: '520px',
+              maxWidth: '900px',
+              maxHeight: '85vh',
+              display: 'flex',
+              flexDirection: 'column',
               background: '#fff',
               borderRadius: 16,
               padding: '1.5rem',
@@ -228,10 +236,13 @@ export default function OrdresMissionPage() {
             <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
               Choisissez un bon de commande pour générer les ordres de mission.
             </p>
-            <label style={{ display: 'block', marginBottom: '1rem' }}>
-              <select
-                value={selectedBcForGeneration ?? ''}
-                onChange={(e) => setSelectedBcForGeneration(e.target.value ? Number(e.target.value) : null)}
+            <label style={{ display: 'block', marginBottom: '0.75rem' }}>
+              <input
+                type="search"
+                placeholder="Rechercher par dossier, chantier, client ou n° de BC…"
+                value={bcSearch}
+                onChange={(e) => setBcSearch(e.target.value)}
+                autoFocus
                 style={{
                   width: '100%',
                   padding: '0.75rem',
@@ -239,20 +250,48 @@ export default function OrdresMissionPage() {
                   border: '1px solid #d1d5db',
                   fontSize: '0.95rem',
                 }}
-              >
-                <option value="">— Choisir un BC —</option>
-                {bonsCommande.map((bc) => (
-                  <option key={bc.id} value={bc.id}>
-                    {bc.numero} — {bc.client?.name ?? `Client #${bc.client_id}`}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
+            <div className="table-wrap" style={{ flex: '1 1 auto', overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: '1rem' }}>
+              <table className="data-table data-table--compact">
+                <thead>
+                  <tr>
+                    <th>N° BC</th>
+                    <th>Client</th>
+                    <th>Dossier</th>
+                    <th>Chantier</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bonsCommande.length === 0 ? (
+                    <tr><td colSpan={4} className="text-muted" style={{ padding: '1rem', textAlign: 'center' }}>Aucun bon de commande trouvé</td></tr>
+                  ) : null}
+                  {bonsCommande.map((bc) => (
+                    <tr
+                      key={bc.id}
+                      tabIndex={0}
+                      role="button"
+                      aria-selected={selectedBcForGeneration === bc.id}
+                      className={selectedBcForGeneration === bc.id ? 'is-selected' : undefined}
+                      style={{ cursor: 'pointer', background: selectedBcForGeneration === bc.id ? '#eef2ff' : undefined }}
+                      onClick={() => setSelectedBcForGeneration(bc.id)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedBcForGeneration(bc.id) } }}
+                    >
+                      <td style={{ fontWeight: 600 }}>{bc.numero}</td>
+                      <td>{bc.client?.name ?? `Client #${bc.client_id}`}</td>
+                      <td>{bc.dossier?.reference ?? '—'}</td>
+                      <td>{bc.dossier?.site?.name ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <div className="crud-actions" style={{ gap: '0.75rem' }}>
               <button
                 type="button"
                 className="btn btn-primary"
                 disabled={!selectedBcForGeneration}
+                onClick={() => { /* la sélection d'une ligne suffit à ouvrir la fiche des jalons */ }}
               >
                 Sélectionner ce BC
               </button>
@@ -262,6 +301,7 @@ export default function OrdresMissionPage() {
                 onClick={() => {
                   setShowGenerationModal(false)
                   setSelectedBcForGeneration(null)
+                  setBcSearch('')
                 }}
               >
                 Annuler
@@ -278,6 +318,7 @@ export default function OrdresMissionPage() {
           onClose={() => {
             setShowGenerationModal(false)
             setSelectedBcForGeneration(null)
+            setBcSearch('')
           }}
           onSuccess={() => {
             void qc.invalidateQueries({ queryKey: ['ordres-mission'] })

@@ -6,6 +6,7 @@ export type MeasureDisplayStatut =
   | 'in_progress'
   | 'paused'
   | 'frozen'
+  | 'rescheduled'
   | 'done'
   | 'validated'
   | 'rejected'
@@ -16,6 +17,7 @@ export const MESURE_STATUT_META: Record<MeasureDisplayStatut, { label: string; c
   in_progress: { label: 'En cours',   color: '#f59e0b', bg: '#fef3c7' },
   paused:      { label: 'Pause',      color: '#7c3aed', bg: '#ede9fe' },
   frozen:      { label: 'Gelé',       color: '#0891b2', bg: '#cffafe' },
+  rescheduled: { label: 'Replanifié', color: '#2563eb', bg: '#dbeafe' },
   done:        { label: 'Terminé',    color: '#3b82f6', bg: '#dbeafe' },
   validated:   { label: 'Validé',     color: '#10b981', bg: '#d1fae5' },
   rejected:    { label: 'Annulé',     color: '#ef4444', bg: '#fee2e2' },
@@ -57,6 +59,7 @@ export function displayMeasureStatut(task: MissionTask): MeasureDisplayStatut {
   if (task.statut === 'rejected') return 'rejected'
   if (task.statut === 'paused') return 'paused'
   if (task.statut === 'frozen') return 'frozen'
+  if (task.statut === 'rescheduled') return 'rescheduled'
   if (task.statut === 'validated') return 'validated'
   if (task.statut === 'done') return 'done'
   if (task.statut === 'in_progress') return 'in_progress'

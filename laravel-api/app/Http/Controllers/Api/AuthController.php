@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Validation\Rules\Password;
 
@@ -35,6 +36,13 @@ class AuthController extends Controller
         ]);
 
         $message = 'Si cette adresse est reconnue, un e-mail de réinitialisation vient d\'être envoyé.';
+
+        $throttleKey = 'password-reset:'.mb_strtolower(trim($validated['email']));
+        if (RateLimiter::tooManyAttempts($throttleKey, 3)) {
+            return response()->json(['message' => $message]);
+        }
+        RateLimiter::hit($throttleKey, 600);
+
         $user = User::query()->where('email', $validated['email'])->first();
 
         if ($user === null) {
@@ -103,14 +111,32 @@ class AuthController extends Controller
             'device_name' => 'nullable|string|max:255',
         ]);
 
+        // Verrouillage par identifiant tente (pas par IP : l'infra devant cette
+        // instance ne transmet pas l'IP reelle du client, tout le trafic mobile
+        // remonte avec la meme adresse -- un throttle par IP bloquerait tout le
+        // monde en meme temps qu'un bruteforce cible sur un seul compte).
+        $email = mb_strtolower(trim((string) $request->input('email')));
+        $throttleKey = 'login:'.$email;
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            $this->securityLogger->log('login_throttled', $email, ['retry_after_seconds' => $seconds]);
+
+            return response()->json([
+                'message' => "Trop de tentatives échouées. Réessayez dans {$seconds} secondes.",
+            ], 429);
+        }
+
         if (! Auth::attempt($request->only('email', 'password'))) {
-            $this->securityLogger->log('login_failed', $request->input('email'), [
+            RateLimiter::hit($throttleKey, 900);
+            $this->securityLogger->log('login_failed', $email, [
                 'reason' => 'invalid_credentials',
             ]);
 
             return response()->json(['message' => 'Identifiants invalides'], 401);
         }
 
+        RateLimiter::clear($throttleKey);
         $user = Auth::user();
         $device = $request->input('device_name');
         $tokenName = is_string($device) && trim($device) !== '' ? trim($device) : 'spa';

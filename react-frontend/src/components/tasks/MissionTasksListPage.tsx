@@ -195,6 +195,11 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
   const quantityUnit = taskQuantityUnit(task, context)
   const [quantityCount, setQuantityCount] = useState(String(task.quantity_count ?? Math.min(1, task.remaining_quantity ?? 1)))
   const [message, setMessage] = useState('')
+  const [showValidatePanel, setShowValidatePanel] = useState(false)
+  const [validateConform, setValidateConform] = useState(true)
+  const [validateValueFinal, setValidateValueFinal] = useState('')
+  const [validateConclusion, setValidateConclusion] = useState('')
+  const [validateObservations, setValidateObservations] = useState('')
   const [correctionNotes, setCorrectionNotes] = useState<Record<number, string>>({})
   const [activeTab, setActiveTab] = useState<'suivi' | 'essais'>('suivi')
   const [localSamples, setLocalSamples] = useState<MissionTaskSample[]>(task.samples ?? [])
@@ -292,7 +297,7 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
         statut,
       })
       const pv = normalizePvNumbers([...pvNumbers, pvDraft])
-      if (!task.reception_generated_at && pv.length > 0 && Number(quantityCount) >= 1) {
+      if (context === 'terrain' && !task.reception_generated_at && pv.length > 0 && Number(quantityCount) >= 1) {
         const result = await missionTasksApi.closeReception(task.id, {
           pv_numbers: pv,
           quantity_unit: quantityUnit.value,
@@ -321,7 +326,22 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
     },
   })
 
-  const error = save.error || duplicate.error || attachSample.error || detachSample.error
+  const validateTask = useMutation({
+    mutationFn: () => missionTasksApi.validate(task.id, {
+      is_conform: validateConform,
+      value_final: validateValueFinal.trim() ? Number(validateValueFinal) : undefined,
+      conclusion: validateConclusion.trim() || undefined,
+      observations: validateObservations.trim() || undefined,
+    }),
+    onSuccess: async () => {
+      await refresh()
+      setShowValidatePanel(false)
+      setMessage('Tâche validée.')
+      window.setTimeout(onClose, 1200)
+    },
+  })
+
+  const error = save.error || duplicate.error || attachSample.error || detachSample.error || validateTask.error
   const pvCount = normalizePvNumbers([...pvNumbers, pvDraft]).length
   const maxQuantity = task.reception_generated_at ? (task.quantity_count ?? 1) : (task.remaining_quantity ?? task.ordered_quantity ?? 1)
 
@@ -361,6 +381,7 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
         <label>Statut
           <select value={statut} onChange={(event) => setStatut(event.target.value as MissionTask['statut'])}>
             {TASK_FILTERS.flatMap((filter) => filter.statuts).filter((value, index, all) => all.indexOf(value) === index)
+              .filter((value) => value !== 'validated' || task.statut === 'validated')
               .filter((value) => context !== 'labo' || hasFoldCoverage || value === 'todo' || value === task.statut)
               .map((value) => (
                 <option key={value} value={value}>{getTaskStatutMeta(value as MissionTask['statut']).label}</option>
@@ -371,7 +392,13 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
               Rattachez un FOLD (ou cochez « pas de FOLD nécessaire ») pour pouvoir avancer cette tâche.
             </span>
           ) : null}
+          {task.statut !== 'validated' ? (
+            <span className="text-muted" style={{ fontSize: '0.82rem' }}>
+              Pour clôturer définitivement, utilisez « Valider la tâche » ci-dessous.
+            </span>
+          ) : null}
         </label>
+        {context === 'terrain' ? <>
         <label>Unité de quantité
           <span className="mission-task-modal__unit">
             <strong>{quantityUnit.value}</strong>
@@ -415,6 +442,7 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
           ) : null}
           <span className="text-muted">{pvCount} numéro{pvCount !== 1 ? 's' : ''} de PV saisi{pvCount !== 1 ? 's' : ''}</span>
         </label>
+        </> : null}
       </div>
       {context === 'labo' ? (
         <div className="mission-task-modal__grid" style={{ marginTop: '0.75rem' }}>
@@ -486,10 +514,37 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
           </label>
         </div>
       ) : null}
+      {task.statut !== 'validated' && showValidatePanel ? (
+        <div className="card" style={{ padding: '0.75rem 1rem', marginBottom: '1rem' }}>
+          <h4 style={{ marginTop: 0 }}>Valider la tâche</h4>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <input type="checkbox" checked={validateConform} onChange={(event) => setValidateConform(event.target.checked)} />
+            Résultat conforme
+          </label>
+          <label>Valeur finale (optionnel)
+            <input type="text" inputMode="decimal" value={validateValueFinal} onChange={(event) => setValidateValueFinal(event.target.value.replace(',', '.'))} />
+          </label>
+          <label>Conclusion (optionnel)
+            <input type="text" value={validateConclusion} onChange={(event) => setValidateConclusion(event.target.value)} />
+          </label>
+          <label>Observations (optionnel)
+            <textarea value={validateObservations} onChange={(event) => setValidateObservations(event.target.value)} rows={2} />
+          </label>
+          <div className="crud-actions">
+            <button type="button" className="btn btn--primary" disabled={validateTask.isPending} onClick={() => validateTask.mutate()}>
+              {validateTask.isPending ? 'Validation…' : 'Confirmer la validation'}
+            </button>
+            <button type="button" className="btn btn--secondary" onClick={() => setShowValidatePanel(false)}>Annuler</button>
+          </div>
+        </div>
+      ) : null}
       {message ? <p className="success">{message}</p> : null}
       {error ? <p className="error">{(error as Error).message}</p> : null}
       <div className="mission-task-modal__actions">
         {(task.remaining_quantity ?? 0) > 0 && task.reception_generated_at ? <button type="button" className="btn btn--secondary" disabled={duplicate.isPending} onClick={() => duplicate.mutate()}>Ajouter une tâche sur le reliquat</button> : null}
+        {task.statut !== 'validated' && !showValidatePanel ? (
+          <button type="button" className="btn btn--secondary" onClick={() => setShowValidatePanel(true)}>Valider la tâche</button>
+        ) : null}
         <button type="button" className="btn btn--primary" disabled={save.isPending} onClick={() => save.mutate()}>
           {save.isPending ? 'Enregistrement…' : 'Enregistrer'}
         </button>
@@ -600,6 +655,8 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
     return searchable.includes(query)
   }), [tasks, statusFilter, clientFilter, technicianFilter, dateFrom, dateTo, search])
   const grouped = useMemo(() => groupTasksByDossierJalonProduit(displayed), [displayed])
+  const isLabo = context === 'labo'
+  const columnCount = 7
 
   return (
     <ModuleEntityShell
@@ -648,12 +705,14 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
         <label className="mission-task-list__search-field">Recherche
           <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tâche, dossier, client, chantier, jalon…" />
         </label>
-        <label>Client
-          <select value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
-            <option value="">Tous les clients</option>
-            {clients.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
-        </label>
+        {!isLabo ? (
+          <label>Client
+            <select value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
+              <option value="">Tous les clients</option>
+              {clients.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+          </label>
+        ) : null}
         <label>Technicien
           <select value={technicianFilter} onChange={(event) => setTechnicianFilter(event.target.value)}>
             <option value="">Tous les techniciens</option>
@@ -677,6 +736,7 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
               <thead>
                 <tr>
                   <th>N° tâche</th>
+                  {isLabo ? <th>N° FOLD / PV</th> : <th>N° PV</th>}
                   <th>Tâche</th>
                   <th>Technicien assigné</th>
                   <th>Statut</th>
@@ -686,13 +746,13 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
               </thead>
               <tbody>
                 {displayed.length === 0 ? (
-                  <tr><td colSpan={6} className="text-muted">Aucune tâche pour ce filtre.</td></tr>
+                  <tr><td colSpan={columnCount} className="text-muted">Aucune tâche pour ce filtre.</td></tr>
                 ) : null}
                 {grouped.flatMap((dossier) => {
                   const dossierOpen = !closedDossiers.has(dossier.key)
                   return [
                     <tr key={dossier.key} className="mission-task-list__dossier-row">
-                      <th colSpan={6} scope="rowgroup">
+                      <th colSpan={columnCount} scope="rowgroup">
                         <div className="mission-task-list__group-row-inner">
                           <button
                             type="button"
@@ -704,8 +764,8 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                             {dossierOpen ? '▾' : '▸'}
                           </button>
                           <span className="mission-task-list__dossier-title">{dossier.reference}</span>
-                          <span className="mission-task-list__dossier-client" title={dossier.client}>{dossier.client}</span>
-                          <span className="mission-task-list__dossier-site" title={dossier.site}>{dossier.site}</span>
+                          {!isLabo ? <span className="mission-task-list__dossier-client" title={dossier.client}>{dossier.client}</span> : null}
+                          {!isLabo ? <span className="mission-task-list__dossier-site" title={dossier.site}>{dossier.site}</span> : null}
                           <strong className="mission-task-list__dossier-count">{dossier.count} tâche{dossier.count > 1 ? 's' : ''}</strong>
                         </div>
                       </th>
@@ -715,7 +775,7 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                       const jalonOpen = openedGroups.has(jalonGroupKey)
                       return [
                         <tr key={jalonGroupKey} className="mission-task-list__jalon-row">
-                          <th colSpan={6} scope="rowgroup">
+                          <th colSpan={columnCount} scope="rowgroup">
                             <div className="mission-task-list__group-row-inner">
                               <button
                                 type="button"
@@ -736,7 +796,7 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                           const produitOpen = openedGroups.has(produitGroupKey)
                           return [
                             <tr key={produitGroupKey} className="mission-task-list__produit-row">
-                              <th colSpan={6} scope="rowgroup">
+                              <th colSpan={columnCount} scope="rowgroup">
                                 <div className="mission-task-list__group-row-inner">
                                   <button
                                     type="button"
@@ -775,6 +835,14 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                                     <strong>{task.unique_number ?? `TSK-${task.id}`}</strong>
                                     {om ? <div className="text-muted mission-task-list__sub">{om.numero}</div> : null}
                                   </td>
+                                  {isLabo ? (
+                                    <td>
+                                      <div>{task.samples?.length ? task.samples.map((s) => s.fold_number).filter(Boolean).join(', ') : <span className="text-muted">—</span>}</div>
+                                      <div className="text-muted mission-task-list__sub">{task.pv_numbers?.length ? task.pv_numbers.join(', ') : '—'}</div>
+                                    </td>
+                                  ) : (
+                                    <td>{task.pv_numbers?.length ? task.pv_numbers.join(', ') : <span className="text-muted">—</span>}</td>
+                                  )}
                                   <td>
                                     <div className="mission-task-list__task" title={taskLabel(task)}>{taskLabel(task)}</div>
                                   </td>

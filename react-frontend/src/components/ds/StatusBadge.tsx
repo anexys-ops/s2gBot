@@ -140,6 +140,40 @@ export function ordreMissionStatutBadgeProps(
   return { variant: m.variant, children: m.label, label: m.label }
 }
 
+/** Statut de ligne d'OM : planifie | replanifie | en_cours | freeze | annule | attente_validation | cloture | a_faire | realise */
+export function ligneStatutBadgeProps(
+  statut: string
+): Pick<StatusBadgeProps, 'variant' | 'children'> & { label: string } {
+  const map: Record<string, { label: string; variant: StatusBadgeVariant }> = {
+    a_faire: { label: 'À faire', variant: 'neutral' },
+    planifie: { label: 'Planifié', variant: 'info' },
+    replanifie: { label: 'Replanifié', variant: 'info' },
+    en_cours: { label: 'En cours', variant: 'warning' },
+    attente_validation: { label: 'Attente validation', variant: 'warning' },
+    freeze: { label: 'Freeze', variant: 'neutral' },
+    annule: { label: 'Annulé', variant: 'neutral' },
+    cloture: { label: 'Clôturé', variant: 'success' },
+    realise: { label: 'Réalisé', variant: 'success' },
+  }
+  const m = map[statut] ?? { label: statut, variant: 'neutral' as const }
+  return { variant: m.variant, children: m.label, label: m.label }
+}
+
+/** Statut de formulaire d'essai (task_test_forms) : not_started | draft | submitted | correction_requested | validated */
+export function essayFormStatutBadgeProps(
+  statut: string
+): Pick<StatusBadgeProps, 'variant' | 'children'> & { label: string } {
+  const map: Record<string, { label: string; variant: StatusBadgeVariant }> = {
+    not_started: { label: 'Non commencé', variant: 'neutral' },
+    draft: { label: 'Brouillon', variant: 'info' },
+    submitted: { label: 'Soumis', variant: 'warning' },
+    correction_requested: { label: 'Correction demandée', variant: 'danger' },
+    validated: { label: 'Validé', variant: 'success' },
+  }
+  const m = map[statut] ?? { label: statut, variant: 'neutral' as const }
+  return { variant: m.variant, children: m.label, label: m.label }
+}
+
 export function equipementStatutBadgeProps(status: string): { label: string; variant: StatusBadgeVariant } {
   const k = status.toLowerCase()
   if (k === 'active' || k === 'ok' || k === 'in_service' || k.includes('actif')) {

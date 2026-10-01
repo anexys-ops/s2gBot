@@ -35,6 +35,15 @@
     };
     // Pagination explicite : DomPDF peut perdre les dernières lignes d'une longue table.
     $pageChunks = $affectations->isEmpty() ? collect([collect()]) : $affectations->chunk(9)->values();
+    $isLabo = ($planningType ?? 'technicien') === \App\Models\OrdreMission::TYPE_LABO;
+    $showClientColumn = $show('show_client') && ! $isLabo;
+    $showChantierColumn = ! $isLabo;
+    $showFoldColumn = $isLabo;
+    $columnCount = collect([
+        $show('show_start_date'), $show('show_end_date'), $show('show_technician'),
+        $showClientColumn, $showChantierColumn, $showFoldColumn,
+        $show('show_order'), $show('show_task'), $show('show_quantity'), $show('show_notes'),
+    ])->filter()->count();
 @endphp
     @include('pdf.partials.branding-header', ['layoutConfig' => $layoutConfig ?? [], 'brandingLogoDataUri' => $brandingLogoDataUri ?? null])
     <h1>{{ $title }}</h1>
@@ -51,7 +60,9 @@
                 @if($show('show_start_date'))<th style="width:8%">Démarrage</th>@endif
                 @if($show('show_end_date'))<th style="width:8%">Fin</th>@endif
                 @if($show('show_technician'))<th style="width:13%">Technicien</th>@endif
-                @if($show('show_client'))<th style="width:14%">Client</th>@endif
+                @if($showClientColumn)<th style="width:14%">Client</th>@endif
+                @if($showChantierColumn)<th style="width:14%">Chantier</th>@endif
+                @if($showFoldColumn)<th style="width:10%">N° FOLD</th>@endif
                 @if($show('show_order'))<th style="width:12%">Bon de commande</th>@endif
                 @if($show('show_task'))<th>Tâche</th>@endif
                 @if($show('show_quantity'))<th style="width:6%">Quantité</th>@endif
@@ -65,8 +76,14 @@
                     $line = $isMissionTask ? $affectation->ordreMissionLigne : $affectation->bonCommandeLigne;
                     $order = $isMissionTask ? $line?->ordreMission?->bonCommande : $line?->bonCommande;
                     $startDate = $isMissionTask ? $affectation->planned_date : $affectation->date_debut;
-                    $endDate = $isMissionTask ? ($affectation->due_date ?? $affectation->planned_date) : $affectation->date_fin;
+                    $endDate = $isMissionTask ? $affectation->due_date : $affectation->date_fin;
                     $technician = $isMissionTask ? $affectation->assignedUser : $affectation->user;
+                    $chantier = $isMissionTask
+                        ? $line?->ordreMission?->site?->name
+                        : ($affectation->bonCommandeLigne?->bonCommande?->dossier?->site?->name);
+                    $foldNumbers = $isMissionTask
+                        ? $affectation->samples->pluck('fold_number')->filter()->implode(', ')
+                        : null;
                     $notes = array_values(array_unique(array_filter([
                         trim((string) $affectation->notes),
                         trim((string) ($isMissionTask ? $line?->bonCommandeLigne?->notes_ligne : $line?->notes_ligne)),
@@ -76,14 +93,16 @@
                     @if($show('show_start_date'))<td class="date">{{ $startDate?->format('d/m/Y') ?? '—' }}</td>@endif
                     @if($show('show_end_date'))<td class="date">{{ $endDate?->format('d/m/Y') ?? '—' }}</td>@endif
                     @if($show('show_technician'))<td><strong>{{ $technician?->name ?? '—' }}</strong></td>@endif
-                    @if($show('show_client'))<td>{{ $order?->client?->name ?? ($isMissionTask ? $line?->ordreMission?->client?->name : null) ?? '—' }}</td>@endif
+                    @if($showClientColumn)<td>{{ $order?->client?->name ?? ($isMissionTask ? $line?->ordreMission?->client?->name : null) ?? '—' }}</td>@endif
+                    @if($showChantierColumn)<td>{{ $chantier ?? '—' }}</td>@endif
+                    @if($showFoldColumn)<td>{{ $foldNumbers !== null && $foldNumbers !== '' ? $foldNumbers : '—' }}</td>@endif
                     @if($show('show_order'))<td>{{ $order?->numero ?? '—' }}</td>@endif
                     @if($show('show_task'))<td>{{ $line?->libelle ?? '—' }}</td>@endif
-                    @if($show('show_quantity'))<td class="qty">{{ $line ? $formatQty($line->quantite) : '—' }}</td>@endif
+                    @if($show('show_quantity'))<td class="qty">{{ $line ? $formatQty($affectation->merged_quantity ?? $line->quantite) : '—' }}</td>@endif
                     @if($show('show_notes'))<td class="notes">{{ $notes !== [] ? implode("\n", $notes) : '—' }}</td>@endif
                 </tr>
             @empty
-                <tr><td class="empty" colspan="8">Aucune tâche planifiée sur cette période.</td></tr>
+                <tr><td class="empty" colspan="{{ $columnCount }}">Aucune tâche planifiée sur cette période.</td></tr>
             @endforelse
         </tbody>
     </table>

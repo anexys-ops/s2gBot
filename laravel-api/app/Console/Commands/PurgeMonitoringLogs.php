@@ -7,7 +7,6 @@ use App\Models\SecurityLog;
 use App\Models\SystemErrorLog;
 use App\Models\UserSessionPresence;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class PurgeMonitoringLogs extends Command
@@ -29,12 +28,10 @@ class PurgeMonitoringLogs extends Command
             ->where('created_at', '<', $cutoff)
             ->delete();
 
-        if (Schema::hasTable('activity_logs_archive')) {
-            $counts['activity_logs_archive'] = DB::table('activity_logs_archive')
-                ->where('created_at', '<', $cutoff)
-                ->delete();
-        }
-
+        // activity_logs_archive n'est PAS purgee ici : elle est deliberement
+        // conservee plus longtemps (cf. logs:purge-archive, 2 ans par defaut
+        // sur archived_at) -- la purger avec la meme retention courte que les
+        // logs actifs viderait l'archive immediatement apres chaque archivage.
         if (Schema::hasTable('system_error_logs')) {
             $counts['system_error_logs'] = SystemErrorLog::query()
                 ->where('created_at', '<', $cutoff)

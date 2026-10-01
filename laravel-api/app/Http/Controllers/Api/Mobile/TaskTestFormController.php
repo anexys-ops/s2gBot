@@ -39,6 +39,9 @@ class TaskTestFormController extends Controller
         $data = $request->validate([
             'status' => 'nullable|in:not_started,draft,submitted,correction_requested,validated',
             'context' => 'nullable|in:terrain,ingenieur,labo',
+            'user_id' => 'nullable|integer|exists:users,id',
+            'sort' => 'nullable|in:fold,updated_at,statut,technicien',
+            'dir' => 'nullable|in:asc,desc',
             'page' => 'nullable|integer|min:1',
         ]);
 
@@ -52,11 +55,17 @@ class TaskTestFormController extends Controller
             })
             ->join('mission_tasks as mt', 'mt.ordre_mission_ligne_id', '=', 'oml.id')
             ->join('ordres_mission as om', 'om.id', '=', 'oml.ordre_mission_id')
+            ->join('ref_articles as ra', 'ra.id', '=', 'att.ref_article_id')
             ->join('test_types as tt', 'tt.id', '=', 'att.test_type_id')
             ->leftJoin('task_test_forms as ttf', function ($join) {
                 $join->on('ttf.mission_task_id', '=', 'mt.id')->on('ttf.test_type_id', '=', 'att.test_type_id');
             })
+            ->leftJoin('mission_task_samples as mts', 'mts.mission_task_id', '=', 'mt.id')
+            ->leftJoin('samples as smp', 'smp.id', '=', 'mts.sample_id')
+            ->leftJoin('users as tech', 'tech.id', '=', 'mt.assigned_user_id')
             ->whereNull('mt.deleted_at')
+            ->whereNull('om.deleted_at')
+            ->whereNull('ra.deleted_at')
             ->where(function ($q) {
                 $q->whereNull('tt.context')
                     ->orWhere(fn ($q2) => $q2->where('tt.context', 'terrain')->where('om.type', 'technicien'))
@@ -64,34 +73,55 @@ class TaskTestFormController extends Controller
                     ->orWhere(fn ($q2) => $q2->where('tt.context', 'labo')->where('om.type', 'labo'));
             })
             ->when($data['context'] ?? null, fn ($q, $context) => $q->where('tt.context', $context))
+            ->when($data['user_id'] ?? null, fn ($q, $userId) => $q->where('mt.assigned_user_id', $userId))
             ->when(($data['status'] ?? null) === 'not_started', fn ($q) => $q->whereNull('ttf.id'))
             ->when(in_array($data['status'] ?? null, ['draft', 'submitted', 'correction_requested', 'validated'], true),
                 fn ($q) => $q->where('ttf.status', $data['status']))
-            ->selectRaw('mt.id as task_id, att.test_type_id, ttf.id as form_id, ttf.status as form_status, COALESCE(ttf.updated_at, mt.updated_at) as sort_date')
-            ->distinct()
-            ->orderByDesc('sort_date');
+            ->selectRaw('mt.id as task_id, att.test_type_id, ttf.id as form_id, ttf.status as form_status, COALESCE(ttf.updated_at, mt.updated_at) as sort_date, MIN(smp.fold_number) as sort_fold, COALESCE(mt.planned_date, mt.due_date) as ref_date, tech.name as technicien_name')
+            ->groupBy('mt.id', 'att.test_type_id', 'ttf.id', 'ttf.status', 'ttf.updated_at', 'mt.updated_at', 'mt.planned_date', 'mt.due_date', 'tech.name');
+
+        $sort = $data['sort'] ?? 'fold';
+        $dir = $data['dir'] ?? 'asc';
+        match ($sort) {
+            'updated_at' => $pairs->orderBy('sort_date', $dir),
+            'statut' => $pairs->orderByRaw('form_status IS NULL, form_status '.$dir),
+            'technicien' => $pairs->orderByRaw('technicien_name IS NULL, technicien_name '.$dir),
+            default => $pairs->orderByRaw('sort_fold IS NULL, sort_fold '.$dir)->orderByDesc('sort_date'),
+        };
+
+        $allRows = $pairs->get();
+        $total = $allRows->count();
+
+        $today = now()->toDateString();
+        $stats = [
+            'total' => $total,
+            'by_status' => [
+                'not_started' => $allRows->filter(fn ($r) => $r->form_status === null)->count(),
+                'draft' => $allRows->filter(fn ($r) => $r->form_status === 'draft')->count(),
+                'submitted' => $allRows->filter(fn ($r) => $r->form_status === 'submitted')->count(),
+                'correction_requested' => $allRows->filter(fn ($r) => $r->form_status === 'correction_requested')->count(),
+                'validated' => $allRows->filter(fn ($r) => $r->form_status === 'validated')->count(),
+            ],
+            'today_total' => $allRows->filter(fn ($r) => $r->ref_date === $today)->count(),
+            'today_started' => $allRows->filter(fn ($r) => $r->ref_date === $today && $r->form_status !== null)->count(),
+            'late' => $allRows->filter(fn ($r) => $r->ref_date !== null && $r->ref_date < $today && $r->form_status !== 'validated')->count(),
+        ];
 
         $page = $data['page'] ?? 1;
         $perPage = 30;
-        $total = (clone $pairs)->get()->count();
-        $rows = $pairs->forPage($page, $perPage)->get();
+        $rows = $allRows->slice(($page - 1) * $perPage, $perPage)->values();
 
         $taskIds = $rows->pluck('task_id')->unique()->values();
         $typeIds = $rows->pluck('test_type_id')->unique()->values();
 
         $tasks = MissionTask::query()->whereIn('id', $taskIds)->with([
             'assignedUser:id,name',
-            'ordreMissionLigne:id,ordre_mission_id',
-            'ordreMissionLigne.ordreMission:id,client_id,site_id,dossier_id',
-            'ordreMissionLigne.ordreMission.client:id,name',
-            'ordreMissionLigne.ordreMission.site:id,name',
-            'ordreMissionLigne.ordreMission.dossier:id,reference',
+            'samples:id,fold_number',
         ])->get()->keyBy('id');
         $types = TestType::query()->whereIn('id', $typeIds)->get(['id', 'name', 'norm', 'context'])->keyBy('id');
 
-        $items = $rows->map(function ($row) use ($tasks, $types) {
+        $items = $rows->map(function ($row) use ($tasks, $types, $today) {
             $task = $tasks->get($row->task_id);
-            $om = $task?->ordreMissionLigne?->ordreMission;
 
             return [
                 'id' => $row->form_id ?? "pending-{$row->task_id}-{$row->test_type_id}",
@@ -101,11 +131,13 @@ class TaskTestFormController extends Controller
                     'id' => $task->id,
                     'unique_number' => $task->unique_number,
                     'assigned_user' => $task->assignedUser?->name,
+                    'assigned_user_id' => $task->assigned_user_id,
                 ] : null,
-                'client' => $om?->client?->name,
-                'chantier' => $om?->site?->name,
-                'dossier' => $om?->dossier?->reference,
+                'fold_numbers' => $task?->samples->pluck('fold_number')->filter()->values() ?? [],
+                'pv_numbers' => $task?->pv_numbers ?? [],
                 'updated_at' => $row->sort_date,
+                'ref_date' => $row->ref_date,
+                'is_late' => $row->ref_date !== null && $row->ref_date < $today && $row->form_status !== 'validated',
             ];
         })->values();
 
@@ -115,6 +147,7 @@ class TaskTestFormController extends Controller
             'last_page' => (int) max(1, ceil($total / $perPage)),
             'per_page' => $perPage,
             'total' => $total,
+            'stats' => $stats,
         ]);
     }
 

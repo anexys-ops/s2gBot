@@ -9,6 +9,7 @@ use App\Support\AppBranding;
 use App\Support\PdfTemplateResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 
 class TerrainPlanningPdfGenerator
 {
@@ -30,7 +31,7 @@ class TerrainPlanningPdfGenerator
         $query = BcLignePlanningAffectation::query()
             ->with([
                 'bonCommandeLigne.bonCommande.client',
-                'bonCommandeLigne.bonCommande.dossier',
+                'bonCommandeLigne.bonCommande.dossier.site',
                 'user',
             ])
             ->whereDate('date_debut', '<=', $to)
@@ -44,8 +45,9 @@ class TerrainPlanningPdfGenerator
             ? $query->orderBy('date_debut')->orderBy('user_id')->orderBy('id')->get()
             : collect();
 
-        $affectations = $legacy
-            ->concat($this->missionTasks->scheduled($from, $to, $userId, null, $type))
+        $affectations = $this->mergeSameDayDuplicates(
+            $legacy->concat($this->missionTasks->scheduled($from, $to, $userId, null, $type))
+        )
             ->sortBy(fn ($row) => $row instanceof MissionTask
                 ? $row->planned_date?->format('Y-m-d')
                 : $row->date_debut?->format('Y-m-d'))
@@ -71,6 +73,7 @@ class TerrainPlanningPdfGenerator
             'title' => $title,
             'periodLabel' => $periodLabel,
             'generatedAt' => now()->format('d/m/Y H:i'),
+            'planningType' => $type,
         ])->render();
 
         $pdf = Pdf::loadHTML($html);
@@ -85,5 +88,43 @@ class TerrainPlanningPdfGenerator
     private function formatDate(string $value): string
     {
         return CarbonImmutable::parse($value)->format('d/m/Y');
+    }
+
+    /**
+     * Fusionne les tâches identiques (même technicien, même jour, même produit,
+     * même ligne de BC) en une seule ligne dont la quantité est la somme des
+     * quantités individuelles — évite d'afficher N lignes en double dans le
+     * programme quand un jalon génère une tâche par unité de quantité.
+     * Les lignes historiques (BcLignePlanningAffectation) ne sont pas fusionnées.
+     */
+    private function mergeSameDayDuplicates(Collection $affectations): Collection
+    {
+        return $affectations
+            ->groupBy(function ($row) {
+                if (! $row instanceof MissionTask) {
+                    return 'legacy-'.spl_object_id($row);
+                }
+                $ligne = $row->ordreMissionLigne;
+
+                return implode('|', [
+                    $row->assigned_user_id ?? 'none',
+                    $row->planned_date?->format('Y-m-d') ?? 'none',
+                    $ligne?->libelle ?? 'none',
+                    $ligne?->ref_article_id ?? 'none',
+                    $ligne?->article_action_id ?? 'none',
+                    $ligne?->bon_commande_ligne_id ?? 'none',
+                ]);
+            })
+            ->map(function (Collection $group) {
+                /** @var MissionTask $first */
+                $first = $group->first();
+                if ($group->count() > 1 && $first instanceof MissionTask && $first->ordreMissionLigne) {
+                    $totalQuantite = $group->sum(fn (MissionTask $t) => (float) ($t->ordreMissionLigne?->quantite ?? 0));
+                    $first->merged_quantity = $totalQuantite;
+                }
+
+                return $first;
+            })
+            ->values();
     }
 }

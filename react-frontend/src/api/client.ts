@@ -2381,6 +2381,20 @@ export interface MonitoringSecurityRow {
   created_at: string
 }
 
+export interface MonitoringMobileAuditRow {
+  id: number
+  user_id: number | null
+  user?: { id: number; name: string; email?: string } | null
+  action: string
+  latitude?: number | null
+  longitude?: number | null
+  accuracy?: number | null
+  occurred_at: string
+  details?: Record<string, unknown> | null
+  ip_address?: string | null
+  user_agent?: string | null
+}
+
 export interface MonitoringSessionRow {
   id: number
   token_id: number
@@ -2427,6 +2441,16 @@ export const monitoringApi = {
       method: 'POST',
       body: JSON.stringify({ page }),
     }),
+  mobileAudit: (params?: { limit?: number; user_id?: number; action?: string; from?: string; to?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.limit) q.set('limit', String(params.limit))
+    if (params?.user_id) q.set('user_id', String(params.user_id))
+    if (params?.action) q.set('action', params.action)
+    if (params?.from) q.set('from', params.from)
+    if (params?.to) q.set('to', params.to)
+    const s = q.toString()
+    return api<MonitoringMobileAuditRow[]>(`/mobile/audit-logs${s ? `?${s}` : ''}`)
+  },
 }
 
 export interface StatsEssaisParType {
@@ -3198,22 +3222,36 @@ export interface LaboTaskTestFormRow {
   id: number | string
   status: 'not_started' | 'draft' | 'submitted' | 'correction_requested' | 'validated'
   updated_at: string
+  ref_date?: string | null
+  is_late?: boolean
   test_type: { id: number; name: string; norm?: string | null; context?: string | null } | null
-  task: { id: number; unique_number?: string | null; assigned_user?: string | null } | null
-  client?: string | null
-  chantier?: string | null
-  dossier?: string | null
+  task: { id: number; unique_number?: string | null; assigned_user?: string | null; assigned_user_id?: number | null } | null
+  fold_numbers?: string[]
+  pv_numbers?: string[]
 }
+
+export interface LaboTaskTestFormStats {
+  total: number
+  by_status: Record<'not_started' | 'draft' | 'submitted' | 'correction_requested' | 'validated', number>
+  today_total: number
+  today_started: number
+  late: number
+}
+
+export type LaboTaskTestFormListResponse = LaravelPaginator<LaboTaskTestFormRow> & { stats: LaboTaskTestFormStats }
 
 export const taskTestFormsApi = {
   list: (taskId: number) => api<{ task_id: number; forms: TaskTestFormSummary[] }>(`/mobile/task-forms/tasks/${taskId}`),
-  listAll: (params?: { status?: string; context?: string; page?: number }) => {
+  listAll: (params?: { status?: string; context?: string; user_id?: number; sort?: string; dir?: 'asc' | 'desc'; page?: number }) => {
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)
     if (params?.context) q.set('context', params.context)
+    if (params?.user_id) q.set('user_id', String(params.user_id))
+    if (params?.sort) q.set('sort', params.sort)
+    if (params?.dir) q.set('dir', params.dir)
     if (params?.page) q.set('page', String(params.page))
     const s = q.toString()
-    return api<LaravelPaginator<LaboTaskTestFormRow>>(`/mobile/task-forms${s ? `?${s}` : ''}`)
+    return api<LaboTaskTestFormListResponse>(`/mobile/task-forms${s ? `?${s}` : ''}`)
   },
   save: (taskId: number, typeId: number, answers: Record<string, unknown>) =>
     api<{ answers: Record<string, unknown> }>(`/mobile/task-forms/tasks/${taskId}/types/${typeId}`, { method: 'PUT', body: JSON.stringify({ answers }) }),
@@ -4003,8 +4041,31 @@ export interface PlanningEvent {
   is_validated?: boolean
   user?: { id: number; name: string } | null
   equipment?: { id: number; name: string; code?: string } | null
-  mission_task?: { id: number; statut?: 'todo' | 'in_progress' | 'paused' | 'frozen' | 'rescheduled' | 'done' | 'validated' | 'rejected'; ordre_mission_ligne?: { id: number; libelle: string; ordre_mission?: { id: number; numero: string; bon_commande_id: number | null } | null } | null } | null
-  bon_commande_ligne?: { id: number; libelle: string; bon_commande?: { id: number; numero: string } | null } | null
+  mission_task?: {
+    id: number
+    unique_number?: string | null
+    statut?: 'todo' | 'in_progress' | 'paused' | 'frozen' | 'rescheduled' | 'done' | 'validated' | 'rejected'
+    ordre_mission_ligne?: {
+      id: number
+      libelle: string
+      ordre_mission?: {
+        id: number
+        numero: string
+        bon_commande_id: number | null
+        client?: { id: number; name: string } | null
+        site?: { id: number; name: string } | null
+      } | null
+    } | null
+  } | null
+  bon_commande_ligne?: {
+    id: number
+    libelle: string
+    bon_commande?: {
+      id: number
+      numero: string
+      dossier?: { id: number; reference: string; client?: { id: number; name: string } | null; site?: { id: number; name: string } | null } | null
+    } | null
+  } | null
 }
 
 export const planningApi = {

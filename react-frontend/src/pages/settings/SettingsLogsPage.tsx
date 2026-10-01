@@ -6,7 +6,7 @@ import { formatActivityDetail } from '../../lib/activityLogFormat'
 import { useAuth } from '../../contexts/AuthContext'
 import { canViewMonitoringLogs } from '../../lib/settingsAccess'
 
-type LogTab = 'activity' | 'errors' | 'security' | 'sessions'
+type LogTab = 'activity' | 'errors' | 'security' | 'sessions' | 'mobile-audit'
 
 function actionCategory(action: string): 'created' | 'updated' | 'deleted' | 'print' | 'other' {
   if (action.endsWith('.created') || action.includes('login')) return 'created'
@@ -103,19 +103,28 @@ export default function SettingsLogsPage() {
     refetchInterval: tab === 'sessions' ? 15_000 : false,
   })
 
+  const mobileAuditQ = useQuery({
+    queryKey: ['monitoring-mobile-audit'],
+    queryFn: () => monitoringApi.mobileAudit({ limit: 150 }),
+    enabled: tab === 'mobile-audit',
+    refetchInterval: tab === 'mobile-audit' ? 30_000 : false,
+  })
+
   const tabs: { id: LogTab; label: string }[] = [
     { id: 'activity', label: 'Activité utilisateurs' },
     { id: 'errors', label: 'Erreurs HTTP' },
     { id: 'security', label: 'Sécurité' },
     { id: 'sessions', label: 'Sessions ouvertes' },
+    { id: 'mobile-audit', label: 'Audit mobile (GPS)' },
   ]
 
   return (
     <div className="settings-logs">
       <p className="settings-logs__intro">
         Traçabilité devis, factures et clients : ID, tâche effectuée, auteur, IP et détail des champs modifiés.
-        Rétention automatique <strong>7 jours</strong> (purge planifiée tous les 3 jours). Les mots de passe ne sont
-        jamais enregistrés.
+        Rétention automatique <strong>7 jours</strong> (purge planifiée tous les 3 jours), sauf l'audit mobile
+        (GPS) conservé <strong>90 jours minimum</strong> pour traçabilité. Les mots de passe ne sont jamais
+        enregistrés.
       </p>
 
       <nav className="settings-logs__tabs" aria-label="Types de journaux">
@@ -268,8 +277,12 @@ export default function SettingsLogsPage() {
                 <tr key={log.id}>
                   <td>{new Date(log.created_at).toLocaleString('fr-FR')}</td>
                   <td>
-                    <span className={`log-badge log-badge--${log.event_type === 'login_failed' ? 'deleted' : 'updated'}`}>
-                      {log.event_type === 'login_failed' ? 'Connexion échouée' : log.event_type}
+                    <span className={`log-badge log-badge--${log.event_type === 'login_failed' || log.event_type === 'login_throttled' ? 'deleted' : 'updated'}`}>
+                      {log.event_type === 'login_failed'
+                        ? 'Connexion échouée'
+                        : log.event_type === 'login_throttled'
+                          ? 'Connexion bloquée (trop de tentatives)'
+                          : log.event_type}
                     </span>
                   </td>
                   <td>{log.email_attempted ?? '—'}</td>
@@ -319,6 +332,68 @@ export default function SettingsLogsPage() {
           </table>
           {(sessionsQ.data ?? []).length === 0 && !sessionsQ.isLoading && (
             <p className="settings-logs__empty">Aucune session active (dernières 30 min).</p>
+          )}
+        </LogPanel>
+      )}
+
+      {tab === 'mobile-audit' && (
+        <LogPanel loading={mobileAuditQ.isLoading} error={mobileAuditQ.error as Error | null}>
+          <table className="monitoring-table">
+            <thead>
+              <tr>
+                <th>Horodatage</th>
+                <th>Utilisateur</th>
+                <th>Action</th>
+                <th>Position GPS</th>
+                <th>IP</th>
+                <th>Détail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(mobileAuditQ.data ?? []).map((log) => (
+                <tr key={log.id}>
+                  <td>{new Date(log.occurred_at).toLocaleString('fr-FR')}</td>
+                  <td>
+                    {log.user?.name ?? '—'}
+                    {log.user?.email ? (
+                      <span className="settings-logs__email">
+                        <br />
+                        {log.user.email}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td>
+                    <code>{log.action}</code>
+                  </td>
+                  <td>
+                    {log.latitude != null && log.longitude != null ? (
+                      <a
+                        href={`https://www.google.com/maps?q=${log.latitude},${log.longitude}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="link-inline"
+                      >
+                        {log.latitude.toFixed(5)}, {log.longitude.toFixed(5)}
+                      </a>
+                    ) : (
+                      <span className="text-muted">Non communiquée</span>
+                    )}
+                    {log.accuracy != null ? (
+                      <span className="settings-logs__email">
+                        <br />± {Math.round(log.accuracy)} m
+                      </span>
+                    ) : null}
+                  </td>
+                  <td title={log.user_agent ?? undefined}>{log.ip_address ?? '—'}</td>
+                  <td className="monitoring-table__changes">
+                    {log.details ? JSON.stringify(log.details) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {(mobileAuditQ.data ?? []).length === 0 && !mobileAuditQ.isLoading && (
+            <p className="settings-logs__empty">Aucun événement d’audit mobile.</p>
           )}
         </LogPanel>
       )}

@@ -50,6 +50,7 @@ use App\Http\Controllers\Api\LithologyLayerController;
 use App\Http\Controllers\Api\MailController;
 use App\Http\Controllers\Api\MailTemplateController;
 use App\Http\Controllers\Api\MissionController;
+use App\Http\Controllers\Api\Mobile\MobileAuditLogController;
 use App\Http\Controllers\Api\Mobile\MobileDossierController;
 use App\Http\Controllers\Api\Mobile\MobileTerrainController;
 use App\Http\Controllers\Api\Mobile\TaskTestFormController;
@@ -546,6 +547,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('tasks/{task}/types/{testType}/report.xlsx', [TaskTestFormController::class, 'downloadExcel'])->whereNumber('task')->whereNumber('testType');
         Route::get('photos/{photo}', [TaskTestFormController::class, 'downloadPhoto'])->whereNumber('photo');
         Route::delete('photos/{photo}', [TaskTestFormController::class, 'deletePhoto'])->whereNumber('photo');
+    });
+
+    // Journal d'audit mobile (geolocalisation) — POST ouvert a tout compte authentifie
+    // (chacun journalise ses propres actions) ; GET reserve aux admins labo dans le
+    // controleur (memes conventions que /settings/journaux).
+    Route::prefix('mobile/audit-logs')->group(function () {
+        Route::post('/', [MobileAuditLogController::class, 'store']);
+        Route::get('/', [MobileAuditLogController::class, 'index']);
     });
 
     // App mobile laboratoire / terrain — dossiers (mesures + photos)

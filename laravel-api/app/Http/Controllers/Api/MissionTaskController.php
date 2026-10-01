@@ -521,7 +521,7 @@ class MissionTaskController extends Controller
             ->whereHas('ordreMissionLigne.ordreMission', fn ($sq) => $sq->where('type', 'labo'))
             ->with([
                 'assignedUser:id,name',
-                'ordreMissionLigne.ordreMission:id,numero,type,statut,client_id,site_id,dossier_id',
+                'ordreMissionLigne.ordreMission:id,numero,type,statut,client_id,site_id,dossier_id,bon_commande_id',
                 'ordreMissionLigne.ordreMission.client:id,name',
                 'ordreMissionLigne.ordreMission.site:id,name',
                 'ordreMissionLigne.ordreMission.dossier:id,reference,titre',

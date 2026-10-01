@@ -1205,7 +1205,8 @@ button.link-inline.invoice-number-btn {
   font-weight: 600;
 }
 
-.terrain-planning__filter-row select {
+.terrain-planning__filter-row select,
+.terrain-planning__filter-row label > div {
   min-width: 15rem;
 }
 

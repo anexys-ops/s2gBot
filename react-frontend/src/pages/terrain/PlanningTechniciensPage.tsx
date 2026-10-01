@@ -1,8 +1,9 @@
 import { Fragment, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { bonsCommandeApi, planningTerrainApi, type BonCommande } from '../../api/client'
+import { bonsCommandeApi, planningTerrainApi, type BonCommande, type PlanningTerrainAffectationRow } from '../../api/client'
 import StatusBadge, { bonCommandeStatutBadgeProps } from '../../components/ds/StatusBadge'
+import SearchableSelect from '../../components/ds/SearchableSelect'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 import { dateInputFromApi, toLocalDateInput } from '../../lib/appLocale'
@@ -72,6 +73,8 @@ export default function PlanningTechniciensPage({ context = 'terrain' }: { conte
   const [to, setTo] = useState(() => toYmd(addDays(initialWeekStart, 6)))
   const [periodMode, setPeriodMode] = useState<PeriodMode>('semaine')
   const [userFilter, setUserFilter] = useState<number | ''>('')
+  const [clientFilter, setClientFilter] = useState('')
+  const [siteFilter, setSiteFilter] = useState('')
   const [unposBcFilter, setUnposBcFilter] = useState<number | ''>('')
   const [unposUserIdMap, setUnposUserIdMap] = useState<Record<number, number | ''>>({})
   const [unposDebutMap, setUnposDebutMap] = useState<Record<number, string>>({})
@@ -175,6 +178,47 @@ export default function PlanningTechniciensPage({ context = 'terrain' }: { conte
   const selectedTechnician = (techniciens ?? []).find((item) => item.id === userFilter)
   const printTechnicianLabel = selectedTechnician ? formatTechnicienOption(selectedTechnician) : meta.allAssignees
   const printPeriodLabel = from === to ? from : `${from} au ${to}`
+
+  const affectationClientName = (item: PlanningTerrainAffectationRow): string | null =>
+    item.client_name ?? item.bon_commande_ligne?.bon_commande?.client?.name ?? null
+
+  const allAffectations = useMemo(
+    () => [...(affectations ?? []), ...assignedWithoutDate],
+    [affectations, assignedWithoutDate],
+  )
+
+  const clientOptions = useMemo(() => {
+    const names = new Set<string>()
+    allAffectations.forEach((item) => {
+      const name = affectationClientName(item)
+      if (name) names.add(name)
+    })
+    return [...names].sort((a, b) => a.localeCompare(b, 'fr')).map((name) => ({ id: name, label: name }))
+  }, [allAffectations])
+
+  const siteOptions = useMemo(() => {
+    const names = new Set<string>()
+    allAffectations.forEach((item) => {
+      if (item.site_name) names.add(item.site_name)
+    })
+    return [...names].sort((a, b) => a.localeCompare(b, 'fr')).map((name) => ({ id: name, label: name }))
+  }, [allAffectations])
+
+  const matchesClientSiteFilters = (item: PlanningTerrainAffectationRow): boolean => {
+    if (clientFilter && affectationClientName(item) !== clientFilter) return false
+    if (siteFilter && item.site_name !== siteFilter) return false
+    return true
+  }
+
+  const filteredAffectations = useMemo(
+    () => (affectations ?? []).filter(matchesClientSiteFilters),
+    [affectations, clientFilter, siteFilter],
+  )
+
+  const filteredAssignedWithoutDate = useMemo(
+    () => assignedWithoutDate.filter(matchesClientSiteFilters),
+    [assignedWithoutDate, clientFilter, siteFilter],
+  )
 
   function selectDay() {
     setPeriodMode('jour')
@@ -359,6 +403,26 @@ export default function PlanningTechniciensPage({ context = 'terrain' }: { conte
               ))}
             </select>
           </label>
+          <label>
+            Client
+            <SearchableSelect
+              options={clientOptions}
+              value={clientFilter}
+              onChange={(val) => setClientFilter(String(val))}
+              placeholder="Rechercher un client…"
+              emptyLabel="Tous les clients"
+            />
+          </label>
+          <label>
+            Chantier
+            <SearchableSelect
+              options={siteOptions}
+              value={siteFilter}
+              onChange={(val) => setSiteFilter(String(val))}
+              placeholder="Rechercher un chantier…"
+              emptyLabel="Tous les chantiers"
+            />
+          </label>
           {lab ? (
             <button type="button" className="btn btn-primary btn-sm" onClick={() => setPdfOpen(true)}>
               Générer le PDF
@@ -379,7 +443,7 @@ export default function PlanningTechniciensPage({ context = 'terrain' }: { conte
             </p>
             <div className="terrain-planning__week-grid">
               {weekDaysFrom(from).map((day) => {
-                const dayAffectations = affectations.filter((item) => affectationOnDay(item, day))
+                const dayAffectations = filteredAffectations.filter((item) => affectationOnDay(item, day))
                 return (
                   <div key={ymdLocal(day)} className="card terrain-planning__day-card">
                     <div className="terrain-planning__day-title">
@@ -411,10 +475,10 @@ export default function PlanningTechniciensPage({ context = 'terrain' }: { conte
                 </tr>
               </thead>
               <tbody>
-                {affectations.length === 0 ? (
+                {filteredAffectations.length === 0 ? (
                   <tr><td colSpan={lab ? 5 : 4} className="text-muted">Aucune affectation sur cette période.</td></tr>
                 ) : null}
-                {affectations.map((item) => {
+                {filteredAffectations.map((item) => {
                   const ligne = item.bon_commande_ligne
                   const bc = ligne?.bon_commande
                   return (
@@ -450,14 +514,14 @@ export default function PlanningTechniciensPage({ context = 'terrain' }: { conte
         </div>
       ) : null}
 
-      {assignedWithoutDate.length > 0 ? (
+      {filteredAssignedWithoutDate.length > 0 ? (
         <section className="card no-print" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
-          <h2 className="h2" style={{ fontSize: '1rem' }}>{isTerrain ? 'Tâches terrain affectées sans date' : 'Tâches à planifier'} ({assignedWithoutDate.length})</h2>
+          <h2 className="h2" style={{ fontSize: '1rem' }}>{isTerrain ? 'Tâches terrain affectées sans date' : 'Tâches à planifier'} ({filteredAssignedWithoutDate.length})</h2>
           <p className="text-muted">Ces tâches ne peuvent pas apparaître dans le calendrier avant la saisie d’un responsable et d’une date prévue dans l’OM.</p>
           <div className="table-wrap">
             <table className="data-table data-table--compact">
               <thead><tr><th>{meta.assignee}</th><th>BC</th><th>Tâche</th><th>Ordre de mission</th></tr></thead>
-              <tbody>{assignedWithoutDate.map((item) => (
+              <tbody>{filteredAssignedWithoutDate.map((item) => (
                 <tr key={item.id}>
                   <td>{item.user?.name ?? (item.user_id ? `Utilisateur #${item.user_id}` : 'Non assigné')}</td>
                   <td>{item.bon_commande_ligne?.bon_commande ? <Link to={`/bons-commande/${item.bon_commande_ligne.bon_commande.id}`}>{item.bon_commande_ligne.bon_commande.numero}</Link> : '—'}</td>

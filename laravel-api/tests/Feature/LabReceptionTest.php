@@ -117,6 +117,32 @@ class LabReceptionTest extends TestCase
         $this->assertFalse($row['reception_complete']);
     }
 
+    public function test_transco_number_is_numbered_per_famille_with_code_prefix(): void
+    {
+        [$labLine, , , $client, $technicien] = $this->seedBcWithLabAndReportLines();
+        $this->legacyOrderItemId($client);
+        $receptionnaire = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+
+        $famille = $labLine->article->famille;
+        $this->assertNotNull($famille, 'La ligne labo doit avoir un produit rattaché à une famille.');
+        $prefix = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $famille->code));
+
+        $payload = [
+            'bon_commande_ligne_id' => $labLine->id,
+            'condition_state' => 'bon',
+            'storage_location' => 'Salle A',
+            'collected_by' => $technicien->id,
+            'sample_type' => 'sol',
+            'quantity' => 1,
+        ];
+
+        $first = $this->actingAs($receptionnaire, 'sanctum')->postJson('/api/v1/lab/reception/receive-from-line', $payload)->assertCreated();
+        $second = $this->actingAs($receptionnaire, 'sanctum')->postJson('/api/v1/lab/reception/receive-from-line', $payload)->assertCreated();
+
+        $this->assertSame($prefix.'-10000001', $first->json('transco_number'));
+        $this->assertSame($prefix.'-10000002', $second->json('transco_number'));
+    }
+
     public function test_receive_from_line_creates_sample_with_transco_and_label(): void
     {
         [$labLine, , , $client, $technicien] = $this->seedBcWithLabAndReportLines();

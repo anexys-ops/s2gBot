@@ -31,6 +31,7 @@ class TerrainPlanningPdfGenerator
         $query = BcLignePlanningAffectation::query()
             ->with([
                 'bonCommandeLigne.bonCommande.client',
+                'bonCommandeLigne.bonCommande.quote:id,meta',
                 'bonCommandeLigne.bonCommande.dossier.site',
                 'user',
             ])
@@ -74,6 +75,7 @@ class TerrainPlanningPdfGenerator
             'periodLabel' => $periodLabel,
             'generatedAt' => now()->format('d/m/Y H:i'),
             'planningType' => $type,
+            'jalonResolver' => app(DevisJalonResolver::class),
         ])->render();
 
         $pdf = Pdf::loadHTML($html);

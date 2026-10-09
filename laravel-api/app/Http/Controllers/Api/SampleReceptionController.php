@@ -475,7 +475,7 @@ class SampleReceptionController extends Controller
         $sample->received_at = now();
 
         if (empty($sample->transco_number) && Schema::hasColumn('samples', 'transco_number')) {
-            $sample->transco_number = Sequence::nextNumeric('TRANSCO');
+            $sample->transco_number = $this->nextTranscoNumber($sample);
         }
 
         if (isset($data['reception_index'])) {
@@ -487,6 +487,30 @@ class SampleReceptionController extends Controller
 
         $sample->save();
         $this->taskClosure->afterSampleReceived($sample, $user instanceof User ? $user->id : null);
+    }
+
+    /**
+     * Numéro Transco géré par famille : un compteur indépendant par famille de produit
+     * (type de séquence « TRANSCO-F<id> »), préfixé par le code de la famille pour
+     * rester unique globalement (ex. « S2GDIVERS-10000001 »).
+     * Sans famille connue (échantillon hors catalogue), repli sur l'ancien compteur
+     * global non préfixé.
+     */
+    private function nextTranscoNumber(Sample $sample): string
+    {
+        $famille = $sample->product?->famille ?? $sample->bonCommandeLigne?->article?->famille;
+        if (! $famille) {
+            return Sequence::nextNumeric('TRANSCO');
+        }
+
+        $prefix = substr(preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $famille->code)) ?? '', 0, 12);
+        $type = 'TRANSCO-F'.$famille->id;
+
+        do {
+            $number = ($prefix !== '' ? $prefix.'-' : '').Sequence::nextNumeric($type);
+        } while (Sample::query()->where('transco_number', $number)->exists());
+
+        return $number;
     }
 
     /** @param  array<string, mixed>  $data */

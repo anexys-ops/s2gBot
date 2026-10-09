@@ -42,7 +42,7 @@
     $columnCount = collect([
         $show('show_start_date'), $show('show_end_date'), $show('show_technician'),
         $showClientColumn, $showChantierColumn, $showFoldColumn,
-        $show('show_order'), $show('show_task'), $show('show_quantity'), $show('show_notes'),
+        $show('show_order'), $show('show_jalon'), $show('show_task'), $show('show_quantity'), $show('show_notes'),
     ])->filter()->count();
 @endphp
     @include('pdf.partials.branding-header', ['layoutConfig' => $layoutConfig ?? [], 'brandingLogoDataUri' => $brandingLogoDataUri ?? null])
@@ -64,6 +64,7 @@
                 @if($showChantierColumn)<th style="width:14%">Chantier</th>@endif
                 @if($showFoldColumn)<th style="width:10%">N° FOLD</th>@endif
                 @if($show('show_order'))<th style="width:12%">Bon de commande</th>@endif
+                @if($show('show_jalon'))<th style="width:12%">Jalon</th>@endif
                 @if($show('show_task'))<th>Tâche</th>@endif
                 @if($show('show_quantity'))<th style="width:6%">Quantité</th>@endif
                 @if($show('show_notes'))<th style="width:18%">Commentaires / notes</th>@endif
@@ -84,6 +85,10 @@
                     $foldNumbers = $isMissionTask
                         ? $affectation->samples->pluck('fold_number')->filter()->implode(', ')
                         : null;
+                    $jalonLabel = $jalonResolver->jalonsLabel(
+                        $order,
+                        $isMissionTask ? $line?->bonCommandeLigne : $line,
+                    );
                     $notes = array_values(array_unique(array_filter([
                         trim((string) $affectation->notes),
                         trim((string) ($isMissionTask ? $line?->bonCommandeLigne?->notes_ligne : $line?->notes_ligne)),
@@ -97,6 +102,7 @@
                     @if($showChantierColumn)<td>{{ $chantier ?? '—' }}</td>@endif
                     @if($showFoldColumn)<td>{{ $foldNumbers !== null && $foldNumbers !== '' ? $foldNumbers : '—' }}</td>@endif
                     @if($show('show_order'))<td>{{ $order?->numero ?? '—' }}</td>@endif
+                    @if($show('show_jalon'))<td>{{ $jalonLabel !== '' ? $jalonLabel : '—' }}</td>@endif
                     @if($show('show_task'))<td>{{ $line?->libelle ?? '—' }}</td>@endif
                     @if($show('show_quantity'))<td class="qty">{{ $line ? $formatQty($affectation->merged_quantity ?? $line->quantite) : '—' }}</td>@endif
                     @if($show('show_notes'))<td class="notes">{{ $notes !== [] ? implode("\n", $notes) : '—' }}</td>@endif

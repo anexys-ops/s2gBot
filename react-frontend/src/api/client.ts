@@ -1145,6 +1145,7 @@ export type PlanningTerrainAffectationRow = BcLignePlanningAffectation & {
   dossier_id?: number | null
   dossier_reference?: string | null
   site_name?: string | null
+  jalon_label?: string | null
   statut?: string
   date_debut: string
   date_fin: string

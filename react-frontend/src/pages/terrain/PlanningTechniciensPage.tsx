@@ -457,6 +457,7 @@ export default function PlanningTechniciensPage({ context = 'terrain' }: { conte
                           <strong>{item.user?.name ?? (item.user_id ? `Utilisateur #${item.user_id}` : 'Non assigné')}</strong>
                           {bc ? <Link to={`/bons-commande/${bc.id}`} className="link-inline">{bc.numero}</Link> : null}
                           {item.ordre_mission_id ? <Link to={`/ordres-mission/${item.ordre_mission_id}`} className="link-inline">{item.ordre_mission_numero} — {item.bon_commande_ligne?.libelle}</Link> : null}
+                          {item.jalon_label ? <span className="text-muted">Jalon : {item.jalon_label}</span> : null}
                         </div>
                       )
                     })}
@@ -470,13 +471,13 @@ export default function PlanningTechniciensPage({ context = 'terrain' }: { conte
             <table className="data-table data-table--compact" style={{ width: '100%' }}>
               <thead>
                 <tr>
-                  <th>Période</th><th>{meta.assignee}</th><th>BC / tâche</th><th>Client / dossier</th>
+                  <th>Période</th><th>{meta.assignee}</th><th>BC / tâche</th><th>Jalon</th><th>Client / dossier</th>
                   {lab ? <th className="terrain-planning__actions">Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
                 {filteredAffectations.length === 0 ? (
-                  <tr><td colSpan={lab ? 5 : 4} className="text-muted">Aucune affectation sur cette période.</td></tr>
+                  <tr><td colSpan={lab ? 6 : 5} className="text-muted">Aucune affectation sur cette période.</td></tr>
                 ) : null}
                 {filteredAffectations.map((item) => {
                   const ligne = item.bon_commande_ligne
@@ -489,6 +490,7 @@ export default function PlanningTechniciensPage({ context = 'terrain' }: { conte
                           {bc ? <><Link to={`/bons-commande/${bc.id}`} className="link-inline">{bc.numero}</Link>{ligne?.libelle ? ` — ${ligne.libelle}` : ''}</> : '—'}
                           {item.ordre_mission_id ? <> · <Link to={`/ordres-mission/${item.ordre_mission_id}`} className="link-inline">{item.ordre_mission_numero}</Link></> : null}
                       </td>
+                      <td>{item.jalon_label ?? '—'}</td>
                       <td>
                         {bc || item.dossier_id ? <>{item.client_name ?? bc?.client?.name ?? '—'} / <Link to={`/dossiers/${item.dossier_id ?? bc?.dossier_id}/bc-bl`} className="link-inline">{item.dossier_reference ?? `Dossier #${item.dossier_id ?? bc?.dossier_id}`}</Link></> : (item.client_name ?? '—')}
                       </td>

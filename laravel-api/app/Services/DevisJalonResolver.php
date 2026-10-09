@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BonCommande;
+use App\Models\BonCommandeLigne;
 
 /**
  * Résout l'appartenance d'une ligne de BC à un jalon du devis (regroupement par
@@ -40,5 +41,47 @@ class DevisJalonResolver
         }
 
         return [$refArticleId];
+    }
+
+    /**
+     * Tous les jalons du devis auxquels une ligne de BC est rattachée. Un même produit
+     * (ex. « Déplacement du technicien pour contrôle ») peut figurer dans plusieurs
+     * jalons : on les retourne tous plutôt que de n'en retenir qu'un arbitrairement.
+     *
+     * @return list<array{id: string, label: string, code: string|null}>
+     */
+    public function jalonsForLigne(?BonCommande $bc, ?BonCommandeLigne $ligne): array
+    {
+        $jalons = $bc?->quote?->meta['devis_jalons'] ?? [];
+        if (! $ligne || $jalons === []) {
+            return [];
+        }
+
+        $matches = [];
+        foreach ($jalons as $jalon) {
+            $label = trim((string) ($jalon['libelle'] ?? ''));
+            $refs = array_map('intval', $jalon['product_ref_article_ids'] ?? []);
+            $matchesProduct = $ligne->ref_article_id && in_array((int) $ligne->ref_article_id, $refs, true);
+            $matchesForfait = $label !== '' && $ligne->libelle === 'Prestation forfaitaire — '.$label;
+            if (! $matchesProduct && ! $matchesForfait) {
+                continue;
+            }
+            $matches[] = [
+                'id' => (string) ($jalon['id'] ?? ''),
+                'label' => $label,
+                'code' => $jalon['s2g_code'] ?? null,
+            ];
+        }
+
+        return $matches;
+    }
+
+    /** Libellé lisible « CODE — Libellé / CODE2 — Libellé2 » (vide si aucun jalon). */
+    public function jalonsLabel(?BonCommande $bc, ?BonCommandeLigne $ligne): string
+    {
+        return implode(' / ', array_map(
+            fn (array $j) => trim(($j['code'] ? $j['code'].' — ' : '').$j['label']),
+            $this->jalonsForLigne($bc, $ligne),
+        ));
     }
 }

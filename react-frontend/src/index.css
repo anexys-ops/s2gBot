@@ -8843,17 +8843,22 @@ a.catalogue-tree__link-article:hover {
 .catalogue-liste__famille-chips {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
   gap: 0.4rem;
-  flex: 1 1 auto;
+  flex: 1 1 100%;
   min-width: 0;
 }
 .catalogue-liste__chip {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+  flex: 0 0 auto;
+  max-width: 100%;
   padding: 0.28rem 0.75rem;
   font-size: 0.78rem;
   font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
   color: #374151;
   background: #fff;
   border: 1px solid #e5e7eb;

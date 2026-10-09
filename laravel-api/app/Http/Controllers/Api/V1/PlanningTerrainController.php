@@ -9,6 +9,7 @@ use App\Models\BonCommandeLigne;
 use App\Models\MissionTask;
 use App\Models\OrdreMission;
 use App\Models\User;
+use App\Services\DevisJalonResolver;
 use App\Services\TerrainPlanningBcLinesService;
 use App\Services\TerrainPlanningMissionTasksService;
 use App\Services\TerrainPlanningPdfGenerator;
@@ -125,6 +126,7 @@ class PlanningTerrainController extends Controller
             ->with([
                 'bonCommandeLigne.bonCommande.dossier.site',
                 'bonCommandeLigne.bonCommande.client',
+                'bonCommandeLigne.bonCommande.quote:id,meta',
                 'user',
                 'createur',
             ])
@@ -144,7 +146,11 @@ class PlanningTerrainController extends Controller
         }
 
         $rows = $q->orderBy('date_debut')->orderBy('id')->get()
-            ->map(fn (BcLignePlanningAffectation $row) => [...$row->toArray(), 'source' => 'bc']);
+            ->map(fn (BcLignePlanningAffectation $row) => [
+                ...$row->toArray(),
+                'source' => 'bc',
+                'jalon_label' => app(DevisJalonResolver::class)->jalonsLabel($row->bonCommandeLigne?->bonCommande, $row->bonCommandeLigne) ?: null,
+            ]);
         $rows = $rows->concat($missionTasks->scheduled($from, $to, $selectedUserId, $user)
             ->map(fn (MissionTask $task) => $this->missionPlanningRow($task)))
             ->sortBy(fn (array $row) => $row['date_debut'].'-'.$row['id'])
@@ -185,6 +191,7 @@ class PlanningTerrainController extends Controller
             'date_fin' => ($task->due_date ?? $task->planned_date)?->format('Y-m-d'),
             'statut' => $task->statut,
             'notes' => $task->notes,
+            'jalon_label' => app(DevisJalonResolver::class)->jalonsLabel($bc, $line?->bonCommandeLigne) ?: null,
             'bon_commande_ligne' => [
                 'id' => $line?->bon_commande_ligne_id,
                 'libelle' => $line?->libelle,

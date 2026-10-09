@@ -51,6 +51,7 @@ class TerrainPlanningMissionTasksService
                 'assignedUser:id,name,email,role',
                 'ordreMissionLigne.bonCommandeLigne',
                 'ordreMissionLigne.ordreMission.bonCommande.client',
+                'ordreMissionLigne.ordreMission.bonCommande.quote:id,meta',
                 'ordreMissionLigne.ordreMission.client',
                 'ordreMissionLigne.ordreMission.dossier',
                 'ordreMissionLigne.ordreMission.site',

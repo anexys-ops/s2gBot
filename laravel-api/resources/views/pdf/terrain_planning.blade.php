@@ -57,17 +57,17 @@
     <table>
         <thead>
             <tr>
-                @if($show('show_start_date'))<th style="width:8%">Démarrage</th>@endif
-                @if($show('show_end_date'))<th style="width:8%">Fin</th>@endif
-                @if($show('show_technician'))<th style="width:13%">Technicien</th>@endif
-                @if($showClientColumn)<th style="width:14%">Client</th>@endif
-                @if($showChantierColumn)<th style="width:14%">Chantier</th>@endif
-                @if($showFoldColumn)<th style="width:10%">N° FOLD</th>@endif
-                @if($show('show_order'))<th style="width:12%">Bon de commande</th>@endif
-                @if($show('show_jalon'))<th style="width:12%">Jalon</th>@endif
-                @if($show('show_task'))<th>Tâche</th>@endif
+                @if($show('show_start_date'))<th style="width:7%">Démarrage</th>@endif
+                @if($show('show_end_date'))<th style="width:7%">Fin</th>@endif
+                @if($show('show_technician'))<th style="width:10%">Technicien</th>@endif
+                @if($showClientColumn)<th style="width:10%">Client</th>@endif
+                @if($showChantierColumn)<th style="width:11%">Chantier</th>@endif
+                @if($showFoldColumn)<th style="width:9%">N° FOLD</th>@endif
+                @if($show('show_order'))<th style="width:9%">Bon de commande</th>@endif
+                @if($show('show_jalon'))<th style="width:10%">Jalon</th>@endif
+                @if($show('show_task'))<th style="width:20%">Tâche</th>@endif
                 @if($show('show_quantity'))<th style="width:6%">Quantité</th>@endif
-                @if($show('show_notes'))<th style="width:18%">Commentaires / notes</th>@endif
+                @if($show('show_notes'))<th style="width:11%">Commentaires / notes</th>@endif
             </tr>
         </thead>
         <tbody>

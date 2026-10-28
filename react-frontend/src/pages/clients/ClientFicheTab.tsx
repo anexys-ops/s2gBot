@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
-import { clientsApi, adminUsersApi, type Client, type EntityMetaPayload } from '../../api/client'
+import { clientsApi, staffApi, type Client, type EntityMetaPayload } from '../../api/client'
 import ClientFormModal from '../../components/clients/ClientFormModal'
 import EntityMetaCard from '../../components/module/EntityMetaCard'
 import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
@@ -42,7 +42,7 @@ const emptyForm = (c: Client): Partial<Client> => ({
   currency_code: c.currency_code ?? 'MAD',
 })
 
-const INTERNAL_ROLES = ['lab_admin', 'lab_technician', 'lab_manager', 'commercial', 'admin']
+const INTERNAL_ROLES = ['lab_admin', 'lab_technician', 'laborantin', 'receptionnaire', 'ingenieur', 'responsable', 'commercial']
 
 export default function ClientFicheTab() {
   const { clientId, client, isAdmin } = useOutletContext<ClientOutletContext>()
@@ -55,11 +55,11 @@ export default function ClientFicheTab() {
   // Liste des utilisateurs internes pour les selects référents
   const { data: usersData } = useQuery({
     queryKey: ['admin-users-all'],
-    queryFn: () => adminUsersApi.list({ page: 1 }),
+    queryFn: () => staffApi.list(),
     enabled: isAdmin,
     staleTime: 5 * 60 * 1000,
   })
-  const staffUsers = (usersData?.data ?? []).filter((u) =>
+  const staffUsers = (usersData ?? []).filter((u) =>
     INTERNAL_ROLES.includes(u.role),
   )
 

@@ -4,7 +4,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  adminUsersApi,
+  staffApi,
   expenseReportsApi,
   EXPENSE_CATEGORIES,
   EXPENSE_PAYMENT_METHOD_LABELS,
@@ -40,10 +40,10 @@ export default function ExpenseLineModal({ reportId, initial, onClose, onSaved }
 
   const { data: usersPage } = useQuery({
     queryKey: ['admin-users', 'ndf-line'],
-    queryFn: () => adminUsersApi.list({ page: 1 }),
+    queryFn: () => staffApi.list(),
     staleTime: 120_000,
   })
-  const users = usersPage?.data ?? []
+  const users = usersPage ?? []
 
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const [form, setForm] = useState({

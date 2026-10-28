@@ -95,7 +95,7 @@ class OrdreMissionController extends Controller
      */
     public function generateFromBC(Request $request, BonCommande $bonCommande): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $request->user()->canGenerateMissionOrders()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
         if (! AgencyAccess::userMayAccessBonCommande($request->user(), $bonCommande)) {
@@ -173,7 +173,7 @@ class OrdreMissionController extends Controller
      */
     public function getBonCommandeLignesForGeneration(Request $request, BonCommande $bonCommande): JsonResponse
     {
-        if (! $request->user()->isLabAdmin()) {
+        if (! $request->user()->canGenerateMissionOrders()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
         if (! AgencyAccess::userMayAccessBonCommande($request->user(), $bonCommande)) {

@@ -27,6 +27,16 @@ class User extends Authenticatable
     public const ROLE_RESPONSABLE = 'responsable';
     public const ROLE_RECEPTIONNAIRE = 'receptionnaire';
 
+    /** Rôles internes pouvant se voir affecter des tâches / OM (listes « Assigné à »). */
+    public const ASSIGNABLE_STAFF_ROLES = [
+        self::ROLE_LAB_ADMIN,
+        self::ROLE_LAB_TECHNICIAN,
+        self::ROLE_LABORANTIN,
+        self::ROLE_RECEPTIONNAIRE,
+        self::ROLE_INGENIEUR,
+        self::ROLE_RESPONSABLE,
+    ];
+
     public const ROLES_INTERNAL = [
         self::ROLE_LAB_ADMIN,
         self::ROLE_LAB_TECHNICIAN,
@@ -149,6 +159,27 @@ class User extends Authenticatable
     public function isLabTechnician(): bool
     {
         return $this->role === self::ROLE_LAB_TECHNICIAN;
+    }
+
+    /**
+     * Lecture des commandes / bons de commande : lab (admin, technicien) ou personnel
+     * interne dont un groupe d'accès porte la permission orders.read.
+     */
+    public function canReadOrders(): bool
+    {
+        return $this->isLab()
+            || ($this->isInternal() && $this->hasCapability(PermissionCatalog::ORDERS_READ));
+    }
+
+    /**
+     * Génération d'ordres de mission depuis un BC : admin lab ou personnel interne
+     * dont un groupe d'accès porte la permission orders.write (ex. « Responsable
+     * contrôle technique »).
+     */
+    public function canGenerateMissionOrders(): bool
+    {
+        return $this->isLabAdmin()
+            || ($this->isInternal() && $this->hasCapability(PermissionCatalog::ORDERS_WRITE));
     }
 
     public function isLab(): bool

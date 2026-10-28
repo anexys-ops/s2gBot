@@ -153,6 +153,14 @@ export const permissionsCatalogApi = {
     api<{ permissions: Record<string, string>; groups?: Record<string, string[]> }>('/permissions/catalog'),
 }
 
+/** Annuaire du personnel interne, non paginé — alimente les combos « Assigné à », « Technicien »… */
+export const staffApi = {
+  list: async (): Promise<User[]> => {
+    const rows = await api<Array<{ id: number; name: string; email?: string; role?: string; poste?: string | null; agency_id?: number | null }>>('/staff-users')
+    return rows.map((r) => ({ id: r.id, name: r.name, email: r.email ?? '', role: r.role ?? '', poste: r.poste ?? null, agency_id: r.agency_id ?? null }))
+  },
+}
+
 export const adminUsersApi = {
   list: (params?: { search?: string; page?: number }) => {
     const q = new URLSearchParams()

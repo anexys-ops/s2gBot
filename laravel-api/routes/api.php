@@ -69,6 +69,7 @@ use App\Http\Controllers\Api\SampleController;
 use App\Http\Controllers\Api\LabReceptionController;
 use App\Http\Controllers\Api\SampleReceptionController;
 use App\Http\Controllers\Api\SiteController;
+use App\Http\Controllers\Api\StaffDirectoryController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\SystemMonitoringController;
 use App\Http\Controllers\Api\TestResultController;
@@ -216,6 +217,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
+    Route::get('staff-users', [StaffDirectoryController::class, 'index']);
 
     Route::put('user/profile', [AccountController::class, 'updateProfile']);
     Route::put('user/password', [AccountController::class, 'updatePassword']);

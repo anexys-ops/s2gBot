@@ -51,6 +51,34 @@ class OrdreMissionFromBonCommandeTest extends TestCase
         $this->assertSame(1, MissionTask::query()->count());
     }
 
+    public function test_responsable_with_orders_group_can_list_bcs_and_generate_om(): void
+    {
+        [$bc] = $this->seedBcWithTechnicienAction();
+
+        $supervisor = User::factory()->create(['role' => User::ROLE_RESPONSABLE, 'client_id' => null, 'site_id' => null]);
+        $group = \App\Models\AccessGroup::query()->create([
+            'name' => 'Responsable contrôle technique',
+            'permissions' => ['modules.terrain', 'orders.read', 'orders.write'],
+        ]);
+        $supervisor->accessGroups()->attach($group->id);
+
+        // Les BC apparaissent (auparavant 403 : seul isLab() passait).
+        $list = $this->actingAs($supervisor, 'sanctum')->getJson('/api/v1/bons-commande?statut=en_cours')->assertOk();
+        $this->assertTrue(collect($list->json())->pluck('id')->contains($bc->id));
+
+        $this->actingAs($supervisor, 'sanctum')->getJson("/api/bons-commande/{$bc->id}/ordres-mission-jalons")->assertOk();
+        $this->actingAs($supervisor, 'sanctum')->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")->assertCreated();
+    }
+
+    public function test_responsable_without_orders_group_cannot_list_bcs_nor_generate_om(): void
+    {
+        [$bc] = $this->seedBcWithTechnicienAction();
+        $supervisor = User::factory()->create(['role' => User::ROLE_RESPONSABLE, 'client_id' => null, 'site_id' => null]);
+
+        $this->actingAs($supervisor, 'sanctum')->getJson('/api/v1/bons-commande')->assertForbidden();
+        $this->actingAs($supervisor, 'sanctum')->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")->assertForbidden();
+    }
+
     public function test_generate_from_bc_uses_planning_fallback_without_catalogue_actions(): void
     {
         [$bc, $lab, $tech] = $this->seedBcWithTechnicienAction(withAction: false);

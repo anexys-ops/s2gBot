@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  adminUsersApi,
+  staffApi,
   equipmentsApi,
   type EquipmentMaintenancePlanRow,
   type EquipmentRow,
@@ -30,11 +30,11 @@ export default function EquipmentSuiviTab({ equipment, equipmentId, isAdmin }: P
 
   const { data: usersPage } = useQuery({
     queryKey: ['admin-users', 'equipment-suivi'],
-    queryFn: () => adminUsersApi.list({ page: 1 }),
+    queryFn: () => staffApi.list(),
     enabled: isAdmin,
   })
-  const labUsers = (usersPage?.data ?? []).filter((u) =>
-    ['lab_admin', 'lab_technician'].includes(u.role),
+  const labUsers = (usersPage ?? []).filter((u) =>
+    ['lab_admin', 'lab_technician', 'laborantin', 'ingenieur', 'responsable'].includes(u.role),
   )
 
   const [planForm, setPlanForm] = useState({

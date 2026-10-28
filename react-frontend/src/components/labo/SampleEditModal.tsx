@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import Modal from '../Modal'
 import SearchableSelect from '../ds/SearchableSelect'
 import {
-  adminUsersApi,
+  staffApi,
   samplesReceptionApi,
   type ReceptionSample,
 } from '../../api/client'
@@ -35,10 +35,10 @@ export default function SampleEditModal({ sample, onClose, onSaved, onDeleted, o
 
   const { data: usersRes } = useQuery({
     queryKey: ['admin-users', 'reception'],
-    queryFn: () => adminUsersApi.list({ page: 1 }),
+    queryFn: () => staffApi.list(),
     staleTime: 120_000,
   })
-  const users = usersRes?.data ?? []
+  const users = usersRes ?? []
 
   const handlePhotoChange = (file: File | undefined) => {
     if (!file) return

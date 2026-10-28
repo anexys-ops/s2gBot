@@ -72,8 +72,15 @@ class BonCommandeController extends Controller
                     ->orWhereHas('quote', fn ($qq) => $qq->where('number', 'like', $like));
             });
         }
-        if ($request->user()->isLab()) {
+        if ($request->user()->canReadOrders()) {
             $rows = $q->get();
+            if (! $request->user()->isLab()) {
+                // Personnel interne autorisé via un groupe d'accès : périmètre agence/client.
+                $viewer = $request->user();
+                $rows = $rows
+                    ->filter(fn (BonCommande $bonCommande) => AgencyAccess::userMayAccessBonCommande($viewer, $bonCommande))
+                    ->values();
+            }
             if ($unassignedPlanning) {
                 $rows = $rows
                     ->filter(fn (BonCommande $bonCommande) => $this->terrainPlanningLines->prepare($bonCommande))

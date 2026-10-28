@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  adminUsersApi,
+  staffApi,
   dossiersApi,
   equipmentsApi,
   materielAffectationsApi,
@@ -134,7 +134,7 @@ export default function MaterielPlanningPage() {
   })
   const { data: usersPage } = useQuery({
     queryKey: ['admin-users', 'materiel-planning'],
-    queryFn: () => adminUsersApi.list({ page: 1 }),
+    queryFn: () => staffApi.list(),
     enabled: isAdmin && newEventOpen,
   })
 
@@ -385,7 +385,7 @@ export default function MaterielPlanningPage() {
               <label className="catalogue-article-new-form__col-6">Technicien
                 <select value={newEvent.userId} onChange={(event) => setNewEvent({ ...newEvent, userId: event.target.value })}>
                   <option value="">— Non assigné —</option>
-                  {(usersPage?.data ?? []).map((technician) => <option key={technician.id} value={technician.id}>{technician.name}</option>)}
+                  {(usersPage ?? []).map((technician) => <option key={technician.id} value={technician.id}>{technician.name}</option>)}
                 </select>
               </label>
               <label className="catalogue-article-new-form__col-3">Date de début *

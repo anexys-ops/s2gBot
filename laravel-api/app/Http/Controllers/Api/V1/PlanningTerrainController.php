@@ -62,28 +62,15 @@ class PlanningTerrainController extends Controller
 
     public function techniciens(Request $request): JsonResponse
     {
-        if (! $request->user()->isLab()) {
+        if (! $request->user()->isInternal()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $context = (string) $request->query('context', 'terrain');
-        $roles = match ($context) {
-            'labo' => [
-                User::ROLE_LAB_ADMIN,
-                User::ROLE_LAB_TECHNICIAN,
-                User::ROLE_LABORANTIN,
-                User::ROLE_RECEPTIONNAIRE,
-            ],
-            'ingenieur' => [
-                User::ROLE_LAB_ADMIN,
-                User::ROLE_INGENIEUR,
-                User::ROLE_RESPONSABLE,
-            ],
-            default => [User::ROLE_LAB_ADMIN, User::ROLE_LAB_TECHNICIAN],
-        };
-
+        // Quel que soit le contexte (terrain, labo, ingénierie), tout le personnel
+        // interne affectable est proposé — superviseurs (responsable) et ingénieurs
+        // inclus. Le paramètre context est conservé pour compatibilité.
         $users = User::query()
-            ->whereIn('role', $roles)
+            ->whereIn('role', User::ASSIGNABLE_STAFF_ROLES)
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'role', 'poste']);
 

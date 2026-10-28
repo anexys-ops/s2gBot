@@ -414,7 +414,8 @@ export default function BonCommandeFichePage() {
   const isAdmin = user?.role === 'lab_admin'
   const canConfirmer = lab && bc.statut === 'brouillon'
   const canSaveBc = lab && (bc.statut === 'confirme' || bc.statut === 'en_cours')
-  const canGenerateOm = lab && isAdmin && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
+  const mayGenerateOm = isAdmin || Boolean(user?.effective_permissions?.includes('orders.write'))
+  const canGenerateOm = mayGenerateOm && (bc.statut === 'confirme' || bc.statut === 'en_cours' || bc.statut === 'livre')
   const hasBonLivraison = (bc.bons_livraison?.length ?? 0) > 0
   const canEditQuantites = lab && forfaitLignes.length > 0 && bc.statut !== 'annule'
 

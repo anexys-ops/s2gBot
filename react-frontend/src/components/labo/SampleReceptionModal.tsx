@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import { useQuery } from '@tanstack/react-query'
 import Modal from '../Modal'
 import {
-  adminUsersApi,
+  staffApi,
   samplesReceptionApi,
   type LabReceptionAttendu,
   type ReceiveSampleBody,
@@ -231,10 +231,10 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
 
   const { data: usersRes } = useQuery({
     queryKey: ['admin-users', 'reception'],
-    queryFn: () => adminUsersApi.list({ page: 1 }),
+    queryFn: () => staffApi.list(),
     staleTime: 120_000,
   })
-  const users = usersRes?.data ?? []
+  const users = usersRes ?? []
 
   const commonDefaults = useMemo(
     () => ({

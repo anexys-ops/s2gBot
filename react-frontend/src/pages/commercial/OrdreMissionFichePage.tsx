@@ -9,7 +9,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { adminUsersApi, bonsCommandeApi, equipmentsApi, ordresMissionApi, type EquipmentRow, type MissionTask, type OrdreMission, type OrdreMissionLigne, type User } from '../../api/client'
+import { bonsCommandeApi, equipmentsApi, ordresMissionApi, planningTerrainApi, type EquipmentRow, type MissionTask, type OrdreMission, type OrdreMissionLigne, type User } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import OmExpensePanel from '../../components/ordres-mission/OmExpensePanel'
 import OmLigneAddPanel from '../../components/ordres-mission/OmLigneAddPanel'
@@ -270,12 +270,23 @@ export default function OrdreMissionFichePage() {
     staleTime: 30_000,
   })
 
-  const { data: usersRaw } = useQuery({
-    queryKey: ['users', 'staff'],
-    queryFn: () => adminUsersApi.list(),
+  // Liste complète (non paginée) du personnel assignable selon le type d'OM —
+  // l'ancienne liste admin /admin/users était paginée par 20 et masquait les
+  // techniciens créés récemment.
+  const assignContext = om?.type === 'labo' ? 'labo' : om?.type === 'ingenieur' ? 'ingenieur' : 'terrain'
+  const { data: assignees } = useQuery({
+    queryKey: ['users', 'assignees', assignContext],
+    queryFn: () => planningTerrainApi.techniciens(assignContext),
+    enabled: Boolean(om),
     staleTime: 120_000,
   })
-  const users: User[] = Array.isArray(usersRaw) ? usersRaw : (usersRaw?.data ?? [])
+  const users: User[] = (assignees ?? []).map((item) => ({
+    id: item.id,
+    name: item.name,
+    email: item.email ?? '',
+    role: item.role ?? '',
+    poste: item.poste ?? null,
+  }))
 
   const { data: equipmentsRaw } = useQuery({
     queryKey: ['equipments', 'om-selector'],

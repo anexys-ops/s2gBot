@@ -12385,3 +12385,17 @@ a.catalogue-tree__link-article:hover {
     grid-column: auto;
   }
 }
+
+.bc-row--pending > td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-warning, #d97706);
+}
+.bc-row--pending {
+  background: color-mix(in srgb, var(--color-warning, #d97706) 7%, transparent);
+}
+.bc-list__pending-filter,
+.bc-from-devis-panel__pending-bc {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+}

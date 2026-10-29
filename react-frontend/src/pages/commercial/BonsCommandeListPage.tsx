@@ -320,6 +320,7 @@ export default function BonsCommandeListPage() {
     ht: true,
     ttc: true,
     status: true,
+    bcClient: true,
     bl: true,
     invoices: true,
     pdf: true,
@@ -422,6 +423,7 @@ export default function BonsCommandeListPage() {
           { id: 'ht', label: 'Montant HT' },
           { id: 'ttc', label: 'Montant TTC' },
           { id: 'status', label: 'Statut' },
+          { id: 'bcClient', label: 'BC client' },
           ...(isLab
             ? [
                 { id: 'bl', label: 'BL' },
@@ -503,6 +505,7 @@ export default function BonsCommandeListPage() {
                   {visible.ht !== false && <th>HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.ttc !== false && <th>TTC ({MONEY_UNIT_LABEL})</th>}
                   {visible.status !== false && <th>Statut</th>}
+                  {visible.bcClient !== false && <th>BC client</th>}
                   {isLab && visible.bl !== false && <th className="data-table__num">BL</th>}
                   {isLab && visible.invoices !== false && <th className="data-table__num">Factures</th>}
                   {isLab && visible.pdf !== false && (
@@ -529,7 +532,7 @@ export default function BonsCommandeListPage() {
                   return (
                     <tr
                       key={bc.id}
-                      className="table-row-link"
+                      className={bc.bc_client_en_attente ? 'table-row-link bc-row--pending' : 'table-row-link'}
                       onClick={(e) => {
                         if (shouldIgnoreTableRowClick(e.target)) return
                         navigate(`/bons-commande/${bc.id}`)
@@ -600,11 +603,17 @@ export default function BonsCommandeListPage() {
                               {st.label}
                             </StatusBadge>
                           )}
+                        </td>
+                      )}
+                      {visible.bcClient !== false && (
+                        <td className="data-table__status">
                           {bc.bc_client_en_attente ? (
                             <StatusBadge variant="warning" size="sm">
-                              BC client en attente
+                              ⏳ En attente
                             </StatusBadge>
-                          ) : null}
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
                         </td>
                       )}
                       {isLab && visible.bl !== false && (
@@ -652,6 +661,7 @@ export default function BonsCommandeListPage() {
                   { id: 'ht', kind: 'money' },
                   { id: 'ttc', kind: 'money' },
                   { id: 'status', kind: 'text' },
+                  { id: 'bcClient', kind: 'text' },
                   ...(isLab
                     ? [
                         { id: 'bl', kind: 'text' as const },

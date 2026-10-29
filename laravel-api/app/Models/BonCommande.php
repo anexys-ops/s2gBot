@@ -34,6 +34,8 @@ class BonCommande extends Model
         'client_id',
         'contact_id',
         'statut',
+        'bc_client_en_attente',
+        'bc_client_recu_le',
         'date_commande',
         'date_livraison_prevue',
         'montant_ht',
@@ -46,6 +48,8 @@ class BonCommande extends Model
     protected function casts(): array
     {
         return [
+            'bc_client_en_attente' => 'boolean',
+            'bc_client_recu_le' => 'date',
             'date_commande' => 'date',
             'date_livraison_prevue' => 'date',
         ];

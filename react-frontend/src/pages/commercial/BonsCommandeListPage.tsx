@@ -66,6 +66,7 @@ function BonCommandeCreateFromDevisPanel() {
       }),
   })
 
+  const [bcClientEnAttente, setBcClientEnAttente] = useState(false)
   const eligibleQuotes = eligiblePage?.data ?? []
   const hasQuoteSearch = debouncedQuoteSearch.trim() !== ''
 
@@ -75,8 +76,9 @@ function BonCommandeCreateFromDevisPanel() {
   )
 
   const createMut = useMutation({
-    mutationFn: (id: number) => devisV1Api.transformerBc(id),
+    mutationFn: (id: number) => devisV1Api.transformerBc(id, { bcClientEnAttente }),
     onSuccess: (bc) => {
+      setBcClientEnAttente(false)
       void qc.invalidateQueries({ queryKey: ['bons-commande'] })
       void qc.invalidateQueries({ queryKey: ['quotes', 'eligible-bc'] })
       setQuoteId('')
@@ -188,6 +190,15 @@ function BonCommandeCreateFromDevisPanel() {
               )}
             </div>
 
+            <label className="bc-from-devis-panel__pending-bc">
+              <input
+                type="checkbox"
+                checked={bcClientEnAttente}
+                onChange={(e) => setBcClientEnAttente(e.target.checked)}
+              />{' '}
+              BC client en attente (démarrage avant réception du bon de commande du client)
+            </label>
+
             <div className="bc-from-devis-panel__actions">
               <button
                 type="button"
@@ -289,6 +300,7 @@ export default function BonsCommandeListPage() {
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statutFilter, setStatutFilter] = useState('')
+  const [pendingOnly, setPendingOnly] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<BonCommande | null>(null)
   const [statusModalBc, setStatusModalBc] = useState<{ id: number; numero: string; statut: string } | null>(null)
   const [pdfTarget, setPdfTarget] = useState<BonCommande | null>(null)
@@ -315,10 +327,11 @@ export default function BonsCommandeListPage() {
   })
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['bons-commande', debouncedSearch, statutFilter || 'all'],
+    queryKey: ['bons-commande', debouncedSearch, statutFilter || 'all', pendingOnly],
     queryFn: () =>
       bonsCommandeApi.list({
         statut: statutFilter || undefined,
+        bcClientEnAttente: pendingOnly || undefined,
         search: debouncedSearch.trim() || undefined,
       }),
     placeholderData: keepPreviousData,
@@ -359,7 +372,7 @@ export default function BonsCommandeListPage() {
     }),
     [bons],
   )
-  const hasActiveFilters = searchInput.trim() !== '' || statutFilter !== ''
+  const hasActiveFilters = searchInput.trim() !== '' || statutFilter !== '' || pendingOnly
 
   const shellProps = {
     shellClassName: 'module-shell--crm' as const,
@@ -437,6 +450,19 @@ export default function BonsCommandeListPage() {
                   </button>
                 </span>
               ) : null}
+              {pendingOnly ? (
+                <span className="list-table-toolbar__chip">
+                  <span className="list-table-toolbar__chip-text">BC client en attente</span>
+                  <button
+                    type="button"
+                    className="list-table-toolbar__chip-remove"
+                    onClick={() => setPendingOnly(false)}
+                    aria-label="Effacer le filtre BC client en attente"
+                  >
+                    ×
+                  </button>
+                </span>
+              ) : null}
               {statutFilter ? (
                 <span className="list-table-toolbar__chip">
                   <span className="list-table-toolbar__chip-text">
@@ -456,6 +482,11 @@ export default function BonsCommandeListPage() {
           ) : null
         }
       />
+
+      <label className="bc-list__pending-filter">
+        <input type="checkbox" checked={pendingOnly} onChange={(e) => setPendingOnly(e.target.checked)} />{' '}
+        Seulement les BC client en attente
+      </label>
 
       <div className="card dossier-tab-panel dossier-tab-panel--table">
         <ListTablePanelHeader title="Bons de commande" count={bons.length} />
@@ -569,6 +600,11 @@ export default function BonsCommandeListPage() {
                               {st.label}
                             </StatusBadge>
                           )}
+                          {bc.bc_client_en_attente ? (
+                            <StatusBadge variant="warning" size="sm">
+                              BC client en attente
+                            </StatusBadge>
+                          ) : null}
                         </td>
                       )}
                       {isLab && visible.bl !== false && (

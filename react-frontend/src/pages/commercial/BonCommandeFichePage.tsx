@@ -273,6 +273,17 @@ export default function BonCommandeFichePage() {
     },
   })
 
+  const mutBcClientEnAttente = useMutation({
+    mutationFn: (value: boolean) => bonsCommandeApi.update(bcId, { bc_client_en_attente: value }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
+    },
+    onError: (err) => {
+      setPlanningToast({ message: toastErrorMessage(err, 'Échec de la mise à jour du BC client.'), variant: 'error' })
+    },
+  })
+
   const mutGenerateOm = useMutation({
     mutationFn: () => ordresMissionApi.generateFromBC(bcId),
     onSuccess: (created) => {
@@ -475,6 +486,19 @@ export default function BonCommandeFichePage() {
             ) : (
               <StatusBadge variant={statutBadge.variant} size="sm">{statutBadge.label}</StatusBadge>
             )
+          ) : null}
+          {lab && bc.statut !== 'annule' ? (
+            <label className="bc-fiche__pending-bc" title="Cocher tant que le bon de commande du client n'est pas reçu">
+              <input
+                type="checkbox"
+                checked={Boolean(bc.bc_client_en_attente)}
+                disabled={mutBcClientEnAttente.isPending}
+                onChange={(e) => mutBcClientEnAttente.mutate(e.target.checked)}
+              />{' '}
+              BC client en attente
+            </label>
+          ) : bc.bc_client_en_attente ? (
+            <StatusBadge variant="warning" size="sm">BC client en attente</StatusBadge>
           ) : null}
           {bc.avancement_om ? (
             <span className={`bc-fiche__om-progress bc-fiche__om-progress--${bc.avancement_om.statut}`}>

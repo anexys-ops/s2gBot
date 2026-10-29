@@ -51,6 +51,32 @@ class OrdreMissionFromBonCommandeTest extends TestCase
         $this->assertSame(1, MissionTask::query()->count());
     }
 
+    public function test_bc_client_en_attente_flag_can_be_toggled_and_filtered(): void
+    {
+        [$bc, $lab] = $this->seedBcWithTechnicienAction();
+
+        $this->actingAs($lab, 'sanctum')
+            ->putJson("/api/v1/bons-commande/{$bc->id}", ['bc_client_en_attente' => true])
+            ->assertOk()
+            ->assertJsonPath('bc_client_en_attente', true);
+
+        $this->actingAs($lab, 'sanctum')
+            ->getJson('/api/v1/bons-commande?bc_client_en_attente=1')
+            ->assertOk()
+            ->assertJsonCount(1);
+
+        $this->actingAs($lab, 'sanctum')
+            ->putJson("/api/v1/bons-commande/{$bc->id}", ['bc_client_en_attente' => false])
+            ->assertOk()
+            ->assertJsonPath('bc_client_en_attente', false);
+        $this->assertNotNull($bc->fresh()->bc_client_recu_le);
+
+        $this->actingAs($lab, 'sanctum')
+            ->getJson('/api/v1/bons-commande?bc_client_en_attente=1')
+            ->assertOk()
+            ->assertJsonCount(0);
+    }
+
     public function test_responsable_with_orders_group_can_list_bcs_and_generate_om(): void
     {
         [$bc] = $this->seedBcWithTechnicienAction();

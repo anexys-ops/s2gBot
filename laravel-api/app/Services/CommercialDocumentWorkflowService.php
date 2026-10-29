@@ -21,7 +21,7 @@ class CommercialDocumentWorkflowService
         private readonly BonCommandeTotalsService $bonCommandeTotals,
     ) {}
 
-    public function createBonCommandeFromQuote(Quote $quote, User $user): BonCommande
+    public function createBonCommandeFromQuote(Quote $quote, User $user, bool $bcClientEnAttente = false): BonCommande
     {
         if (! $quote->dossier_id) {
             throw new \InvalidArgumentException('Devis sans dossier : impossible de créer un bon de commande.');
@@ -33,7 +33,7 @@ class CommercialDocumentWorkflowService
 
         $quote->load('quoteLines');
 
-        return DB::transaction(function () use ($quote, $user) {
+        return DB::transaction(function () use ($quote, $user, $bcClientEnAttente) {
             $numero = $this->sequences->next(
                 DocumentSequence::TYPE_BON_COMMANDE,
                 ClientFilialeResolver::codeForQuote($quote),
@@ -50,6 +50,7 @@ class CommercialDocumentWorkflowService
                 'client_id' => $quote->client_id,
                 'contact_id' => $quote->contact_id,
                 'statut' => BonCommande::STATUT_BROUILLON,
+                'bc_client_en_attente' => $bcClientEnAttente,
                 'date_commande' => now()->toDateString(),
                 'date_livraison_prevue' => $quote->site_delivery_date,
                 'montant_ht' => $quote->amount_ht,

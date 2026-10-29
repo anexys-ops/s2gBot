@@ -25,7 +25,7 @@ class DevisTransformController extends Controller
         }
 
         try {
-            $bc = $this->workflow->createBonCommandeFromQuote($quote, $request->user());
+            $bc = $this->workflow->createBonCommandeFromQuote($quote, $request->user(), $request->boolean('bc_client_en_attente'));
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

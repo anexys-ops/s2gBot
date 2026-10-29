@@ -975,6 +975,8 @@ export type BonCommande = {
   client_id: number
   contact_id?: number | null
   statut: string
+  bc_client_en_attente?: boolean
+  bc_client_recu_le?: string | null
   date_commande: string
   date_livraison_prevue?: string | null
   montant_ht: string | number
@@ -1109,8 +1111,9 @@ export const labCentreGroupsApi = {
 }
 
 export const bonsCommandeApi = {
-  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string; planning?: boolean; unassignedPlanning?: boolean }) => {
+  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string; planning?: boolean; unassignedPlanning?: boolean; bcClientEnAttente?: boolean }) => {
     const q = new URLSearchParams()
+    if (params?.bcClientEnAttente) q.set('bc_client_en_attente', '1')
     if (params?.dossier_id) q.set('dossier_id', String(params.dossier_id))
     if (params?.client_id) q.set('client_id', String(params.client_id))
     if (params?.statut) q.set('statut', params.statut)
@@ -1121,7 +1124,7 @@ export const bonsCommandeApi = {
     return api<BonCommande[]>(`/v1/bons-commande${s ? `?${s}` : ''}`)
   },
   get: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}`),
-  update: (id: number, body: { notes?: string; date_livraison_prevue?: string; montant_ht?: number; montant_ttc?: number; contact_id?: number | null; statut?: string; lab_centre_group_id?: number | null }) =>
+  update: (id: number, body: { notes?: string; date_livraison_prevue?: string; montant_ht?: number; montant_ttc?: number; contact_id?: number | null; statut?: string; lab_centre_group_id?: number | null; bc_client_en_attente?: boolean }) =>
     api<BonCommande>(`/v1/bons-commande/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api<null>(`/v1/bons-commande/${id}`, { method: 'DELETE' }),
   syncPrixDevis: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}/sync-prix-devis`, { method: 'POST' }),
@@ -1268,7 +1271,11 @@ export const tagsApi = {
 
 export const devisV1Api = {
   /** Devis (quote) → Bon de commande (lab uniquement) */
-  transformerBc: (quoteId: number) => api<BonCommande>(`/v1/devis/${quoteId}/transformer-bc`, { method: 'POST' }),
+  transformerBc: (quoteId: number, opts?: { bcClientEnAttente?: boolean }) =>
+    api<BonCommande>(`/v1/devis/${quoteId}/transformer-bc`, {
+      method: 'POST',
+      body: JSON.stringify({ bc_client_en_attente: opts?.bcClientEnAttente ?? false }),
+    }),
 }
 
 export type Reglement = {

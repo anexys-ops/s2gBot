@@ -52,6 +52,9 @@ class BonCommandeController extends Controller
         if ($request->filled('statut')) {
             $q->where('statut', (string) $request->query('statut'));
         }
+        if ($request->boolean('bc_client_en_attente')) {
+            $q->where('bc_client_en_attente', true);
+        }
         if ($request->boolean('planning')) {
             $q->planifiable();
         }
@@ -158,7 +161,11 @@ class BonCommandeController extends Controller
             'montant_ttc' => 'sometimes|numeric|min:0',
             'contact_id' => 'sometimes|nullable|exists:client_contacts,id',
             'statut' => 'sometimes|string|in:brouillon,confirme,en_cours,livre,annule',
+            'bc_client_en_attente' => 'sometimes|boolean',
         ]);
+        if (array_key_exists('bc_client_en_attente', $data)) {
+            $data['bc_client_recu_le'] = $data['bc_client_en_attente'] ? null : now()->toDateString();
+        }
         if ($data !== []) {
             $bonCommande->update($data);
             $bonCommande->refresh();

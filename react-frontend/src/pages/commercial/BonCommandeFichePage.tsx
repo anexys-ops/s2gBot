@@ -746,8 +746,15 @@ export default function BonCommandeFichePage() {
                                   <span key={type} className="bc-lignes-table__om-badge">
                                     OM {type === 'technicien' ? 'terrain' : type === 'ingenieur' ? 'ingénieur' : 'labo'} :{' '}
                                     {formatQuantity(covered)}/{formatQuantity(fl.quantite)}
+                                    {' · reste '}
+                                    {formatQuantity(Math.max(0, Number(fl.quantite) - Number(covered)))}
                                   </span>
                                 ))}
+                                {fl && Object.keys(fl.om_quantites ?? {}).length === 0 ? (
+                                  <span className="bc-lignes-table__om-badge">
+                                    Reste à planifier : {formatQuantity(fl.quantite)}
+                                  </span>
+                                ) : null}
                                 {showJalonMassQty ? (
                                   <div style={{ marginTop: '0.4rem' }}>
                                     <BcJalonQtyMass
@@ -836,6 +843,8 @@ export default function BonCommandeFichePage() {
                                 <span key={type} className="bc-lignes-table__om-badge">
                                   OM {type === 'technicien' ? 'terrain' : type === 'ingenieur' ? 'ingénieur' : 'labo'} :{' '}
                                   {formatQuantity(covered)}/{formatQuantity(l.quantite)}
+                                  {' · reste '}
+                                  {formatQuantity(Math.max(0, Number(l.quantite) - Number(covered)))}
                                 </span>
                               ))}
                             </td>

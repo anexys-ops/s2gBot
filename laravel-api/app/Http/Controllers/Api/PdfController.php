@@ -39,6 +39,7 @@ class PdfController extends Controller
         'delivery_note',
         'expense_report',
         'rapport_bc',
+        'dossier',
     ];
 
     public function __construct(
@@ -48,6 +49,7 @@ class PdfController extends Controller
         private BonLivraisonPdfGenerator $bonLivraisonPdfGenerator,
         private ExpenseReportPdfGenerator $expenseReportPdfGenerator,
         private RapportBCPdfGenerator $rapportBCPdfGenerator,
+        private \App\Services\DossierPdfGenerator $dossierPdfGenerator,
     ) {}
 
     public function templates(Request $request): JsonResponse
@@ -164,6 +166,7 @@ class PdfController extends Controller
             'delivery_note' => $this->streamDeliveryNotePdf($id, $templateId, $inline),
             'expense_report' => $this->streamExpenseReportPdf($id, $templateId, $inline),
             'rapport_bc' => $this->streamRapportBCPdf($id, $templateId, $inline),
+            'dossier' => $this->streamDossierPdf($id, $inline),
             default => response()->json(['message' => 'Type PDF non pris en charge'], 422),
         };
     }
@@ -263,6 +266,30 @@ class PdfController extends Controller
             return response()->json(['message' => 'Bon de livraison introuvable'], 404);
         }
         [$pdfBytes, $filename] = $this->bonLivraisonPdfGenerator->generate($bl, $templateId);
+
+        if ($inline) {
+            return $this->inlinePdfResponse($pdfBytes, $filename);
+        }
+
+        return response()->streamDownload(
+            fn () => print($pdfBytes),
+            $this->sanitizeFilename($filename),
+            ['Content-Type' => 'application/pdf']
+        );
+    }
+
+    private function streamDossierPdf(int $id, bool $inline = false): Response|StreamedResponse|JsonResponse
+    {
+        $dossier = \App\Models\Dossier::find($id);
+        if (! $dossier) {
+            return response()->json(['message' => 'Dossier introuvable'], 404);
+        }
+        // Lien signé (sans session) : l'accès a été contrôlé à la création du lien.
+        $user = request()->user();
+        if ($user && ! \App\Support\AgencyAccess::userMayAccessDossier($user, $dossier)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        [$pdfBytes, $filename] = $this->dossierPdfGenerator->generate($dossier);
 
         if ($inline) {
             return $this->inlinePdfResponse($pdfBytes, $filename);

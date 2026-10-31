@@ -284,6 +284,10 @@ class MissionTaskController extends Controller
             }
         }
 
+        if (($data['statut'] ?? null) === MissionTask::STATUT_DONE && $task->statut !== MissionTask::STATUT_DONE) {
+            app(\App\Services\TestFormAnswerValidator::class)->assertTaskFormsComplete($task);
+        }
+
         // Auto-timestamps sur changements de statut
         if (isset($data['statut'])) {
             if ($data['statut'] === MissionTask::STATUT_IN_PROGRESS && !$task->started_at) {

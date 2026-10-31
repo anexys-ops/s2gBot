@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { bonsCommandeApi, ordresMissionApi, type OrdreMission } from '../../api/client'
+import SearchableSelect from '../../components/ds/SearchableSelect'
 import ClickableStatusBadge from '../../components/ds/ClickableStatusBadge'
 import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
@@ -78,6 +79,8 @@ export default function OrdresMissionPage() {
   const [selectedBcForGeneration, setSelectedBcForGeneration] = useState<number | null>(null)
   const [bcSearch, setBcSearch] = useState('')
   const debouncedBcSearch = useDebouncedValue(bcSearch, 300)
+  const [bcClientFilter, setBcClientFilter] = useState('')
+  const [bcSiteFilter, setBcSiteFilter] = useState('')
 
   useEffect(() => {
     setTypeFilter(typeFromUrl)
@@ -123,6 +126,31 @@ export default function OrdresMissionPage() {
     enabled: showGenerationModal,
     staleTime: 60_000,
   })
+
+  const bcClientOptions = useMemo(() => {
+    const names = new Set<string>()
+    bonsCommande.forEach((bc) => { if (bc.client?.name) names.add(bc.client.name) })
+    return [...names].sort((a, b) => a.localeCompare(b, 'fr')).map((name) => ({ id: name, label: name }))
+  }, [bonsCommande])
+
+  const bcSiteOptions = useMemo(() => {
+    const names = new Set<string>()
+    bonsCommande.forEach((bc) => {
+      if (bcClientFilter && bc.client?.name !== bcClientFilter) return
+      if (bc.dossier?.site?.name) names.add(bc.dossier.site.name)
+    })
+    return [...names].sort((a, b) => a.localeCompare(b, 'fr')).map((name) => ({ id: name, label: name }))
+  }, [bonsCommande, bcClientFilter])
+
+  const filteredBonsCommande = useMemo(
+    () =>
+      bonsCommande.filter(
+        (bc) =>
+          (!bcClientFilter || bc.client?.name === bcClientFilter) &&
+          (!bcSiteFilter || bc.dossier?.site?.name === bcSiteFilter),
+      ),
+    [bonsCommande, bcClientFilter, bcSiteFilter],
+  )
 
   const deleteMut = useMutation({
     mutationFn: (id: number) => ordresMissionApi.delete(id),
@@ -214,6 +242,8 @@ export default function OrdresMissionPage() {
             setShowGenerationModal(false)
             setSelectedBcForGeneration(null)
             setBcSearch('')
+            setBcClientFilter('')
+            setBcSiteFilter('')
           }}
         >
           <div
@@ -252,6 +282,28 @@ export default function OrdresMissionPage() {
                 }}
               />
             </label>
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+              <label style={{ flex: '1 1 14rem' }}>
+                Client
+                <SearchableSelect
+                  options={bcClientOptions}
+                  value={bcClientFilter}
+                  onChange={(val) => { setBcClientFilter(String(val)); setBcSiteFilter('') }}
+                  placeholder="Rechercher un client…"
+                  emptyLabel="Tous les clients"
+                />
+              </label>
+              <label style={{ flex: '1 1 14rem' }}>
+                Chantier
+                <SearchableSelect
+                  options={bcSiteOptions}
+                  value={bcSiteFilter}
+                  onChange={(val) => setBcSiteFilter(String(val))}
+                  placeholder="Rechercher un chantier…"
+                  emptyLabel="Tous les chantiers"
+                />
+              </label>
+            </div>
             <div className="table-wrap" style={{ flex: '1 1 auto', overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: '1rem' }}>
               <table className="data-table data-table--compact">
                 <thead>
@@ -263,10 +315,10 @@ export default function OrdresMissionPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {bonsCommande.length === 0 ? (
+                  {filteredBonsCommande.length === 0 ? (
                     <tr><td colSpan={4} className="text-muted" style={{ padding: '1rem', textAlign: 'center' }}>Aucun bon de commande trouvé</td></tr>
                   ) : null}
-                  {bonsCommande.map((bc) => (
+                  {filteredBonsCommande.map((bc) => (
                     <tr
                       key={bc.id}
                       tabIndex={0}
@@ -353,6 +405,7 @@ export default function OrdresMissionPage() {
                   <th>Type</th>
                   <th>Client</th>
                   <th className="data-table__code">Dossier</th>
+                  <th>Chantier</th>
                   <th>Statut</th>
                   <th>Date prévue</th>
                   <th>Responsable</th>
@@ -386,6 +439,7 @@ export default function OrdresMissionPage() {
                         <span className="text-muted">—</span>
                       )}
                     </td>
+                    <td>{om.site?.name ?? dossier?.site?.name ?? <span className="text-muted">—</span>}</td>
                     <td className="data-table__status">
                       {isLab ? (
                         <ClickableStatusBadge

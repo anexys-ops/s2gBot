@@ -24,8 +24,19 @@ class DevisTransformController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
+        $data = $request->validate([
+            'bc_client_en_attente' => 'sometimes|boolean',
+            'jalon_ids' => 'sometimes|nullable|array',
+            'jalon_ids.*' => 'string',
+        ]);
+
         try {
-            $bc = $this->workflow->createBonCommandeFromQuote($quote, $request->user(), $request->boolean('bc_client_en_attente'));
+            $bc = $this->workflow->createBonCommandeFromQuote(
+                $quote,
+                $request->user(),
+                (bool) ($data['bc_client_en_attente'] ?? false),
+                array_key_exists('jalon_ids', $data) ? array_map('strval', $data['jalon_ids'] ?? []) : null,
+            );
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

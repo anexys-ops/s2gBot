@@ -25,7 +25,8 @@ class OrdreMissionController extends Controller
     private const WITH = [
         'client:id,name',
         'site:id,name',
-        'dossier:id,reference,titre',
+        'dossier:id,reference,titre,site_id',
+        'dossier.site:id,name',
         'centreGroup:id,code,name',
         'responsable:id,name',
         'bonCommande:id,numero,quote_id,dossier_id',

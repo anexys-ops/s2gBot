@@ -10,6 +10,7 @@ use App\Models\TestType;
 use App\Models\User;
 use App\Services\MissionTaskClosureService;
 use App\Services\TaskFormAssignmentService;
+use App\Services\TestFormAnswerValidator;
 use App\Services\DynamicTestFormService;
 use App\Services\TaskTestFormExcelGenerator;
 use App\Services\TaskTestFormWordGenerator;
@@ -25,6 +26,7 @@ class TaskTestFormController extends Controller
     public function __construct(
         private readonly TaskFormAssignmentService $assignments,
         private readonly DynamicTestFormService $dynamicForms,
+        private readonly TestFormAnswerValidator $answerValidator,
     ) {}
 
     /**
@@ -178,7 +180,7 @@ class TaskTestFormController extends Controller
             );
             abort_unless(in_array($form->status, ['draft', 'correction_requested'], true), 422, 'Ce formulaire ne peut plus être modifié.');
             $answers = $this->dynamicForms->calculateAnswers($form->form_snapshot['fields'] ?? [], $data['answers']);
-            $this->validateAnswers($form, $answers, false);
+            $this->answerValidator->validate($form, $answers, false);
             $form->update(['answers' => $answers, 'status' => 'draft', 'correction_note' => null]);
 
             return $form;
@@ -193,7 +195,7 @@ class TaskTestFormController extends Controller
         $this->assertAssignedType($task, $testType);
         $form = TaskTestForm::query()->where('mission_task_id', $task->id)->where('test_type_id', $testType->id)->firstOrFail();
         abort_unless($form->status === 'draft', 422, 'Le formulaire doit être en brouillon.');
-        $this->validateAnswers($form, $form->answers ?? [], true);
+        $this->answerValidator->validate($form, $form->answers ?? [], true);
         $form->update(['status' => 'submitted', 'submitted_by' => $request->user()->id, 'submitted_at' => now()]);
 
         return response()->json($form->fresh('photos'));
@@ -327,75 +329,4 @@ class TaskTestFormController extends Controller
             'fields' => $this->dynamicForms->resolvedFields($testType->form_fields ?? [])];
     }
 
-    private function validateAnswers(TaskTestForm $form, array $answers, bool $complete): void
-    {
-        $errors = [];
-        $fields = collect($form->form_snapshot['fields'] ?? []);
-        $keys = $fields->pluck('key')->all();
-        foreach (array_keys($answers) as $key) {
-            if (! in_array($key, $keys, true)) {
-                $errors["answers.$key"] = 'Champ non prévu dans le formulaire.';
-            }
-        }
-        foreach ($fields as $field) {
-            $key = $field['key'];
-            $value = $answers[$key] ?? null;
-            if ($field['type'] === 'photo') {
-                if ($complete && ($field['required'] ?? false) && ! $form->photos()->where('field_key', $key)->exists()) {
-                    $errors["answers.$key"] = 'Photo requise.';
-                }
-                continue;
-            }
-            if ($field['type'] === 'table') {
-                if (! is_array($value) || ! array_is_list($value)) {
-                    $errors["answers.$key"] = 'Le tableau doit contenir des lignes.';
-                    continue;
-                }
-                if ($complete && ($field['required'] ?? false) && $value === []) {
-                    $errors["answers.$key"] = 'Ajoutez au moins une ligne.';
-                }
-                foreach ($value as $rowIndex => $row) {
-                    if (! is_array($row)) {
-                        $errors["answers.$key.$rowIndex"] = 'Ligne invalide.';
-                        continue;
-                    }
-                    $columnKeys = array_column($field['columns'] ?? [], 'key');
-                    foreach (array_keys($row) as $columnKey) {
-                        if (! in_array($columnKey, $columnKeys, true)) $errors["answers.$key.$rowIndex.$columnKey"] = 'Colonne inconnue.';
-                    }
-                    foreach ($field['columns'] ?? [] as $column) {
-                        $columnKey = $column['key'];
-                        $error = $this->valueError($column, $row[$columnKey] ?? null, $complete);
-                        if ($error) $errors["answers.$key.$rowIndex.$columnKey"] = $error;
-                    }
-                }
-                continue;
-            }
-            $error = $this->valueError($field, $value, $complete);
-            if ($error) $errors["answers.$key"] = $error;
-        }
-        if ($errors !== []) {
-            throw ValidationException::withMessages($errors);
-        }
-    }
-
-    private function valueError(array $field, mixed $value, bool $complete): ?string
-    {
-        if ($value === null || $value === '' || $value === []) {
-            return $complete && ($field['required'] ?? false) ? 'Champ requis.' : null;
-        }
-        $valid = match ($field['type']) {
-            'number', 'formula' => is_numeric($value),
-            'boolean' => is_bool($value),
-            'date' => is_string($value) && (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $value),
-            'time' => is_string($value) && (bool) preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $value),
-            'duration' => is_string($value) && (bool) preg_match('/^\d{1,3}:[0-5]\d$/', $value),
-            'select' => is_string($value) && in_array($value, $field['options'] ?? [], true),
-            'checkboxes' => is_array($value) && array_is_list($value)
-                && count($value) === count(array_unique($value))
-                && collect($value)->every(fn ($item) => is_string($item) && in_array($item, $field['options'] ?? [], true)),
-            default => is_string($value),
-        };
-        return $valid ? null : 'Valeur invalide.';
-    }
 }

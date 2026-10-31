@@ -165,6 +165,10 @@ class MobileTerrainController extends Controller
                 ]);
             }
 
+            if ($data['statut'] === MissionTask::STATUT_DONE) {
+                app(\App\Services\TestFormAnswerValidator::class)->assertTaskFormsComplete($locked);
+            }
+
             $changes = ['statut' => $data['statut']];
             if ($data['statut'] === MissionTask::STATUT_IN_PROGRESS && ! $locked->started_at) {
                 $changes['started_at'] = now();

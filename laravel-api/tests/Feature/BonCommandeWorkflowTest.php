@@ -1080,4 +1080,66 @@ class BonCommandeWorkflowTest extends TestCase
 
         return [$lab, $bcId, $blId, $blLineId, $bcLineId];
     }
+
+    /** @return array{0: User, 1: Quote, 2: array<string, Article>} */
+    private function seedQuoteWithTwoForfaitJalons(): array
+    {
+        $client = Client::query()->create(['name' => 'Jalons Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site jalons']);
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $dossier = Dossier::query()->create([
+            'reference' => 'DOS-JAL-SEL', 'titre' => 'D', 'client_id' => $client->id, 'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON, 'date_debut' => '2026-01-01', 'created_by' => $lab->id,
+        ]);
+        $famille = FamilleArticle::query()->create(['code' => 'JSEL', 'libelle' => 'Jalons', 'ordre' => 1, 'actif' => true]);
+        $make = fn (string $code) => Article::query()->create([
+            'ref_famille_article_id' => $famille->id, 'code' => $code, 'libelle' => $code,
+            'kind' => Article::KIND_PRODUCT, 'actif' => true, 'prix_unitaire_ht' => 0, 'tva_rate' => 20,
+        ]);
+        $a1 = $make('PA1');
+        $a2 = $make('PA2');
+        $q = Quote::query()->create([
+            'number' => 'Q-JSEL', 'client_id' => $client->id, 'site_id' => $site->id, 'dossier_id' => $dossier->id,
+            'quote_date' => '2026-02-01', 'amount_ht' => 100, 'amount_ttc' => 120, 'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+            'meta' => ['devis_jalons' => [
+                ['id' => 'j1', 'libelle' => 'Jalon un', 'mode' => 'forfait', 'quantity' => 50, 'prix_unitaire_ht' => 10, 'product_ref_article_ids' => [$a1->id]],
+                ['id' => 'j2', 'libelle' => 'Jalon deux', 'mode' => 'forfait', 'quantity' => 5, 'prix_unitaire_ht' => 10, 'product_ref_article_ids' => [$a2->id]],
+            ]],
+        ]);
+        foreach ([$a1, $a2] as $a) {
+            QuoteLine::query()->create([
+                'quote_id' => $q->id, 'ref_article_id' => $a->id, 'description' => $a->libelle,
+                'quantity' => 1, 'unit_price' => 0, 'tva_rate' => 20, 'total' => 0,
+            ]);
+        }
+
+        return [$lab, $q, ['a1' => $a1, 'a2' => $a2]];
+    }
+
+    public function test_transform_keeps_jalon_quantity_on_detail_lines(): void
+    {
+        [$lab, $q, $a] = $this->seedQuoteWithTwoForfaitJalons();
+
+        $bc = $this->actingAs($lab, 'sanctum')->postJson("/api/v1/devis/{$q->id}/transformer-bc")->assertCreated()->json();
+
+        $line = BonCommandeLigne::query()->where('bon_commande_id', $bc['id'])->where('ref_article_id', $a['a1']->id)->firstOrFail();
+        $this->assertEquals(50, (float) $line->quantite);
+        $this->assertEquals(5, (float) BonCommandeLigne::query()->where('bon_commande_id', $bc['id'])->where('ref_article_id', $a['a2']->id)->value('quantite'));
+    }
+
+    public function test_transform_can_select_only_some_jalons(): void
+    {
+        [$lab, $q, $a] = $this->seedQuoteWithTwoForfaitJalons();
+
+        $bc = $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/v1/devis/{$q->id}/transformer-bc", ['jalon_ids' => ['j2']])
+            ->assertCreated()->json();
+
+        $lignes = BonCommandeLigne::query()->where('bon_commande_id', $bc['id'])->get();
+        $this->assertCount(0, $lignes->where('ref_article_id', $a['a1']->id));
+        $this->assertCount(1, $lignes->where('ref_article_id', $a['a2']->id));
+        $this->assertCount(0, $lignes->filter(fn ($l) => str_contains((string) $l->libelle, 'Jalon un')));
+        $this->assertCount(1, $lignes->filter(fn ($l) => str_contains((string) $l->libelle, 'Jalon deux')));
+    }
 }

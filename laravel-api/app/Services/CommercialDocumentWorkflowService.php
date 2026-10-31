@@ -21,7 +21,12 @@ class CommercialDocumentWorkflowService
         private readonly BonCommandeTotalsService $bonCommandeTotals,
     ) {}
 
-    public function createBonCommandeFromQuote(Quote $quote, User $user, bool $bcClientEnAttente = false): BonCommande
+    public function createBonCommandeFromQuote(
+        Quote $quote,
+        User $user,
+        bool $bcClientEnAttente = false,
+        ?array $jalonIds = null,
+    ): BonCommande
     {
         if (! $quote->dossier_id) {
             throw new \InvalidArgumentException('Devis sans dossier : impossible de créer un bon de commande.');
@@ -33,7 +38,7 @@ class CommercialDocumentWorkflowService
 
         $quote->load('quoteLines');
 
-        return DB::transaction(function () use ($quote, $user, $bcClientEnAttente) {
+        return DB::transaction(function () use ($quote, $user, $bcClientEnAttente, $jalonIds) {
             $numero = $this->sequences->next(
                 DocumentSequence::TYPE_BON_COMMANDE,
                 ClientFilialeResolver::codeForQuote($quote),
@@ -64,16 +69,49 @@ class CommercialDocumentWorkflowService
             $quoteMeta = is_array($quote->meta) ? $quote->meta : [];
             $documentTva = (float) $quote->tva_rate;
 
+            // Sélection des jalons à transférer (null = tous). Un jalon sans id stable
+            // est identifié par sa position (« idx-N »).
+            $allJalons = array_values(array_filter($quoteMeta['devis_jalons'] ?? [], 'is_array'));
+            $jalonKey = fn (array $jalon, int $idx): string => (string) ($jalon['id'] ?? 'idx-'.$idx);
+            $selectedJalons = [];
+            foreach ($allJalons as $idx => $jalon) {
+                if ($jalonIds === null || in_array($jalonKey($jalon, $idx), $jalonIds, true)) {
+                    $selectedJalons[] = $jalon;
+                }
+            }
+            $restrictJalons = $jalonIds !== null;
+            $refsOfJalons = fn (array $jalons): array => array_values(array_unique(array_map(
+                'intval',
+                array_merge(...array_map(fn ($j) => (array) ($j['product_ref_article_ids'] ?? []), $jalons ?: [[]])),
+            )));
+            $selectedRefIds = $refsOfJalons($selectedJalons);
+            $allRefIds = $refsOfJalons($allJalons);
+            // Quantité d'un jalon forfait reprise à l'identique sur chacune de ses lignes de détail.
+            $forfaitQtyByRef = [];
+            foreach ($selectedJalons as $jalon) {
+                if (! QuotePricingService::isJalonForfait($jalon)) {
+                    continue;
+                }
+                foreach ((array) ($jalon['product_ref_article_ids'] ?? []) as $refId) {
+                    $forfaitQtyByRef[(int) $refId] ??= max(1, (int) ($jalon['quantity'] ?? 1));
+                }
+            }
+
             // Step 1: copy ALL quote lines — forfait product lines included
             /** @var QuoteLine $line */
             foreach ($quote->quoteLines as $line) {
+                $refId = (int) $line->ref_article_id;
+                if ($restrictJalons && $refId > 0 && in_array($refId, $allRefIds, true) && ! in_array($refId, $selectedRefIds, true)) {
+                    continue;
+                }
+                $qty = (float) ($forfaitQtyByRef[$refId] ?? $line->quantity);
                 BonCommandeLigne::query()->create([
                     'bon_commande_id' => $bc->id,
                     'ref_article_id' => $line->ref_article_id,
                     'libelle' => $line->description,
                     'ordre' => $ordre++,
-                    'quantite' => (float) $line->quantity,
-                    'quantite_devis' => (float) $line->quantity,
+                    'quantite' => $qty,
+                    'quantite_devis' => $qty,
                     'prix_unitaire_ht' => (float) $line->unit_price,
                     'tva_rate' => (float) $line->tva_rate,
                     'montant_ht' => (float) $line->total,
@@ -97,15 +135,13 @@ class CommercialDocumentWorkflowService
                         'montant_ht' => $globalHt,
                     ]);
                 } else {
-                    foreach ($quoteMeta['devis_jalons'] ?? [] as $jalon) {
-                        if (is_array($jalon)) {
-                            $this->createBcLigneFromJalon($bc, $jalon, $documentTva, $ordre++);
-                        }
+                    foreach ($selectedJalons as $jalon) {
+                        $this->createBcLigneFromJalon($bc, $jalon, $documentTva, $ordre++);
                     }
                 }
             } else {
-                foreach ($quoteMeta['devis_jalons'] ?? [] as $jalon) {
-                    if (is_array($jalon) && QuotePricingService::isJalonForfait($jalon)) {
+                foreach ($selectedJalons as $jalon) {
+                    if (QuotePricingService::isJalonForfait($jalon)) {
                         $this->createBcLigneFromJalon($bc, $jalon, $documentTva, $ordre++);
                     }
                 }

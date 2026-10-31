@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import {
@@ -75,8 +75,26 @@ function BonCommandeCreateFromDevisPanel() {
     [eligibleQuotes, quoteId],
   )
 
+  // Jalons du devis sélectionné : tous transférés par défaut, décochables un par un.
+  const [excludedJalons, setExcludedJalons] = useState<Set<string>>(new Set())
+  const quoteJalons = useMemo(
+    () =>
+      (selectedQuote?.meta?.devis_jalons ?? []).map((jalon, idx) => ({
+        key: String(jalon.id ?? `idx-${idx}`),
+        label: [jalon.s2g_code, jalon.libelle].filter(Boolean).join(' — ') || `Jalon ${idx + 1}`,
+      })),
+    [selectedQuote],
+  )
+  useEffect(() => {
+    setExcludedJalons(new Set())
+  }, [quoteId])
+
   const createMut = useMutation({
-    mutationFn: (id: number) => devisV1Api.transformerBc(id, { bcClientEnAttente }),
+    mutationFn: (id: number) =>
+      devisV1Api.transformerBc(id, {
+        bcClientEnAttente,
+        jalonIds: quoteJalons.length > 0 ? quoteJalons.filter((j) => !excludedJalons.has(j.key)).map((j) => j.key) : null,
+      }),
     onSuccess: (bc) => {
       setBcClientEnAttente(false)
       void qc.invalidateQueries({ queryKey: ['bons-commande'] })
@@ -190,6 +208,29 @@ function BonCommandeCreateFromDevisPanel() {
               )}
             </div>
 
+            {quoteJalons.length > 0 ? (
+              <fieldset className="bc-from-devis-panel__jalons">
+                <legend>Jalons à transférer dans le bon de commande</legend>
+                {quoteJalons.map((jalon) => (
+                  <label key={jalon.key} className="bc-from-devis-panel__jalon">
+                    <input
+                      type="checkbox"
+                      checked={!excludedJalons.has(jalon.key)}
+                      onChange={(e) =>
+                        setExcludedJalons((prev) => {
+                          const next = new Set(prev)
+                          if (e.target.checked) next.delete(jalon.key)
+                          else next.add(jalon.key)
+                          return next
+                        })
+                      }
+                    />{' '}
+                    {jalon.label}
+                  </label>
+                ))}
+              </fieldset>
+            ) : null}
+
             <label className="bc-from-devis-panel__pending-bc">
               <input
                 type="checkbox"
@@ -203,7 +244,7 @@ function BonCommandeCreateFromDevisPanel() {
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={!quoteId || createMut.isPending}
+                disabled={!quoteId || createMut.isPending || (quoteJalons.length > 0 && excludedJalons.size >= quoteJalons.length)}
                 onClick={handleCreate}
               >
                 {createMut.isPending ? 'Création en cours…' : 'Créer le BC'}

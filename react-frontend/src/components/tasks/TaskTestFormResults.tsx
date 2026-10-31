@@ -317,7 +317,7 @@ export default function TaskTestFormResults({ forms, taskId, onOpenPhoto, render
           {form.submission?.correction_note ? <p>Correction demandée : {form.submission.correction_note}</p> : null}
           {form.submission ? <dl>{form.form_fields.filter((field) => field.type !== 'photo').map((field) => {
             const value = form.submission?.answers?.[field.key]
-            return <div key={field.key}><dt>{field.label}{field.help ? <div className="text-muted mission-task-list__sub">{field.help}</div> : null}</dt><dd>
+            return <div key={field.key} className={field.type === 'table' ? 'task-test-results__field--wide' : undefined}><dt>{field.label}{field.help ? <div className="text-muted mission-task-list__sub">{field.help}</div> : null}</dt><dd>
               {field.type === 'table' && Array.isArray(value) ? <>
                 <div className="table-wrap"><table className="data-table data-table--compact"><thead><tr>{field.columns?.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead><tbody>
                   {value.map((row: Record<string, unknown>, index: number) => <tr key={index}>{field.columns?.map((column) => <td key={column.key}>{String(row[column.key] ?? '—')}</td>)}</tr>)}

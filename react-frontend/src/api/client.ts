@@ -1271,10 +1271,13 @@ export const tagsApi = {
 
 export const devisV1Api = {
   /** Devis (quote) → Bon de commande (lab uniquement) */
-  transformerBc: (quoteId: number, opts?: { bcClientEnAttente?: boolean }) =>
+  transformerBc: (quoteId: number, opts?: { bcClientEnAttente?: boolean; jalonIds?: string[] | null }) =>
     api<BonCommande>(`/v1/devis/${quoteId}/transformer-bc`, {
       method: 'POST',
-      body: JSON.stringify({ bc_client_en_attente: opts?.bcClientEnAttente ?? false }),
+      body: JSON.stringify({
+        bc_client_en_attente: opts?.bcClientEnAttente ?? false,
+        ...(opts?.jalonIds ? { jalon_ids: opts.jalonIds } : {}),
+      }),
     }),
 }
 
@@ -3555,7 +3558,7 @@ export interface OrdreMission {
   created_at?: string
   client?: { id: number; name: string } | null
   site?: { id: number; name: string } | null
-  dossier?: { id: number; reference: string; titre?: string | null; date_debut?: string | null; date_fin_prevue?: string | null } | null
+  dossier?: { id: number; reference: string; titre?: string | null; site?: { id: number; name: string } | null; date_debut?: string | null; date_fin_prevue?: string | null } | null
   responsable?: { id: number; name: string } | null
   bonCommande?: {
     id: number
@@ -3564,7 +3567,7 @@ export interface OrdreMission {
     quote_id?: number | null
     quote?: { id: number; number: string } | null
     lignes?: BonCommandeLigne[]
-    dossier?: { id: number; reference: string; titre?: string | null } | null
+    dossier?: { id: number; reference: string; titre?: string | null; site?: { id: number; name: string } | null } | null
   } | null
   /** Sérialisation Laravel (snake_case) */
   bon_commande?: OrdreMission['bonCommande']

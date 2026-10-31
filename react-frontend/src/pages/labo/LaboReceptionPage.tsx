@@ -15,6 +15,8 @@ import {
   type SampleStatusStats,
 } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
+import Modal from '../../components/Modal'
+import StatusBadge, { sampleStatutBadgeProps } from '../../components/ds/StatusBadge'
 import SampleReceptionModal, { type ReceptionMode } from '../../components/labo/SampleReceptionModal'
 import SampleEditModal from '../../components/labo/SampleEditModal'
 import SampleLabelPrint, { type LabelFormat } from '../../components/labo/SampleLabelPrint'
@@ -520,20 +522,9 @@ export default function LaboReceptionPage() {
                       </td>
                       <td style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
                         <div>{formatDateTime(sample.received_at ?? sample.collected_at)}</div>
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            marginTop: 2,
-                            padding: '1px 7px',
-                            borderRadius: 10,
-                            fontSize: '0.72rem',
-                            fontWeight: 600,
-                            background: tab.bg,
-                            color: tab.color,
-                          }}
-                        >
-                          {tab.label}
-                        </span>
+                        <div style={{ marginTop: 2 }}>
+                          <StatusBadge variant={sampleStatutBadgeProps(sample.status).variant} size="sm">{tab.label}</StatusBadge>
+                        </div>
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
@@ -843,73 +834,38 @@ function SampleHistoryModal({ sample, onClose }: { sample: ReceptionSample; onCl
   const logs = data?.data ?? []
 
   return (
-    <div
-      className="modal-backdrop"
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      onClick={onClose}
-    >
-      <div
-        className="card"
-        style={{ width: '100%', maxWidth: 520, maxHeight: '80vh', overflowY: 'auto', padding: '1.5rem' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <div>
-            <h3 style={{ margin: 0 }}>Historique — {sample.fold_number}</h3>
-            {sample.transco_number && <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>Transco : {sample.transco_number}</div>}
-          </div>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>✕</button>
-        </div>
-
-        {isLoading && <p>Chargement…</p>}
-        {!isLoading && logs.length === 0 && (
-          <p className="text-muted">Aucun historique disponible pour cet échantillon.</p>
-        )}
-        {logs.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {logs.map((log) => {
-              const toTab = statusTabInfo(log.status_to)
-              return (
-                <div
-                  key={log.id}
-                  style={{
-                    padding: '0.6rem 0.75rem',
-                    borderRadius: 6,
-                    background: '#f9fafb',
-                    borderLeft: `3px solid ${toTab.color}`,
-                  }}
-                >
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {log.status_from && (
-                      <>
-                        <span style={{ fontSize: '0.8rem', color: statusTabInfo(log.status_from).color, fontWeight: 600 }}>
-                          {statusTabInfo(log.status_from).label}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>→</span>
-                      </>
-                    )}
-                    <span style={{ fontSize: '0.8rem', color: toTab.color, fontWeight: 700 }}>
-                      {toTab.label}
-                    </span>
-                    <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: '#9ca3af' }}>
-                      {formatDateTime(log.created_at)}
-                    </span>
-                  </div>
-                  {log.user && (
-                    <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 2 }}>par {log.user.name}</div>
+    <Modal title={`Historique — ${sample.fold_number}`} onClose={onClose}>
+      {sample.transco_number && <div className="text-muted" style={{ marginBottom: '0.75rem' }}>Transco : {sample.transco_number}</div>}
+      {isLoading && <p>Chargement…</p>}
+      {!isLoading && logs.length === 0 && (
+        <p className="text-muted">Aucun historique disponible pour cet échantillon.</p>
+      )}
+      {logs.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {logs.map((log) => {
+            const toTab = statusTabInfo(log.status_to)
+            const to = sampleStatutBadgeProps(log.status_to, toTab.label)
+            const from = log.status_from ? sampleStatutBadgeProps(log.status_from, statusTabInfo(log.status_from).label) : null
+            return (
+              <div key={log.id} style={{ padding: '0.6rem 0.75rem', borderRadius: 6, background: '#f9fafb', borderLeft: '3px solid var(--color-border, #dbe3eb)' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {from && (
+                    <>
+                      <StatusBadge variant={from.variant} size="sm">{from.label}</StatusBadge>
+                      <span aria-hidden>→</span>
+                    </>
                   )}
-                  {log.notes && (
-                    <div style={{ fontSize: '0.82rem', color: '#374151', marginTop: 4, fontStyle: 'italic' }}>
-                      {log.notes}
-                    </div>
-                  )}
+                  <StatusBadge variant={to.variant} size="sm">{to.label}</StatusBadge>
+                  <span className="text-muted" style={{ marginLeft: 'auto', fontSize: '0.78rem' }}>{formatDateTime(log.created_at)}</span>
                 </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-    </div>
+                {log.user && <div className="text-muted" style={{ fontSize: '0.78rem', marginTop: 2 }}>par {log.user.name}</div>}
+                {log.notes && <div style={{ fontSize: '0.82rem', marginTop: 4, fontStyle: 'italic' }}>{log.notes}</div>}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </Modal>
   )
 }
 
@@ -928,51 +884,36 @@ function ChangeStatusModal({
   const [notes, setNotes] = useState('')
 
   return (
-    <div
-      className="modal-backdrop"
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      onClick={onClose}
-    >
-      <div
-        className="card"
-        style={{ width: '100%', maxWidth: 420, padding: '1.5rem' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 style={{ marginBottom: '1rem' }}>Changer le statut — {sample.fold_number}</h3>
-        <div style={{ marginBottom: '0.75rem' }}>
-          <label style={{ display: 'block', fontWeight: 600, marginBottom: 4 }}>Nouveau statut</label>
-          <select
-            value={newStatus}
-            onChange={(e) => setNewStatus(e.target.value)}
-            style={{ width: '100%' }}
-          >
-            {STATUS_TABS.filter((t) => t.key !== 'en_transit' && t.key !== 'receptionne').map((t) => (
-              <option key={t.key} value={t.key}>{t.label}</option>
-            ))}
-          </select>
-        </div>
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', fontWeight: 600, marginBottom: 4 }}>Note (optionnel)</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={2}
-            style={{ width: '100%' }}
-            placeholder="Raison du changement de statut…"
-          />
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-          <button type="button" className="btn btn-secondary" onClick={onClose}>Annuler</button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={isPending}
-            onClick={() => onConfirm(newStatus, notes.trim() || undefined)}
-          >
-            {isPending ? 'En cours…' : 'Confirmer'}
-          </button>
-        </div>
+    <Modal title={`Changer le statut — ${sample.fold_number}`} onClose={onClose}>
+      <div style={{ marginBottom: '0.75rem' }}>
+        <label style={{ display: 'block', fontWeight: 600, marginBottom: 4 }}>Nouveau statut</label>
+        <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} style={{ width: '100%' }}>
+          {STATUS_TABS.filter((t) => t.key !== 'en_transit' && t.key !== 'receptionne').map((t) => (
+            <option key={t.key} value={t.key}>{t.label}</option>
+          ))}
+        </select>
       </div>
-    </div>
+      <div style={{ marginBottom: '1rem' }}>
+        <label style={{ display: 'block', fontWeight: 600, marginBottom: 4 }}>Note (optionnel)</label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+          style={{ width: '100%' }}
+          placeholder="Raison du changement de statut…"
+        />
+      </div>
+      <div className="crud-actions modal-actions">
+        <button type="button" className="btn btn-secondary" onClick={onClose}>Annuler</button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={isPending}
+          onClick={() => onConfirm(newStatus, notes.trim() || undefined)}
+        >
+          {isPending ? 'En cours…' : 'Confirmer'}
+        </button>
+      </div>
+    </Modal>
   )
 }

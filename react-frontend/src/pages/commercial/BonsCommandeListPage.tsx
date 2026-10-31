@@ -16,7 +16,7 @@ import { IconEye, QuotePdfButton } from '../../components/crm/QuoteListTableActi
 import TableIconHeader from '../../components/TableIconHeader'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import ClickableStatusBadge from '../../components/ds/ClickableStatusBadge'
-import StatusBadge, { bonCommandeStatutBadgeProps, quoteStatutBadgeProps } from '../../components/ds/StatusBadge'
+import StatusBadge, { bonCommandeStatutBadgeProps, quoteStatutBadgeProps, BON_COMMANDE_STATUT_LABELS } from '../../components/ds/StatusBadge'
 import StatusChangeModal from '../../components/StatusChangeModal'
 import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
 import ListTableToolbar from '../../components/ListTableToolbar'
@@ -32,13 +32,7 @@ import { commercialDocumentCapabilities } from '../../lib/commercialDocumentActi
 import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
 
-const STATUT_LABELS: Record<string, string> = {
-  brouillon: 'Brouillon',
-  confirme: 'Confirmé',
-  en_cours: 'En cours',
-  livre: 'Livré',
-  annule: 'Annulé',
-}
+const STATUT_LABELS: Record<string, string> = BON_COMMANDE_STATUT_LABELS
 
 const statusOptions = Object.entries(STATUT_LABELS).map(([value, label]) => ({ value, label }))
 

@@ -4,13 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { rapportBCApi, type RapportBC, type RapportBCBonCommande } from '../../api/client'
 import { formatAppDate } from '../../lib/appLocale'
 import { useAuth } from '../../contexts/AuthContext'
-
-const STATUT_META: Record<string, { label: string; color: string; bg: string }> = {
-  brouillon:    { label: 'Brouillon',    color: '#6b7280', bg: '#f3f4f6' },
-  preliminaire: { label: 'Préliminaire', color: '#f59e0b', bg: '#fef3c7' },
-  valide:       { label: 'Validé',       color: '#10b981', bg: '#d1fae5' },
-  archive:      { label: 'Archivé',      color: '#8b5cf6', bg: '#ede9fe' },
-}
+import Modal from '../../components/Modal'
+import StatusBadge, { rapportBcStatutBadgeProps } from '../../components/ds/StatusBadge'
 
 const TABS = [
   { key: '', label: 'Tous' },
@@ -21,12 +16,8 @@ const TABS = [
 ]
 
 function StatutBadge({ statut }: { statut: string }) {
-  const meta = STATUT_META[statut] ?? { label: statut, color: '#6b7280', bg: '#f3f4f6' }
-  return (
-    <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 10px', borderRadius: 12, color: meta.color, background: meta.bg, whiteSpace: 'nowrap' }}>
-      {meta.label}
-    </span>
-  )
+  const st = rapportBcStatutBadgeProps(statut)
+  return <StatusBadge variant={st.variant} size="sm">{st.label}</StatusBadge>
 }
 
 function BcPickerModal({
@@ -47,61 +38,50 @@ function BcPickerModal({
   }, [bcs, search])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#fff', borderRadius: 12, width: 600, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.22)' }}>
-        {/* Header */}
-        <div style={{ padding: '18px 20px 12px', borderBottom: '1px solid #e5e7eb' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: '1rem' }}>Sélectionner un bon de commande</span>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: '#6b7280' }}>✕</button>
-          </div>
-          <div style={{ position: 'relative' }}>
-            <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', opacity: 0.4 }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input
-              autoFocus
-              type="text"
-              placeholder="Rechercher par numéro ou client…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: '100%', padding: '9px 12px 9px 34px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: '0.9rem', boxSizing: 'border-box' }}
-            />
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: 6 }}>{filtered.length} bon{filtered.length !== 1 ? 's' : ''} de commande</div>
-        </div>
-        {/* Liste */}
-        <div style={{ overflowY: 'auto', flex: 1 }}>
-          {filtered.length === 0 && (
-            <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af', fontSize: '0.85rem' }}>Aucun BC trouvé.</div>
-          )}
-          {filtered.map((bc) => (
-            <button
-              key={bc.id}
-              onClick={() => onSelect(bc.id)}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                width: '100%', padding: '12px 20px', background: selected === bc.id ? '#eff6ff' : 'none',
-                border: 'none', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', textAlign: 'left',
-                transition: 'background 0.1s',
-              }}
-            >
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#111827' }}>
-                  {bc.numero}
-                  {bc.dossier?.reference && (
-                    <span style={{ fontWeight: 400, fontSize: '0.78rem', color: '#2563eb', marginLeft: 8 }}>{bc.dossier.reference}</span>
-                  )}
-                </div>
-                {bc.client && <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 1 }}>{bc.client.name}</div>}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{bc.rapport_b_cs_count} rapport{bc.rapport_b_cs_count !== 1 ? 's' : ''}</span>
-                {selected === bc.id && <span style={{ color: '#2563eb', fontWeight: 700 }}>✓</span>}
-              </div>
-            </button>
-          ))}
-        </div>
+    <Modal title="Sélectionner un bon de commande" onClose={onClose} size="wide">
+      <input
+        autoFocus
+        type="search"
+        placeholder="Rechercher par numéro ou client…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        style={{ width: '100%', marginBottom: 6 }}
+      />
+      <div className="text-muted" style={{ fontSize: '0.78rem', marginBottom: 8 }}>
+        {filtered.length} bon{filtered.length !== 1 ? 's' : ''} de commande
       </div>
-    </div>
+      <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
+        {filtered.length === 0 && (
+          <div className="text-muted" style={{ padding: 32, textAlign: 'center' }}>Aucun BC trouvé.</div>
+        )}
+        {filtered.map((bc) => (
+          <button
+            key={bc.id}
+            type="button"
+            onClick={() => onSelect(bc.id)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              width: '100%', padding: '12px 16px', background: selected === bc.id ? '#eff6ff' : 'none',
+              border: 'none', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', textAlign: 'left',
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 700 }}>
+                {bc.numero}
+                {bc.dossier?.reference && (
+                  <span style={{ fontWeight: 400, fontSize: '0.78rem', color: '#2563eb', marginLeft: 8 }}>{bc.dossier.reference}</span>
+                )}
+              </div>
+              {bc.client && <div className="text-muted" style={{ fontSize: '0.78rem', marginTop: 1 }}>{bc.client.name}</div>}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+              <span className="text-muted" style={{ fontSize: '0.72rem' }}>{bc.rapport_b_cs_count} rapport{bc.rapport_b_cs_count !== 1 ? 's' : ''}</span>
+              {selected === bc.id && <span style={{ color: '#2563eb', fontWeight: 700 }}>✓</span>}
+            </div>
+          </button>
+        ))}
+      </div>
+    </Modal>
   )
 }
 
@@ -284,9 +264,8 @@ export default function RapportBCListPage() {
 
       {/* Modal création */}
       {showCreate && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 500, boxShadow: '0 16px 48px rgba(0,0,0,0.18)' }}>
-            <h2 style={{ margin: '0 0 18px', fontSize: '1.1rem', fontWeight: 700 }}>Nouveau rapport</h2>
+        <Modal title="Nouveau rapport" onClose={() => { setShowCreate(false); setNewTitre(''); setNewBcId('') }}>
+          <div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Sélecteur BC */}
               <div>
@@ -330,23 +309,25 @@ export default function RapportBCListPage() {
                 Créé par : <strong>{user?.name ?? '—'}</strong> · Date : <strong>{new Date().toLocaleDateString('fr-FR')}</strong>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+            <div className="crud-actions modal-actions" style={{ marginTop: 20 }}>
               <button
+                type="button"
+                className="btn btn-secondary"
                 onClick={() => { setShowCreate(false); setNewTitre(''); setNewBcId('') }}
-                style={{ padding: '8px 16px', background: '#f3f4f6', border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600 }}
               >
                 Annuler
               </button>
               <button
+                type="button"
+                className="btn btn-primary"
                 onClick={() => createMut.mutate()}
                 disabled={createMut.isPending || !newBcId}
-                style={{ padding: '8px 20px', background: newBcId ? '#2563eb' : '#93c5fd', color: '#fff', border: 'none', borderRadius: 7, cursor: newBcId ? 'pointer' : 'default', fontWeight: 700 }}
               >
                 {createMut.isPending ? 'Création…' : 'Créer'}
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal BC picker */}

@@ -4,32 +4,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { rapportBCApi, documentPdfTemplatesApi, pdfApi, type RapportBCTask, type RapportBCVersion, type RapportBCSuivi, type DocumentPdfTemplateRow } from '../../api/client'
 import { formatAppDate } from '../../lib/appLocale'
 import { useAuth } from '../../contexts/AuthContext'
+import Modal from '../../components/Modal'
 import { hasStaffCapability } from '../../lib/staffAccess'
-import { getTaskStatutMeta } from '../../lib/missionTaskStatuts'
-
-const STATUT_META: Record<string, { label: string; color: string; bg: string }> = {
-  brouillon:    { label: 'Brouillon',    color: '#6b7280', bg: '#f3f4f6' },
-  preliminaire: { label: 'Préliminaire', color: '#f59e0b', bg: '#fef3c7' },
-  valide:       { label: 'Validé',       color: '#10b981', bg: '#d1fae5' },
-  archive:      { label: 'Archivé',      color: '#8b5cf6', bg: '#ede9fe' },
-}
+import StatusBadge, { rapportBcStatutBadgeProps, taskStatutBadgeProps } from '../../components/ds/StatusBadge'
 
 function StatutBadge({ statut }: { statut: string }) {
-  const meta = STATUT_META[statut] ?? { label: statut, color: '#6b7280', bg: '#f3f4f6' }
-  return (
-    <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 10px', borderRadius: 12, color: meta.color, background: meta.bg }}>
-      {meta.label}
-    </span>
-  )
+  const st = rapportBcStatutBadgeProps(statut)
+  return <StatusBadge variant={st.variant} size="md">{st.label}</StatusBadge>
 }
 
 function TaskStatutBadge({ statut }: { statut: string }) {
-  const meta = getTaskStatutMeta(statut)
-  return (
-    <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 10, color: meta.color, background: meta.bg, whiteSpace: 'nowrap' }}>
-      {meta.label}
-    </span>
-  )
+  const st = taskStatutBadgeProps(statut)
+  return <StatusBadge variant={st.variant} size="sm">{st.label}</StatusBadge>
 }
 
 export default function RapportBCDetailPage() {
@@ -281,7 +267,7 @@ export default function RapportBCDetailPage() {
                 {statuts.map((s) => {
                   const isPublishStatut = PUBLISH_STATUTS.includes(s)
                   if (isPublishStatut && !canPublish) return null
-                  return <option key={s} value={s}>{STATUT_META[s]?.label ?? s}</option>
+                  return <option key={s} value={s}>{rapportBcStatutBadgeProps(s).label}</option>
                 })}
               </select>
               {!canPublish && <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: 4 }}>Les statuts Validé et Archivé sont réservés aux administrateurs.</div>}
@@ -297,7 +283,7 @@ export default function RapportBCDetailPage() {
               style={{ padding: '7px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}>
               {updateMut.isPending ? 'Sauvegarde…' : 'Sauvegarder'}
             </button>
-            <button onClick={() => setEditing(false)} style={{ padding: '7px 16px', background: '#e5e7eb', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Annuler</button>
+            <button onClick={() => setEditing(false)} className="btn btn-secondary">Annuler</button>
           </div>
         </div>
       )}
@@ -441,10 +427,8 @@ export default function RapportBCDetailPage() {
 
       {/* Modal impression PDF */}
       {showPrintModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 480, boxShadow: '0 16px 48px rgba(0,0,0,0.18)' }}>
-            <h2 style={{ margin: '0 0 16px', fontSize: '1.05rem', fontWeight: 700 }}>Générer le PDF du rapport</h2>
-
+        <Modal title="Générer le PDF du rapport" onClose={() => { setShowPrintModal(false) }}>
+          <div>
             {pdfTemplates.length === 0 ? (
               <div style={{ padding: '16px 0', color: '#6b7280', fontSize: '0.88rem' }}>
                 <p>Aucun modèle PDF actif pour les rapports de mission.</p>
@@ -503,20 +487,19 @@ export default function RapportBCDetailPage() {
             <div style={{ marginTop: 18, textAlign: 'right' }}>
               <button
                 onClick={() => setShowPrintModal(false)}
-                style={{ padding: '8px 16px', background: '#f3f4f6', border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600 }}
+                className="btn btn-secondary"
               >
                 Fermer
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal demande de validation */}
       {showValidationModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 420, boxShadow: '0 16px 48px rgba(0,0,0,0.18)' }}>
-            <h2 style={{ margin: '0 0 14px', fontSize: '1rem', fontWeight: 700 }}>Demander la validation</h2>
+        <Modal title="Demander la validation" onClose={() => { setShowValidationModal(false); setValidationMessage('') }}>
+          <div>
             <p style={{ fontSize: '0.85rem', color: '#6b7280', margin: '0 0 14px' }}>
               Le rapport passera en statut <strong>Préliminaire</strong> et sera soumis à la validation d'un administrateur.
             </p>
@@ -533,7 +516,7 @@ export default function RapportBCDetailPage() {
             <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => { setShowValidationModal(false); setValidationMessage('') }}
-                style={{ padding: '8px 16px', background: '#f3f4f6', border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600 }}
+                className="btn btn-secondary"
               >
                 Annuler
               </button>
@@ -546,14 +529,13 @@ export default function RapportBCDetailPage() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal sélection tâches */}
       {showTaches && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', borderRadius: 10, padding: 24, width: 520, maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ fontWeight: 700, fontSize: '1rem' }}>Sélectionner les tâches</div>
+        <Modal title="Sélectionner les tâches" onClose={() => { setShowTaches(false) }}>
+          <div>
             <div style={{ overflowY: 'auto', flex: 1, maxHeight: 400 }}>
               {bcTaches.length === 0 && <div style={{ color: '#9ca3af', fontSize: '0.85rem' }}>Aucune tâche terminée trouvée pour ce BC.</div>}
               {bcTaches.map((t: RapportBCTask) => (
@@ -583,10 +565,10 @@ export default function RapportBCDetailPage() {
                 style={{ padding: '7px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}>
                 {updateMut.isPending ? 'Sauvegarde…' : 'Valider'}
               </button>
-              <button onClick={() => setShowTaches(false)} style={{ padding: '7px 16px', background: '#e5e7eb', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Annuler</button>
+              <button onClick={() => setShowTaches(false)} className="btn btn-secondary">Annuler</button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

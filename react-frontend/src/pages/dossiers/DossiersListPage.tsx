@@ -5,7 +5,7 @@ import { clientsApi, dossiersApi, type DossierRow, type DossierStatut } from '..
 import { useAuth } from '../../contexts/AuthContext'
 import DossierCard from '../../components/Dossiers/DossierCard'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
-import StatusBadge, { dossierStatutBadgeProps } from '../../components/ds/StatusBadge'
+import StatusBadge, { dossierStatutBadgeProps, DOSSIER_STATUT_LABELS } from '../../components/ds/StatusBadge'
 import ClickableStatusBadge from '../../components/ds/ClickableStatusBadge'
 import ListTableToolbar, { PaginationBar } from '../../components/ListTableToolbar'
 import { ListTablePanelHeader } from '../../components/ListTablePanel'
@@ -17,15 +17,7 @@ import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisi
 import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
 import { formatAppDate } from '../../lib/appLocale'
 
-const STATUT_LABELS: Record<DossierStatut, string> = {
-  brouillon: 'Brouillon',
-  en_cours: 'En cours',
-  planifie: 'Planifié',
-  terrain: 'Terrain',
-  expertise: 'Expertise',
-  cloture: 'Clôturé',
-  archive: 'Archivé',
-}
+const STATUT_LABELS: Record<DossierStatut, string> = DOSSIER_STATUT_LABELS
 
 const STATUT_OPTIONS = (Object.keys(STATUT_LABELS) as DossierStatut[]).map((v) => ({
   value: v,

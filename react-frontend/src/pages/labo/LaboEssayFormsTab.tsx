@@ -4,18 +4,12 @@ import { planningTerrainApi, taskTestFormsApi, type LaboTaskTestFormRow } from '
 import Modal from '../../components/Modal'
 import TestFormWebEditor from '../../components/tasks/TestFormWebEditor'
 import TaskTestFormResults from '../../components/tasks/TaskTestFormResults'
-import StatusBadge, { essayFormStatutBadgeProps } from '../../components/ds/StatusBadge'
+import StatusBadge, { essayFormStatutBadgeProps, ESSAY_FORM_STATUT_LABELS } from '../../components/ds/StatusBadge'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatAppDate } from '../../lib/appLocale'
 import { formatTechnicienOption } from '../../lib/userRolePresentation'
 
-const STATUS_LABELS: Record<string, string> = {
-  not_started: 'Non commencé',
-  draft: 'Brouillon',
-  submitted: 'Soumis',
-  correction_requested: 'Correction demandée',
-  validated: 'Validé',
-}
+const STATUS_LABELS: Record<string, string> = ESSAY_FORM_STATUT_LABELS
 
 type SortKey = 'fold' | 'updated_at' | 'statut' | 'technicien'
 

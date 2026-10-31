@@ -18,27 +18,11 @@ import type { PdfGenerateType } from '../lib/documentPdfTypes'
 import { useAuth } from '../contexts/AuthContext'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
+import { QUOTE_STATUT_LABELS, INVOICE_STATUT_LABELS } from '../components/ds/StatusBadge'
 
-const QUOTE_STATUS_LABELS: Record<string, string> = {
-  draft: 'Brouillon',
-  validated: 'Validé',
-  signed: 'Signé',
-  sent: 'Envoyé',
-  relanced: 'Relancé',
-  lost: 'Perdu',
-  invoiced: 'Facturé',
-  accepted: 'Accepté',
-  rejected: 'Refusé',
-}
+const QUOTE_STATUS_LABELS: Record<string, string> = QUOTE_STATUT_LABELS
 
-const INVOICE_STATUS_LABELS: Record<string, string> = {
-  draft: 'Brouillon',
-  validated: 'Validée',
-  signed: 'Signée',
-  sent: 'Envoyée',
-  relanced: 'Relancée',
-  paid: 'Encaissée',
-}
+const INVOICE_STATUS_LABELS: Record<string, string> = INVOICE_STATUT_LABELS
 
 type Tab = 'quotes' | 'invoices' | 'offerings'
 

@@ -8,7 +8,7 @@ import InvoiceLinesEditor, {
   invoiceLinesToApi,
   type InvoiceLineDraft,
 } from '../../components/invoices/InvoiceLinesEditor'
-import StatusBadge, { invoiceStatutBadgeProps } from '../../components/ds/StatusBadge'
+import StatusBadge, { invoiceStatutBadgeProps, INVOICE_STATUT_LABELS } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import Toast, { toastErrorMessage, type ToastVariant } from '../../components/Toast'
 import {
@@ -23,14 +23,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { dateInputFromApi, formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import { invoiceReminderTone } from '../../lib/invoiceReminder'
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Brouillon',
-  validated: 'Validée',
-  signed: 'Signée',
-  sent: 'Envoyée',
-  relanced: 'Relancée',
-  paid: 'Encaissée',
-}
+const STATUS_LABELS: Record<string, string> = INVOICE_STATUT_LABELS
 
 function emptyLine(defaultTva: number): InvoiceLineDraft {
   return {

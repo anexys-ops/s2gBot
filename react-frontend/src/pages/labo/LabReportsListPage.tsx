@@ -4,36 +4,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { labReportsApi, type LabReport } from '../../api/client'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { formatAppDate } from '../../lib/appLocale'
+import StatusBadge, { labReportStatutBadgeProps } from '../../components/ds/StatusBadge'
 import LaboEssayFormsTab from './LaboEssayFormsTab'
 
-const STATUS_META: Record<
-  LabReport['status'],
-  { label: string; color: string; bg: string }
-> = {
-  brouillon:     { label: 'Brouillon',     color: '#6b7280', bg: '#f3f4f6' },
-  en_validation: { label: 'En validation', color: '#f59e0b', bg: '#fef3c7' },
-  valide:        { label: 'Validé',        color: '#3b82f6', bg: '#dbeafe' },
-  signe:         { label: 'Signé',         color: '#8b5cf6', bg: '#ede9fe' },
-  emis:          { label: 'Émis',          color: '#10b981', bg: '#d1fae5' },
-}
-
-function StatusBadge({ status }: { status: LabReport['status'] }) {
-  const meta = STATUS_META[status] ?? STATUS_META.brouillon
-  return (
-    <span
-      style={{
-        fontSize: '0.72rem',
-        fontWeight: 700,
-        padding: '2px 8px',
-        borderRadius: 10,
-        color: meta.color,
-        background: meta.bg,
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {meta.label}
-    </span>
-  )
+function ReportStatusBadge({ status }: { status: LabReport['status'] }) {
+  const st = labReportStatutBadgeProps(status)
+  return <StatusBadge variant={st.variant} size="sm">{st.label}</StatusBadge>
 }
 
 export default function LabReportsListPage() {
@@ -78,8 +54,8 @@ export default function LabReportsListPage() {
               style={{ fontSize: '0.85rem' }}
             >
               <option value="">— Tous statuts —</option>
-              {Object.entries(STATUS_META).map(([k, v]) => (
-                <option key={k} value={k}>{v.label}</option>
+              {(['brouillon', 'en_validation', 'valide', 'signe', 'emis'] as const).map((k) => (
+                <option key={k} value={k}>{labReportStatutBadgeProps(k).label}</option>
               ))}
             </select>
             <button
@@ -148,7 +124,7 @@ export default function LabReportsListPage() {
                   </td>
                   <td style={td}>{r.title}</td>
                   <td style={td}>
-                    <StatusBadge status={r.status} />
+                    <ReportStatusBadge status={r.status} />
                   </td>
                   <td style={td}>{r.technician?.name ?? '—'}</td>
                   <td style={td}>{formatAppDate(r.created_at)}</td>

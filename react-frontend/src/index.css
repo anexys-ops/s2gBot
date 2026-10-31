@@ -12423,3 +12423,65 @@ a.catalogue-tree__link-article:hover {
   align-items: center;
   gap: 0.4rem;
 }
+
+/* ——— Modales : occupent la hauteur utile, en-tête fixe, corps défilant, boutons toujours visibles ——— */
+.modal-overlay {
+  padding: clamp(0.5rem, 2vw, 1.5rem);
+}
+.modal-box {
+  display: flex;
+  flex-direction: column;
+  max-width: min(96vw, 680px);
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow: hidden;
+}
+.modal-box--wide {
+  max-width: min(96vw, 960px);
+}
+.modal-box--xl,
+.modal-box:has(.client-form-modal),
+.modal-box:has(.s2g-picker-modal),
+.modal-box:has(.sample-reception-modal),
+.modal-box:has(.catalogue-article-new-form),
+.modal-box:has(.user-admin-form) {
+  max-width: min(96vw, 1100px);
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+}
+.modal-box > .modal-head {
+  flex: 0 0 auto;
+}
+.modal-box > .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Barre d'actions collée en bas de la modale (Enregistrer / Annuler toujours visibles). */
+.modal-body > .crud-actions:last-child,
+.modal-body > form > .crud-actions:last-child,
+.modal-body > form > div:last-child.crud-actions,
+.modal-body .modal-actions {
+  position: sticky;
+  bottom: -1.25rem;
+  z-index: 2;
+  margin: 1rem -1.25rem -1.25rem;
+  padding: 0.75rem 1.25rem;
+  background: #fff;
+  border-top: 1px solid #e2e8f0;
+  justify-content: flex-end;
+}
+/* Modales aux styles en ligne (génération d'OM, réception labo, rapports) : même garantie. */
+.modal-overlay > div:not(.modal-box) {
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+}
+@media (max-width: 640px) {
+  .modal-box,
+  .modal-box--wide,
+  .modal-box--xl {
+    max-width: 100%;
+    border-radius: 12px;
+  }
+}

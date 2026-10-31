@@ -1,18 +1,8 @@
 import type { LabReport, LabReportSection } from '../../../api/client'
 import SectionRenderer from './SectionRenderer'
 import { formatAppDate } from '../../../lib/appLocale'
+import StatusBadge, { labReportStatutBadgeProps } from '../../ds/StatusBadge'
 import './report.css'
-
-const STATUS_META: Record<
-  LabReport['status'],
-  { label: string; color: string; bg: string }
-> = {
-  brouillon:     { label: 'Brouillon',     color: '#6b7280', bg: '#f3f4f6' },
-  en_validation: { label: 'En validation', color: '#f59e0b', bg: '#fef3c7' },
-  valide:        { label: 'Validé',        color: '#3b82f6', bg: '#dbeafe' },
-  signe:         { label: 'Signé',         color: '#8b5cf6', bg: '#ede9fe' },
-  emis:          { label: 'Émis',          color: '#10b981', bg: '#d1fae5' },
-}
 
 function ConformityBadge({ value }: { value: LabReportSection['conformity'] }) {
   return (
@@ -27,7 +17,7 @@ type Props = {
 }
 
 export default function LabReportView({ report }: Props) {
-  const statusMeta = STATUS_META[report.status]
+  const statusMeta = labReportStatutBadgeProps(report.status)
   const sections = report.sections ?? []
 
   return (
@@ -59,18 +49,7 @@ export default function LabReportView({ report }: Props) {
             <div>Émis le : {formatAppDate(report.emitted_at)}</div>
           )}
           <div style={{ marginTop: '0.35rem' }}>
-            <span
-              style={{
-                fontSize: '.78rem',
-                fontWeight: 700,
-                padding: '0.15rem 0.5rem',
-                borderRadius: 8,
-                background: statusMeta.bg,
-                color: statusMeta.color,
-              }}
-            >
-              {statusMeta.label}
-            </span>
+            <StatusBadge variant={statusMeta.variant} size="sm">{statusMeta.label}</StatusBadge>
           </div>
         </div>
       </div>

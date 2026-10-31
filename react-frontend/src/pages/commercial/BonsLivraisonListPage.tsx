@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tansta
 import { bonsCommandeApi, bonsLivraisonApi, type BonCommande, type BonLivraison } from '../../api/client'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import ClickableStatusBadge from '../../components/ds/ClickableStatusBadge'
-import StatusBadge, { bonLivraisonStatutBadgeProps } from '../../components/ds/StatusBadge'
+import StatusBadge, { bonLivraisonStatutBadgeProps, BON_LIVRAISON_STATUT_LABELS } from '../../components/ds/StatusBadge'
 import ListTableToolbar from '../../components/ListTableToolbar'
 import { ListTablePanelHeader } from '../../components/ListTablePanel'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
@@ -16,11 +16,7 @@ import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisi
 import { formatAppDate } from '../../lib/appLocale'
 import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
 
-const STATUT_LABELS: Record<string, string> = {
-  brouillon: 'Brouillon',
-  livre: 'Livré',
-  signe: 'Signé',
-}
+const STATUT_LABELS: Record<string, string> = BON_LIVRAISON_STATUT_LABELS
 
 const statusOptions = Object.entries(STATUT_LABELS).map(([value, label]) => ({ value, label }))
 

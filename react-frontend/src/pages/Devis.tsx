@@ -12,7 +12,7 @@ import TableIconHeader from '../components/TableIconHeader'
 import DocumentPdfPickerModal from '../components/pdf/DocumentPdfPickerModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ClickableStatusBadge from '../components/ds/ClickableStatusBadge'
-import StatusBadge, { quoteStatutBadgeProps } from '../components/ds/StatusBadge'
+import StatusBadge, { quoteStatutBadgeProps, QUOTE_STATUT_LABELS } from '../components/ds/StatusBadge'
 import EntityMetaCard from '../components/module/EntityMetaCard'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import { useAuth } from '../contexts/AuthContext'
@@ -44,17 +44,7 @@ function quotePricingMode(q: Quote): { label: string; variant: 'warning' | 'info
     : { label: 'Détaillé', variant: 'info' }
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Brouillon',
-  validated: 'Validé',
-  signed: 'Signé',
-  sent: 'Envoyé',
-  relanced: 'Relancé',
-  lost: 'Perdu',
-  invoiced: 'Facturé',
-  accepted: 'Accepté',
-  rejected: 'Refusé',
-}
+const STATUS_LABELS: Record<string, string> = QUOTE_STATUT_LABELS
 
 export default function Devis() {
   const { user } = useAuth()

@@ -13,7 +13,7 @@ import {
 import StatusChangeModal from '../components/StatusChangeModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ClickableStatusBadge from '../components/ds/ClickableStatusBadge'
-import StatusBadge, { bonCommandeStatutBadgeProps, invoiceStatutBadgeProps } from '../components/ds/StatusBadge'
+import StatusBadge, { bonCommandeStatutBadgeProps, invoiceStatutBadgeProps, BON_COMMANDE_STATUT_LABELS, INVOICE_STATUT_LABELS } from '../components/ds/StatusBadge'
 import Toast, { toastErrorMessage, type ToastVariant } from '../components/Toast'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import TableRowActions from '../components/TableRowActions'
@@ -34,22 +34,9 @@ import {
 } from '../lib/invoiceReminder'
 import { shouldIgnoreTableRowClick } from '../lib/tableRowInteraction'
 
-const BC_STATUT_LABELS: Record<string, string> = {
-  brouillon: 'Brouillon',
-  confirme: 'Confirmé',
-  en_cours: 'En cours',
-  livre: 'Livré',
-  annule: 'Annulé',
-}
+const BC_STATUT_LABELS: Record<string, string> = BON_COMMANDE_STATUT_LABELS
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Brouillon',
-  validated: 'Validée',
-  signed: 'Signée',
-  sent: 'Envoyée',
-  relanced: 'Relancée',
-  paid: 'Encaissée',
-}
+const STATUS_LABELS: Record<string, string> = INVOICE_STATUT_LABELS
 
 function InvoiceCreateFromBcPanel({ onNotify }: { onNotify: (message: string, variant: ToastVariant) => void }) {
   const queryClient = useQueryClient()

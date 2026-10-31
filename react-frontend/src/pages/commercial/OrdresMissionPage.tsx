@@ -8,9 +8,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { bonsCommandeApi, ordresMissionApi, type OrdreMission } from '../../api/client'
+import Modal from '../../components/Modal'
 import SearchableSelect from '../../components/ds/SearchableSelect'
 import ClickableStatusBadge from '../../components/ds/ClickableStatusBadge'
-import StatusBadge, { ordreMissionStatutBadgeProps } from '../../components/ds/StatusBadge'
+import StatusBadge, { ordreMissionStatutBadgeProps, ORDRE_MISSION_STATUT_LABELS } from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import StatusChangeModal from '../../components/StatusChangeModal'
 import OdmGenerationModal from '../../components/ordres-mission/OdmGenerationModal'
@@ -40,13 +41,7 @@ function parseOmType(value: string | null): OmType | '' {
   return ''
 }
 
-const STATUT_META: Record<string, string> = {
-  brouillon: 'Brouillon',
-  planifie:  'Planifié',
-  en_cours:  'En cours',
-  termine:   'Terminé',
-  annule:    'Annulé',
-}
+const STATUT_META: Record<string, string> = ORDRE_MISSION_STATUT_LABELS
 
 const STATUTS = ['brouillon', 'planifie', 'en_cours', 'termine', 'annule'] as const
 
@@ -226,19 +221,10 @@ export default function OrdresMissionPage() {
 
       {/* Modal de sélection du BC */}
       {showGenerationModal && !selectedBcForGeneration ? (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 3000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '1rem',
-            background: 'rgba(15, 23, 42, 0.55)',
-            backdropFilter: 'blur(4px)',
-          }}
-          onClick={() => {
+        <Modal
+          title="Sélectionner le bon de commande"
+          size="xl"
+          onClose={() => {
             setShowGenerationModal(false)
             setSelectedBcForGeneration(null)
             setBcSearch('')
@@ -246,23 +232,7 @@ export default function OrdresMissionPage() {
             setBcSiteFilter('')
           }}
         >
-          <div
-            style={{
-              width: '100%',
-              maxWidth: '900px',
-              maxHeight: '85vh',
-              display: 'flex',
-              flexDirection: 'column',
-              background: '#fff',
-              borderRadius: 16,
-              padding: '1.5rem',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.1rem', fontWeight: 600 }}>
-              Sélectionner le bon de commande
-            </h2>
+          <div>
             <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
               Choisissez un bon de commande pour générer les ordres de mission.
             </p>
@@ -338,7 +308,7 @@ export default function OrdresMissionPage() {
                 </tbody>
               </table>
             </div>
-            <div className="crud-actions" style={{ gap: '0.75rem' }}>
+            <div className="crud-actions modal-actions">
               <button
                 type="button"
                 className="btn btn-primary"
@@ -360,7 +330,7 @@ export default function OrdresMissionPage() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       ) : null}
 
       {/* Modal de sélection des jalons */}

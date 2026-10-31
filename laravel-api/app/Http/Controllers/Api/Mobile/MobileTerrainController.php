@@ -41,7 +41,8 @@ class MobileTerrainController extends Controller
 
         $events = PlanningEvent::query()->with([
                 'bonCommandeLigne.bonCommande.client:id,name',
-                'bonCommandeLigne.bonCommande.dossier:id,reference,titre',
+                'bonCommandeLigne.bonCommande.dossier:id,reference,titre,site_id',
+                'bonCommandeLigne.bonCommande.dossier.site:id,name',
             ])
             ->where('user_id', $userId)
             ->whereNull('mission_task_id')
@@ -61,9 +62,9 @@ class MobileTerrainController extends Controller
                 'type_evenement' => $event->type_evenement,
                 'notes' => $event->notes,
                 'libelle' => $event->bonCommandeLigne?->libelle,
-                'bon_commande' => $event->bonCommandeLigne?->bonCommande?->only(['id', 'numero']),
+                'bon_commande' => $event->bonCommandeLigne?->bonCommande?->only(['id', 'numero', 'bc_client_en_attente', 'bc_client_recu_le']),
                 'client' => $event->bonCommandeLigne?->bonCommande?->client?->only(['id', 'name']),
-                'dossier' => $event->bonCommandeLigne?->bonCommande?->dossier?->only(['id', 'reference', 'titre']),
+                'dossier' => $this->dossierPayload($event->bonCommandeLigne?->bonCommande?->dossier),
             ]);
 
         $equipmentMovements = MaterielAffectation::query()->with('equipment')
@@ -118,7 +119,7 @@ class MobileTerrainController extends Controller
         $task->load([
             'ordreMissionLigne.ordreMission.client',
             'ordreMissionLigne.ordreMission.site',
-            'ordreMissionLigne.ordreMission.dossier',
+            'ordreMissionLigne.ordreMission.dossier.site:id,name',
             'ordreMissionLigne.ordreMission.bonCommande',
             'ordreMissionLigne.equipment',
             'planningEquipments.equipment',
@@ -129,7 +130,7 @@ class MobileTerrainController extends Controller
             ...$this->taskPayload($task),
             'client' => $om?->client?->only(['id', 'name', 'address', 'city', 'phone', 'email', 'lat', 'lng']),
             'site' => $om?->site?->only(['id', 'name', 'address', 'latitude', 'longitude']),
-            'dossier' => $om?->dossier?->only(['id', 'reference', 'titre']),
+            'dossier' => $this->dossierPayload($om?->dossier),
             'equipment' => $this->equipmentForTask($task),
         ]);
     }
@@ -421,8 +422,9 @@ class MobileTerrainController extends Controller
             ->with([
                 'ordreMissionLigne.ordreMission.client:id,name',
                 'ordreMissionLigne.ordreMission.site:id,name',
-                'ordreMissionLigne.ordreMission.dossier:id,reference,titre',
-                'ordreMissionLigne.ordreMission.bonCommande:id,numero',
+                'ordreMissionLigne.ordreMission.dossier:id,reference,titre,site_id',
+                'ordreMissionLigne.ordreMission.dossier.site:id,name',
+                'ordreMissionLigne.ordreMission.bonCommande:id,numero,bc_client_en_attente,bc_client_recu_le',
             ]);
     }
 
@@ -430,6 +432,15 @@ class MobileTerrainController extends Controller
     {
         return $this->ownTasks($userId)->whereHas('ordreMissionLigne', fn (Builder $q) => $q
             ->where('ordre_mission_id', $missionId))->exists();
+    }
+
+    private function dossierPayload(?\App\Models\Dossier $dossier): ?array
+    {
+        if (! $dossier) {
+            return null;
+        }
+
+        return [...$dossier->only(['id', 'reference', 'titre']), 'site' => $dossier->site?->only(['id', 'name'])];
     }
 
     private function taskPayload(MissionTask $task): array
@@ -452,10 +463,10 @@ class MobileTerrainController extends Controller
             'libelle' => $line?->libelle,
             'quantite' => $line?->quantite,
             'ordre_mission' => $om?->only(['id', 'numero', 'type', 'statut']),
-            'bon_commande' => $om?->bonCommande?->only(['id', 'numero']),
+            'bon_commande' => $om?->bonCommande?->only(['id', 'numero', 'bc_client_en_attente', 'bc_client_recu_le']),
             'client' => $om?->client?->only(['id', 'name']),
             'site' => $om?->site?->only(['id', 'name']),
-            'dossier' => $om?->dossier?->only(['id', 'reference', 'titre']),
+            'dossier' => $this->dossierPayload($om?->dossier),
         ];
     }
 

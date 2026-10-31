@@ -64,10 +64,16 @@ class MobileTerrainApiTest extends TestCase
             ->assertOk()->assertJsonCount(1, 'tasks')->assertJsonPath('tasks.0.id', $mine->id)
             ->assertJsonPath('events.0.source_type', 'terrain_bc')
             ->assertJsonPath('events.0.client.name', 'Client mobile')
+            ->assertJsonPath('events.0.bon_commande.bc_client_en_attente', false)
+            ->assertJsonPath('events.0.dossier.site.name', 'Chantier mobile')
             ->assertJsonPath('equipment_movements.0.equipment.code', 'MAT-1');
-        $this->getJson('/api/mobile/terrain/tasks')->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $mine->id);
+        $this->getJson('/api/mobile/terrain/tasks')->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $mine->id)
+            ->assertJsonPath('0.bon_commande.bc_client_en_attente', false)
+            ->assertJsonPath('0.dossier.site.name', 'Chantier mobile');
         $this->getJson('/api/mobile/terrain/tasks/'.$mine->id)
-            ->assertOk()->assertJsonPath('client.name', 'Client mobile')->assertJsonPath('equipment.0.a_recuperer_le', '2026-09-22')
+            ->assertOk()->assertJsonPath('client.name', 'Client mobile')
+            ->assertJsonPath('bon_commande.bc_client_en_attente', false)
+            ->assertJsonPath('dossier.site.name', 'Chantier mobile')->assertJsonPath('equipment.0.a_recuperer_le', '2026-09-22')
             ->assertJsonPath('equipment.0.a_deposer_le', '2026-09-24');
         $this->getJson('/api/mobile/terrain/tasks/'.$theirs->id)->assertForbidden();
     }

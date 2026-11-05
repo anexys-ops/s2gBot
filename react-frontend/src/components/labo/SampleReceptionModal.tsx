@@ -144,6 +144,17 @@ function SampleFormCard({
           </label>
         )}
 
+        <label className="sample-reception-card__full">
+          <span>Nature de l’échantillon</span>
+          <input
+            type="text"
+            value={draft.nature_echantillon}
+            onChange={(e) => onChange({ nature_echantillon: e.target.value })}
+            placeholder="Ex. Béton B30, grave non traitée, sable 0/4…"
+            maxLength={191}
+          />
+        </label>
+
         <label>
           <span>État</span>
           <select

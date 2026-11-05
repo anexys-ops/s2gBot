@@ -17,6 +17,7 @@ class OrdreMissionLigne extends Model
     protected $fillable = [
         'ordre_mission_id',
         'bon_commande_ligne_id',
+        'devis_jalon_id',
         'ref_article_id',
         'article_action_id',
         'libelle',

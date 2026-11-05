@@ -209,6 +209,7 @@ export default function AppNavigation() {
         module: 'laboratoire',
         items: filterItems([
           { to: '/labo/reception', label: 'Réception (FOLD)', module: 'laboratoire' },
+          { to: '/labo/jalons-recus', label: 'Jalons réceptionnés', module: 'laboratoire' },
           { to: '/labo/rapports', label: "Rapports d'essais", module: 'laboratoire' },
           { to: '/rapport-bc', label: 'Rapports de mission', module: 'rapport-bc' },
           { to: '/labo/fiches', label: 'Fiches techniques', module: 'laboratoire' },

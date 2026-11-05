@@ -17,6 +17,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Models\DocumentSequence;
 use App\Services\CommercialDocumentTotalsService;
+use App\Services\CommercialDocumentWorkflowService;
 use App\Services\CommercialPdfPreGenerationService;
 use App\Services\DocumentActivityLogger;
 use App\Services\DocumentCurrencyService;
@@ -47,6 +48,7 @@ class QuoteController extends Controller
         private readonly DocumentActivityLogger $documentActivity,
         private readonly DocumentCurrencyService $documentCurrency,
         private readonly CommercialPdfPreGenerationService $pdfPreGeneration,
+        private readonly CommercialDocumentWorkflowService $workflow,
     ) {}
 
     private const QUOTE_LINE_BASE = [
@@ -82,6 +84,7 @@ class QuoteController extends Controller
             'agency',
             'site',
             'dossier',
+            'dossier.site:id,name',
             'quoteLines.commercialOffering',
             'quoteLines.refArticle',
             'quoteLines.refPackage',
@@ -104,9 +107,11 @@ class QuoteController extends Controller
                 $q->where('number', 'like', $like)
                     ->orWhere('notes', 'like', $like)
                     ->orWhereHas('client', fn ($cq) => $cq->where('name', 'like', $like))
+                    ->orWhereHas('site', fn ($sq) => $sq->where('name', 'like', $like))
                     ->orWhereHas('dossier', function ($dq) use ($like) {
                         $dq->where('reference', 'like', $like)
-                            ->orWhere('titre', 'like', $like);
+                            ->orWhere('titre', 'like', $like)
+                            ->orWhereHas('site', fn ($sq) => $sq->where('name', 'like', $like));
                     });
             });
         }
@@ -274,6 +279,7 @@ class QuoteController extends Controller
         $before = $quote->only(self::QUOTE_AUDIT_FIELDS);
         $tasks = [];
         $statusRule = Rule::in(Quote::statuses());
+        [$previousJalonIds, $previousRefIds] = $this->jalonAndRefSnapshot($quote);
 
         if ($quote->status !== Quote::STATUS_DRAFT) {
             $validated = $request->validate([
@@ -291,6 +297,7 @@ class QuoteController extends Controller
             );
             $quote->save();
             $this->recordQuoteStatusChange($quote, $oldStatus, $request);
+            $this->workflow->syncBonsCommandeFromQuote($quote->fresh(), $previousJalonIds, $previousRefIds);
             $fresh = $quote->fresh();
             $tasks[] = 'statut/notes';
             $this->documentActivity->quoteUpdated($request->user(), $fresh, $before, $tasks);
@@ -400,11 +407,32 @@ class QuoteController extends Controller
         $quote->save();
         $this->recalculateQuoteTotals($quote);
         $this->recordQuoteStatusChange($quote->fresh(), $oldStatus, $request);
+        // Devis déjà transformé en BC : on complète les BC existants (nouveaux jalons / détails).
+        $this->workflow->syncBonsCommandeFromQuote($quote->fresh(), $previousJalonIds, $previousRefIds);
         $fresh = $quote->fresh();
         $this->documentActivity->quoteUpdated($request->user(), $fresh, $before, $tasks, $lineChanges);
         $this->pdfPreGeneration->warmQuote($fresh);
 
         return response()->json($this->loadQuoteForResponse($fresh));
+    }
+
+    /**
+     * Jalons (ids) et articles (ref_article_id) du devis avant modification, pour distinguer ce qui
+     * est nouveau de ce qui n'a simplement pas encore été transféré en BC.
+     *
+     * @return array{0: list<string>, 1: list<int>}
+     */
+    private function jalonAndRefSnapshot(Quote $quote): array
+    {
+        $meta = is_array($quote->meta) ? $quote->meta : [];
+        $jalonIds = [];
+        foreach (array_values(array_filter($meta['devis_jalons'] ?? [], 'is_array')) as $idx => $jalon) {
+            $jalonIds[] = (string) ($jalon['id'] ?? 'idx-'.$idx);
+        }
+        $refIds = $quote->quoteLines()->whereNotNull('ref_article_id')->pluck('ref_article_id')
+            ->map(fn ($id) => (int) $id)->unique()->values()->all();
+
+        return [$jalonIds, $refIds];
     }
 
     public function destroy(Request $request, Quote $quote): JsonResponse

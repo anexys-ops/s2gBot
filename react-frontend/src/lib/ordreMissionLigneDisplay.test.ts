@@ -39,6 +39,16 @@ describe('buildOrdreMissionLigneGroups', () => {
     expect(groups[0].lignes.map((ligne) => ligne.id)).toEqual([1, 2])
   })
 
+  it('range une tâche ajoutée à la main sous son jalon (devis_jalon_id)', () => {
+    const bcLignes = [bcLine(101, 11, 3), bcLine(102, 12, 3)]
+    const manual = { ...omLine(5, null, 2), devis_jalon_id: 'j-beton' }
+    const groups = buildOrdreMissionLigneGroups([omLine(1, 101, 0), manual], bcLignes, meta)
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0].jalon?.id).toBe('j-beton')
+    expect(groups[0].lignes.map((ligne) => ligne.id)).toEqual([1, 5])
+  })
+
   it('conserve les tâches libres hors jalon', () => {
     const groups = buildOrdreMissionLigneGroups([omLine(9, null, 0)], [], meta)
     expect(groups).toEqual([{ key: 'standalone', jalon: null, lignes: [expect.objectContaining({ id: 9 })] }])

@@ -51,6 +51,20 @@ class OrdreMissionFromBonCommandeTest extends TestCase
         $this->assertSame(1, MissionTask::query()->count());
     }
 
+    public function test_om_index_exposes_chantier_of_dossier(): void
+    {
+        [$bc, $lab] = $this->seedBcWithTechnicienAction();
+        $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/bons-commande/{$bc->id}/generate-ordres-mission")
+            ->assertCreated();
+
+        $res = $this->actingAs($lab, 'sanctum')->getJson('/api/ordres-mission')->assertOk();
+        $row = $res->json('0');
+        $chantier = $row['site']['name'] ?? $row['dossier']['site']['name'] ?? null;
+        $this->assertSame('Chantier ODM', $chantier);
+        $this->assertSame('Chantier ODM', $row['bon_commande']['dossier']['site']['name'] ?? null);
+    }
+
     public function test_bc_client_en_attente_flag_can_be_toggled_and_filtered(): void
     {
         [$bc, $lab] = $this->seedBcWithTechnicienAction();

@@ -70,6 +70,7 @@ class Sample extends Model
         'bon_commande_ligne_id',
         'description',
         'sample_type',
+        'nature_echantillon',
         'origin_location',
         'depth_m',
         'collected_by',

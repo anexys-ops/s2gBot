@@ -161,6 +161,8 @@ Route::middleware('auth:sanctum')->group(function () {
         // v1.2.0 — validation de statut réservée à responsable / lab_admin (RBAC)
         Route::post('bons-commande/{bonCommande}/sync-prix-devis', [BonCommandeController::class, 'syncPrixDevis'])
             ->whereNumber('bonCommande');
+        Route::post('bons-commande/{bonCommande}/completer-depuis-devis', [BonCommandeController::class, 'completerDepuisDevis'])
+            ->whereNumber('bonCommande');
         Route::post('bons-commande/{bonCommande}/confirmer', [BonCommandeController::class, 'confirmer'])
             ->middleware('role:responsable')
             ->whereNumber('bonCommande');
@@ -486,6 +488,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('ordres-mission/{ordre_mission}', [OrdreMissionController::class, 'update']);
     Route::delete('ordres-mission/{ordre_mission}', [OrdreMissionController::class, 'destroy']);
     Route::post('ordres-mission/{ordre_mission}/lignes', [OrdreMissionController::class, 'storeLigne']);
+    Route::post('ordres-mission/{ordre_mission}/lignes/batch', [OrdreMissionController::class, 'storeLignesBatch']);
     Route::put('ordres-mission/{ordre_mission}/lignes', [OrdreMissionController::class, 'updateLignes']);
     Route::put('ordres-mission/{ordre_mission}/lignes/{ligne}', [OrdreMissionController::class, 'updateLigne']);
     Route::delete('ordres-mission/{ordre_mission}/lignes/{ligne}', [OrdreMissionController::class, 'destroyLigne']);
@@ -578,6 +581,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('v1')->group(function () {
         Route::get('lab/reception/attendus', [LabReceptionController::class, 'attendus']);
         Route::get('lab/reception/stats',    [LabReceptionController::class, 'stats']);
+        Route::get('lab/reception/jalons-recus', [LabReceptionController::class, 'jalonsRecus']);
         Route::post('lab/reception/receive-from-line', [SampleReceptionController::class, 'receiveFromLine'])
             ->middleware('role:receptionnaire,responsable,laborantin,lab_technician,ingenieur');
         Route::post('lab/reception/receive-batch-from-line', [SampleReceptionController::class, 'receiveBatchFromLine'])

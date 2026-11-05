@@ -120,6 +120,7 @@ class SampleReceptionController extends Controller
             'storage_location' => ['nullable', 'string', 'max:191'],
             'collected_by' => ['nullable', 'integer', 'exists:users,id'],
             'sample_type' => ['nullable', Rule::in(Sample::TYPES)],
+            'nature_echantillon' => ['nullable', 'string', 'max:191'],
             'origin_location' => ['nullable', 'string', 'max:255'],
             'depth_m' => ['nullable', 'numeric'],
             'weight_g' => ['nullable', 'numeric', 'min:0'],
@@ -170,6 +171,7 @@ class SampleReceptionController extends Controller
             'samples.*.storage_location' => ['nullable', 'string', 'max:191'],
             'samples.*.collected_by' => ['nullable', 'integer', 'exists:users,id'],
             'samples.*.sample_type' => ['nullable', Rule::in(Sample::TYPES)],
+            'samples.*.nature_echantillon' => ['nullable', 'string', 'max:191'],
             'samples.*.origin_location' => ['nullable', 'string', 'max:255'],
             'samples.*.depth_m' => ['nullable', 'numeric'],
             'samples.*.weight_g' => ['nullable', 'numeric', 'min:0'],
@@ -258,6 +260,7 @@ class SampleReceptionController extends Controller
             'weight_g' => ['nullable', 'numeric', 'min:0'],
             'quantity' => ['nullable', 'integer', 'min:1'],
             'notes' => ['nullable', 'string'],
+            'nature_echantillon' => ['nullable', 'string', 'max:191'],
         ]);
 
         if (isset($data['collected_by'])) {
@@ -548,6 +551,7 @@ class SampleReceptionController extends Controller
         return $request->validate([
             'description' => ['sometimes', 'nullable', 'string'],
             'sample_type' => ['sometimes', Rule::in(Sample::TYPES)],
+            'nature_echantillon' => ['sometimes', 'nullable', 'string', 'max:191'],
             'origin_location' => ['sometimes', 'nullable', 'string', 'max:255'],
             'depth_m' => ['sometimes', 'nullable', 'numeric'],
             'collected_by' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
@@ -573,6 +577,7 @@ class SampleReceptionController extends Controller
             'reference' => ['nullable', 'string', 'max:191'],
             'description' => ['nullable', 'string'],
             'sample_type' => [$req, Rule::in(Sample::TYPES)],
+            'nature_echantillon' => ['nullable', 'string', 'max:191'],
             'origin_location' => ['nullable', 'string', 'max:255'],
             'depth_m' => ['nullable', 'numeric'],
             'collected_by' => ['nullable', 'integer', 'exists:users,id'],

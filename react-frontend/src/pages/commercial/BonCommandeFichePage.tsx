@@ -17,6 +17,7 @@ import CentreGroupField from '../../components/centres/CentreGroupField'
 import {
   buildBcLigneDisplayRows,
   filterForfaitBcLigneIds,
+  jalonOmCoverage,
   filterForfaitBcLignes,
   isForfaitBcJalon,
   isNonBillableForfaitBcLigne,
@@ -198,6 +199,22 @@ export default function BonCommandeFichePage() {
     },
     onError: (err) => {
       setPlanningToast({ message: toastErrorMessage(err, 'Échec de la synchronisation des prix.'), variant: 'error' })
+    },
+  })
+
+  const [completerOpen, setCompleterOpen] = useState(false)
+  const mutCompleter = useMutation({
+    mutationFn: () => bonsCommandeApi.completerDepuisDevis(bcId),
+    onSuccess: (res) => {
+      setCompleterOpen(false)
+      setPlanningToast({
+        message: res.lignes_ajoutees > 0
+          ? `${res.lignes_ajoutees} ligne(s) ajoutée(s) depuis le devis.`
+          : 'Le bon de commande est déjà à jour avec le devis.',
+        variant: 'success',
+      })
+      void qc.invalidateQueries({ queryKey: ['bon-commande', bcId] })
+      void qc.invalidateQueries({ queryKey: ['bons-commande'] })
     },
   })
 
@@ -456,6 +473,17 @@ export default function BonCommandeFichePage() {
             title="Importer les prix unitaires HT depuis le devis lié"
           >
             {mutSyncPrix.isPending ? 'Synchronisation…' : 'Sync prix du devis'}
+          </button>
+        ) : null}
+        {bc.quote_id ? (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setCompleterOpen(true)}
+            disabled={mutCompleter.isPending}
+            title="Ajouter les jalons et détails ajoutés au devis après la création de ce BC"
+          >
+            Compléter depuis le devis
           </button>
         ) : null}
       </div>
@@ -722,6 +750,12 @@ export default function BonCommandeFichePage() {
                             isForfaitBcJalon(row.jalonId, devisDisplayMeta) &&
                             editableJalonIds.length > 0
                           const fl = row.forfaitLigne
+                          const jalonCoverage = jalonOmCoverage(
+                            fl,
+                            row.ligneIds
+                              .map((id) => ligneById.get(id))
+                              .filter((l): l is BonCommandeLigne => l != null),
+                          )
                           const flRawQty = fl ? (qtyEdits[fl.id] ?? qtyInputFromApi(fl.quantite)) : null
                           const flRawPrix = fl ? (prixEdits[fl.id] ?? prixInputFromApi(fl.prix_unitaire_ht)) : null
                           const flPreviewQty = flRawQty != null ? Number(String(flRawQty).replace(',', '.')) : 0
@@ -742,17 +776,17 @@ export default function BonCommandeFichePage() {
                                   </>
                                 ) : null}
                                 {row.label}
-                                {fl?.om_quantites && Object.entries(fl.om_quantites).map(([type, covered]) => (
+                                {jalonCoverage.byType.map(({ type, covered, reste }) => (
                                   <span key={type} className="bc-lignes-table__om-badge">
                                     OM {type === 'technicien' ? 'terrain' : type === 'ingenieur' ? 'ingénieur' : 'labo'} :{' '}
-                                    {formatQuantity(covered)}/{formatQuantity(fl.quantite)}
+                                    {formatQuantity(covered)}/{formatQuantity(jalonCoverage.quantite)}
                                     {' · reste '}
-                                    {formatQuantity(Math.max(0, Number(fl.quantite) - Number(covered)))}
+                                    {formatQuantity(reste)}
                                   </span>
                                 ))}
-                                {fl && Object.keys(fl.om_quantites ?? {}).length === 0 ? (
+                                {fl && jalonCoverage.byType.length === 0 ? (
                                   <span className="bc-lignes-table__om-badge">
-                                    Reste à planifier : {formatQuantity(fl.quantite)}
+                                    Reste à planifier : {formatQuantity(jalonCoverage.quantite)}
                                   </span>
                                 ) : null}
                                 {showJalonMassQty ? (
@@ -1059,6 +1093,26 @@ export default function BonCommandeFichePage() {
           error={mutStatus.isError ? (mutStatus.error as Error).message : null}
           onClose={() => setStatusOpen(false)}
           onSave={(next) => mutStatus.mutate(next)}
+        />
+      ) : null}
+
+      {completerOpen ? (
+        <ConfirmDialog
+          title="Compléter depuis le devis"
+          message={
+            <>
+              Ajouter au bon <strong>{bc.numero}</strong> les détails ajoutés aux jalons déjà présents, ainsi que
+              les jalons et articles du devis qui ne figurent sur <strong>aucun</strong> bon de commande de ce devis
+              (avec leurs quantités et prix du devis). Rien n’est supprimé ni modifié.
+            </>
+          }
+          confirmLabel="Compléter"
+          loading={mutCompleter.isPending}
+          error={mutCompleter.isError ? toastErrorMessage(mutCompleter.error, 'Échec de la mise à jour.') : null}
+          onConfirm={() => mutCompleter.mutate()}
+          onCancel={() => {
+            if (!mutCompleter.isPending) setCompleterOpen(false)
+          }}
         />
       ) : null}
 

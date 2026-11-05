@@ -9,6 +9,7 @@ export type SampleFormDraft = {
   storage_location: string
   collected_by: number | ''
   sample_type: string
+  nature_echantillon: string
   weight_g: string
   notes: string
   description: string
@@ -29,6 +30,7 @@ export function createEmptyDraft(receptionIndex: number, defaults?: Partial<Samp
     storage_location: '',
     collected_by: '',
     sample_type: 'sol',
+    nature_echantillon: '',
     weight_g: '',
     notes: '',
     description: '',
@@ -46,6 +48,7 @@ export function draftToReceiveBody(
   storage_location?: string
   collected_by?: number
   sample_type?: string
+  nature_echantillon?: string
   weight_g?: number
   notes?: string
   description?: string
@@ -57,6 +60,7 @@ export function draftToReceiveBody(
     storage_location: draft.storage_location || undefined,
     collected_by: draft.collected_by ? Number(draft.collected_by) : undefined,
     sample_type: draft.sample_type,
+    nature_echantillon: draft.nature_echantillon.trim() || undefined,
     weight_g: draft.weight_g ? Number(draft.weight_g) : undefined,
     notes: draft.notes || undefined,
     description: draft.description || undefined,

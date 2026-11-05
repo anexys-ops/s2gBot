@@ -7,6 +7,7 @@ import {
   isForfaitBcJalon,
   isForfaitBcLigne,
   isNonBillableForfaitBcLigne,
+  jalonOmCoverage,
   qtyExceedsDevis,
   resolveDevisDisplayMeta,
 } from './bcLigneDisplay'
@@ -135,5 +136,36 @@ describe('buildBcLigneDisplayRows', () => {
     expect(rows[0].type === 'jalon_header' && rows[0].ligneIds).toEqual([1, 2])
     expect(rows[1].type === 'product' && rows[1].nested).toBe(true)
     expect(rows[3].type === 'product' && rows[3].nested).toBe(false)
+  })
+})
+
+describe('jalonOmCoverage', () => {
+  it('derives jalon remaining from detail lines (cas client : 4/30 sur les détails)', () => {
+    const fl = { quantite: 30 }
+    const children = [
+      { quantite: 30, om_quantites: { technicien: 4 } },
+      { quantite: 30, om_quantites: { labo: 4 } },
+      { quantite: 30, om_quantites: { labo: 4 } },
+      { quantite: 30 },
+    ]
+    expect(jalonOmCoverage(fl, children)).toEqual({
+      quantite: 30,
+      byType: [
+        { type: 'technicien', covered: 4, reste: 26 },
+        { type: 'labo', covered: 4, reste: 26 },
+      ],
+    })
+  })
+
+  it('keeps the largest remaining when details are unevenly planned', () => {
+    const res = jalonOmCoverage({ quantite: 10 }, [
+      { quantite: 10, om_quantites: { labo: 6 } },
+      { quantite: 10, om_quantites: { labo: 2 } },
+    ])
+    expect(res.byType).toEqual([{ type: 'labo', covered: 2, reste: 8 }])
+  })
+
+  it('returns no coverage when nothing is planned', () => {
+    expect(jalonOmCoverage({ quantite: 5 }, [{ quantite: 5 }]).byType).toEqual([])
   })
 })

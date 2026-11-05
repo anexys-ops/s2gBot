@@ -19,6 +19,7 @@ use App\Services\OrdreMissionFromBonCommandeService;
 use App\Support\AgencyAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class OrdreMissionController extends Controller
 {
@@ -49,10 +50,13 @@ class OrdreMissionController extends Controller
     {
         $q = OrdreMission::with([
             'client:id,name',
+            'site:id,name',
             'responsable:id,name',
-            'dossier:id,reference,titre',
+            'dossier:id,reference,titre,site_id',
+            'dossier.site:id,name',
             'bonCommande:id,numero,quote_id,dossier_id',
-            'bonCommande.dossier:id,reference,titre',
+            'bonCommande.dossier:id,reference,titre,site_id',
+            'bonCommande.dossier.site:id,name',
             'bonCommande.quote:id,number',
         ]);
 
@@ -290,8 +294,87 @@ class OrdreMissionController extends Controller
             'assigned_user_id' => 'nullable|exists:users,id',
             'date_prevue' => 'nullable|date',
             'statut' => 'sometimes|in:'.implode(',', OrdreMissionLigne::STATUTS),
+            'devis_jalon_id' => 'nullable|string|max:64',
         ]);
 
+        if ($error = $this->invalidJalonMessage($ordreMission, $validated['devis_jalon_id'] ?? null)) {
+            return response()->json(['message' => $error], 422);
+        }
+
+        $result = $this->createManualLigne($ordreMission, $validated);
+        if (is_string($result)) {
+            return response()->json(['message' => $result], 422);
+        }
+
+        return response()->json(
+            $result->fresh()->load(['assignedUser:id,name', 'equipment:id,name,code', 'article:id,code,libelle', 'articleAction']),
+            201
+        );
+    }
+
+    /**
+     * Ajout groupé de tâches sous un jalon : un produit du catalogue = une tâche, avec sa quantité.
+     */
+    public function storeLignesBatch(Request $request, OrdreMission $ordreMission): JsonResponse
+    {
+        if (! $request->user()->canValidateStatus()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $validated = $request->validate([
+            'devis_jalon_id' => 'nullable|string|max:64',
+            'items' => 'required|array|min:1|max:100',
+            'items.*.ref_article_id' => 'required|integer|distinct|exists:ref_articles,id',
+            'items.*.quantite' => 'required|numeric|min:0.001',
+        ]);
+
+        $jalonId = $validated['devis_jalon_id'] ?? null;
+        if ($error = $this->invalidJalonMessage($ordreMission, $jalonId)) {
+            return response()->json(['message' => $error], 422);
+        }
+
+        $created = DB::transaction(function () use ($ordreMission, $validated, $jalonId) {
+            $lignes = [];
+            foreach ($validated['items'] as $item) {
+                $lignes[] = $this->createManualLigne($ordreMission, [
+                    'ref_article_id' => $item['ref_article_id'],
+                    'quantite' => $item['quantite'],
+                    'devis_jalon_id' => $jalonId,
+                ]);
+            }
+
+            return $lignes;
+        });
+
+        return response()->json(
+            collect($created)->map(fn (OrdreMissionLigne $l) => $l->fresh()->load(['article:id,code,libelle']))->values(),
+            201
+        );
+    }
+
+    /** Message d'erreur si le jalon n'existe pas dans le devis source de l'OdM, null sinon. */
+    private function invalidJalonMessage(OrdreMission $ordreMission, ?string $jalonId): ?string
+    {
+        if ($jalonId === null || $jalonId === '') {
+            return null;
+        }
+        $jalons = $ordreMission->bonCommande?->quote?->meta['devis_jalons'] ?? [];
+        foreach ($jalons as $jalon) {
+            if ((string) ($jalon['id'] ?? '') === $jalonId) {
+                return null;
+            }
+        }
+
+        return 'Ce jalon n’existe pas dans le devis de l’ordre de mission.';
+    }
+
+    /**
+     * Crée une tâche manuelle (hors ligne de BC) et son MissionTask.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function createManualLigne(OrdreMission $ordreMission, array $validated): OrdreMissionLigne|string
+    {
         $libelle = trim((string) ($validated['libelle'] ?? ''));
         $refArticleId = isset($validated['ref_article_id']) ? (int) $validated['ref_article_id'] : null;
         $articleActionId = isset($validated['article_action_id']) ? (int) $validated['article_action_id'] : null;
@@ -306,17 +389,17 @@ class OrdreMissionController extends Controller
         if ($articleActionId) {
             $action = ArticleAction::query()->findOrFail($articleActionId);
             if ($refArticleId && (int) $action->ref_article_id !== $refArticleId) {
-                return response()->json(['message' => 'L’action catalogue ne correspond pas à l’article sélectionné.'], 422);
+                return 'L’action catalogue ne correspond pas à l’article sélectionné.';
             }
             if ($action->type !== $this->actionTypeForOrdreMission($ordreMission->type)) {
-                return response()->json(['message' => 'Cette action catalogue n’est pas compatible avec le type d’OdM.'], 422);
+                return 'Cette action catalogue n’est pas compatible avec le type d’OdM.';
             }
             $libelle = $action->libelle ?: $libelle;
             $refArticleId ??= (int) $action->ref_article_id;
         }
 
         if ($libelle === '') {
-            return response()->json(['message' => 'Libellé ou article catalogue requis.'], 422);
+            return 'Libellé ou article catalogue requis.';
         }
 
         $nextOrdre = ((int) $ordreMission->lignes()->max('ordre')) + 1;
@@ -324,6 +407,7 @@ class OrdreMissionController extends Controller
         $ligne = OrdreMissionLigne::query()->create([
             'ordre_mission_id' => $ordreMission->id,
             'bon_commande_ligne_id' => null,
+            'devis_jalon_id' => ($validated['devis_jalon_id'] ?? null) ?: null,
             'ref_article_id' => $refArticleId,
             'article_action_id' => $articleActionId,
             'libelle' => $libelle,
@@ -336,10 +420,7 @@ class OrdreMissionController extends Controller
 
         $ligne->ensureTaskExists();
 
-        return response()->json(
-            $ligne->fresh()->load(['assignedUser:id,name', 'equipment:id,name,code', 'article:id,code,libelle', 'articleAction']),
-            201
-        );
+        return $ligne;
     }
 
     public function updateLigne(Request $request, OrdreMission $ordreMission, OrdreMissionLigne $ligne): JsonResponse

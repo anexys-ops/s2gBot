@@ -352,18 +352,14 @@ class BonCommandeController extends Controller
             return response()->json(['message' => 'Devis introuvable.'], 422);
         }
 
+        $workflow = app(CommercialDocumentWorkflowService::class);
+        // Prix du devis repris par article (et non par position : des lignes ajoutées après coup
+        // décaleraient tout) ; ligne « Prestation forfaitaire — <jalon> » = prix du jalon.
         $bonCommande->load('lignes');
-        $quoteLines = $quote->quoteLines->sortBy('order')->values();
-        $bcLignes = $bonCommande->lignes->sortBy('ordre')->values();
-
         $updated = 0;
-        foreach ($bcLignes as $idx => $ligne) {
-            $ql = $quoteLines[$idx] ?? null;
-            if (! $ql) {
-                continue;
-            }
-            $prix = round((float) $ql->unit_price, 4);
-            if ($prix <= 0) {
+        foreach ($bonCommande->lignes as $ligne) {
+            $prix = $workflow->quotePriceForBcLigne($quote, $ligne);
+            if ($prix === null || $prix <= 0 || abs($prix - (float) $ligne->prix_unitaire_ht) < 0.00005) {
                 continue;
             }
             $ligne->prix_unitaire_ht = $prix;
@@ -391,6 +387,32 @@ class BonCommandeController extends Controller
         ]);
 
         return response()->json($bonCommande);
+    }
+
+    /**
+     * Complète ce BC avec ce qui a été ajouté au devis après sa transformation : détails d'un jalon
+     * déjà présent, et jalons / produits du devis présents sur aucun BC du devis.
+     */
+    public function completerDepuisDevis(Request $request, BonCommande $bonCommande): JsonResponse
+    {
+        if (! $request->user()->isLab()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if (! AgencyAccess::userMayAccessBonCommande($request->user(), $bonCommande)) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+        if (! in_array($bonCommande->statut, CommercialDocumentWorkflowService::BC_SYNC_STATUTS, true)) {
+            return response()->json(['message' => 'Ce bon de commande ne peut plus être complété (livré ou annulé).'], 422);
+        }
+        $quote = $bonCommande->quote_id ? Quote::with('quoteLines')->find($bonCommande->quote_id) : null;
+        if (! $quote) {
+            return response()->json(['message' => 'Ce bon de commande n\'est pas lié à un devis.'], 422);
+        }
+
+        $added = app(CommercialDocumentWorkflowService::class)
+            ->syncBonsCommandeFromQuote($quote, null, null, $bonCommande);
+
+        return response()->json(['lignes_ajoutees' => $added]);
     }
 
     public function confirmer(Request $request, BonCommande $bonCommande): JsonResponse

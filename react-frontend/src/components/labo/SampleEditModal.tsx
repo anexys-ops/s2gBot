@@ -24,6 +24,7 @@ export default function SampleEditModal({ sample, onClose, onSaved, onDeleted, o
   const [storageLocation, setStorageLocation] = useState(sample.storage_location ?? '')
   const [collectedBy, setCollectedBy] = useState<number | ''>(sample.collected_by?.id ?? '')
   const [sampleType, setSampleType] = useState(sample.sample_type ?? 'sol')
+  const [natureEchantillon, setNatureEchantillon] = useState(sample.nature_echantillon ?? '')
   const [weightG, setWeightG] = useState(sample.weight_g != null ? String(sample.weight_g) : '')
   const [notes, setNotes] = useState(sample.notes ?? '')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -57,6 +58,7 @@ export default function SampleEditModal({ sample, onClose, onSaved, onDeleted, o
         storage_location: storageLocation || undefined,
         collected_by: collectedBy ? Number(collectedBy) : undefined,
         sample_type: sampleType,
+        nature_echantillon: natureEchantillon.trim() || null,
         weight_g: weightG ? Number(weightG) : undefined,
         notes: notes || undefined,
       })
@@ -126,6 +128,17 @@ export default function SampleEditModal({ sample, onClose, onSaved, onDeleted, o
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
+        </label>
+
+        <label>
+          <span style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Nature de l’échantillon</span>
+          <input
+            type="text"
+            value={natureEchantillon}
+            onChange={(e) => setNatureEchantillon(e.target.value)}
+            maxLength={191}
+            style={{ width: '100%' }}
+          />
         </label>
 
         <label>

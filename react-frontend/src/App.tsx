@@ -109,6 +109,7 @@ const AgencesPage = lazy(() => import('./pages/config/AgencesPage'))
 const SettingsCentresPage = lazy(() => import('./pages/settings/SettingsCentresPage'))
 const PlanningIngenieurPage = lazy(() => import('./pages/ingenierie/PlanningIngenieurPage'))
 const LaboReceptionPage = lazy(() => import('./pages/labo/LaboReceptionPage'))
+const LaboJalonsRecusPage = lazy(() => import('./pages/labo/LaboJalonsRecusPage'))
 const PlanningLaboPage = lazy(() => import('./pages/labo/PlanningLaboPage'))
 const TranscoFoldPage = lazy(() => import('./pages/labo/TranscoFoldPage'))
 const LabReportsListPage = lazy(() => import('./pages/labo/LabReportsListPage'))
@@ -323,6 +324,7 @@ function AppRoutes() {
         <Route path="labo/rapports" element={<LabReportsListPage />} />
         <Route path="labo/rapports/:reportId" element={<LabReportViewPage />} />
         <Route path="labo/reception" element={<LaboReceptionPage />} />
+        <Route path="labo/jalons-recus" element={<LaboJalonsRecusPage />} />
         <Route path="labo/odm" element={<Navigate to="/ordres-mission?context=labo&type=labo" replace />} />
         <Route path="labo/planning" element={<PlanningLaboPage />} />
         <Route path="labo/transco" element={<TranscoFoldPage />} />

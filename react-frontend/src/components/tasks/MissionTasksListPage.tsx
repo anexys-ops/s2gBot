@@ -9,6 +9,7 @@ import SearchableSelect from '../ds/SearchableSelect'
 import { TASK_FILTERS, getTaskStatutMeta } from '../../lib/missionTaskStatuts'
 import { dateInputFromApi, formatAppDate } from '../../lib/appLocale'
 import { formatTechnicienOption } from '../../lib/userRolePresentation'
+import { sampleCountFromTaskForms } from '../../lib/taskSampleCount'
 import TaskTestFormResults from './TaskTestFormResults'
 
 export type MissionTasksContext = 'labo' | 'terrain' | 'ingenieur'
@@ -246,6 +247,14 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
     queryKey: ['task-test-forms', task.id],
     queryFn: () => taskTestFormsApi.list(task.id),
   })
+  const formSampleCount = useMemo(() => sampleCountFromTaskForms(taskForms?.forms), [taskForms])
+  const [quantityCountTouched, setQuantityCountTouched] = useState(false)
+  // Une étiquette par échantillon : on reprend le « Nombre d'échantillons » saisi dans le
+  // formulaire d'essai tant que l'utilisateur n'a pas modifié le champ lui-même.
+  useEffect(() => {
+    if (!formSampleCount || quantityCountTouched || task.reception_generated_at || task.quantity_count != null) return
+    setQuantityCount(String(formSampleCount.count))
+  }, [formSampleCount, quantityCountTouched, task.reception_generated_at, task.quantity_count])
   const review = useMutation({
     mutationFn: ({ typeId, decision, correctionNote }: { typeId: number; decision: 'validate' | 'correction'; correctionNote?: string }) =>
       taskTestFormsApi.review(task.id, typeId, decision, correctionNote),
@@ -406,8 +415,24 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
           </span>
         </label>
         <label>Nombre d’étiquettes
-          <input type="number" min={1} max={maxQuantity} value={quantityCount} onChange={(event) => setQuantityCount(event.target.value)} disabled={Boolean(task.reception_generated_at)} />
+          <input
+            type="number"
+            min={1}
+            max={maxQuantity}
+            value={quantityCount}
+            onChange={(event) => {
+              setQuantityCountTouched(true)
+              setQuantityCount(event.target.value)
+            }}
+            disabled={Boolean(task.reception_generated_at)}
+          />
           <span className="text-muted">Commandé : {task.ordered_quantity ?? '—'} · Déjà réceptionné : {task.received_quantity ?? 0} · Reliquat : {task.remaining_quantity ?? '—'}</span>
+          {formSampleCount && !task.reception_generated_at ? (
+            <span className="text-muted" style={{ fontSize: '0.82rem' }}>
+              Formulaire « {formSampleCount.formName} » : {formSampleCount.count} échantillon{formSampleCount.count > 1 ? 's' : ''}
+              {formSampleCount.count > maxQuantity ? ` — au-delà du reliquat (${maxQuantity}), ajustez la quantité.` : ' — une étiquette par échantillon.'}
+            </span>
+          ) : null}
         </label>
         <label className="mission-task-modal__pv">Numéro(s) de PV
           {pvNumbers.length > 0 ? (

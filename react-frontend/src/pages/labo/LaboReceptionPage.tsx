@@ -107,7 +107,7 @@ export default function LaboReceptionPage() {
   const [labelData, setLabelData] = useState<SampleLabelData | null>(null)
   const [labelQueue, setLabelQueue] = useState<SampleLabelData[]>([])
   const [labelIndex, setLabelIndex] = useState(0)
-  const [labelFormat, setLabelFormat] = useState<LabelFormat>('a6')
+  const [labelFormat, setLabelFormat] = useState<LabelFormat>('etiquette')
   const [expandedLineId, setExpandedLineId] = useState<number | null>(null)
   const [editSample, setEditSample] = useState<ReceptionSample | null>(null)
   const [historyTarget, setHistoryTarget] = useState<ReceptionSample | null>(null)

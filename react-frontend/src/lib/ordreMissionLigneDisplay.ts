@@ -20,9 +20,18 @@ export function buildOrdreMissionLigneGroups(
   if (sorted.length === 0) return []
 
   const tasksByBcLineId = new Map<number, OrdreMissionLigne[]>()
+  const manualTasksByJalonId = new Map<string, OrdreMissionLigne[]>()
   for (const ligne of sorted) {
     const sourceId = Number(ligne.bon_commande_ligne_id ?? 0)
-    if (sourceId <= 0) continue
+    if (sourceId <= 0) {
+      // Tâche ajoutée à la main sous un jalon : rattachée par l'id du jalon devis.
+      if (ligne.devis_jalon_id) {
+        const bucket = manualTasksByJalonId.get(ligne.devis_jalon_id) ?? []
+        bucket.push(ligne)
+        manualTasksByJalonId.set(ligne.devis_jalon_id, bucket)
+      }
+      continue
+    }
     const bucket = tasksByBcLineId.get(sourceId) ?? []
     bucket.push(ligne)
     tasksByBcLineId.set(sourceId, bucket)
@@ -34,7 +43,10 @@ export function buildOrdreMissionLigneGroups(
     if (row.type === 'jalon_header') {
       const sourceIds = [...row.ligneIds]
       if (row.forfaitLigne) sourceIds.unshift(row.forfaitLigne.id)
-      const groupLignes = sourceIds.flatMap((sourceId) => tasksByBcLineId.get(sourceId) ?? [])
+      const groupLignes = [
+        ...sourceIds.flatMap((sourceId) => tasksByBcLineId.get(sourceId) ?? []),
+        ...(manualTasksByJalonId.get(row.jalonId) ?? []),
+      ]
       if (groupLignes.length === 0) continue
       groupLignes.forEach((ligne) => emitted.add(ligne.id))
       groups.push({

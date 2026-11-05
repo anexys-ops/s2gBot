@@ -1128,6 +1128,8 @@ export const bonsCommandeApi = {
     api<BonCommande>(`/v1/bons-commande/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => api<null>(`/v1/bons-commande/${id}`, { method: 'DELETE' }),
   syncPrixDevis: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}/sync-prix-devis`, { method: 'POST' }),
+  completerDepuisDevis: (id: number) =>
+    api<{ lignes_ajoutees: number }>(`/v1/bons-commande/${id}/completer-depuis-devis`, { method: 'POST' }),
   confirmer: (id: number) => api<BonCommande>(`/v1/bons-commande/${id}/confirmer`, { method: 'POST' }),
   transformerBl: (id: number) => api<BonLivraison>(`/v1/bons-commande/${id}/transformer-bl`, { method: 'POST' }),
   updateLigne: (
@@ -1954,6 +1956,7 @@ export type ReceptionSample = {
   cancellation_reason?: string | null
   status: string
   sample_type?: string | null
+  nature_echantillon?: string | null
   dossier_id?: number | null
   bon_commande_ligne_id?: number | null
   product_id?: number | null
@@ -2019,6 +2022,10 @@ export type SampleLabelPayload = {
   bc?: string | null
   devis?: string | null
   sample_type?: string | null
+  nature_echantillon?: string | null
+  jalon?: string | null
+  jalon_prix_ht?: number | null
+  tache?: string | null
   condition_state?: string | null
   storage_location?: string | null
   weight_g?: number | null
@@ -2060,6 +2067,7 @@ export type ReceiveFromLineBody = {
   storage_location?: string
   collected_by?: number
   sample_type?: string
+  nature_echantillon?: string | null
   origin_location?: string
   depth_m?: number
   weight_g?: number
@@ -2077,9 +2085,37 @@ export type ReceiveSampleBody = {
   weight_g?: number
   quantity?: number
   notes?: string
+  nature_echantillon?: string
+}
+
+export type LabJalonRecu = {
+  key: string
+  client: { id: number; name: string } | null
+  chantier: { id: number; name: string } | null
+  dossier: { id: number; reference: string; titre?: string | null } | null
+  bon_commande: { id: number; numero: string }
+  jalon: { id: string; code: string | null; label: string } | null
+  libelle: string
+  pv_numbers: string[]
+  numeros_reception: string[]
+  folds: string[]
+  echantillons_recus: number
+  echantillons_a_traiter: number
+  derniere_reception_at: string | null
+}
+
+export type LabJalonsRecusResponse = {
+  data: LabJalonRecu[]
+  stats: { jalons: number; jalons_a_traiter: number; echantillons_recus: number; echantillons_a_traiter: number }
 }
 
 export const labReceptionApi = {
+  jalonsRecus: (params?: { search?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.search) q.set('search', params.search)
+    const s = q.toString()
+    return api<LabJalonsRecusResponse>(`/v1/lab/reception/jalons-recus${s ? `?${s}` : ''}`)
+  },
   attendus: (params?: { search?: string }) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
@@ -2779,7 +2815,7 @@ export interface Quote {
   client?: Client
   client_contact?: ClientContactRow
   site?: Site
-  dossier?: Pick<DossierRow, 'id' | 'reference' | 'titre'>
+  dossier?: Pick<DossierRow, 'id' | 'reference' | 'titre'> & { site?: Pick<Site, 'id' | 'name'> | null }
   billing_address?: ClientAddress
   delivery_address?: ClientAddress
   quote_lines?: QuoteLine[]
@@ -3521,6 +3557,8 @@ export interface OrdreMissionLigne {
   id: number
   ordre_mission_id: number
   bon_commande_ligne_id?: number | null
+  /** Jalon du devis d'une tâche ajoutée à la main (sans ligne de BC source). */
+  devis_jalon_id?: string | null
   ref_article_id?: number | null
   article_action_id?: number | null
   libelle: string
@@ -3697,6 +3735,11 @@ export const ordresMissionApi = {
     },
   ) =>
     api<OrdreMissionLigne>(`/ordres-mission/${omId}/lignes`, { method: 'POST', body: JSON.stringify(body) }),
+  createLignesBatch: (
+    omId: number,
+    body: { devis_jalon_id?: string | null; items: Array<{ ref_article_id: number; quantite: number }> },
+  ) =>
+    api<OrdreMissionLigne[]>(`/ordres-mission/${omId}/lignes/batch`, { method: 'POST', body: JSON.stringify(body) }),
   updateLigne: (omId: number, ligneId: number, body: Partial<OrdreMissionLigne>) =>
     api<OrdreMissionLigne>(`/ordres-mission/${omId}/lignes/${ligneId}`, { method: 'PUT', body: JSON.stringify(body) }),
   updateLignes: (omId: number, lignes: Array<Partial<OrdreMissionLigne> & { id: number }>) =>

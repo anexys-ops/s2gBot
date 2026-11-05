@@ -65,6 +65,7 @@ export default function Devis() {
   const { visible, toggle } = usePersistedColumnVisibility('quotes', {
     number: true,
     client: true,
+    site: true,
     date: true,
     ht: true,
     ttc: true,
@@ -207,7 +208,7 @@ export default function Devis() {
           setSearchInput(v)
           setPage(1)
         }}
-        searchPlaceholder="Numéro, notes…"
+        searchPlaceholder="Numéro, client, chantier, notes…"
         statusValue={statusFilter}
         onStatusChange={(v) => {
           setStatusFilter(v)
@@ -217,6 +218,7 @@ export default function Devis() {
         columns={[
           { id: 'number', label: 'Numéro' },
           { id: 'client', label: 'Client' },
+          { id: 'site', label: 'Chantier' },
           { id: 'date', label: 'Date' },
           { id: 'ht', label: 'Montant HT' },
           { id: 'ttc', label: 'Montant TTC' },
@@ -281,6 +283,7 @@ export default function Devis() {
                 <tr>
                   {visible.number !== false && <th className="data-table__code">Numéro</th>}
                   {visible.client !== false && <th>Client</th>}
+                  {visible.site !== false && <th>Chantier</th>}
                   {visible.date !== false && <th>Date</th>}
                   {visible.ht !== false && <th>Montant HT ({MONEY_UNIT_LABEL})</th>}
                   {visible.ttc !== false && <th>Montant TTC ({MONEY_UNIT_LABEL})</th>}
@@ -322,6 +325,7 @@ export default function Devis() {
                         </td>
                       )}
                       {visible.client !== false && <td>{q.client?.name ?? '—'}</td>}
+                      {visible.site !== false && <td>{q.site?.name ?? q.dossier?.site?.name ?? '—'}</td>}
                       {visible.date !== false && <td>{formatAppDate(q.quote_date)}</td>}
                       {visible.ht !== false && (
                         <td className="data-table__num">
@@ -428,6 +432,7 @@ export default function Devis() {
                 columns={[
                   { id: 'number', kind: 'text' },
                   { id: 'client', kind: 'text' },
+                  { id: 'site', kind: 'text' },
                   { id: 'date', kind: 'text' },
                   { id: 'ht', kind: 'money' },
                   { id: 'ttc', kind: 'money' },

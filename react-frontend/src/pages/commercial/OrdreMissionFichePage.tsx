@@ -13,6 +13,7 @@ import { bonsCommandeApi, equipmentsApi, ordresMissionApi, planningTerrainApi, t
 import ConfirmDialog from '../../components/ConfirmDialog'
 import OmExpensePanel from '../../components/ordres-mission/OmExpensePanel'
 import OmLigneAddPanel from '../../components/ordres-mission/OmLigneAddPanel'
+import OmJalonTasksAddModal from '../../components/ordres-mission/OmJalonTasksAddModal'
 import OmAvailabilityPanel from '../../components/ordres-mission/OmAvailabilityPanel'
 import { TaskEditModal } from '../../components/tasks/MissionTasksListPage'
 import SaveButton from '../../components/ds/SaveButton'
@@ -222,6 +223,7 @@ export default function OrdreMissionFichePage() {
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const omId = Number(id)
   const [showAddLigne, setShowAddLigne] = useState(false)
+  const [addTasksJalon, setAddTasksJalon] = useState<{ id: string; label: string; code?: string | null } | null>(null)
   const [deleteLigneTarget, setDeleteLigneTarget] = useState<OrdreMissionLigne | null>(null)
   const [foldTask, setFoldTask] = useState<MissionTask | null>(null)
   const [availabilityLigneId, setAvailabilityLigneId] = useState<number | null>(null)
@@ -689,6 +691,18 @@ export default function OrdreMissionFichePage() {
             </button>
           ) : null}
         </div>
+        {addTasksJalon && isLab ? (
+          <OmJalonTasksAddModal
+            om={om}
+            jalon={addTasksJalon}
+            onClose={() => setAddTasksJalon(null)}
+            onCreated={() => {
+              void qc.invalidateQueries({ queryKey: ['ordre-mission', omId] })
+              void qc.invalidateQueries({ queryKey: ['ordres-mission'] })
+              void qc.invalidateQueries({ queryKey: ['mission-tasks-list'] })
+            }}
+          />
+        ) : null}
         {showAddLigne && isLab ? (
           <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
             <OmLigneAddPanel
@@ -729,6 +743,16 @@ export default function OrdreMissionFichePage() {
                             {group.jalon.code ? ' — ' : ''}{group.jalon.label}
                             {group.jalon.quantite != null ? (
                               <span className="om-lignes-table__jalon-qty">Qté BC : {group.jalon.quantite}</span>
+                            ) : null}
+                            {isLab ? (
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                style={{ marginLeft: '0.75rem' }}
+                                onClick={() => setAddTasksJalon(group.jalon)}
+                              >
+                                + Ajouter une tâche
+                              </button>
                             ) : null}
                           </div>
                           {isLab ? (

@@ -12,6 +12,7 @@ use App\Models\Client;
 use App\Models\Dossier;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Quote;
 use App\Models\Sample;
 use App\Models\Site;
 use App\Models\TestType;
@@ -155,11 +156,13 @@ class LabReceptionTest extends TestCase
             'storage_location' => 'Salle A / Étagère 1',
             'collected_by' => $technicien->id,
             'sample_type' => 'sol',
+            'nature_echantillon' => 'Grave non traitée',
             'quantity' => 1,
         ]);
 
         $res->assertCreated();
         $res->assertJsonPath('status', Sample::STATUS_RECEPTIONNE);
+        $res->assertJsonPath('nature_echantillon', 'Grave non traitée');
         $this->assertNotEmpty($res->json('fold_number'));
         $this->assertNotEmpty($res->json('transco_number'));
         $this->assertNotNull($res->json('received_at'));
@@ -179,6 +182,88 @@ class LabReceptionTest extends TestCase
         $this->assertSame($technicien->name, $qr['technicien']);
         $this->assertNotEmpty($qr['date']);
         $this->assertSame(1, $qr['prelevements']);
+        $this->assertSame('DOS-REC-001', $qr['dossier']);
+        $label->assertJsonPath('payload.nature_echantillon', 'Grave non traitée');
+    }
+
+    public function test_label_qr_contains_jalon_task_dossier_and_jalon_price(): void
+    {
+        [$labLine, , $bc, $client, $technicien] = $this->seedBcWithLabAndReportLines();
+        $this->legacyOrderItemId($client);
+        $quote = Quote::query()->create([
+            'number' => 'DEV-REC-001', 'client_id' => $client->id, 'dossier_id' => $bc->dossier_id,
+            'quote_date' => '2026-03-01', 'amount_ht' => 800, 'amount_ttc' => 960, 'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+            'meta' => ['devis_jalons' => [[
+                'id' => 'j-sol', 'libelle' => 'Contrôle sol', 's2g_code' => 'CS', 'mode' => 'forfait',
+                'quantity' => 3, 'prix_unitaire_ht' => 150,
+                'product_ref_article_ids' => [$labLine->ref_article_id],
+            ]]],
+        ]);
+        $bc->update(['quote_id' => $quote->id]);
+        BonCommandeLigne::query()->create([
+            'bon_commande_id' => $bc->id, 'libelle' => 'Prestation forfaitaire — Contrôle sol',
+            'quantite' => 3, 'prix_unitaire_ht' => 120, 'tva_rate' => 20, 'montant_ht' => 360,
+        ]);
+        $receptionnaire = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+
+        $sampleId = (int) $this->actingAs($receptionnaire, 'sanctum')->postJson('/api/v1/lab/reception/receive-from-line', [
+            'bon_commande_ligne_id' => $labLine->id,
+            'condition_state' => 'bon',
+            'collected_by' => $technicien->id,
+        ])->assertCreated()->json('id');
+
+        $label = $this->actingAs($receptionnaire, 'sanctum')->getJson("/api/v1/samples/{$sampleId}/label")->assertOk();
+        $qr = json_decode((string) $label->json('qr_json'), true);
+        $this->assertSame('CS — Contrôle sol', $qr['jalon']);
+        $this->assertSame('Essai sol réception', $qr['tache']);
+        $this->assertSame('DOS-REC-001', $qr['dossier']);
+        $this->assertEquals(120, $qr['prix_jalon_ht']);
+        $this->assertNotEmpty($qr['fold']);
+    }
+
+    public function test_jalons_recus_lists_received_jalons_with_pv_and_reception_numbers(): void
+    {
+        [$labLine, , $bc, $client, $technicien] = $this->seedBcWithLabAndReportLines();
+        $this->legacyOrderItemId($client);
+        $quote = Quote::query()->create([
+            'number' => 'DEV-REC-002', 'client_id' => $client->id, 'dossier_id' => $bc->dossier_id,
+            'quote_date' => '2026-03-01', 'amount_ht' => 800, 'amount_ttc' => 960, 'tva_rate' => 20,
+            'status' => Quote::STATUS_SIGNED,
+            'meta' => ['devis_jalons' => [[
+                'id' => 'j-sol', 'libelle' => 'Contrôle sol', 's2g_code' => 'CS', 'mode' => 'detaille',
+                'product_ref_article_ids' => [$labLine->ref_article_id],
+            ]]],
+        ]);
+        $bc->update(['quote_id' => $quote->id]);
+        $receptionnaire = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+
+        $empty = $this->actingAs($receptionnaire, 'sanctum')->getJson('/api/v1/lab/reception/jalons-recus')->assertOk();
+        $this->assertSame([], $empty->json('data'));
+
+        $transco = $this->actingAs($receptionnaire, 'sanctum')->postJson('/api/v1/lab/reception/receive-batch-from-line', [
+            'bon_commande_ligne_id' => $labLine->id,
+            'batch_total' => 2,
+            'samples' => [
+                ['reception_index' => 1, 'condition_state' => 'bon', 'collected_by' => $technicien->id],
+                ['reception_index' => 2, 'condition_state' => 'bon', 'collected_by' => $technicien->id],
+            ],
+        ])->assertCreated()->json('data.0.transco_number');
+
+        $res = $this->actingAs($receptionnaire, 'sanctum')->getJson('/api/v1/lab/reception/jalons-recus')->assertOk();
+        $res->assertJsonCount(1, 'data');
+        $res->assertJsonPath('data.0.libelle', 'CS — Contrôle sol');
+        $res->assertJsonPath('data.0.client.name', 'Réception Co');
+        $res->assertJsonPath('data.0.chantier.name', 'Chantier Réception');
+        $res->assertJsonPath('data.0.echantillons_recus', 2);
+        $this->assertContains($transco, $res->json('data.0.numeros_reception'));
+
+        $this->actingAs($receptionnaire, 'sanctum')
+            ->getJson('/api/v1/lab/reception/jalons-recus?search=Chantier%20R%C3%A9ception')
+            ->assertJsonCount(1, 'data');
+        $this->actingAs($receptionnaire, 'sanctum')
+            ->getJson('/api/v1/lab/reception/jalons-recus?search=introuvable')
+            ->assertJsonCount(0, 'data');
     }
 
     public function test_receive_batch_from_line_creates_multiple_samples(): void

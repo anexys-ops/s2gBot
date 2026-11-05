@@ -234,3 +234,46 @@ export function buildBcLigneDisplayRows<T extends GroupableLigne>(
 
   return rows
 }
+
+export type OmCoverageType = 'technicien' | 'ingenieur' | 'labo'
+
+type OmCoverageLigne = Pick<BonCommandeLigne, 'quantite' | 'om_quantites'>
+
+/**
+ * Couverture OM d'un jalon, déduite de ses lignes de détail : les OM pointent sur les
+ * détails, jamais sur la ligne « Prestation forfaitaire ». Pour chaque type d'OM, le jalon
+ * n'est couvert qu'à hauteur du détail le moins planifié (reste du jalon = plus grand reste).
+ * Les détails sans aucun OM (ex. rapport) ne bloquent pas le calcul.
+ */
+export function jalonOmCoverage(
+  forfaitLigne: OmCoverageLigne | undefined,
+  children: OmCoverageLigne[],
+): { quantite: number; byType: Array<{ type: OmCoverageType; covered: number; reste: number }> } {
+  const quantite = Number(
+    forfaitLigne?.quantite ?? Math.max(0, ...children.map((c) => Number(c.quantite) || 0)),
+  ) || 0
+  const coveredByType = new Map<OmCoverageType, number>()
+  const ownCoverage = forfaitLigne?.om_quantites ?? {}
+  for (const [type, covered] of Object.entries(ownCoverage) as Array<[OmCoverageType, number]>) {
+    coveredByType.set(type, Number(covered) || 0)
+  }
+  for (const child of children) {
+    const childQty = Number(child.quantite) || 0
+    for (const [type, covered] of Object.entries(child.om_quantites ?? {}) as Array<[OmCoverageType, number]>) {
+      // Ramène la couverture du détail à l'échelle du jalon (détails à la même quantité en général).
+      const scaled = childQty > 0 && quantite > 0 && childQty !== quantite
+        ? (Number(covered) / childQty) * quantite
+        : Number(covered) || 0
+      const prev = coveredByType.get(type)
+      coveredByType.set(type, prev == null ? scaled : Math.min(prev, scaled))
+    }
+  }
+  const order: OmCoverageType[] = ['technicien', 'labo', 'ingenieur']
+  const byType = order
+    .filter((type) => coveredByType.has(type))
+    .map((type) => {
+      const covered = Math.min(quantite, coveredByType.get(type) ?? 0)
+      return { type, covered, reste: Math.max(0, quantite - covered) }
+    })
+  return { quantite, byType }
+}

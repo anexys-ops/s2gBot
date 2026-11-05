@@ -813,6 +813,22 @@ class MissionTaskController extends Controller
                 }
             }
 
+            // Tâche ajoutée à la main sous un jalon (sans ligne de BC source).
+            $manualJalonId = (string) ($ligne?->devis_jalon_id ?? '');
+            if ($context === null && $manualJalonId !== '' && is_array($meta)) {
+                foreach (($meta['devis_jalons'] ?? []) as $jalon) {
+                    if ((string) ($jalon['id'] ?? '') !== $manualJalonId) {
+                        continue;
+                    }
+                    $context = [
+                        'id' => $manualJalonId,
+                        'label' => trim((string) ($jalon['libelle'] ?? '')),
+                        'code' => $jalon['s2g_code'] ?? null,
+                    ];
+                    break;
+                }
+            }
+
             $task->setAttribute('jalon_context', $context);
             if ($source) {
                 $remaining = $this->remainingQuantity($source);

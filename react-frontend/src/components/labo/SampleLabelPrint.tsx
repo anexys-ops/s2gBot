@@ -8,7 +8,8 @@ import {
   resolveAppLogoSrc,
 } from '../../lib/appBranding'
 
-export type LabelFormat = 'a6' | 'a5'
+/** « etiquette » : étiquette adhésive 50 × 30 mm (modèle client) ; A6/A5 : fiche détaillée. */
+export type LabelFormat = 'etiquette' | 'a6' | 'a5'
 
 type Props = {
   label: SampleLabelData
@@ -28,13 +29,35 @@ function formatDateTime(iso?: string | null): string {
   return d.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
+function formatDate(iso?: string | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso.replace(' ', 'T'))
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleDateString('fr-FR')
+}
+
 function absoluteAssetUrl(src: string): string {
   if (src.startsWith('http') || src.startsWith('data:')) return src
   const path = src.startsWith('/') ? src : `/${src}`
   return `${window.location.origin}${path}`
 }
 
+const STICKER_STYLES = `
+@page { size: 50mm 30mm; margin: 0; }
+* { box-sizing: border-box; }
+body { font-family: 'DM Sans', Arial, sans-serif; margin: 0; padding: 0; color: #000; background: #fff; }
+.sticker-label { width: 50mm; height: 30mm; padding: 1.5mm 2mm; border: 0.3mm solid #1a5276; border-radius: 2.5mm; overflow: hidden; display: flex; flex-direction: column; gap: 0.8mm; page-break-after: always; }
+.sticker-label__top { display: flex; align-items: center; gap: 2mm; }
+.sticker-label__qr img, .sticker-label__qr canvas { display: block; width: 13mm !important; height: 13mm !important; }
+.sticker-label__ref { font-size: 6.5pt; line-height: 1.15; }
+.sticker-label__ref strong { display: block; font-size: 7.5pt; font-family: ui-monospace, monospace; word-break: break-all; }
+.sticker-label__rows { margin: 0; display: grid; grid-template-columns: auto 1fr; column-gap: 1mm; row-gap: 0.3mm; font-size: 6pt; line-height: 1.15; }
+.sticker-label__rows dt { white-space: nowrap; }
+.sticker-label__rows dd { margin: 0; font-weight: 700; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+`
+
 function printStyles(format: LabelFormat): string {
+  if (format === 'etiquette') return STICKER_STYLES
   const compact = format === 'a6'
   return `
 @page { size: ${compact ? '105mm 148mm' : '148mm 210mm'}; margin: 6mm; }
@@ -65,6 +88,31 @@ type LabelBodyProps = {
   logoSrc: string
   qrRef: RefObject<HTMLCanvasElement>
   barcodeRef: RefObject<SVGSVGElement>
+}
+
+function StickerLabelBody({ payload, qrRef }: Pick<LabelBodyProps, 'payload' | 'qrRef'>) {
+  return (
+    <div className="sticker-label">
+      <div className="sticker-label__top">
+        <div className="sticker-label__qr">
+          <canvas ref={qrRef} aria-label="QR code échantillon" />
+        </div>
+        <div className="sticker-label__ref">
+          Réf échantillon
+          <strong>{payload.fold ?? '—'}</strong>
+          {payload.label_ref ? `Éch. ${payload.label_ref}` : null}
+        </div>
+      </div>
+      <dl className="sticker-label__rows">
+        <dt>Réf labo :</dt>
+        <dd>{payload.transco ?? '—'}</dd>
+        <dt>Date de réception :</dt>
+        <dd>{formatDate(payload.received_at)}</dd>
+        <dt>Nature de matériaux :</dt>
+        <dd>{payload.nature_echantillon || payload.product || '—'}</dd>
+      </dl>
+    </div>
+  )
 }
 
 function LabelBody({ payload, barcode, format, logoSrc, qrRef, barcodeRef }: LabelBodyProps) {
@@ -161,10 +209,10 @@ export default function SampleLabelPrint({ label, format, onFormatChange, onClos
     void (async () => {
       if (qrRef.current) {
         await QRCode.toCanvas(qrRef.current, qr_json, {
-          width: format === 'a6' ? 120 : 148,
+          width: format === 'etiquette' ? 96 : format === 'a6' ? 120 : 148,
           margin: 2,
           errorCorrectionLevel: 'M',
-          color: { dark: '#1a5276', light: '#ffffff' },
+          color: { dark: format === 'etiquette' ? '#000000' : '#1a5276', light: '#ffffff' },
         })
       }
       if (barcodeRef.current && barcode) {
@@ -196,7 +244,9 @@ export default function SampleLabelPrint({ label, format, onFormatChange, onClos
       const qrDataUrl = qrRef.current.toDataURL('image/png')
       html = html.replace(
         /<canvas[^>]*(?:\/>|><\/canvas>)/,
-        `<img src="${qrDataUrl}" alt="QR code échantillon" style="display:block;margin:0 auto;border-radius:4px;" />`,
+        format === 'etiquette'
+          ? `<img src="${qrDataUrl}" alt="QR code échantillon" />`
+          : `<img src="${qrDataUrl}" alt="QR code échantillon" style="display:block;margin:0 auto;border-radius:4px;" />`,
       )
     }
     html = html.replace(
@@ -230,6 +280,7 @@ export default function SampleLabelPrint({ label, format, onFormatChange, onClos
             <label className="sample-label-modal__format">
               <span>Format</span>
               <select value={format} onChange={(e) => onFormatChange(e.target.value as LabelFormat)}>
+                <option value="etiquette">Étiquette 50 × 30 mm</option>
                 <option value="a6">A6 (105 × 148 mm)</option>
                 <option value="a5">A5 (148 × 210 mm)</option>
               </select>
@@ -237,14 +288,18 @@ export default function SampleLabelPrint({ label, format, onFormatChange, onClos
           </div>
 
           <div ref={printRef} className="sample-label-preview">
-            <LabelBody
-              payload={payload}
-              barcode={barcode}
-              format={format}
-              logoSrc={logoSrc}
-              qrRef={qrRef}
-              barcodeRef={barcodeRef}
-            />
+            {format === 'etiquette' ? (
+              <StickerLabelBody payload={payload} qrRef={qrRef} />
+            ) : (
+              <LabelBody
+                payload={payload}
+                barcode={barcode}
+                format={format}
+                logoSrc={logoSrc}
+                qrRef={qrRef}
+                barcodeRef={barcodeRef}
+              />
+            )}
           </div>
 
           <div className="sample-label-modal__actions">

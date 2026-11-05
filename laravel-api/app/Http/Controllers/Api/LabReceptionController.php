@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Sample;
+use App\Services\LabJalonsRecusService;
 use App\Services\LabReceptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +13,28 @@ class LabReceptionController extends Controller
 {
     public function __construct(
         private readonly LabReceptionService $receptionService,
+        private readonly LabJalonsRecusService $jalonsRecus,
     ) {}
+
+    /**
+     * Jalons réceptionnés au labo (client, chantier, jalon, n° PV, n° de réception) — vue
+     * du responsable laboratoire pour ne voir que ce qui est prêt à être traité.
+     */
+    public function jalonsRecus(Request $request): JsonResponse
+    {
+        $search = $request->query('search');
+        $items = $this->jalonsRecus->list(is_string($search) ? $search : null);
+
+        return response()->json([
+            'data' => $items,
+            'stats' => [
+                'jalons' => $items->count(),
+                'jalons_a_traiter' => $items->where('echantillons_a_traiter', '>', 0)->count(),
+                'echantillons_recus' => $items->sum('echantillons_recus'),
+                'echantillons_a_traiter' => $items->sum('echantillons_a_traiter'),
+            ],
+        ]);
+    }
 
     /**
      * Produits attendus en réception — lignes BC confirmées avec essai labo et technicien terrain.

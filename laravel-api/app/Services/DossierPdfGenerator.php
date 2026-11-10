@@ -20,7 +20,9 @@ class DossierPdfGenerator
             'centreGroup',
             'createur',
             'contacts',
-            'quotes',
+            'client.contacts',
+            'quotes.clientContact',
+            'quotes.bonsCommande:id,quote_id,numero,date_commande,reference_bc_client',
         ]);
 
         $html = view('pdf.dossier_fiche', [

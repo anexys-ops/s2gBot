@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\ListQuery;
 use App\Http\Controllers\Controller;
 use App\Mail\InvoiceEmailMailable;
 use App\Models\Agency;
@@ -82,11 +83,16 @@ class InvoiceController extends Controller
             }
         }
 
-        if ($request->filled('client_id')) {
-            $query->where('client_id', (int) $request->query('client_id'));
-        }
-
-        $invoices = $query->orderByDesc('invoice_date')->paginate(15);
+        ListQuery::filter($query, $request);
+        ListQuery::sort($query, $request, [
+            'created_at' => 'invoices.created_at',
+            'date' => 'invoices.invoice_date',
+            'numero' => 'invoices.number',
+            'client' => ListQuery::byClientName('invoices'),
+            'montant' => 'invoices.amount_ht',
+            'statut' => 'invoices.status',
+        ]);
+        $invoices = $query->paginate(15);
 
         return response()->json($invoices);
     }

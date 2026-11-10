@@ -6,6 +6,7 @@ import { ListTableFootRow, ListTablePanelHeader } from '../components/ListTableP
 import { sumNumeric } from '../lib/listTableTotals'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
+import { useListControls } from '../hooks/useListControls'
 import {
   commercialOfferingsApi,
   quotesApi,
@@ -37,6 +38,11 @@ export default function CrmDocuments() {
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
+  const quotesListControls = useListControls('crm-documents-quotes', () => setPage(1))
+  const invoicesListControls = useListControls('crm-documents-invoices', () => setPage(1))
+  const offeringsListControls = useListControls('crm-documents-offerings', () => setPage(1))
+  const listControls =
+    tab === 'quotes' ? quotesListControls : tab === 'invoices' ? invoicesListControls : offeringsListControls
   const [pdfTarget, setPdfTarget] = useState<{ type: PdfGenerateType; id: number; label: string } | null>(null)
 
   const quoteStatusOptions = Object.entries(QUOTE_STATUS_LABELS).map(([value, label]) => ({ value, label }))
@@ -67,30 +73,38 @@ export default function CrmDocuments() {
   }, [tab, debouncedSearch, statusFilter])
 
   const quotesQ = useQuery({
-    queryKey: ['crm-documents', 'quotes', debouncedSearch, statusFilter, page],
+    queryKey: ['crm-documents', 'quotes', debouncedSearch, statusFilter, page, quotesListControls.params],
     queryFn: () =>
       quotesApi.list({
         search: debouncedSearch.trim() || undefined,
         status: statusFilter || undefined,
         page,
+        ...quotesListControls.params,
       }),
     enabled: tab === 'quotes',
   })
 
   const invoicesQ = useQuery({
-    queryKey: ['crm-documents', 'invoices', debouncedSearch, statusFilter, page],
+    queryKey: ['crm-documents', 'invoices', debouncedSearch, statusFilter, page, invoicesListControls.params],
     queryFn: () =>
       invoicesApi.list({
         search: debouncedSearch.trim() || undefined,
         status: statusFilter || undefined,
         page,
+        ...invoicesListControls.params,
       }),
     enabled: tab === 'invoices',
   })
 
   const offeringsQ = useQuery({
-    queryKey: ['crm-documents', 'offerings', debouncedSearch, page],
-    queryFn: () => commercialOfferingsApi.list({ search: debouncedSearch.trim() || undefined, per_page: 30, page }),
+    queryKey: ['crm-documents', 'offerings', debouncedSearch, page, offeringsListControls.params],
+    queryFn: () =>
+      commercialOfferingsApi.list({
+        search: debouncedSearch.trim() || undefined,
+        per_page: 30,
+        page,
+        ...offeringsListControls.params,
+      }),
     enabled: tab === 'offerings',
   })
 
@@ -239,6 +253,21 @@ export default function CrmDocuments() {
         statusOptions={
           tab === 'offerings' ? undefined : tab === 'quotes' ? quoteStatusOptions : invoiceStatusOptions
         }
+        listControls={listControls}
+        sortOptions={
+          tab === 'offerings'
+            ? ['created_at', { key: 'numero', label: 'Code' }, { key: 'nom', label: 'Libellé' }]
+            : [
+                'created_at',
+                { key: 'date', label: tab === 'quotes' ? 'Date du devis' : 'Date de facture' },
+                'numero',
+                'client',
+                'montant',
+                'statut',
+              ]
+        }
+        clientFilter={isLab && tab !== 'offerings'}
+        periodFilter
         columns={toolbarColumns}
         visibleColumns={visible}
         onToggleColumn={toggle}

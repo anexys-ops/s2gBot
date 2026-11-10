@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { ListTablePanelHeader } from '../components/ListTablePanel'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import { useListControls } from '../hooks/useListControls'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import ClientFormModal from '../components/clients/ClientFormModal'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
@@ -67,6 +68,7 @@ export default function Clients() {
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all')
   const [page, setPage] = useState(1)
+  const listControls = useListControls('clients', () => setPage(1))
   const perPage = 20
   const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null)
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null)
@@ -83,11 +85,12 @@ export default function Clients() {
   })
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['clients', 'paginated', debouncedSearch, viewFilter, page, perPage],
+    queryKey: ['clients', 'paginated', debouncedSearch, viewFilter, listControls.params, page, perPage],
     queryFn: () =>
       clientsApi.listPaginated({
         search: debouncedSearch.trim() || undefined,
         view: viewFilter,
+        ...listControls.params,
         page,
         per_page: perPage,
       }),
@@ -291,6 +294,9 @@ export default function Clients() {
         ]}
         visibleColumns={visible}
         onToggleColumn={toggle}
+        listControls={listControls}
+        sortOptions={['created_at', 'nom', { key: 'numero', label: 'Code client' }]}
+        periodFilter
         extra={
           <label>
             <span className="filter-label">Vue (filtre liste)</span>

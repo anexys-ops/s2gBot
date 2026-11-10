@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\ListQuery;
 use App\Http\Controllers\Controller;
 use App\Models\Equipment;
 use Illuminate\Http\JsonResponse;
@@ -24,8 +25,14 @@ class EquipmentController extends Controller
         $dueWithin = (int) ($validated['due_within'] ?? 0);
 
         $q = Equipment::query()
-            ->with(['agency', 'testTypes:id,name', 'calibrations' => fn ($c) => $c->limit(3)])
-            ->orderBy('code');
+            ->with(['agency', 'testTypes:id,name', 'calibrations' => fn ($c) => $c->limit(3)]);
+        ListQuery::filter($q, $request, null);
+        ListQuery::sort($q, $request, [
+            'numero' => 'equipments.code',
+            'created_at' => 'equipments.created_at',
+            'nom' => 'equipments.name',
+            'statut' => 'equipments.status',
+        ], $request->filled('sort') ? ListQuery::DEFAULT_SORT : 'numero');
 
         if (! empty($validated['status'])) {
             $q->where('status', $validated['status']);

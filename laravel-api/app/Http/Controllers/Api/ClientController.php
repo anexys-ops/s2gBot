@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\ListQuery;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Support\AgencyAccess;
@@ -70,7 +71,13 @@ class ClientController extends Controller
 
         $this->applyViewFilter($query, $request->query('view'));
 
-        $query->orderBy('name');
+        ListQuery::filter($query, $request, null);
+        // Sans « sort » (listes déroulantes) : ordre alphabétique historique.
+        ListQuery::sort($query, $request, [
+            'nom' => 'clients.name',
+            'created_at' => 'clients.created_at',
+            'numero' => 'clients.prolab_code',
+        ], $request->filled('sort') ? ListQuery::DEFAULT_SORT : 'nom');
 
         if ($request->has('page') || $request->has('per_page')) {
             $perPage = (int) $request->query('per_page', 20);

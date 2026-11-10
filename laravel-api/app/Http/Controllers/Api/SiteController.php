@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\ListQuery;
 use App\Http\Controllers\Controller;
 use App\Models\Agency;
 use App\Models\Site;
@@ -30,11 +31,13 @@ class SiteController extends Controller
             });
         }
 
-        if ($clientId = $request->query('client_id')) {
-            $query->where('client_id', (int) $clientId);
-        }
-
-        $query->orderBy('name');
+        ListQuery::filter($query, $request);
+        ListQuery::sort($query, $request, [
+            'nom' => 'sites.name',
+            'created_at' => 'sites.created_at',
+            'numero' => 'sites.reference',
+            'client' => ListQuery::byClientName('sites'),
+        ], $request->filled('sort') ? ListQuery::DEFAULT_SORT : 'nom');
 
         if ($request->has('page') || $request->has('per_page')) {
             $perPage = (int) $request->query('per_page', 20);

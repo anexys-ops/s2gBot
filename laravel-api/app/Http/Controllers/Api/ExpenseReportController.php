@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\ListQuery;
 use App\Http\Controllers\Controller;
 use App\Models\ExpenseLine;
 use App\Models\ExpenseReport;
@@ -52,7 +53,13 @@ class ExpenseReportController extends Controller
                         });
                 });
             })
-            ->orderByDesc('id');
+            ;
+        ListQuery::filter($q, $request, null);
+        ListQuery::sort($q, $request, [
+            'created_at' => 'expense_reports.created_at',
+            'numero' => 'expense_reports.unique_number',
+            'statut' => 'expense_reports.statut',
+        ]);
 
         return response()->json($q->paginate(20));
     }

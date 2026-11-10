@@ -17,6 +17,7 @@ import StatusBadge from '../../components/ds/StatusBadge'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import TableRowActions from '../../components/TableRowActions'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { useListControls } from '../../hooks/useListControls'
 import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
 import { MATERIEL_HOME, MATERIEL_MODULE_TABS } from './materielModuleTabs'
@@ -90,19 +91,21 @@ export default function MaterielStocksPage() {
   const [stockFilter, setStockFilter] = useState<StockFilter>('')
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('')
   const [page, setPage] = useState(1)
+  const listControls = useListControls('stocks', () => setPage(1))
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [editing, setEditing] = useState<CommercialOffering | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<CommercialOffering | null>(null)
   const [form, setForm] = useState(emptyConsumableForm())
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['commercial-offerings', 'consommables', debouncedSearch, page],
+    queryKey: ['commercial-offerings', 'consommables', debouncedSearch, listControls.params, page],
     queryFn: () =>
       commercialOfferingsApi.list({
         search: debouncedSearch.trim() || undefined,
         kind: 'product',
         track_stock: true,
         per_page: 30,
+        ...listControls.params,
         page,
       }),
     enabled: isLab,
@@ -250,6 +253,9 @@ export default function MaterielStocksPage() {
           setPage(1)
         }}
         searchPlaceholder="Code, libellé, unité, description…"
+        listControls={listControls}
+        sortOptions={['created_at', 'nom', { key: 'numero', label: 'Code' }]}
+        periodFilter
         extra={
           <>
             <label className="list-table-toolbar__field list-table-toolbar__status">

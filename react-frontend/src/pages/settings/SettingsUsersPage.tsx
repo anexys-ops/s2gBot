@@ -16,6 +16,7 @@ import { canManageUsers } from '../../lib/settingsAccess'
 import ListTableToolbar, { PaginationBar } from '../../components/ListTableToolbar'
 import { ListTablePanelHeader } from '../../components/ListTablePanel'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { useListControls } from '../../hooks/useListControls'
 import { MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import { DEFAULT_EXPENSE_TAUX_KM } from '../../lib/expenseBareme'
 import { userPosteLabel, userRoleLabel, userRoleTone } from '../../lib/userRolePresentation'
@@ -110,6 +111,7 @@ export default function SettingsUsersPage() {
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [page, setPage] = useState(1)
+  const listControls = useListControls('users', () => setPage(1))
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [formTab, setFormTab] = useState<FormTab>('identite')
   const [editing, setEditing] = useState<User | null>(null)
@@ -121,8 +123,8 @@ export default function SettingsUsersPage() {
 
   const allowed = canManageUsers(me)
   const { data, isLoading, error } = useQuery({
-    queryKey: ['admin-users', debouncedSearch, page],
-    queryFn: () => adminUsersApi.list({ search: debouncedSearch.trim() || undefined, page }),
+    queryKey: ['admin-users', debouncedSearch, listControls.params, page],
+    queryFn: () => adminUsersApi.list({ search: debouncedSearch.trim() || undefined, ...listControls.params, page }),
     enabled: allowed,
     placeholderData: keepPreviousData,
   })
@@ -298,6 +300,10 @@ export default function SettingsUsersPage() {
           setPage(1)
         }}
         searchPlaceholder="Nom, e-mail, poste…"
+        listControls={listControls}
+        sortOptions={['created_at', 'nom', 'client']}
+        clientFilter
+        periodFilter
         extra={
           <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
             + Utilisateur

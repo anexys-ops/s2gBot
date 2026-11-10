@@ -23,6 +23,7 @@ import DocumentPdfPickerModal from '../../components/pdf/DocumentPdfPickerModal'
 import ExpenseLineModal from './ExpenseLineModal'
 import NdfSendEmailModal from './NdfSendEmailModal'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { useListControls } from '../../hooks/useListControls'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
 import { formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import './expense-reports.css'
@@ -610,6 +611,7 @@ export default function ExpenseReportsPage() {
   const [searchInput, setSearchInput] = useState('')
   const [filterStatut, setFilterStatut] = useState('')
   const [page, setPage] = useState(1)
+  const listControls = useListControls('expense-reports', () => setPage(1))
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const qc = useQueryClient()
 
@@ -624,11 +626,12 @@ export default function ExpenseReportsPage() {
   })
 
   const { data, isLoading } = useQuery({
-    queryKey: ['expense-reports', debouncedSearch, filterStatut, page],
+    queryKey: ['expense-reports', debouncedSearch, filterStatut, listControls.params, page],
     queryFn: () =>
       expenseReportsApi.list({
         search: debouncedSearch.trim() || undefined,
         statut: filterStatut || undefined,
+        ...listControls.params,
         page,
       }),
     placeholderData: keepPreviousData,
@@ -713,6 +716,9 @@ export default function ExpenseReportsPage() {
           statusValue={filterStatut}
           onStatusChange={(v) => { setFilterStatut(v); setPage(1) }}
           statusOptions={EXPENSE_STATUT_OPTIONS}
+          listControls={listControls}
+          sortOptions={['created_at', 'numero', 'statut']}
+          periodFilter
           columns={[
             { id: 'number', label: 'N° NDF' },
             { id: 'context', label: 'Contexte' },

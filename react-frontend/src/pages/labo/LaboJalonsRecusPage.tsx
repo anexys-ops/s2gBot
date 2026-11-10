@@ -10,6 +10,7 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import ListTableToolbar from '../../components/ListTableToolbar'
 import { ListTablePanelHeader } from '../../components/ListTablePanel'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { applyListControlsLocally, useListControls } from '../../hooks/useListControls'
 import { formatAppDate } from '../../lib/appLocale'
 
 const STATUS_OPTIONS = [
@@ -32,6 +33,7 @@ export default function LaboJalonsRecusPage() {
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statusFilter, setStatusFilter] = useState('a_traiter')
+  const listControls = useListControls('jalons-recus')
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['lab-jalons-recus', debouncedSearch],
@@ -40,8 +42,18 @@ export default function LaboJalonsRecusPage() {
   })
 
   const rows = useMemo(
-    () => (data?.data ?? []).filter((r) => statusFilter === 'tous' || r.echantillons_a_traiter > 0),
-    [data, statusFilter],
+    () =>
+      applyListControlsLocally(
+        (data?.data ?? []).filter((r) => statusFilter === 'tous' || r.echantillons_a_traiter > 0),
+        listControls,
+        {
+          created_at: (r) => r.derniere_reception_at,
+          nom: (r) => r.libelle,
+          client: (r) => r.client?.name,
+          clientId: (r) => r.client?.id,
+        },
+      ),
+    [data, statusFilter, listControls],
   )
 
   return (
@@ -66,6 +78,14 @@ export default function LaboJalonsRecusPage() {
         statusValue={statusFilter}
         onStatusChange={setStatusFilter}
         statusOptions={STATUS_OPTIONS}
+        listControls={listControls}
+        sortOptions={[
+          { key: 'created_at', label: 'Dernière réception' },
+          { key: 'nom', label: 'Jalon' },
+          'client',
+        ]}
+        clientFilter
+        periodFilter
       />
 
       <div className="card dossier-tab-panel dossier-tab-panel--table">

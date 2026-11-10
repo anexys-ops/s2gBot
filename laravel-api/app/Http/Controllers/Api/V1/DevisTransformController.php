@@ -26,6 +26,7 @@ class DevisTransformController extends Controller
 
         $data = $request->validate([
             'bc_client_en_attente' => 'sometimes|boolean',
+            'reference_bc_client' => 'sometimes|nullable|string|max:191',
             'jalon_ids' => 'sometimes|nullable|array',
             'jalon_ids.*' => 'string',
         ]);
@@ -36,6 +37,7 @@ class DevisTransformController extends Controller
                 $request->user(),
                 (bool) ($data['bc_client_en_attente'] ?? false),
                 array_key_exists('jalon_ids', $data) ? array_map('strval', $data['jalon_ids'] ?? []) : null,
+                $data['reference_bc_client'] ?? null,
             );
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);

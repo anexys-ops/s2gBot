@@ -9,6 +9,7 @@ import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { ListTableFootRow, ListTablePanelHeader } from '../components/ListTablePanel'
 import { sumNumeric } from '../lib/listTableTotals'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import { useListControls } from '../hooks/useListControls'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
 import ModuleEntityShell from '../components/module/ModuleEntityShell'
 import TableRowActions from '../components/TableRowActions'
@@ -53,8 +54,8 @@ export default function Sites() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
-  const [clientFilter, setClientFilter] = useState<string>('')
   const [page, setPage] = useState(1)
+  const listControls = useListControls('sites', () => setPage(1))
   const [siteToDelete, setSiteToDelete] = useState<Site | null>(null)
   const perPage = 20
   const { visible, toggle } = usePersistedColumnVisibility('sites', {
@@ -69,14 +70,12 @@ export default function Sites() {
     actions: true,
   })
 
-  const clientFilterId = clientFilter ? Number(clientFilter) : undefined
-
   const { data, isLoading, error } = useQuery({
-    queryKey: ['sites', 'paginated', debouncedSearch, clientFilter, page, perPage],
+    queryKey: ['sites', 'paginated', debouncedSearch, listControls.params, page, perPage],
     queryFn: () =>
       sitesApi.listPaginated({
         search: debouncedSearch.trim() || undefined,
-        client_id: clientFilterId && Number.isFinite(clientFilterId) ? clientFilterId : undefined,
+        ...listControls.params,
         page,
         per_page: perPage,
       }),
@@ -85,7 +84,7 @@ export default function Sites() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, clientFilter])
+  }, [debouncedSearch])
 
   const { data: clientsData } = useQuery({
     queryKey: ['clients', 'select-options'],
@@ -256,25 +255,10 @@ export default function Sites() {
         ]}
         visibleColumns={visible}
         onToggleColumn={toggle}
-        extra={
-          <label>
-            <span className="filter-label">Filtrer par client</span>
-            <select
-              value={clientFilter}
-              onChange={(e) => {
-                setClientFilter(e.target.value)
-                setPage(1)
-              }}
-            >
-              <option value="">Tous les clients</option>
-              {clients.map((c) => (
-                <option key={c.id} value={String(c.id)}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        }
+        listControls={listControls}
+        sortOptions={['created_at', 'nom', { key: 'numero', label: 'Référence' }, 'client']}
+        clientFilter={canManage}
+        periodFilter
       />
       <div className="card dossier-tab-panel dossier-tab-panel--table">
         <ListTablePanelHeader title="Chantiers" count={list.length} />

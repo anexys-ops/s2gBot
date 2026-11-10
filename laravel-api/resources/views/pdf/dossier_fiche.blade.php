@@ -4,137 +4,174 @@
     <meta charset="UTF-8">
     <title>Dossier {{ $dossier->reference }}</title>
     <style>
-        body { font-family: DejaVu Sans, sans-serif; font-size: 11px; color: #1a1a1a; margin: 0; padding: 20px; }
-        h1 { font-size: 17px; margin: 0 0 4px; }
-        h2 { font-size: 13px; margin: 18px 0 6px; border-bottom: 1px solid #ccc; padding-bottom: 3px; color: #333; }
-        .meta { margin: 3px 0; color: #444; }
-        .badge { display: inline-block; background: #e8f0fe; color: #1a56db; padding: 1px 7px; border-radius: 99px; font-size: 10px; font-weight: bold; }
-        .badge-statut { background: #fef3c7; color: #92400e; }
-        .grid2 { display: table; width: 100%; margin-top: 8px; }
-        .grid2-col { display: table-cell; width: 50%; vertical-align: top; padding-right: 12px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10.5px; }
-        th, td { border: 1px solid #d1d5db; padding: 5px 7px; text-align: left; vertical-align: top; }
-        th { background: #f3f4f6; font-weight: bold; }
-        .text-muted { color: #666; }
-        .section { margin-top: 16px; }
-        .label { font-weight: 600; min-width: 130px; display: inline-block; }
-        dl { margin: 0; }
-        dt { float: left; clear: left; min-width: 140px; font-weight: 600; color: #374151; margin-bottom: 4px; }
-        dd { margin-left: 150px; margin-bottom: 4px; }
-        .notes-box { border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 10px; background: #f9fafb; margin-top: 6px; white-space: pre-wrap; }
-        .footer { position: fixed; bottom: 15px; left: 20px; right: 20px; font-size: 9px; color: #999; border-top: 1px solid #e5e7eb; padding-top: 4px; display: flex; justify-content: space-between; }
+        @page { margin: 14mm 12mm; }
+        body { font-family: DejaVu Sans, sans-serif; font-size: 9.5px; color: #111; margin: 0; }
+        h1 { font-size: 14px; text-align: center; margin: 10px 0 12px; }
+        h2 { font-size: 10.5px; margin: 12px 0 4px; }
+        table { width: 100%; border-collapse: collapse; }
+        td, th { border: 1px solid #333; padding: 4px 5px; vertical-align: top; }
+        .lbl { background: #f9c9a0; font-weight: bold; width: 16%; }
+        .lbl-sm { background: #f9c9a0; font-weight: bold; width: 9%; }
+        .tall { height: 34px; }
+        .box { display: inline-block; width: 8px; height: 8px; border: 1px solid #333; margin-right: 4px; vertical-align: middle; }
+        .box.on { background: #333; }
+        .noborder td { border: none; padding: 2px 0; }
+        .head th { background: #f9c9a0; text-align: center; }
+        .line { display: inline-block; border-bottom: 1px solid #333; min-width: 120px; }
+        .right { text-align: right; }
+        .muted { color: #555; }
     </style>
 </head>
 <body>
 @php
-    $statuts = [
-        'brouillon' => 'Brouillon',
-        'en_cours' => 'En cours',
-        'cloture' => 'Clôturé',
-        'archive' => 'Archivé',
-    ];
-    $statutLabel = $statuts[$dossier->statut] ?? $dossier->statut;
+    $client = $dossier->client;
+    // Devis de référence : le premier devis du dossier (celui qui l'a ouvert).
+    $quote = $dossier->quotes->sortBy('id')->first();
+    $bc = $quote?->bonsCommande?->sortBy('id')->first();
+    $contact = $quote?->clientContact
+        ?? $client?->contacts?->firstWhere('is_principal', true)
+        ?? $client?->contacts?->first();
+    $dossierContact = $contact ? null : $dossier->contacts->first();
+    $contactNom = $contact
+        ? trim(($contact->prenom ?? '').' '.($contact->nom ?? ''))
+        : ($dossierContact ? trim(($dossierContact->prenom ?? '').' '.($dossierContact->nom ?? '')) : '');
+    $contactGsm = $contact?->telephone_mobile ?? $dossierContact?->telephone ?? '';
+    $contactFixe = $contact?->telephone_direct ?? '';
+    $contactEmail = $contact?->email ?? $dossierContact?->email ?? '';
+    $adresse = trim(implode(' ', array_filter([$client?->address, $client?->postal_code, $client?->city])));
+    $etabliPar = $dossier->createur?->name ?? '';
+    $fmt = fn ($d) => $d ? \Carbon\Carbon::parse($d)->format('d/m/Y') : '';
 @endphp
 
 @include('pdf.partials.branding-header', ['layoutConfig' => [], 'brandingLogoDataUri' => $brandingLogoDataUri ?? null])
 
-<h1>Fiche dossier — {{ $dossier->reference }}</h1>
-<p style="margin:2px 0 10px; font-size:13px; color:#374151;">{{ $dossier->titre }}</p>
+<h1>Dossier N° : &nbsp; {{ $dossier->reference }}</h1>
 
-<span class="badge badge-statut">{{ $statutLabel }}</span>
-@if($dossier->centreGroup)
-<span class="badge" style="margin-left:6px;">{{ $dossier->centreGroup->name }}</span>
-@endif
+<h2>1. Information générales sur le client :</h2>
+<table>
+    <tr>
+        <td class="lbl">Nom du client</td>
+        <td>{{ $client?->name }}</td>
+        <td class="lbl-sm">Code</td>
+        <td style="width:14%">{{ $client?->prolab_code }}</td>
+    </tr>
+    <tr>
+        <td class="lbl">Adresse</td>
+        <td colspan="3">{{ $adresse }}</td>
+    </tr>
+</table>
 
-<div class="section">
-    <h2>Informations générales</h2>
-    <dl>
-        <dt>Client</dt>
-        <dd>{{ $dossier->client?->name ?? '—' }}</dd>
-        <dt>Chantier</dt>
-        <dd>{{ $dossier->site?->name ?? '—' }}</dd>
-        @if($dossier->mission)
-        <dt>Mission</dt>
-        <dd>{{ $dossier->mission->reference }}{{ $dossier->mission->title ? ' — '.$dossier->mission->title : '' }}</dd>
-        @endif
-        <dt>Date début</dt>
-        <dd>{{ $dossier->date_debut?->format('d/m/Y') ?? '—' }}</dd>
-        @if($dossier->date_fin_prevue)
-        <dt>Date fin prévue</dt>
-        <dd>{{ $dossier->date_fin_prevue->format('d/m/Y') }}</dd>
-        @endif
-        @if($dossier->maitre_ouvrage)
-        <dt>Maître d'ouvrage</dt>
-        <dd>{{ $dossier->maitre_ouvrage }}</dd>
-        @endif
-        @if($dossier->entreprise_chantier)
-        <dt>Entreprise chantier</dt>
-        <dd>{{ $dossier->entreprise_chantier }}</dd>
-        @endif
-        <dt>Créé par</dt>
-        <dd>{{ $dossier->createur?->name ?? '—' }}</dd>
-        <dt>Créé le</dt>
-        <dd>{{ $dossier->created_at?->format('d/m/Y') ?? '—' }}</dd>
-    </dl>
-</div>
+<h2>Contact principal :</h2>
+<table>
+    <tr>
+        <td class="lbl">Nom :</td>
+        <td style="width:40%">{{ $contactNom }}</td>
+        <td class="lbl-sm">GSM :</td>
+        <td>{{ $contactGsm }}</td>
+    </tr>
+    <tr>
+        <td class="lbl">E-mail :</td>
+        <td>{{ $contactEmail }}</td>
+        <td class="lbl-sm">Fixe :</td>
+        <td>{{ $contactFixe }}</td>
+    </tr>
+</table>
 
-@if($dossier->contacts && $dossier->contacts->count() > 0)
-<div class="section">
-    <h2>Contacts</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Nom</th>
-                <th>Rôle</th>
-                <th>Email</th>
-                <th>Téléphone</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($dossier->contacts as $contact)
-            <tr>
-                <td>{{ $contact->prenom ? $contact->prenom.' ' : '' }}{{ $contact->nom }}</td>
-                <td>{{ $contact->role ?? '—' }}</td>
-                <td>{{ $contact->email ?? '—' }}</td>
-                <td>{{ $contact->telephone ?? '—' }}</td>
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
-</div>
-@endif
+<h2>2. Informations sur le projet :</h2>
+<table>
+    <tr>
+        <td class="lbl tall">Projet :</td>
+        <td colspan="3">{{ $dossier->site?->name ?? $dossier->titre }}</td>
+    </tr>
+    <tr>
+        <td class="lbl">Entreprise/MO :</td>
+        <td style="width:40%">{{ collect([$dossier->entreprise_chantier, $dossier->maitre_ouvrage])->filter()->implode(' / ') }}</td>
+        <td class="lbl-sm">Code :</td>
+        <td>{{ $dossier->site?->reference }}</td>
+    </tr>
+</table>
 
-@if($dossier->quotes && $dossier->quotes->count() > 0)
-<div class="section">
-    <h2>Devis ({{ $dossier->quotes->count() }})</h2>
-    <table>
-        <thead>
-            <tr><th>N°</th><th>Date</th><th>Statut</th><th>Total HT</th></tr>
-        </thead>
-        <tbody>
-            @foreach($dossier->quotes as $q)
-            <tr>
-                <td>{{ $q->number }}</td>
-                <td>{{ $q->quote_date ? \Carbon\Carbon::parse($q->quote_date)->format('d/m/Y') : '—' }}</td>
-                <td>{{ $q->status }}</td>
-                <td class="text-right">{{ number_format((float)($q->total_ht ?? 0), 2, ',', ' ') }} DH</td>
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
-</div>
-@endif
+<h2>Type de prestations</h2>
+<table>
+    <tr>
+        <td><span class="box"></span>Étude Géotechniques</td>
+        <td><span class="box"></span>Essai de laboratoire</td>
+        <td><span class="box"></span>Expertise technique</td>
+        <td><span class="box"></span>Études spéciales</td>
+    </tr>
+    <tr>
+        <td><span class="box"></span>Contrôle de qualité</td>
+        <td><span class="box"></span>Avis technique</td>
+        <td><span class="box"></span>Études Géophysique</td>
+        <td><span class="box"></span>Recherche du Innovation</td>
+    </tr>
+</table>
 
-@if($dossier->notes)
-<div class="section">
-    <h2>Notes</h2>
-    <div class="notes-box">{{ $dossier->notes }}</div>
-</div>
-@endif
+<h2>3. Détail du dossier</h2>
+<table>
+    <tr>
+        <td><strong>Devis N° :</strong> {{ $quote?->number }}</td>
+        <td><strong>Etablie par :</strong> {{ $etabliPar }}</td>
+        <td><strong>Date :</strong> {{ $fmt($quote?->quote_date) }}</td>
+        <td><strong>Date BCC :</strong> {{ $bc ? $fmt($bc->date_commande) : '…/…/….' }}</td>
+    </tr>
+</table>
+<table style="border-top:none">
+    <tr>
+        <td class="lbl" rowspan="2" style="width:22%">Documents inclus dans le dossier :</td>
+        <td><span class="box"></span>Plans</td>
+        <td><span class="box"></span>Cahier des charges / Tdr</td>
+    </tr>
+    <tr>
+        <td><span class="box"></span>Documents préliminaires</td>
+        <td><span class="box"></span>Autres : ……………………………</td>
+    </tr>
+    <tr>
+        <td class="lbl">Priorité et délai :</td>
+        <td colspan="2">
+            Urgence : &nbsp;
+            <span class="box"></span>Normale &nbsp;&nbsp;
+            <span class="box"></span>Prioritaire &nbsp;&nbsp;
+            <span class="box"></span>Très urgente
+        </td>
+    </tr>
+</table>
 
-<div class="footer">
-    <span>{{ $dossier->reference }} — {{ $dossier->titre }}</span>
-    <span>Imprimé le {{ now()->format('d/m/Y à H:i') }}</span>
-</div>
+<h2>Observation ou instructions spécifiques :</h2>
+<p style="margin:2px 0 8px">{{ $dossier->notes ?: '……………………………………………………………………………………………………………………………………………………' }}</p>
+
+<h2>Réception Service Technique</h2>
+<table class="noborder">
+    <tr>
+        <td>Nom : <span class="line" style="min-width:160px">&nbsp;</span></td>
+        <td>Visa : <span class="line" style="min-width:160px">&nbsp;</span></td>
+        <td>Date : <span class="line">&nbsp;</span></td>
+    </tr>
+</table>
+
+<h2>4. Affectation interne :</h2>
+<table>
+    <tr class="head">
+        <th colspan="2" style="width:50%">Responsable dossier</th>
+        <th>Date d'affectation</th>
+        <th>Heure</th>
+    </tr>
+    <tr>
+        <td class="lbl" style="width:12%">Nom:</td>
+        <td>&nbsp;</td>
+        <td>&nbsp;</td>
+        <td>&nbsp;</td>
+    </tr>
+    <tr>
+        <td class="lbl">Fonction :</td>
+        <td>&nbsp;</td>
+        <td>&nbsp;</td>
+        <td>&nbsp;</td>
+    </tr>
+</table>
+
+<p style="margin-top:12px"><strong>Délai de traitement souhaité :</strong> <span class="line" style="min-width:200px">&nbsp;</span></p>
+
+<p class="right" style="margin-top:14px"><strong>Établie par :</strong> {{ $etabliPar }}</p>
 </body>
 </html>

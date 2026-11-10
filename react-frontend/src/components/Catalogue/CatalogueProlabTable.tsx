@@ -7,6 +7,8 @@ import { formatRefArticlePrice, formatTvaPercent } from '../../lib/catalogueForm
 type Props = {
   articles: RefArticleRow[]
   isLoading?: boolean
+  /** Articles déjà triés par la vue (tri commun « Trier par ») : ne pas re-trier par famille. */
+  keepOrder?: boolean
   visibleColumns: Record<string, boolean>
 }
 
@@ -33,9 +35,9 @@ function sortArticles(articles: RefArticleRow[]): RefArticleRow[] {
   })
 }
 
-export default function CatalogueProlabTable({ articles, isLoading, visibleColumns }: Props) {
+export default function CatalogueProlabTable({ articles, isLoading, visibleColumns, keepOrder = false }: Props) {
   const navigate = useNavigate()
-  const sorted = useMemo(() => sortArticles(articles), [articles])
+  const sorted = useMemo(() => (keepOrder ? articles : sortArticles(articles)), [articles, keepOrder])
 
   if (isLoading) {
     return <p className="text-muted">Chargement des articles…</p>

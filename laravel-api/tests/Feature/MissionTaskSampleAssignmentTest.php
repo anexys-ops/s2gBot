@@ -123,6 +123,41 @@ class MissionTaskSampleAssignmentTest extends TestCase
         return [$terrainTask, $laboTask, $lab, $bc];
     }
 
+    public function test_closing_terrain_mission_links_its_fold_to_the_labo_task_then_transco_after_reception(): void
+    {
+        [$terrainTask, $laboTask, $lab, $bc] = $this->seedJalonWithTerrainAndLaboTasks();
+        $this->orderItemId();
+        // Deuxième tâche labo du même produit : le FOLD ne doit aller qu'à une seule (la première libre).
+        $secondLabo = OrdreMissionLigne::query()->create([
+            'ordre_mission_id' => $laboTask->ordreMissionLigne->ordre_mission_id,
+            'bon_commande_ligne_id' => $laboTask->ordreMissionLigne->bon_commande_ligne_id,
+            'ref_article_id' => $laboTask->ordreMissionLigne->ref_article_id,
+            'libelle' => 'Essai compression', 'quantite' => 1, 'statut' => 'a_faire', 'ordre' => 1,
+        ])->ensureTaskExists();
+
+        $this->actingAs($lab, 'sanctum')->postJson("/api/mission-tasks/{$terrainTask->id}/close-reception", [
+            'pv_numbers' => ['0152820'],
+            'quantity_unit' => 'U',
+            'quantity_count' => 1,
+        ])->assertOk()->assertJsonPath('samples_created', 1);
+
+        $sample = Sample::query()->where('task_id', $terrainTask->id)->firstOrFail();
+        $this->assertSame([$sample->id], $laboTask->fresh()->samples()->pluck('samples.id')->all());
+        $this->assertSame(0, $secondLabo->fresh()->samples()->count());
+
+        $this->actingAs($lab, 'sanctum')->patchJson("/api/v1/samples/{$sample->id}/receive", [
+            'condition_state' => 'bon',
+        ])->assertOk();
+        $transco = $sample->fresh()->transco_number;
+        $this->assertNotEmpty($transco);
+        $this->assertNotNull($laboTask->fresh()->planned_date);
+
+        $board = collect($this->actingAs($lab, 'sanctum')->getJson('/api/mission-tasks/labo')->assertOk()->json());
+        $row = $board->firstWhere('id', $laboTask->id);
+        $this->assertSame($transco, $row['samples'][0]['transco_number']);
+        $this->assertSame(['0152820'], $row['samples'][0]['task']['pv_numbers']);
+    }
+
     public function test_labo_task_lists_only_same_jalon_samples_by_default(): void
     {
         [$terrainTask, $laboTask, $lab, $bc] = $this->seedJalonWithTerrainAndLaboTasks();

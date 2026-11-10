@@ -26,6 +26,7 @@ class CommercialDocumentWorkflowService
         User $user,
         bool $bcClientEnAttente = false,
         ?array $jalonIds = null,
+        ?string $referenceBcClient = null,
     ): BonCommande
     {
         if (! $quote->dossier_id) {
@@ -38,14 +39,16 @@ class CommercialDocumentWorkflowService
 
         $quote->load('quoteLines');
 
-        return DB::transaction(function () use ($quote, $user, $bcClientEnAttente, $jalonIds) {
-            $numero = $this->sequences->next(
-                DocumentSequence::TYPE_BON_COMMANDE,
-                ClientFilialeResolver::codeForQuote($quote),
-            );
-
+        return DB::transaction(function () use ($quote, $user, $bcClientEnAttente, $jalonIds, $referenceBcClient) {
             $centreGroupId = $quote->lab_centre_group_id
                 ?: Dossier::query()->whereKey($quote->dossier_id)->value('lab_centre_group_id');
+            $numero = $this->sequences->next(
+                DocumentSequence::TYPE_BON_COMMANDE,
+                ClientFilialeResolver::codeForCentre(
+                    $centreGroupId ? (int) $centreGroupId : null,
+                    ClientFilialeResolver::codeForQuote($quote),
+                ),
+            );
 
             $bc = BonCommande::query()->create([
                 'numero' => $numero,
@@ -56,6 +59,7 @@ class CommercialDocumentWorkflowService
                 'contact_id' => $quote->contact_id,
                 'statut' => BonCommande::STATUT_BROUILLON,
                 'bc_client_en_attente' => $bcClientEnAttente,
+                'reference_bc_client' => ($referenceBcClient !== null && trim($referenceBcClient) !== '') ? trim($referenceBcClient) : null,
                 'date_commande' => now()->toDateString(),
                 'date_livraison_prevue' => $quote->site_delivery_date,
                 'montant_ht' => $quote->amount_ht,

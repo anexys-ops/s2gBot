@@ -17,6 +17,7 @@ use App\Models\TaskResult;
 use App\Services\TaskFormAssignmentService;
 use App\Services\MissionTaskStatusService;
 use App\Services\DevisJalonResolver;
+use App\Services\LabTaskSampleLinker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +30,7 @@ class MissionTaskController extends Controller
         private readonly TaskFormAssignmentService $formAssignments,
         private readonly MissionTaskStatusService $statusSync,
         private readonly DevisJalonResolver $jalonResolver,
+        private readonly LabTaskSampleLinker $labLinker,
     ) {}
 
     /** Ajoute N jours ouvrés (saute samedi/dimanche) à une date. */
@@ -380,7 +382,8 @@ class MissionTaskController extends Controller
                     if (Schema::getConnection()->getDriverName() === 'sqlite') {
                         $sampleData['order_item_id'] = OrderItem::query()->value('id');
                     }
-                    Sample::query()->create($sampleData);
+                    // Le FOLD de cette mission va directement aux tâches labo du jalon.
+                    $this->labLinker->linkSample(Sample::query()->create($sampleData));
                     $created++;
                 }
             }
@@ -537,7 +540,8 @@ class MissionTaskController extends Controller
                 'ordreMissionLigne.articleAction.measureConfigs',
                 'measures.measureConfig',
                 'result',
-                'samples:id,fold_number',
+                'samples:id,fold_number,transco_number,status,received_at,task_id',
+                'samples.task:id,unique_number,statut,pv_numbers',
             ]);
 
         if ($uid = $request->integer('user_id')) {

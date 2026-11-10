@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Agency;
 use App\Models\Invoice;
+use App\Models\LabCentreGroup;
 use App\Models\Quote;
 use App\Models\Site;
 use App\Models\User;
@@ -19,6 +20,22 @@ final class ClientFilialeResolver
         $normalized = strtoupper(trim((string) $code));
 
         return $normalized !== '' ? $normalized : 'HQ';
+    }
+
+    /**
+     * Suffixe des numéros de documents : code du centre labo (ex. « MO ») quand le document en a
+     * un, sinon le code filiale client / « HQ » ($fallback). Limité à 10 caractères (colonne
+     * document_sequences.agency_code).
+     */
+    public static function codeForCentre(?int $centreGroupId, string $fallback): string
+    {
+        if (! $centreGroupId) {
+            return $fallback;
+        }
+        $code = LabCentreGroup::query()->whereKey($centreGroupId)->value('code');
+        $code = substr(strtoupper(trim((string) $code)), 0, 10);
+
+        return $code !== '' ? $code : $fallback;
     }
 
     public static function headquartersId(int $clientId): ?int

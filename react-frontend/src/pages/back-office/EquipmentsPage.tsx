@@ -10,6 +10,7 @@ import { ListTablePanelHeader } from '../../components/ListTablePanel'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import EquipmentCreateModal from '../../components/materiel/EquipmentCreateModal'
 import EquipmentEditModal from '../../components/materiel/EquipmentEditModal'
+import { useListControls } from '../../hooks/useListControls'
 import { MATERIEL_MODULE_TABS } from '../materiel/materielModuleTabs'
 
 const STATUS_OPTIONS = [
@@ -59,10 +60,11 @@ export default function EquipmentsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<EquipmentRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<EquipmentRow | null>(null)
+  const listControls = useListControls('equipments')
 
   const { data: rows = [], isLoading, error } = useQuery({
-    queryKey: ['equipments', status],
-    queryFn: () => equipmentsApi.list(status ? { status } : undefined),
+    queryKey: ['equipments', status, listControls.params],
+    queryFn: () => equipmentsApi.list({ ...(status ? { status } : {}), ...listControls.params }),
     enabled: isLab,
   })
 
@@ -118,6 +120,9 @@ export default function EquipmentsPage() {
         statusValue={status}
         onStatusChange={setStatus}
         statusOptions={STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        listControls={listControls}
+        sortOptions={['created_at', { key: 'numero', label: 'Code' }, 'nom', 'statut']}
+        periodFilter
         footer={
           hasActiveFilters ? (
             <>

@@ -15,7 +15,9 @@ import StatusBadge, { ordreMissionStatutBadgeProps, ORDRE_MISSION_STATUT_LABELS 
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import StatusChangeModal from '../../components/StatusChangeModal'
 import OdmGenerationModal from '../../components/ordres-mission/OdmGenerationModal'
+import ListTableToolbar from '../../components/ListTableToolbar'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { useListControls } from '../../hooks/useListControls'
 import { useAuth } from '../../contexts/AuthContext'
 import { ordreMissionBonCommande, ordreMissionDossier, ordreMissionDossierId } from '../../lib/ordreMissionDisplay'
 import { formatAppDate } from '../../lib/appLocale'
@@ -70,6 +72,8 @@ export default function OrdresMissionPage() {
   const typeFromUrl = parseOmType(searchParams.get('type'))
   const [typeFilter, setTypeFilter] = useState<OmType | ''>(() => typeFromUrl)
   const [statutFilter, setStatutFilter] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const listControls = useListControls('ordres-mission')
   const [showGenerationModal, setShowGenerationModal] = useState(false)
   const [selectedBcForGeneration, setSelectedBcForGeneration] = useState<number | null>(null)
   const [bcSearch, setBcSearch] = useState('')
@@ -94,12 +98,13 @@ export default function OrdresMissionPage() {
   }
 
   const { data: ordres = [], isLoading } = useQuery({
-    queryKey: ['ordres-mission', typeFilter, statutFilter, bcFilterFromUrl],
+    queryKey: ['ordres-mission', typeFilter, statutFilter, bcFilterFromUrl, listControls.params],
     queryFn: () =>
       ordresMissionApi.list({
         type: typeFilter || undefined,
         statut: statutFilter || undefined,
         bon_commande_id: bcFilterFromUrl ? Number(bcFilterFromUrl) : undefined,
+        ...listControls.params,
       }),
     staleTime: 30_000,
   })
@@ -169,16 +174,22 @@ export default function OrdresMissionPage() {
     en_cours: ordres.filter((o) => o.type === type && o.statut === 'en_cours').length,
   }))
 
+  /** Ordre fourni par l'API (tri commun « Trier par ») ; recherche locale sur numéro, client, dossier, chantier, BC. */
   const displayedOrdres = useMemo(() => {
-    const list = typeFilter ? ordres.filter((o) => o.type === typeFilter) : ordres
-    return [...list].sort((a, b) => {
-      const bcA = ordreMissionBonCommande(a)?.numero ?? ''
-      const bcB = ordreMissionBonCommande(b)?.numero ?? ''
-      if (bcA !== bcB) return bcB.localeCompare(bcA, 'fr')
-      const typeIdx = (t: string) => TYPE_ORDER.indexOf(t as OmType)
-      return typeIdx(a.type) - typeIdx(b.type)
+    const needle = searchInput.trim().toLowerCase()
+    return ordres.filter((o) => {
+      if (typeFilter && o.type !== typeFilter) return false
+      if (!needle) return true
+      const dossier = ordreMissionDossier(o)
+      return [
+        o.numero,
+        o.client?.name,
+        dossier?.reference,
+        o.site?.name ?? dossier?.site?.name,
+        ordreMissionBonCommande(o)?.numero,
+      ].some((v) => (v ?? '').toLowerCase().includes(needle))
     })
-  }, [ordres, typeFilter])
+  }, [ordres, typeFilter, searchInput])
 
   return (
     <ModuleEntityShell
@@ -349,20 +360,32 @@ export default function OrdresMissionPage() {
         />
       ) : null}
 
-      {/* Filtres */}
-      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <select value={typeFilter} onChange={(e) => setTypeFilterAndUrl(parseOmType(e.target.value || null))} style={{ flex: '1 1 160px', maxWidth: 220 }}>
-          <option value="">— Les 3 types —</option>
-          {TYPE_ORDER.map((v) => <option key={v} value={v}>{TYPE_META[v].label}</option>)}
-        </select>
-        <select value={statutFilter} onChange={(e) => setStatutFilter(e.target.value)} style={{ flex: '1 1 160px', maxWidth: 200 }}>
-          <option value="">— Tous statuts —</option>
-          {Object.entries(STATUT_META).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <Link to="/ordres-mission/planning" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }}>
-          📅 Planning
-        </Link>
-      </div>
+      <ListTableToolbar
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder="N° OdM, client, dossier, chantier, BC…"
+        statusValue={statutFilter}
+        onStatusChange={setStatutFilter}
+        statusOptions={Object.entries(STATUT_META).map(([value, label]) => ({ value, label }))}
+        extra={
+          <>
+            <label className="list-table-toolbar__field">
+              <span className="filter-label">Type</span>
+              <select value={typeFilter} onChange={(e) => setTypeFilterAndUrl(parseOmType(e.target.value || null))}>
+                <option value="">Les 3 types</option>
+                {TYPE_ORDER.map((v) => <option key={v} value={v}>{TYPE_META[v].label}</option>)}
+              </select>
+            </label>
+            <Link to="/ordres-mission/planning" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-end' }}>
+              📅 Planning
+            </Link>
+          </>
+        }
+        listControls={listControls}
+        sortOptions={['created_at', { key: 'date', label: 'Date prévue' }, 'numero', 'client', 'statut']}
+        clientFilter
+        periodFilter
+      />
 
       {isLoading && <p>Chargement…</p>}
       {!isLoading && (

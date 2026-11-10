@@ -10,6 +10,7 @@ import CatalogueArticleCreateModal from '../../components/Catalogue/CatalogueArt
 import ListTableToolbar from '../../components/ListTableToolbar'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
+import { applyListControlsLocally, useListControls } from '../../hooks/useListControls'
 
 type CatalogueViewMode = 'table' | 'list' | 'tree'
 
@@ -88,6 +89,18 @@ export default function CatalogueListePage() {
       }),
     enabled: needsFlatArticles,
   })
+
+  const listControls = useListControls('catalogue-articles')
+  /** Même « Trier par » que les autres listes ; pas de date de création exposée : l'ordre d'id en tient lieu. */
+  const sortedArticles = useMemo(
+    () =>
+      applyListControlsLocally(articlesFlat, listControls, {
+        created_at: (a) => a.id,
+        numero: (a) => a.code,
+        nom: (a) => a.libelle,
+      }),
+    [articlesFlat, listControls],
+  )
 
   const hasActiveFilters =
     search.trim() !== '' ||
@@ -189,6 +202,8 @@ export default function CatalogueListePage() {
           }
           visibleColumns={viewMode === 'table' ? visible : undefined}
           onToggleColumn={viewMode === 'table' ? toggle : undefined}
+          listControls={viewMode === 'tree' ? undefined : listControls}
+          sortOptions={['created_at', { key: 'numero', label: 'Code' }, { key: 'nom', label: 'Libellé' }]}
           extra={
             <>
               <label className="catalogue-liste__famille-field">
@@ -362,12 +377,12 @@ export default function CatalogueListePage() {
                 </p>
               </div>
             )}
-            <CatalogueProlabTable articles={articlesFlat} isLoading={loadingFlat} visibleColumns={visible} />
+            <CatalogueProlabTable articles={sortedArticles} isLoading={loadingFlat} visibleColumns={visible} keepOrder />
           </>
         )}
 
         {viewMode === 'list' && (
-          <CatalogueProlabListe articles={articlesFlat} isLoading={loadingFlat} />
+          <CatalogueProlabListe articles={sortedArticles} isLoading={loadingFlat} keepOrder />
         )}
 
         {viewMode === 'tree' && (

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\ListQuery;
 use App\Http\Controllers\Controller;
 use App\Models\Agency;
 use App\Models\User;
@@ -18,7 +19,13 @@ class UserManagementController extends Controller
     {
         $this->authorizeUsers($request);
 
-        $q = User::query()->with(['client', 'site', 'agency', 'accessGroups', 'agencies'])->orderBy('name');
+        $q = User::query()->with(['client', 'site', 'agency', 'accessGroups', 'agencies']);
+        ListQuery::filter($q, $request);
+        ListQuery::sort($q, $request, [
+            'nom' => 'users.name',
+            'created_at' => 'users.created_at',
+            'client' => ListQuery::byClientName('users'),
+        ], $request->filled('sort') ? ListQuery::DEFAULT_SORT : 'nom');
 
         if ($search = trim((string) $request->query('search', ''))) {
             $q->where(function ($qq) use ($search) {

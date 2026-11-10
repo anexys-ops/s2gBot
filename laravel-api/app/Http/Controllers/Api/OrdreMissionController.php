@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\ListQuery;
 use App\Http\Controllers\Controller;
 use App\Models\ArticleAction;
 use App\Models\BonCommande;
@@ -76,9 +77,16 @@ class OrdreMissionController extends Controller
             $q->where('date_prevue', '<=', $to);
         }
 
-        return response()->json(
-            $q->orderByDesc('id')->get()
-        );
+        ListQuery::filter($q, $request);
+        ListQuery::sort($q, $request, [
+            'created_at' => 'ordres_mission.created_at',
+            'date' => 'ordres_mission.date_prevue',
+            'numero' => 'ordres_mission.numero',
+            'client' => ListQuery::byClientName('ordres_mission'),
+            'statut' => 'ordres_mission.statut',
+        ]);
+
+        return response()->json($q->get());
     }
 
     public function show(OrdreMission $ordreMission): JsonResponse

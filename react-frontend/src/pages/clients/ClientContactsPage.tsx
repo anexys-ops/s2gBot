@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { clientContactsApi, clientsApi, type ClientContactRow } from '../../api/client'
@@ -15,6 +15,7 @@ import Modal from '../../components/Modal'
 import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import TableRowActions from '../../components/TableRowActions'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { applyListControlsLocally, useListControls } from '../../hooks/useListControls'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
 import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
 
@@ -59,11 +60,20 @@ function contactTypeVariant(type?: string | null): StatusBadgeVariant {
 export default function ClientContactsPage() {
   const qc = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
+  const listControls = useListControls('client-contacts')
   const clientFilterRaw = searchParams.get('client')
-  const clientFilterId =
+  const urlClientId =
     clientFilterRaw && Number.isFinite(Number(clientFilterRaw)) && Number(clientFilterRaw) > 0
       ? Number(clientFilterRaw)
       : null
+  // Lien « ?client= » (fiche client) : reporté dans le filtre client commun de la liste.
+  const { setClientId } = listControls
+  useEffect(() => {
+    if (urlClientId == null) return
+    setClientId(urlClientId)
+    setSearchParams({}, { replace: true })
+  }, [urlClientId, setClientId, setSearchParams])
+  const clientFilterId = urlClientId ?? (listControls.clientId || null)
 
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
@@ -116,8 +126,13 @@ export default function ClientContactsPage() {
     if (typeFilter) {
       list = list.filter((c) => (c.contact_type ?? 'commercial') === typeFilter)
     }
-    return list
-  }, [clientFilterId, contactsRaw, debouncedSearch, typeFilter])
+    return applyListControlsLocally(list, { ...listControls, clientId: clientFilterId ?? '' }, {
+      created_at: (c) => c.created_at,
+      nom: (c) => [c.nom, c.prenom].filter(Boolean).join(' '),
+      client: (c) => c.client?.name,
+      clientId: (c) => c.client_id,
+    })
+  }, [clientFilterId, contactsRaw, debouncedSearch, typeFilter, listControls])
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients', 'contacts-pick'],
@@ -133,13 +148,11 @@ export default function ClientContactsPage() {
     )
   }, [clientFilterId, clients, contactsRaw])
 
-  const hasActiveFilters =
-    debouncedSearch.trim() !== '' || typeFilter !== '' || clientFilterId != null
+  const hasActiveFilters = debouncedSearch.trim() !== '' || typeFilter !== ''
 
   const clearAllFilters = () => {
     setSearchInput('')
     setTypeFilter('')
-    if (clientFilterId) setSearchParams({})
   }
 
   const createMut = useMutation({
@@ -221,9 +234,9 @@ export default function ClientContactsPage() {
           ← Liste clients
         </Link>
         {clientFilterId ? (
-          <Link to="/clients/contacts" className="btn btn-secondary btn-sm">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => listControls.setClientId('')}>
             Tous les contacts
-          </Link>
+          </button>
         ) : null}
         <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
           Nouveau contact
@@ -266,6 +279,10 @@ export default function ClientContactsPage() {
         ]}
         visibleColumns={visible}
         onToggleColumn={toggle}
+        listControls={listControls}
+        sortOptions={['created_at', 'nom', 'client']}
+        clientFilter
+        periodFilter
         extra={
           <label>
             <span className="filter-label">Type de contact</span>
@@ -283,19 +300,6 @@ export default function ClientContactsPage() {
           hasActiveFilters ? (
             <>
               <span className="list-table-toolbar__footer-label">Filtres actifs</span>
-              {clientFilterId && filteredClientName ? (
-                <span className="list-table-toolbar__chip">
-                  <span className="list-table-toolbar__chip-text">Client : {filteredClientName}</span>
-                  <button
-                    type="button"
-                    className="list-table-toolbar__chip-remove"
-                    onClick={() => setSearchParams({})}
-                    aria-label="Retirer le filtre client"
-                  >
-                    ×
-                  </button>
-                </span>
-              ) : null}
               {debouncedSearch.trim() !== '' ? (
                 <span className="list-table-toolbar__chip">
                   <span className="list-table-toolbar__chip-text">

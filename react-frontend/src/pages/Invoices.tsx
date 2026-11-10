@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import {
-  clientsApi,
   invoicesApi,
   type Invoice,
 } from '../api/client'
@@ -24,6 +23,7 @@ import { ListTableFootRow, ListTablePanelHeader } from '../components/ListTableP
 import { sumNumeric } from '../lib/listTableTotals'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
+import { useListControls } from '../hooks/useListControls'
 import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
 import { invoiceEmailRecipient, invoiceWhatsAppPhone } from '../lib/invoiceEmailRecipient'
 import {
@@ -229,9 +229,9 @@ export default function Invoices() {
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statusFilter, setStatusFilter] = useState('')
-  const [clientFilter, setClientFilter] = useState('')
   const [quickFilter, setQuickFilter] = useState<InvoiceQuickFilter>('')
   const [page, setPage] = useState(1)
+  const listControls = useListControls('invoices', () => setPage(1))
   const { visible, toggle } = usePersistedColumnVisibility('invoices', {
     number: true,
     client: true,
@@ -261,21 +261,15 @@ export default function Invoices() {
     setToast({ message, variant })
   }
 
-  const { data: clientsList = [] } = useQuery({
-    queryKey: ['clients', 'invoices-toolbar'],
-    queryFn: () => clientsApi.list(),
-    enabled: isLab,
-  })
-
   const { data, isLoading, error } = useQuery({
-    queryKey: ['invoices', debouncedSearch, statusFilter, clientFilter, quickFilter, page],
+    queryKey: ['invoices', debouncedSearch, statusFilter, quickFilter, page, listControls.params],
     queryFn: () =>
       invoicesApi.list({
         search: debouncedSearch.trim() || undefined,
         status: statusFilter || undefined,
         page,
-        client_id: clientFilter ? Number(clientFilter) : undefined,
         quick_filter: quickFilter || undefined,
+        ...listControls.params,
       }),
     placeholderData: keepPreviousData,
   })
@@ -347,7 +341,7 @@ export default function Invoices() {
   const lastPage = data?.last_page ?? 1
   const statusOptions = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))
   const hasActiveFilters =
-    searchInput.trim() !== '' || statusFilter !== '' || clientFilter !== '' || quickFilter !== ''
+    searchInput.trim() !== '' || statusFilter !== '' || quickFilter !== ''
 
   const openEditor = useCallback(
     (inv: Invoice) => {
@@ -449,27 +443,10 @@ export default function Invoices() {
           setPage(1)
         }}
         statusOptions={statusOptions}
-        extra={
-          isLab ? (
-            <label>
-              <span>Client</span>
-              <select
-                value={clientFilter}
-                onChange={(e) => {
-                  setClientFilter(e.target.value)
-                  setPage(1)
-                }}
-              >
-                <option value="">Tous les clients</option>
-                {clientsList.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : undefined
-        }
+        listControls={listControls}
+        sortOptions={['created_at', { key: 'date', label: 'Date de facture' }, 'numero', 'client', 'montant', 'statut']}
+        clientFilter={isLab}
+        periodFilter
         columns={[
           { id: 'number', label: 'Numéro' },
           { id: 'client', label: 'Client' },
@@ -509,21 +486,6 @@ export default function Invoices() {
                     className="list-table-toolbar__chip-remove"
                     onClick={() => setStatusFilter('')}
                     aria-label="Effacer le filtre statut"
-                  >
-                    ×
-                  </button>
-                </span>
-              ) : null}
-              {clientFilter ? (
-                <span className="list-table-toolbar__chip">
-                  <span className="list-table-toolbar__chip-text">
-                    {clientsList.find((c) => String(c.id) === clientFilter)?.name ?? `Client #${clientFilter}`}
-                  </span>
-                  <button
-                    type="button"
-                    className="list-table-toolbar__chip-remove"
-                    onClick={() => setClientFilter('')}
-                    aria-label="Effacer le filtre client"
                   >
                     ×
                   </button>

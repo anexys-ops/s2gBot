@@ -183,6 +183,17 @@ function DelayCell({ task }: { task: MissionTask }) {
   return <span className="mission-task-list__delay mission-task-list__delay--ok">Dans les délais</span>
 }
 
+/** PV de la tâche, sinon ceux des missions terrain dont viennent ses FOLD (tâche labo). */
+function taskPvNumbers(task: MissionTask): string[] {
+  if (task.pv_numbers?.length) return task.pv_numbers
+  return [...new Set((task.samples ?? []).flatMap((s) => s.task?.pv_numbers ?? []))]
+}
+
+function sampleCodeLabel(s: MissionTaskSample): string {
+  const fold = s.fold_number ?? `#${s.id}`
+  return s.transco_number ? `${fold} · Transco ${s.transco_number}` : fold
+}
+
 export function TaskEditModal({ task, context, onClose }: { task: MissionTask; context: MissionTasksContext; onClose: () => void }) {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -207,11 +218,13 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
   const [noFoldRequired, setNoFoldRequired] = useState(task.no_fold_required ?? false)
   const [foldForce, setFoldForce] = useState(false)
   const [foldDraft, setFoldDraft] = useState('')
+  // FOLD rattaché automatiquement à la mission : affiché directement, sélection seulement sur demande.
+  const [showFoldPicker, setShowFoldPicker] = useState((task.samples ?? []).length === 0)
 
   const { data: availableSamples = [] } = useQuery({
     queryKey: ['available-samples', task.id, foldForce],
     queryFn: () => missionTasksApi.availableSamples(task.id, foldForce),
-    enabled: context === 'labo',
+    enabled: context === 'labo' && showFoldPicker,
   })
 
   const attachedIds = useMemo(() => new Set(localSamples.map((s) => s.id)), [localSamples])
@@ -474,16 +487,29 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
           <label className="mission-task-modal__pv" style={{ gridColumn: '1 / -1' }}>
             FOLD (prélèvements) à travailler
             {localSamples.length > 0 ? (
-              <span className="mission-task-modal__badges" aria-label="FOLD rattachés">
+              <span className="mission-task-modal__fold-list" aria-label="FOLD rattachés">
                 {localSamples.map((s) => (
-                  <span key={s.id} className="mission-task-modal__badge">
-                    {s.fold_number ?? s.transco_number ?? `#${s.id}`}
+                  <span key={s.id} className="mission-task-modal__fold-card">
+                    <strong>{s.fold_number ?? `#${s.id}`}</strong>
+                    <span>
+                      {s.transco_number
+                        ? <>Transco <strong>{s.transco_number}</strong>{s.received_at ? ` · réceptionné le ${formatAppDate(s.received_at)}` : ''}</>
+                        : <span className="text-muted">En attente de réception au labo (pas encore de Transco)</span>}
+                    </span>
+                    {s.task ? (
+                      <span className="text-muted">
+                        Mission terrain {s.task.unique_number ?? `#${s.task.id}`}
+                        {s.task.statut ? ` · ${getTaskStatutMeta(s.task.statut as MissionTask['statut']).label}` : ''}
+                        {s.task.pv_numbers?.length ? ` · PV ${s.task.pv_numbers.join(', ')}` : ''}
+                      </span>
+                    ) : null}
                     <button
                       type="button"
+                      className="btn btn-secondary btn-sm"
                       aria-label={`Détacher ${s.fold_number ?? s.id}`}
                       disabled={detachSample.isPending}
                       onClick={() => detachSample.mutate(s.id)}
-                    >×</button>
+                    >Détacher</button>
                   </span>
                 ))}
               </span>
@@ -491,6 +517,13 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
               <span className="text-muted">Aucun FOLD rattaché pour l'instant.</span>
             )}
 
+            {localSamples.length > 0 && !showFoldPicker ? (
+              <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: '0.5rem', alignSelf: 'flex-start' }} onClick={() => setShowFoldPicker(true)}>
+                Changer / ajouter un FOLD
+              </button>
+            ) : null}
+
+            {showFoldPicker ? <>
             <span className="mission-task-modal__pv-entry" style={{ marginTop: '0.5rem' }}>
               <input
                 type="text"
@@ -523,6 +556,8 @@ export function TaskEditModal({ task, context, onClose }: { task: MissionTask; c
                 </span>
               ) : null}
             </span>
+
+            </> : null}
 
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.5rem', fontWeight: 400 }}>
               <input
@@ -862,8 +897,13 @@ export default function MissionTasksListPage({ context }: { context: MissionTask
                                   </td>
                                   {isLabo ? (
                                     <td>
-                                      <div>{task.samples?.length ? task.samples.map((s) => s.fold_number).filter(Boolean).join(', ') : <span className="text-muted">—</span>}</div>
-                                      <div className="text-muted mission-task-list__sub">{task.pv_numbers?.length ? task.pv_numbers.join(', ') : '—'}</div>
+                                      <div>{task.samples?.length ? task.samples.map(sampleCodeLabel).join(', ') : <span className="text-muted">—</span>}</div>
+                                      <div className="text-muted mission-task-list__sub">
+                                        {taskPvNumbers(task).length ? `PV ${taskPvNumbers(task).join(', ')}` : '—'}
+                                        {task.samples?.[0]?.task?.statut
+                                          ? ` · terrain : ${getTaskStatutMeta(task.samples[0].task.statut as MissionTask['statut']).label}`
+                                          : ''}
+                                      </div>
                                     </td>
                                   ) : (
                                     <td>{task.pv_numbers?.length ? task.pv_numbers.join(', ') : <span className="text-muted">—</span>}</td>

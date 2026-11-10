@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\ListQuery;
 use App\Http\Controllers\Controller;
 use App\Models\CommercialOffering;
 use Illuminate\Http\JsonResponse;
@@ -17,7 +18,13 @@ class CommercialOfferingController extends Controller
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $q = CommercialOffering::query()->with('equipment')->orderBy('name');
+        $q = CommercialOffering::query()->with('equipment');
+        ListQuery::filter($q, $request, null);
+        ListQuery::sort($q, $request, [
+            'nom' => 'commercial_offerings.name',
+            'created_at' => 'commercial_offerings.created_at',
+            'numero' => 'commercial_offerings.code',
+        ], $request->filled('sort') ? ListQuery::DEFAULT_SORT : 'nom');
 
         if ($request->boolean('active_only', false)) {
             $q->where('active', true);

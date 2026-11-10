@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\ListQuery;
 use App\Http\Controllers\Controller;
 use App\Models\Agency;
 use App\Models\Order;
@@ -39,7 +40,15 @@ class OrderController extends Controller
         $perPage = (int) $request->query('per_page', 15);
         $perPage = min(100, max(1, $perPage));
 
-        $orders = $query->orderByDesc('created_at')->paginate($perPage);
+        ListQuery::filter($query, $request);
+        ListQuery::sort($query, $request, [
+            'created_at' => 'orders.created_at',
+            'date' => 'orders.order_date',
+            'numero' => 'orders.reference',
+            'client' => ListQuery::byClientName('orders'),
+            'statut' => 'orders.status',
+        ]);
+        $orders = $query->paginate($perPage);
 
         return response()->json($orders);
     }

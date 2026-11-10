@@ -6296,6 +6296,36 @@ a.ds-icon-btn {
 .list-table-toolbar__status {
   flex: 0 1 180px;
 }
+.list-table-toolbar__client {
+  flex: 0 1 220px;
+}
+.list-table-toolbar__sort {
+  flex: 0 1 230px;
+}
+.list-table-toolbar__sort-row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+.list-table-toolbar__sort-row .list-table-toolbar__field {
+  flex: 1 1 auto;
+}
+.list-table-toolbar__sort-dir {
+  min-width: 2.35rem;
+  min-height: 2.35rem;
+  font-size: 1rem;
+}
+.list-table-toolbar__period {
+  margin-top: 0.65rem;
+}
+.list-table-toolbar__period input[type='date'] {
+  min-height: 2.35rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-surface, #fff);
+  font: inherit;
+}
 .list-table-toolbar__extra {
   flex: 0 1 240px;
   min-width: min(100%, 200px);
@@ -12367,6 +12397,31 @@ a.catalogue-tree__link-article:hover {
   color: var(--color-text-muted);
   font-weight: 500;
 }
+
+.mission-task-modal__fold-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  font-weight: 400;
+}
+
+.mission-task-modal__fold-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "fold info action" "fold terrain action";
+  align-items: center;
+  column-gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface);
+}
+
+.mission-task-modal__fold-card > strong { grid-area: fold; font-family: ui-monospace, monospace; }
+.mission-task-modal__fold-card > span:nth-of-type(1) { grid-area: info; }
+.mission-task-modal__fold-card > span:nth-of-type(2) { grid-area: terrain; font-size: 0.85rem; }
+.mission-task-modal__fold-card > button { grid-area: action; }
 
 .mission-task-modal__badges {
   display: flex;

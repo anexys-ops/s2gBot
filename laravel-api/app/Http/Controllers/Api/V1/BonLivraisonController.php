@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Support\ListQuery;
 use App\Http\Controllers\Controller;
 use App\Models\BonLivraison;
 use App\Models\BonLivraisonLigne;
@@ -18,14 +19,17 @@ class BonLivraisonController extends Controller
     public function index(Request $request): JsonResponse
     {
         $q = BonLivraison::query()
-            ->with(['dossier', 'client', 'clientContact', 'lignes', 'bonCommande'])
-            ->orderByDesc('date_livraison')
-            ->orderByDesc('id');
+            ->with(['dossier', 'client', 'clientContact', 'lignes', 'bonCommande']);
+        ListQuery::sort($q, $request, [
+            'created_at' => 'bons_livraison.created_at',
+            'date' => 'bons_livraison.date_livraison',
+            'numero' => 'bons_livraison.numero',
+            'client' => ListQuery::byClientName('bons_livraison'),
+            'statut' => 'bons_livraison.statut',
+        ]);
+        ListQuery::filter($q, $request);
         if ($request->filled('dossier_id')) {
             $q->where('dossier_id', (int) $request->query('dossier_id'));
-        }
-        if ($request->filled('client_id')) {
-            $q->where('client_id', (int) $request->query('client_id'));
         }
         if ($request->filled('statut')) {
             $q->where('statut', (string) $request->query('statut'));

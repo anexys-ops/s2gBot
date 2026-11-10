@@ -161,11 +161,31 @@ export const staffApi = {
   },
 }
 
+/** Tri et filtres communs à toutes les vues liste (cf. App\\Support\\ListQuery côté API). */
+export type ListSortDirection = 'asc' | 'desc'
+export type ListQueryParams = {
+  sort?: string
+  direction?: ListSortDirection
+  client_id?: number
+  created_from?: string
+  created_to?: string
+}
+
+function appendListParams(q: URLSearchParams, p?: ListQueryParams) {
+  if (!p) return
+  if (p.sort) q.set('sort', p.sort)
+  if (p.direction) q.set('direction', p.direction)
+  if (p.client_id && !q.has('client_id')) q.set('client_id', String(p.client_id))
+  if (p.created_from) q.set('created_from', p.created_from)
+  if (p.created_to) q.set('created_to', p.created_to)
+}
+
 export const adminUsersApi = {
-  list: (params?: { search?: string; page?: number }) => {
+  list: (params?: { search?: string; page?: number } & ListQueryParams) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
     if (params?.page) q.set('page', String(params.page))
+    appendListParams(q, params)
     const s = q.toString()
     return api<LaravelPaginator<User>>(`/admin/users${s ? `?${s}` : ''}`)
   },
@@ -249,13 +269,14 @@ export const clientsApi = {
     view?: string
     page?: number
     per_page?: number
-  }) => {
+  } & ListQueryParams) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
     if (params?.commercial_id) q.set('commercial_id', String(params.commercial_id))
     if (params?.view && params.view !== 'all') q.set('view', params.view)
     q.set('page', String(params?.page ?? 1))
     q.set('per_page', String(params?.per_page ?? 20))
+    appendListParams(q, params)
     return api<LaravelPaginator<Client>>(`/clients?${q.toString()}`)
   },
   get: (id: number) => api<Client>(`/clients/${id}`),
@@ -335,6 +356,7 @@ export const clientAddressesApi = {
 export interface ClientContactRow {
   id: number
   client_id: number
+  created_at?: string | null
   client?: Pick<Client, 'id' | 'name' | 'email' | 'phone' | 'city'>
   contact_type?: 'facturation' | 'livraison' | 'technique' | 'chantier' | 'commercial' | 'autre' | null
   prenom: string
@@ -977,6 +999,8 @@ export type BonCommande = {
   statut: string
   bc_client_en_attente?: boolean
   bc_client_recu_le?: string | null
+  /** Référence du BC communiquée par le client, ou « À l'ordre de … » en attente du document. */
+  reference_bc_client?: string | null
   date_commande: string
   date_livraison_prevue?: string | null
   montant_ht: string | number
@@ -1072,7 +1096,7 @@ export const dossiersApi = {
     search?: string
     page?: number
     per_page?: number
-  }) => {
+  } & ListQueryParams) => {
     const q = new URLSearchParams()
     if (params?.client_id) q.set('client_id', String(params.client_id))
     if (params?.statut) q.set('statut', params.statut)
@@ -1082,6 +1106,7 @@ export const dossiersApi = {
     if (params?.search) q.set('search', params.search)
     q.set('page', String(params?.page ?? 1))
     q.set('per_page', String(params?.per_page ?? 20))
+    appendListParams(q, params)
     return api<LaravelPaginator<DossierRow>>(`/v1/dossiers?${q.toString()}`)
   },
   get: (id: number) => api<DossierRow>(`/v1/dossiers/${id}`),
@@ -1111,7 +1136,7 @@ export const labCentreGroupsApi = {
 }
 
 export const bonsCommandeApi = {
-  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string; planning?: boolean; unassignedPlanning?: boolean; bcClientEnAttente?: boolean }) => {
+  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string; planning?: boolean; unassignedPlanning?: boolean; bcClientEnAttente?: boolean } & ListQueryParams) => {
     const q = new URLSearchParams()
     if (params?.bcClientEnAttente) q.set('bc_client_en_attente', '1')
     if (params?.dossier_id) q.set('dossier_id', String(params.dossier_id))
@@ -1120,6 +1145,7 @@ export const bonsCommandeApi = {
     if (params?.search) q.set('search', params.search)
     if (params?.planning) q.set('planning', '1')
     if (params?.unassignedPlanning) q.set('planning_unassigned', '1')
+    appendListParams(q, params)
     const s = q.toString()
     return api<BonCommande[]>(`/v1/bons-commande${s ? `?${s}` : ''}`)
   },
@@ -1224,12 +1250,13 @@ export const planningTerrainApi = {
 }
 
 export const bonsLivraisonApi = {
-  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string }) => {
+  list: (params?: { dossier_id?: number; client_id?: number; statut?: string; search?: string } & ListQueryParams) => {
     const q = new URLSearchParams()
     if (params?.dossier_id) q.set('dossier_id', String(params.dossier_id))
     if (params?.client_id) q.set('client_id', String(params.client_id))
     if (params?.statut) q.set('statut', params.statut)
     if (params?.search) q.set('search', params.search)
+    appendListParams(q, params)
     const s = q.toString()
     return api<BonLivraison[]>(`/v1/bons-livraison${s ? `?${s}` : ''}`)
   },
@@ -1273,11 +1300,15 @@ export const tagsApi = {
 
 export const devisV1Api = {
   /** Devis (quote) → Bon de commande (lab uniquement) */
-  transformerBc: (quoteId: number, opts?: { bcClientEnAttente?: boolean; jalonIds?: string[] | null }) =>
+  transformerBc: (
+    quoteId: number,
+    opts?: { bcClientEnAttente?: boolean; jalonIds?: string[] | null; referenceBcClient?: string | null },
+  ) =>
     api<BonCommande>(`/v1/devis/${quoteId}/transformer-bc`, {
       method: 'POST',
       body: JSON.stringify({
         bc_client_en_attente: opts?.bcClientEnAttente ?? false,
+        reference_bc_client: opts?.referenceBcClient?.trim() || null,
         ...(opts?.jalonIds ? { jalon_ids: opts.jalonIds } : {}),
       }),
     }),
@@ -1467,12 +1498,13 @@ export const sitesApi = {
     client_id?: number
     page?: number
     per_page?: number
-  }) => {
+  } & ListQueryParams) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
     if (params?.client_id) q.set('client_id', String(params.client_id))
     q.set('page', String(params?.page ?? 1))
     q.set('per_page', String(params?.per_page ?? 20))
+    appendListParams(q, params)
     return api<LaravelPaginator<Site>>(`/sites?${q.toString()}`)
   },
   get: (id: number) => api<Site>(`/sites/${id}`),
@@ -1563,10 +1595,11 @@ export interface EquipmentRow {
 }
 
 export const equipmentsApi = {
-  list: (params?: { status?: string; due_within?: number }) => {
+  list: (params?: { status?: string; due_within?: number } & ListQueryParams) => {
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)
     if (params?.due_within != null) q.set('due_within', String(params.due_within))
+    appendListParams(q, params)
     const s = q.toString()
     return api<EquipmentRow[]>(`/equipments${s ? `?${s}` : ''}`)
   },
@@ -1877,12 +1910,13 @@ export const testTypesApi = {
 }
 
 export const ordersApi = {
-  list: (params?: { status?: string; search?: string; page?: number; per_page?: number }) => {
+  list: (params?: { status?: string; search?: string; page?: number; per_page?: number } & ListQueryParams) => {
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)
     if (params?.search) q.set('search', params.search)
     if (params?.page) q.set('page', String(params.page))
     if (params?.per_page) q.set('per_page', String(params.per_page))
+    appendListParams(q, params)
     const s = q.toString()
     return api<LaravelPaginator<Order>>(`/orders${s ? `?${s}` : ''}`)
   },
@@ -2237,7 +2271,7 @@ export const invoicesApi = {
     page?: number
     client_id?: number
     quick_filter?: '' | 'unpaid' | 'overdue' | 'relance'
-  }) => {
+  } & ListQueryParams) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
     if (params?.status) {
@@ -2250,6 +2284,7 @@ export const invoicesApi = {
     if (params?.page) q.set('page', String(params.page))
     if (params?.client_id) q.set('client_id', String(params.client_id))
     if (params?.quick_filter) q.set('quick_filter', params.quick_filter)
+    appendListParams(q, params)
     const s = q.toString()
     return api<LaravelPaginator<Invoice>>(`/invoices${s ? `?${s}` : ''}`)
   },
@@ -2742,7 +2777,7 @@ export const commercialOfferingsApi = {
     track_stock?: boolean
     per_page?: number
     page?: number
-  }) => {
+  } & ListQueryParams) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
     if (params?.kind) q.set('kind', params.kind)
@@ -2750,6 +2785,7 @@ export const commercialOfferingsApi = {
     if (params?.track_stock != null) q.set('track_stock', params.track_stock ? '1' : '0')
     if (params?.per_page) q.set('per_page', String(params.per_page))
     if (params?.page) q.set('page', String(params.page))
+    appendListParams(q, params)
     const s = q.toString()
     return api<LaravelPaginator<CommercialOffering>>(`/commercial-offerings${s ? `?${s}` : ''}`)
   },
@@ -2834,13 +2870,14 @@ export type QuoteBonCommandeChain = {
 }
 
 export const quotesApi = {
-  list: (params?: { search?: string; status?: string; page?: number; per_page?: number; eligible_bc?: boolean }) => {
+  list: (params?: { search?: string; status?: string; page?: number; per_page?: number; eligible_bc?: boolean } & ListQueryParams) => {
     const q = new URLSearchParams()
     if (params?.search) q.set('search', params.search)
     if (params?.status) q.set('status', params.status)
     if (params?.page) q.set('page', String(params.page))
     if (params?.per_page) q.set('per_page', String(params.per_page))
     if (params?.eligible_bc) q.set('eligible_bc', '1')
+    appendListParams(q, params)
     const s = q.toString()
     return api<LaravelPaginator<Quote>>(`/quotes${s ? `?${s}` : ''}`)
   },
@@ -3706,7 +3743,7 @@ export const articleActionsApi = {
 }
 
 export const ordresMissionApi = {
-  list: (params?: { type?: string; statut?: string; bon_commande_id?: number; date_from?: string; date_to?: string }) => {
+  list: (params?: { type?: string; statut?: string; bon_commande_id?: number; date_from?: string; date_to?: string } & ListQueryParams) => {
     const s = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : ''
     return api<OrdreMission[]>(`/ordres-mission${s ? `?${s}` : ''}`)
   },
@@ -3846,6 +3883,9 @@ export interface MissionTaskSample {
   received_at?: string | null
   task_id?: number | null
   bon_commande_ligne_id?: number | null
+  status?: string | null
+  /** Mission terrain qui a produit ce FOLD (PV, statut). */
+  task?: { id: number; unique_number?: string | null; statut?: string | null; pv_numbers?: string[] | null } | null
   pivot?: { forced?: boolean }
 }
 
@@ -4274,12 +4314,13 @@ export interface ExpenseReport {
 export const expenseReportsApi = {
   eligibleOMs: () => api<OrdreMission[]>('/expense-reports/eligible-oms'),
 
-  list: (params?: { statut?: string; ordre_mission_id?: number; search?: string; page?: number }) => {
+  list: (params?: { statut?: string; ordre_mission_id?: number; search?: string; page?: number } & ListQueryParams) => {
     const q = new URLSearchParams()
     if (params?.statut) q.set('statut', params.statut)
     if (params?.ordre_mission_id != null) q.set('ordre_mission_id', String(params.ordre_mission_id))
     if (params?.search) q.set('search', params.search)
     if (params?.page != null) q.set('page', String(params.page))
+    appendListParams(q, params)
     const s = q.toString()
     return api<LaravelPaginator<ExpenseReport>>(`/expense-reports${s ? `?${s}` : ''}`)
   },

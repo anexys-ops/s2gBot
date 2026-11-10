@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { catalogueApi, type RefArticleKind } from '../../api/client'
@@ -7,6 +7,7 @@ import CatalogueArticleCreateModal from '../Catalogue/CatalogueArticleCreateModa
 import ListTableToolbar from '../ListTableToolbar'
 import { useAuth } from '../../contexts/AuthContext'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
+import { applyListControlsLocally, useListControls } from '../../hooks/useListControls'
 
 /**
  * Liste catalogue S2G (jalons & produits) dans Configuration — vision admin complète + CRUD.
@@ -46,6 +47,18 @@ export default function ConfigCatalogueProductsPanel() {
         with_inactif: withInactif,
       }),
   })
+
+  const listControls = useListControls('config-catalogue-articles')
+  /** Pas de date de création exposée sur les articles : l'ordre d'id en tient lieu. */
+  const sortedArticles = useMemo(
+    () =>
+      applyListControlsLocally(articles, listControls, {
+        created_at: (a) => a.id,
+        numero: (a) => a.code,
+        nom: (a) => a.libelle,
+      }),
+    [articles, listControls],
+  )
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['config-catalogue-articles'] })
@@ -89,6 +102,8 @@ export default function ConfigCatalogueProductsPanel() {
         ]}
         visibleColumns={visible}
         onToggleColumn={toggle}
+        listControls={listControls}
+        sortOptions={['created_at', { key: 'numero', label: 'Code' }, { key: 'nom', label: 'Libellé' }]}
         extra={
           <>
             <label className="catalogue-liste__famille-field">
@@ -118,7 +133,7 @@ export default function ConfigCatalogueProductsPanel() {
         }
       />
 
-      <CatalogueProlabTable articles={articles} isLoading={isLoading} visibleColumns={visible} />
+      <CatalogueProlabTable articles={sortedArticles} isLoading={isLoading} visibleColumns={visible} keepOrder />
 
       {isAdmin && articles.length > 0 ? (
         <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: '0.75rem' }}>

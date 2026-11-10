@@ -12,6 +12,7 @@ use App\Models\Sequence;
 use App\Models\User;
 use App\Services\LabReceptionService;
 use App\Services\MissionTaskClosureService;
+use App\Services\LabTaskSampleLinker;
 use App\Services\SampleLabelPayloadBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -490,6 +491,8 @@ class SampleReceptionController extends Controller
 
         $sample->save();
         $this->taskClosure->afterSampleReceived($sample, $user instanceof User ? $user->id : null);
+        // La tâche labo de la mission porte désormais le Transco (via le FOLD rattaché).
+        app(LabTaskSampleLinker::class)->afterReception($sample);
     }
 
     /**

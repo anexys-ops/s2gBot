@@ -7,6 +7,7 @@ import ListTableToolbar, { PaginationBar } from '../components/ListTableToolbar'
 import { ListTablePanelHeader } from '../components/ListTablePanel'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
+import { useListControls } from '../hooks/useListControls'
 import { formatAppDate } from '../lib/appLocale'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -27,6 +28,7 @@ export default function Orders() {
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
+  const listControls = useListControls('orders', () => setPage(1))
   const { visible, toggle } = usePersistedColumnVisibility('orders', {
     reference: true,
     client: true,
@@ -42,12 +44,13 @@ export default function Orders() {
   })
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['orders', debouncedSearch, statusFilter, page],
+    queryKey: ['orders', debouncedSearch, statusFilter, page, listControls.params],
     queryFn: () =>
       ordersApi.list({
         search: debouncedSearch.trim() || undefined,
         status: statusFilter || undefined,
         page,
+        ...listControls.params,
       }),
     placeholderData: keepPreviousData,
   })
@@ -77,6 +80,10 @@ export default function Orders() {
           setPage(1)
         }}
         statusOptions={STATUS_OPTIONS}
+        listControls={listControls}
+        sortOptions={['created_at', { key: 'date', label: 'Date de commande' }, 'numero', 'client', 'statut']}
+        clientFilter={isLab}
+        periodFilter
         columns={[
           { id: 'reference', label: 'Référence' },
           { id: 'client', label: 'Client' },

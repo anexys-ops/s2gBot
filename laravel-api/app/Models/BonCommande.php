@@ -35,6 +35,7 @@ class BonCommande extends Model
         'contact_id',
         'statut',
         'bc_client_en_attente',
+        'reference_bc_client',
         'bc_client_recu_le',
         'date_commande',
         'date_livraison_prevue',

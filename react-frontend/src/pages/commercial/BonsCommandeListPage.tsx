@@ -28,6 +28,7 @@ import ModuleEntityShell from '../../components/module/ModuleEntityShell'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
+import { useListControls } from '../../hooks/useListControls'
 import { commercialDocumentCapabilities } from '../../lib/commercialDocumentActionConfig'
 import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../../lib/appLocale'
 import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
@@ -61,6 +62,7 @@ function BonCommandeCreateFromDevisPanel() {
   })
 
   const [bcClientEnAttente, setBcClientEnAttente] = useState(false)
+  const [referenceBcClient, setReferenceBcClient] = useState('')
   const eligibleQuotes = eligiblePage?.data ?? []
   const hasQuoteSearch = debouncedQuoteSearch.trim() !== ''
 
@@ -87,10 +89,12 @@ function BonCommandeCreateFromDevisPanel() {
     mutationFn: (id: number) =>
       devisV1Api.transformerBc(id, {
         bcClientEnAttente,
+        referenceBcClient,
         jalonIds: quoteJalons.length > 0 ? quoteJalons.filter((j) => !excludedJalons.has(j.key)).map((j) => j.key) : null,
       }),
     onSuccess: (bc) => {
       setBcClientEnAttente(false)
+      setReferenceBcClient('')
       void qc.invalidateQueries({ queryKey: ['bons-commande'] })
       void qc.invalidateQueries({ queryKey: ['quotes', 'eligible-bc'] })
       setQuoteId('')
@@ -229,9 +233,26 @@ function BonCommandeCreateFromDevisPanel() {
               <input
                 type="checkbox"
                 checked={bcClientEnAttente}
-                onChange={(e) => setBcClientEnAttente(e.target.checked)}
+                onChange={(e) => {
+                  setBcClientEnAttente(e.target.checked)
+                  if (e.target.checked && referenceBcClient.trim() === '') setReferenceBcClient('À l’ordre de ')
+                  if (!e.target.checked && referenceBcClient.trim() === 'À l’ordre de') setReferenceBcClient('')
+                }}
               />{' '}
               BC client en attente (démarrage avant réception du bon de commande du client)
+            </label>
+
+            <label className="bc-from-devis-panel__reference">
+              <span>Référence du bon de commande</span>
+              <input
+                type="text"
+                value={referenceBcClient}
+                maxLength={191}
+                onChange={(e) => setReferenceBcClient(e.target.value)}
+                placeholder={bcClientEnAttente
+                  ? 'À l’ordre de [personne ayant décidé la création du BC]'
+                  : 'Référence du BC communiquée par le client'}
+              />
             </label>
 
             <div className="bc-from-devis-panel__actions">
@@ -336,6 +357,7 @@ export default function BonsCommandeListPage() {
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statutFilter, setStatutFilter] = useState('')
   const [pendingOnly, setPendingOnly] = useState(false)
+  const listControls = useListControls('bons-commande')
   const [deleteTarget, setDeleteTarget] = useState<BonCommande | null>(null)
   const [statusModalBc, setStatusModalBc] = useState<{ id: number; numero: string; statut: string } | null>(null)
   const [pdfTarget, setPdfTarget] = useState<BonCommande | null>(null)
@@ -348,8 +370,10 @@ export default function BonsCommandeListPage() {
 
   const { visible, toggle } = usePersistedColumnVisibility('bons-commande', {
     number: true,
+    refBcClient: true,
     devis: true,
     dossier: true,
+    site: true,
     client: true,
     date: true,
     ht: true,
@@ -363,12 +387,13 @@ export default function BonsCommandeListPage() {
   })
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['bons-commande', debouncedSearch, statutFilter || 'all', pendingOnly],
+    queryKey: ['bons-commande', debouncedSearch, statutFilter || 'all', pendingOnly, listControls.params],
     queryFn: () =>
       bonsCommandeApi.list({
         statut: statutFilter || undefined,
         bcClientEnAttente: pendingOnly || undefined,
         search: debouncedSearch.trim() || undefined,
+        ...listControls.params,
       }),
     placeholderData: keepPreviousData,
   })
@@ -445,14 +470,20 @@ export default function BonsCommandeListPage() {
       <ListTableToolbar
         searchValue={searchInput}
         onSearchChange={setSearchInput}
-        searchPlaceholder="N° BC, devis, client, référence ou titre dossier…"
+        searchPlaceholder="N° BC, référence BC, devis, client, dossier, chantier…"
         statusValue={statutFilter}
         onStatusChange={setStatutFilter}
         statusOptions={statusOptions}
+        listControls={listControls}
+        sortOptions={['created_at', { key: 'date', label: 'Date de commande' }, 'numero', 'client', 'montant', 'statut']}
+        clientFilter={isLab}
+        periodFilter
         columns={[
           { id: 'number', label: 'Numéro' },
+          { id: 'refBcClient', label: 'Référence BC' },
           { id: 'devis', label: 'Devis' },
           { id: 'dossier', label: 'Dossier' },
+          { id: 'site', label: 'Chantier' },
           { id: 'client', label: 'Client' },
           { id: 'date', label: 'Date commande' },
           { id: 'ht', label: 'Montant HT' },
@@ -533,8 +564,10 @@ export default function BonsCommandeListPage() {
               <thead>
                 <tr>
                   {visible.number !== false && <th className="data-table__code">Numéro</th>}
+                  {visible.refBcClient !== false && <th>Référence BC</th>}
                   {visible.devis !== false && <th className="data-table__code">Devis</th>}
                   {visible.dossier !== false && <th className="data-table__reference">Dossier</th>}
+                  {visible.site !== false && <th>Chantier</th>}
                   {visible.client !== false && <th>Client</th>}
                   {visible.date !== false && <th>Date</th>}
                   {visible.ht !== false && <th>HT ({MONEY_UNIT_LABEL})</th>}
@@ -584,6 +617,9 @@ export default function BonsCommandeListPage() {
                           </Link>
                         </td>
                       )}
+                      {visible.refBcClient !== false && (
+                        <td>{bc.reference_bc_client || <span className="text-muted">—</span>}</td>
+                      )}
                       {visible.devis !== false && (
                         <td className="data-table__code">
                           {bc.quote_id && bc.quote?.number ? (
@@ -613,6 +649,9 @@ export default function BonsCommandeListPage() {
                             `#${bc.dossier_id}`
                           )}
                         </td>
+                      )}
+                      {visible.site !== false && (
+                        <td>{bc.dossier?.site?.name ?? <span className="text-muted">—</span>}</td>
                       )}
                       {visible.client !== false && (
                         <td>{bc.dossier?.client?.name ?? bc.client?.name ?? '—'}</td>
@@ -689,8 +728,10 @@ export default function BonsCommandeListPage() {
               <ListTableFootRow
                 columns={[
                   { id: 'number', kind: 'text' },
+                  { id: 'refBcClient', kind: 'text' },
                   { id: 'devis', kind: 'text' },
                   { id: 'dossier', kind: 'text' },
+                  { id: 'site', kind: 'text' },
                   { id: 'client', kind: 'text' },
                   { id: 'date', kind: 'text' },
                   { id: 'ht', kind: 'money' },

@@ -17,13 +17,16 @@ function num(v: unknown): number {
 type Props = {
   articles: RefArticleRow[]
   isLoading?: boolean
+  /** Articles déjà triés par la vue (tri commun « Trier par ») : ne pas re-trier par famille. */
+  keepOrder?: boolean
 }
 
 /**
  * Liste produits PROLAB : résumé + replis (détails commerciaux / techniques, tarifs, codes, lien).
  */
-export default function CatalogueProlabListe({ articles, isLoading }: Props) {
+export default function CatalogueProlabListe({ articles, isLoading, keepOrder = false }: Props) {
   const sorted = useMemo(() => {
+    if (keepOrder) return articles
     return [...articles].sort((a, b) => {
       const oa = a.famille?.ordre ?? 999
       const ob = b.famille?.ordre ?? 999
@@ -32,7 +35,7 @@ export default function CatalogueProlabListe({ articles, isLoading }: Props) {
       if (fc !== 0) return fc
       return a.code.localeCompare(b.code, 'fr', { sensitivity: 'base' })
     })
-  }, [articles])
+  }, [articles, keepOrder])
 
   if (isLoading) {
     return <p className="text-muted">Chargement des articles…</p>

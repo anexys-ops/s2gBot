@@ -23,6 +23,7 @@ import { ListTableFootRow, ListTablePanelHeader } from '../components/ListTableP
 import { sumNumeric } from '../lib/listTableTotals'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
+import { useListControls } from '../hooks/useListControls'
 import { formatAppDate, formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
 import { quoteEmailRecipient } from '../lib/quoteEmailRecipient'
 import { shouldIgnoreTableRowClick } from '../lib/tableRowInteraction'
@@ -62,6 +63,7 @@ export default function Devis() {
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
+  const listControls = useListControls('quotes', () => setPage(1))
   const { visible, toggle } = usePersistedColumnVisibility('quotes', {
     number: true,
     client: true,
@@ -79,12 +81,13 @@ export default function Devis() {
   })
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['quotes', debouncedSearch, statusFilter, page],
+    queryKey: ['quotes', debouncedSearch, statusFilter, page, listControls.params],
     queryFn: () =>
       quotesApi.list({
         search: debouncedSearch.trim() || undefined,
         status: statusFilter || undefined,
         page,
+        ...listControls.params,
       }),
     placeholderData: keepPreviousData,
   })
@@ -215,6 +218,10 @@ export default function Devis() {
           setPage(1)
         }}
         statusOptions={statusOptions}
+        listControls={listControls}
+        sortOptions={['created_at', { key: 'date', label: 'Date du devis' }, 'numero', 'client', 'montant', 'statut']}
+        clientFilter
+        periodFilter
         columns={[
           { id: 'number', label: 'Numéro' },
           { id: 'client', label: 'Client' },

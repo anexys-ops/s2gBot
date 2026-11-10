@@ -14,6 +14,7 @@ import TableRowActions from '../../components/TableRowActions'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
+import { useListControls } from '../../hooks/useListControls'
 import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
 import { formatAppDate } from '../../lib/appLocale'
 
@@ -38,11 +39,9 @@ export default function DossiersListPage({ mode = 'staff' }: DossiersListPagePro
   const isLab = user?.role === 'lab_admin' || user?.role === 'lab_technician'
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
-  const [clientFilter, setClientFilter] = useState('')
   const [statut, setStatut] = useState<DossierStatut | ''>('')
-  const [dateDebutFrom, setDateDebutFrom] = useState('')
-  const [dateDebutTo, setDateDebutTo] = useState('')
   const [page, setPage] = useState(1)
+  const listControls = useListControls('dossiers', () => setPage(1))
   const [dossierToDelete, setDossierToDelete] = useState<DossierRow | null>(null)
   const [statusModalDossier, setStatusModalDossier] = useState<{ id: number; reference: string; statut: DossierStatut } | null>(null)
   const perPage = 20
@@ -56,8 +55,6 @@ export default function DossiersListPage({ mode = 'staff' }: DossiersListPagePro
     dateDebut: true,
     actions: true,
   })
-
-  const clientFilterId = clientFilter ? Number(clientFilter) : undefined
 
   const { data: clientsData } = useQuery({
     queryKey: ['clients', 'select-options'],
@@ -73,20 +70,16 @@ export default function DossiersListPage({ mode = 'staff' }: DossiersListPagePro
       'dossiers',
       'paginated',
       debouncedSearch,
-      clientFilter,
       statut,
-      dateDebutFrom,
-      dateDebutTo,
+      listControls.params,
       page,
       perPage,
     ],
     queryFn: () =>
       dossiersApi.listPaginated({
         search: debouncedSearch.trim() || undefined,
-        client_id: clientFilterId && Number.isFinite(clientFilterId) ? clientFilterId : undefined,
         statut: statut !== '' ? statut : undefined,
-        date_debut_from: dateDebutFrom || undefined,
-        date_debut_to: dateDebutTo || undefined,
+        ...listControls.params,
         page,
         per_page: perPage,
       }),
@@ -95,7 +88,7 @@ export default function DossiersListPage({ mode = 'staff' }: DossiersListPagePro
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, clientFilter, statut, dateDebutFrom, dateDebutTo])
+  }, [debouncedSearch, statut])
 
   const deleteMut = useMutation({
     mutationFn: (id: number) => dossiersApi.delete(id),
@@ -126,19 +119,11 @@ export default function DossiersListPage({ mode = 'staff' }: DossiersListPagePro
   const lastPage = data?.last_page ?? 1
   const currentPage = data?.current_page ?? page
 
-  const hasActiveFilters =
-    debouncedSearch.trim() !== '' ||
-    clientFilter !== '' ||
-    statut !== '' ||
-    dateDebutFrom !== '' ||
-    dateDebutTo !== ''
+  const hasActiveFilters = debouncedSearch.trim() !== '' || statut !== ''
 
   const clearAllFilters = () => {
     setSearchInput('')
-    setClientFilter('')
     setStatut('')
-    setDateDebutFrom('')
-    setDateDebutTo('')
     setPage(1)
   }
 
@@ -219,54 +204,13 @@ export default function DossiersListPage({ mode = 'staff' }: DossiersListPagePro
         ]}
         visibleColumns={visible}
         onToggleColumn={toggle}
-        extra={
-          isLab ? (
-            <label>
-              <span className="filter-label">Filtrer par client</span>
-              <select
-                value={clientFilter}
-                onChange={(e) => {
-                  setClientFilter(e.target.value)
-                  setPage(1)
-                }}
-              >
-                <option value="">Tous les clients</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : undefined
-        }
+        listControls={isLab ? listControls : undefined}
+        sortOptions={['created_at', { key: 'date', label: 'Date de début' }, 'numero', { key: 'nom', label: 'Titre' }, 'client', 'statut']}
+        clientFilter
+        periodFilter
         footer={
           isLab ? (
             <>
-              <div className="list-table-toolbar__date-row">
-                <label>
-                  <span className="filter-label">Période (début ≥)</span>
-                  <input
-                    type="date"
-                    value={dateDebutFrom}
-                    onChange={(e) => {
-                      setDateDebutFrom(e.target.value)
-                      setPage(1)
-                    }}
-                  />
-                </label>
-                <label>
-                  <span className="filter-label">Période (début ≤)</span>
-                  <input
-                    type="date"
-                    value={dateDebutTo}
-                    onChange={(e) => {
-                      setDateDebutTo(e.target.value)
-                      setPage(1)
-                    }}
-                  />
-                </label>
-              </div>
               {hasActiveFilters ? (
                 <>
                   <span className="list-table-toolbar__footer-label">Filtres actifs</span>
@@ -286,24 +230,6 @@ export default function DossiersListPage({ mode = 'staff' }: DossiersListPagePro
                       </button>
                     </span>
                   )}
-                  {clientFilter !== '' && (
-                    <span className="list-table-toolbar__chip">
-                      <span className="list-table-toolbar__chip-text">
-                        Client : {clients.find((c) => String(c.id) === clientFilter)?.name ?? clientFilter}
-                      </span>
-                      <button
-                        type="button"
-                        className="list-table-toolbar__chip-remove"
-                        onClick={() => {
-                          setClientFilter('')
-                          setPage(1)
-                        }}
-                        aria-label="Retirer le filtre client"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  )}
                   {statut !== '' && (
                     <span className="list-table-toolbar__chip">
                       <span className="list-table-toolbar__chip-text">{STATUT_LABELS[statut]}</span>
@@ -315,38 +241,6 @@ export default function DossiersListPage({ mode = 'staff' }: DossiersListPagePro
                           setPage(1)
                         }}
                         aria-label="Retirer le filtre statut"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  )}
-                  {dateDebutFrom !== '' && (
-                    <span className="list-table-toolbar__chip">
-                      <span className="list-table-toolbar__chip-text">Début ≥ {dateDebutFrom}</span>
-                      <button
-                        type="button"
-                        className="list-table-toolbar__chip-remove"
-                        onClick={() => {
-                          setDateDebutFrom('')
-                          setPage(1)
-                        }}
-                        aria-label="Retirer la date de début minimale"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  )}
-                  {dateDebutTo !== '' && (
-                    <span className="list-table-toolbar__chip">
-                      <span className="list-table-toolbar__chip-text">Début ≤ {dateDebutTo}</span>
-                      <button
-                        type="button"
-                        className="list-table-toolbar__chip-remove"
-                        onClick={() => {
-                          setDateDebutTo('')
-                          setPage(1)
-                        }}
-                        aria-label="Retirer la date de début maximale"
                       >
                         ×
                       </button>

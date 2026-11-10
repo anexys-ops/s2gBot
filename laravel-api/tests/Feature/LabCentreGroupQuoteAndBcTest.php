@@ -51,6 +51,44 @@ class LabCentreGroupQuoteAndBcTest extends TestCase
         $response->assertCreated();
         $response->assertJsonPath('lab_centre_group_id', $centre->id);
         $response->assertJsonPath('centre_group.code', 'MO');
+        // Retour client V3 : suffixe = code du centre (et non /HQ).
+        $this->assertMatchesRegularExpression('#^DEV-\d{4}-\d{4}/MO$#', (string) $response->json('number'));
+    }
+
+    public function test_dossier_and_bc_numbers_use_centre_code_suffix(): void
+    {
+        $lab = User::factory()->create(['role' => User::ROLE_LAB_ADMIN, 'client_id' => null, 'site_id' => null]);
+        $client = Client::query()->create(['name' => 'Centre Numero Co']);
+        $site = Site::query()->create(['client_id' => $client->id, 'name' => 'Site numéro']);
+        $centre = LabCentreGroup::query()->create(['code' => 'MO', 'name' => 'Mohammedia']);
+
+        $withCentre = Dossier::query()->create([
+            'titre' => 'Avec centre', 'client_id' => $client->id, 'site_id' => $site->id,
+            'lab_centre_group_id' => $centre->id, 'statut' => Dossier::STATUT_BROUILLON,
+            'date_debut' => '2026-01-01', 'created_by' => $lab->id,
+        ]);
+        $withoutCentre = Dossier::query()->create([
+            'titre' => 'Sans centre', 'client_id' => $client->id, 'site_id' => $site->id,
+            'statut' => Dossier::STATUT_BROUILLON, 'date_debut' => '2026-01-01', 'created_by' => $lab->id,
+        ]);
+        $this->assertMatchesRegularExpression('#^DOS-\d{4}-\d{4}/MO$#', $withCentre->reference);
+        $this->assertStringEndsWith('/HQ', $withoutCentre->reference);
+
+        $quote = Quote::query()->create([
+            'number' => 'DEV-CENTRE-NUM', 'client_id' => $client->id, 'site_id' => $site->id,
+            'dossier_id' => $withCentre->id, 'quote_date' => now()->toDateString(),
+            'amount_ht' => 100, 'amount_ttc' => 120, 'tva_rate' => 20, 'status' => Quote::STATUS_SIGNED,
+        ]);
+        QuoteLine::query()->create([
+            'quote_id' => $quote->id, 'description' => 'Essai', 'quantity' => 1,
+            'unit_price' => 100, 'tva_rate' => 20, 'total' => 100,
+        ]);
+
+        $numero = $this->actingAs($lab, 'sanctum')
+            ->postJson("/api/v1/devis/{$quote->id}/transformer-bc")
+            ->assertCreated()
+            ->json('numero');
+        $this->assertMatchesRegularExpression('#^BCC-\d{4}-\d{4}/MO$#', (string) $numero);
     }
 
     public function test_quote_store_honors_explicit_centre_over_dossier_default(): void

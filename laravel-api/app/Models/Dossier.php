@@ -86,7 +86,10 @@ class Dossier extends Model
 
         return app(DocumentSequenceService::class)->next(
             DocumentSequence::TYPE_DOSSIER,
-            ClientFilialeResolver::codeForSite($site),
+            ClientFilialeResolver::codeForCentre(
+                $this->lab_centre_group_id ? (int) $this->lab_centre_group_id : null,
+                ClientFilialeResolver::codeForSite($site),
+            ),
         );
     }
 

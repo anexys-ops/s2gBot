@@ -13,6 +13,7 @@ import TableRowActions from '../../components/TableRowActions'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../../hooks/usePersistedColumnVisibility'
+import { useListControls } from '../../hooks/useListControls'
 import { formatAppDate } from '../../lib/appLocale'
 import { shouldIgnoreTableRowClick } from '../../lib/tableRowInteraction'
 
@@ -181,6 +182,7 @@ export default function BonsLivraisonListPage() {
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [statutFilter, setStatutFilter] = useState('')
+  const listControls = useListControls('bons-livraison')
   const [deleteTarget, setDeleteTarget] = useState<BonLivraison | null>(null)
   const [statusModalBl, setStatusModalBl] = useState<{ id: number; numero: string; statut: string } | null>(null)
 
@@ -195,11 +197,12 @@ export default function BonsLivraisonListPage() {
   })
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['bons-livraison', debouncedSearch, statutFilter || 'all'],
+    queryKey: ['bons-livraison', debouncedSearch, statutFilter || 'all', listControls.params],
     queryFn: () =>
       bonsLivraisonApi.list({
         statut: statutFilter || undefined,
         search: debouncedSearch.trim() || undefined,
+        ...listControls.params,
       }),
     placeholderData: keepPreviousData,
   })
@@ -262,6 +265,10 @@ export default function BonsLivraisonListPage() {
         statusValue={statutFilter}
         onStatusChange={setStatutFilter}
         statusOptions={statusOptions}
+        listControls={listControls}
+        sortOptions={['created_at', { key: 'date', label: 'Date de livraison' }, 'numero', 'client', 'statut']}
+        clientFilter={isLab}
+        periodFilter
         columns={[
           { id: 'number', label: 'Numéro' },
           { id: 'dossier', label: 'Dossier' },

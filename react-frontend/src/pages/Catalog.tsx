@@ -10,6 +10,7 @@ import { ListTableFootRow, ListTablePanelHeader } from '../components/ListTableP
 import { sumNumeric } from '../lib/listTableTotals'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePersistedColumnVisibility } from '../hooks/usePersistedColumnVisibility'
+import { applyListControlsLocally, useListControls } from '../hooks/useListControls'
 import { formatMoney, MONEY_UNIT_LABEL } from '../lib/appLocale'
 import TestFormFieldsEditor, { validateFormFields } from '../components/Catalogue/TestFormFieldsEditor'
 import './CatalogEssais.css'
@@ -133,9 +134,9 @@ export default function Catalog() {
 
   const list = Array.isArray(types) ? types : []
   const needle = debouncedSearch.trim().toLowerCase()
+  const listControls = useListControls('test-types')
   const filtered = useMemo(() => {
-    if (!needle && !contextFilter) return list
-    return list.filter(
+    const rows = !needle && !contextFilter ? list : list.filter(
       (t) =>
         (!contextFilter || t.context === contextFilter) && (!needle || (
           t.name.toLowerCase().includes(needle) ||
@@ -145,7 +146,14 @@ export default function Catalog() {
           (t.form_fields?.some((field) => field.label.toLowerCase().includes(needle)) ?? false) ||
           (t.articles?.some((article) => article.libelle.toLowerCase().includes(needle) || article.code.toLowerCase().includes(needle)) ?? false))),
     )
-  }, [list, needle, contextFilter])
+    /** Pas de date de création exposée sur les types d'essai : l'ordre d'id en tient lieu. */
+    return applyListControlsLocally(rows, listControls, {
+      created_at: (t) => t.id,
+      nom: (t) => t.name,
+      numero: (t) => t.norm,
+      montant: (t) => Number(t.unit_price),
+    })
+  }, [list, needle, contextFilter, listControls])
 
   const priceTotal = useMemo(
     () => sumNumeric(filtered, (t) => t.unit_price),
@@ -256,12 +264,17 @@ export default function Catalog() {
         ]}
         visibleColumns={visible}
         onToggleColumn={toggle}
+        extra={
+          <label className="list-table-toolbar__field">
+            <span className="filter-label">Domaine</span>
+            <select value={contextFilter} onChange={(event) => setContextFilter(event.target.value)}>
+              <option value="">Tous les essais</option><option value="terrain">Terrain</option><option value="ingenieur">Ingénierie</option><option value="labo">Laboratoire</option>
+            </select>
+          </label>
+        }
+        listControls={listControls}
+        sortOptions={['created_at', 'nom', { key: 'numero', label: 'Norme' }, { key: 'montant', label: 'Tarif' }]}
       />
-      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>Domaine
-        <select value={contextFilter} onChange={(event) => setContextFilter(event.target.value)}>
-          <option value="">Tous les essais</option><option value="terrain">Terrain</option><option value="ingenieur">Ingénierie</option><option value="labo">Laboratoire</option>
-        </select>
-      </label>
       <div className="card dossier-tab-panel dossier-tab-panel--table">
         <ListTablePanelHeader title="Types d'essai" count={filtered.length} />
         <div className="table-wrap">

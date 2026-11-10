@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\ListQuery;
 use App\Http\Controllers\Controller;
 use App\Models\Dossier;
 use App\Models\Site;
@@ -19,9 +20,7 @@ class DossierController extends Controller
         $q = Dossier::query()->with(['client', 'site', 'createur', 'mission', 'centreGroup']);
         AgencyAccess::applyDossierScope($q, $request->user());
 
-        if ($request->filled('client_id')) {
-            $q->where('client_id', (int) $request->query('client_id'));
-        }
+        ListQuery::filter($q, $request);
         if ($request->filled('statut')) {
             $q->where('statut', (string) $request->query('statut'));
         }
@@ -46,7 +45,15 @@ class DossierController extends Controller
             });
         }
 
-        $q->ordonne();
+        // Par défaut : les derniers dossiers créés en premier (retour client V3).
+        ListQuery::sort($q, $request, [
+            'created_at' => 'dossiers.created_at',
+            'date' => 'dossiers.date_debut',
+            'numero' => 'dossiers.reference',
+            'nom' => 'dossiers.titre',
+            'client' => ListQuery::byClientName('dossiers'),
+            'statut' => 'dossiers.statut',
+        ]);
 
         if ($request->has('page') || $request->has('per_page')) {
             $perPage = (int) $request->query('per_page', 20);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Support\ListQuery;
 use App\Http\Controllers\Controller;
 use App\Models\BcLignePlanningAffectation;
 use App\Models\BonCommande;
@@ -40,14 +41,18 @@ class BonCommandeController extends Controller
 
         $q = BonCommande::query()
             ->with($relations)
-            ->withCount(['bonsLivraison', 'invoices'])
-            ->orderByDesc('date_commande')
-            ->orderByDesc('id');
+            ->withCount(['bonsLivraison', 'invoices']);
+        ListQuery::sort($q, $request, [
+            'created_at' => 'bons_commande.created_at',
+            'date' => 'bons_commande.date_commande',
+            'numero' => 'bons_commande.numero',
+            'client' => ListQuery::byClientName('bons_commande'),
+            'montant' => 'bons_commande.montant_ht',
+            'statut' => 'bons_commande.statut',
+        ]);
+        ListQuery::filter($q, $request);
         if ($request->filled('dossier_id')) {
             $q->where('dossier_id', (int) $request->query('dossier_id'));
-        }
-        if ($request->filled('client_id')) {
-            $q->where('client_id', (int) $request->query('client_id'));
         }
         if ($request->filled('statut')) {
             $q->where('statut', (string) $request->query('statut'));
@@ -66,6 +71,7 @@ class BonCommandeController extends Controller
             $like = '%'.$search.'%';
             $q->where(function ($sub) use ($like) {
                 $sub->where('numero', 'like', $like)
+                    ->orWhere('reference_bc_client', 'like', $like)
                     ->orWhereHas('client', fn ($cq) => $cq->where('name', 'like', $like))
                     ->orWhereHas('dossier', function ($dq) use ($like) {
                         $dq->where('reference', 'like', $like)
@@ -162,7 +168,13 @@ class BonCommandeController extends Controller
             'contact_id' => 'sometimes|nullable|exists:client_contacts,id',
             'statut' => 'sometimes|string|in:brouillon,confirme,en_cours,livre,annule',
             'bc_client_en_attente' => 'sometimes|boolean',
+            'reference_bc_client' => 'sometimes|nullable|string|max:191',
+            'lab_centre_group_id' => 'sometimes|nullable|integer|exists:lab_centre_groups,id',
         ]);
+        if (array_key_exists('reference_bc_client', $data)) {
+            $ref = trim((string) ($data['reference_bc_client'] ?? ''));
+            $data['reference_bc_client'] = $ref !== '' ? $ref : null;
+        }
         if (array_key_exists('bc_client_en_attente', $data)) {
             $data['bc_client_recu_le'] = $data['bc_client_en_attente'] ? null : now()->toDateString();
         }
@@ -177,6 +189,7 @@ class BonCommandeController extends Controller
             'dossier',
             'client',
             'clientContact',
+            'centreGroup',
         ]));
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\ListQuery;
 use App\Http\Controllers\Controller;
 use App\Mail\QuoteEmailMailable;
 use App\Models\Agency;
@@ -119,6 +120,7 @@ class QuoteController extends Controller
         if ($status = trim((string) $request->query('status', ''))) {
             $query->where('status', $status);
         }
+        ListQuery::filter($query, $request);
 
         if ($request->boolean('eligible_bc')) {
             $query
@@ -128,7 +130,16 @@ class QuoteController extends Controller
 
         $perPage = min(max((int) $request->query('per_page', 15), 1), 100);
 
-        $quotes = $query->orderByDesc('quote_date')->paginate($perPage);
+        // Par défaut : les derniers devis créés en premier (et non par date de devis, modifiable).
+        ListQuery::sort($query, $request, [
+            'created_at' => 'quotes.created_at',
+            'date' => 'quotes.quote_date',
+            'numero' => 'quotes.number',
+            'client' => ListQuery::byClientName('quotes'),
+            'montant' => 'quotes.amount_ht',
+            'statut' => 'quotes.status',
+        ]);
+        $quotes = $query->paginate($perPage);
 
         return response()->json($quotes);
     }
@@ -193,7 +204,15 @@ class QuoteController extends Controller
             isset($validated['filiale_agency_id']) ? (int) $validated['filiale_agency_id'] : null,
         );
         $filialeCode = ClientFilialeResolver::codeForAgencyId($filialeAgencyId, $cid);
-        $number = $this->documentSequences->next(DocumentSequence::TYPE_DEVIS, $filialeCode);
+        $centreGroupId = isset($validated['lab_centre_group_id']) ? (int) $validated['lab_centre_group_id'] : null;
+        if ($centreGroupId === null && $dossierId) {
+            $centreGroupId = Dossier::query()->whereKey($dossierId)->value('lab_centre_group_id');
+            $centreGroupId = $centreGroupId ? (int) $centreGroupId : null;
+        }
+        $number = $this->documentSequences->next(
+            DocumentSequence::TYPE_DEVIS,
+            ClientFilialeResolver::codeForCentre($centreGroupId, $filialeCode),
+        );
         $defaultTva = $validated['tva_rate'] ?? 20;
 
         $travelHt = (float) ($validated['travel_fee_ht'] ?? 0);
@@ -206,12 +225,6 @@ class QuoteController extends Controller
 
         $agencyId = self::resolveLabAgencyIdForQuote($request->user(), $validated['site_id'] ?? null, $cid);
         $meta = ClientFilialeResolver::mergeFilialeMeta($validated['meta'] ?? null, $filialeAgencyId);
-
-        $centreGroupId = isset($validated['lab_centre_group_id']) ? (int) $validated['lab_centre_group_id'] : null;
-        if ($centreGroupId === null && $dossierId) {
-            $centreGroupId = Dossier::query()->whereKey($dossierId)->value('lab_centre_group_id');
-            $centreGroupId = $centreGroupId ? (int) $centreGroupId : null;
-        }
 
         $quote = Quote::create([
             'number' => $number,

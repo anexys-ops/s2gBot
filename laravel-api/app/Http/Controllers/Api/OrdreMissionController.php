@@ -168,6 +168,11 @@ class OrdreMissionController extends Controller
             $selectedLineIds = $validIds;
         }
 
+        $countLignes = fn (): int => OrdreMissionLigne::query()
+            ->whereHas('ordreMission', fn ($q) => $q->where('bon_commande_id', $bonCommande->id))
+            ->count();
+        $lignesBefore = $countLignes();
+
         $orders = $this->generator->generate($bonCommande, $request->user(), $selectedLineIds, $requestedQuantities);
 
         if ($orders === []) {
@@ -177,7 +182,8 @@ class OrdreMissionController extends Controller
             ], 422);
         }
 
-        return response()->json($orders, 201);
+        // 201 si des tâches ont été créées, 200 pour une simple resynchronisation (rien de nouveau).
+        return response()->json($orders, $countLignes() > $lignesBefore ? 201 : 200);
     }
 
     /**
@@ -259,6 +265,18 @@ class OrdreMissionController extends Controller
             'lab_centre_group_id' => 'sometimes|nullable|integer|exists:lab_centre_groups,id',
         ]);
 
+        // Dates réelles posées au passage « en cours » / « terminé » si non saisies.
+        if (($validated['statut'] ?? null) === OrdreMission::STATUT_EN_COURS && ! $ordreMission->date_debut && empty($validated['date_debut'])) {
+            $validated['date_debut'] = now();
+        }
+        if (($validated['statut'] ?? null) === OrdreMission::STATUT_TERMINE) {
+            if (! $ordreMission->date_debut && empty($validated['date_debut'])) {
+                $validated['date_debut'] = now();
+            }
+            if (! $ordreMission->date_fin && empty($validated['date_fin'])) {
+                $validated['date_fin'] = now();
+            }
+        }
         $ordreMission->update($validated);
         $ordreMission->syncMissionTasksFromLignes();
 
@@ -454,6 +472,9 @@ class OrdreMissionController extends Controller
         $ligne->update($validated);
         $ligne->refresh();
         $task = $ligne->ensureTaskExists();
+        if (isset($validated['statut'])) {
+            $this->statusSync->syncTaskFromLigneStatut($task, $validated['statut']);
+        }
         $this->statusSync->syncPlanningFromTask($task, $ligne);
         $this->statusSync->syncOrdreMissionStatus($ordreMission);
 
@@ -490,6 +511,9 @@ class OrdreMissionController extends Controller
             $ligne->update(collect($row)->except('id')->all());
             $ligne->refresh();
             $task = $ligne->ensureTaskExists();
+            if (isset($row['statut'])) {
+                $this->statusSync->syncTaskFromLigneStatut($task, $row['statut']);
+            }
             $this->statusSync->syncPlanningFromTask($task, $ligne);
         }
 

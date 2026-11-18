@@ -248,7 +248,7 @@ class OrdreMissionFromBonCommandeTest extends TestCase
 
         $this->actingAs($lab, 'sanctum')->putJson(
             "/api/ordres-mission/{$om->id}/lignes/{$first->id}",
-            ['assigned_user_id' => $tech->id, 'date_prevue' => '2026-09-25'],
+            ['assigned_user_id' => $tech->id, 'date_prevue' => now()->addWeek()->toDateString()],
         )->assertOk();
         $this->assertSame(OrdreMission::STATUT_PLANIFIE, $om->fresh()->statut);
         $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-commande/{$bc->id}")
@@ -261,7 +261,7 @@ class OrdreMissionFromBonCommandeTest extends TestCase
             ['lignes' => [[
                 'id' => $second->id,
                 'assigned_user_id' => $tech->id,
-                'date_prevue' => '2026-09-26',
+                'date_prevue' => now()->addWeek()->addDay()->toDateString(),
             ]]],
         )->assertOk();
         $this->actingAs($lab, 'sanctum')->getJson("/api/v1/bons-commande/{$bc->id}")

@@ -45,6 +45,35 @@ class MissionTaskStatusService
         $this->syncOrdreMissionStatus($ligne->ordreMission);
     }
 
+    /**
+     * Statut choisi sur la ligne d'OM (fiche OdM) → statut de la tâche, miroir de
+     * syncOrdreMissionFromTask. « cloture » n'est pas reporté : la validation d'une tâche
+     * passe par « Valider la tâche » (résultat, conformité).
+     */
+    public function syncTaskFromLigneStatut(MissionTask $task, string $ligneStatut): void
+    {
+        $statut = match ($ligneStatut) {
+            'en_cours' => MissionTask::STATUT_IN_PROGRESS,
+            'freeze' => MissionTask::STATUT_FROZEN,
+            'replanifie' => MissionTask::STATUT_RESCHEDULED,
+            'attente_validation', 'realise' => MissionTask::STATUT_DONE,
+            'annule' => MissionTask::STATUT_REJECTED,
+            'a_faire', 'planifie' => MissionTask::STATUT_TODO,
+            default => null,
+        };
+        if ($statut === null || $task->statut === $statut || $task->statut === MissionTask::STATUT_VALIDATED) {
+            return;
+        }
+        $updates = ['statut' => $statut];
+        if ($statut === MissionTask::STATUT_IN_PROGRESS && ! $task->started_at) {
+            $updates['started_at'] = now();
+        }
+        if ($statut === MissionTask::STATUT_DONE && ! $task->completed_at) {
+            $updates['completed_at'] = now();
+        }
+        $task->update($updates);
+    }
+
     public function syncPlanningFromTask(MissionTask $task, OrdreMissionLigne $ligne): void
     {
         $date = $task->planned_date?->format('Y-m-d');

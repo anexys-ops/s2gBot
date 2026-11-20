@@ -302,6 +302,16 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
     return () => window.clearTimeout(timer)
   }, [batchTotal, commitCountInput, countInput, isFromLine, maxCount])
 
+  // Nombre d'étiquettes prérempli avec le « Nombre d'échantillons » du formulaire terrain (modifiable).
+  const formSampleCount = line?.nombre_echantillons_formulaire ?? null
+  const prefilledRef = useRef(false)
+  useEffect(() => {
+    if (prefilledRef.current || !isFromLine || !formSampleCount || formSampleCount <= 1) return
+    prefilledRef.current = true
+    const { cancelledSlots: prevCancelled, drafts: prevDrafts, batchTotal: prevBatchTotal } = batchStateRef.current
+    applyBatchCount(String(Math.min(formSampleCount, maxCount)), prevCancelled, prevDrafts, prevBatchTotal)
+  }, [applyBatchCount, formSampleCount, isFromLine, maxCount])
+
   const handleCountKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
@@ -433,6 +443,7 @@ export default function SampleReceptionModal({ mode, onClose, onSuccess }: Props
                 />
               </label>
               <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                {formSampleCount ? `Repris du formulaire terrain : ${formSampleCount} échantillon${formSampleCount > 1 ? 's' : ''}. ` : ''}
                 Saisissez le nombre puis cliquez en dehors du champ ou appuyez sur Entrée pour générer les formulaires.
                 {drafts.length > 0 && (
                   <>

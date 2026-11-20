@@ -90,6 +90,13 @@ type LabelBodyProps = {
   barcodeRef: RefObject<SVGSVGElement>
 }
 
+/** Réf. échantillon (retour client V4) : « Réf transco - nombre d'échantillons », à défaut le FOLD. */
+export function stickerSampleRef(payload: SampleLabelData['payload']): string {
+  if (!payload.transco) return payload.fold ?? '—'
+  const count = payload.reception_batch_total ?? payload.quantity ?? 1
+  return `${payload.transco} - ${count}`
+}
+
 function StickerLabelBody({ payload, qrRef }: Pick<LabelBodyProps, 'payload' | 'qrRef'>) {
   return (
     <div className="sticker-label">
@@ -99,13 +106,13 @@ function StickerLabelBody({ payload, qrRef }: Pick<LabelBodyProps, 'payload' | '
         </div>
         <div className="sticker-label__ref">
           Réf échantillon
-          <strong>{payload.fold ?? '—'}</strong>
+          <strong>{stickerSampleRef(payload)}</strong>
           {payload.label_ref ? `Éch. ${payload.label_ref}` : null}
         </div>
       </div>
       <dl className="sticker-label__rows">
         <dt>Réf labo :</dt>
-        <dd>{payload.transco ?? '—'}</dd>
+        <dd>{payload.fold ?? '—'}</dd>
         <dt>Date de réception :</dt>
         <dd>{formatDate(payload.received_at)}</dd>
         <dt>Nature de matériaux :</dt>

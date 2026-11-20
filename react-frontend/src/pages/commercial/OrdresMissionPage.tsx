@@ -61,6 +61,43 @@ function TypeBadge({ type }: { type: string }) {
   )
 }
 
+type ReceptionState = 'recus' | 'partiel' | 'attente'
+
+/** État de réception d'un OdM : toutes / une partie / aucune de ses tâches n'a son échantillon au labo. */
+function receptionState(om: OrdreMission): ReceptionState {
+  const r = om.reception
+  if (!r || r.taches_receptionnees === 0) return 'attente'
+  return r.taches_receptionnees >= r.taches ? 'recus' : 'partiel'
+}
+
+const RECEPTION_META: Record<ReceptionState, { label: string; variant: 'success' | 'warning' | 'neutral' }> = {
+  recus: { label: 'Réceptionné', variant: 'success' },
+  partiel: { label: 'Partiel', variant: 'warning' },
+  attente: { label: 'En attente', variant: 'neutral' },
+}
+
+/** Colonne « Réception » : même information que la vue « Jalons réceptionnés ». */
+function ReceptionCell({ om }: { om: OrdreMission }) {
+  const r = om.reception
+  if (!r || r.taches === 0) return <span className="text-muted">—</span>
+  const state = receptionState(om)
+  return (
+    <div className="om-reception-cell">
+      <StatusBadge variant={RECEPTION_META[state].variant} size="sm">
+        {RECEPTION_META[state].label} · {r.taches_receptionnees}/{r.taches}
+      </StatusBadge>
+      {r.pv_numbers.length > 0 ? (
+        <div className="text-muted om-reception-cell__line">PV {r.pv_numbers.join(', ')}</div>
+      ) : null}
+      {r.numeros_reception.length > 0 ? (
+        <div className="text-muted om-reception-cell__line" title={r.numeros_reception.join(', ')}>
+          Réception {r.numeros_reception.slice(0, 2).join(', ')}{r.numeros_reception.length > 2 ? ` +${r.numeros_reception.length - 2}` : ''}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export default function OrdresMissionPage() {
   const qc = useQueryClient()
   const { user } = useAuth()
@@ -73,6 +110,7 @@ export default function OrdresMissionPage() {
   const [typeFilter, setTypeFilter] = useState<OmType | ''>(() => typeFromUrl)
   const [statutFilter, setStatutFilter] = useState('')
   const [searchInput, setSearchInput] = useState('')
+  const [receptionFilter, setReceptionFilter] = useState<'' | 'recus' | 'partiel' | 'attente'>('')
   const listControls = useListControls('ordres-mission')
   const [showGenerationModal, setShowGenerationModal] = useState(false)
   const [selectedBcForGeneration, setSelectedBcForGeneration] = useState<number | null>(null)
@@ -179,6 +217,7 @@ export default function OrdresMissionPage() {
     const needle = searchInput.trim().toLowerCase()
     return ordres.filter((o) => {
       if (typeFilter && o.type !== typeFilter) return false
+      if (receptionFilter && receptionState(o) !== receptionFilter) return false
       if (!needle) return true
       const dossier = ordreMissionDossier(o)
       return [
@@ -187,9 +226,11 @@ export default function OrdresMissionPage() {
         dossier?.reference,
         o.site?.name ?? dossier?.site?.name,
         ordreMissionBonCommande(o)?.numero,
+        ...(o.reception?.pv_numbers ?? []),
+        ...(o.reception?.numeros_reception ?? []),
       ].some((v) => (v ?? '').toLowerCase().includes(needle))
     })
-  }, [ordres, typeFilter, searchInput])
+  }, [ordres, typeFilter, searchInput, receptionFilter])
 
   return (
     <ModuleEntityShell
@@ -376,6 +417,15 @@ export default function OrdresMissionPage() {
                 {TYPE_ORDER.map((v) => <option key={v} value={v}>{TYPE_META[v].label}</option>)}
               </select>
             </label>
+            <label className="list-table-toolbar__field">
+              <span className="filter-label">Réception</span>
+              <select value={receptionFilter} onChange={(e) => setReceptionFilter(e.target.value as typeof receptionFilter)}>
+                <option value="">Toutes</option>
+                <option value="recus">Jalons réceptionnés</option>
+                <option value="partiel">Réception partielle</option>
+                <option value="attente">En attente de réception</option>
+              </select>
+            </label>
             <Link to="/ordres-mission/planning" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-end' }}>
               📅 Planning
             </Link>
@@ -400,6 +450,7 @@ export default function OrdresMissionPage() {
                   <th className="data-table__code">Dossier</th>
                   <th>Chantier</th>
                   <th>Statut</th>
+                  <th>Réception</th>
                   <th>Date prévue</th>
                   <th>Responsable</th>
                   <th>Actions</th>
@@ -449,6 +500,7 @@ export default function OrdresMissionPage() {
                         </StatusBadge>
                       )}
                     </td>
+                    <td><ReceptionCell om={om} /></td>
                     <td>{om.date_prevue ? formatAppDate(om.date_prevue) : '—'}</td>
                     <td>{om.responsable?.name ?? '—'}</td>
                     <td>

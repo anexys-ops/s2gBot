@@ -72,6 +72,12 @@ class MissionTask extends Model
     ];
 
     /** Prélèvements (FOLD) rattachés à cette tâche labo pour travailler dessus. */
+    /** Échantillons (FOLD) produits par cette mission terrain (samples.task_id). */
+    public function ownSamples(): HasMany
+    {
+        return $this->hasMany(Sample::class, 'task_id');
+    }
+
     public function samples(): BelongsToMany
     {
         return $this->belongsToMany(Sample::class, 'mission_task_samples')

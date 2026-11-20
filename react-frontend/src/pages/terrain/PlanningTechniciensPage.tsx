@@ -15,7 +15,7 @@ type PlanningContext = 'terrain' | 'labo' | 'ingenieur'
 
 const CONTEXT_META: Record<PlanningContext, { title: string; module: string; parent: string; parentTo: string; assignee: string; allAssignees: string }> = {
   terrain: { title: 'Planning techniciens', module: 'Chantier', parent: 'Chantier', parentTo: '/terrain', assignee: 'Technicien', allAssignees: 'Tous les techniciens' },
-  labo: { title: 'Planning laboratoire', module: 'Laboratoire', parent: 'Laboratoire', parentTo: '/labo', assignee: 'Agent labo', allAssignees: 'Tous les agents labo' },
+  labo: { title: 'Planning laboratoire', module: 'Laboratoire', parent: 'Laboratoire', parentTo: '/labo', assignee: 'Agent laboratoire', allAssignees: 'Tous les agents laboratoire' },
   ingenieur: { title: 'Planning ingénieur', module: 'Ingénierie', parent: 'Ingénierie', parentTo: '/ingenierie', assignee: 'Ingénieur', allAssignees: 'Tous les ingénieurs' },
 }
 
@@ -176,6 +176,10 @@ export default function PlanningTechniciensPage({ context = 'terrain' }: { conte
   })
 
   const selectedTechnician = (techniciens ?? []).find((item) => item.id === userFilter)
+  const assigneeOptions = useMemo(
+    () => (techniciens ?? []).map((item) => ({ id: item.id, label: formatTechnicienOption(item) })),
+    [techniciens],
+  )
   const printTechnicianLabel = selectedTechnician ? formatTechnicienOption(selectedTechnician) : meta.allAssignees
   const printPeriodLabel = from === to ? from : `${from} au ${to}`
 
@@ -307,18 +311,16 @@ export default function PlanningTechniciensPage({ context = 'terrain' }: { conte
                           <td><StatusBadge {...bonCommandeStatutBadgeProps(ligne.bc_statut)} /></td>
                           <td>{ligne.libelle}</td>
                           <td>
-                            <select
+                            <SearchableSelect
+                              options={assigneeOptions}
                               value={unposUserIdMap[ligne.id] ?? ''}
-                              onChange={(event) => setUnposUserIdMap((current) => ({
+                              onChange={(val) => setUnposUserIdMap((current) => ({
                                 ...current,
-                                [ligne.id]: event.target.value ? Number(event.target.value) : '',
+                                [ligne.id]: val === '' || val == null ? '' : Number(val),
                               }))}
-                            >
-                              <option value="">—</option>
-                              {(techniciens ?? []).map((item) => (
-                                <option key={item.id} value={item.id}>{formatTechnicienOption(item)}</option>
-                              ))}
-                            </select>
+                              placeholder={`Rechercher un ${meta.assignee.toLocaleLowerCase('fr')}…`}
+                              emptyLabel="—"
+                            />
                           </td>
                           <td>
                             <input
@@ -396,12 +398,13 @@ export default function PlanningTechniciensPage({ context = 'terrain' }: { conte
           </label>
           <label>
             {meta.assignee}
-            <select value={userFilter} onChange={(event) => setUserFilter(event.target.value ? Number(event.target.value) : '')}>
-              <option value="">{meta.allAssignees}</option>
-              {(techniciens ?? []).map((item) => (
-                <option key={item.id} value={item.id}>{formatTechnicienOption(item)}</option>
-              ))}
-            </select>
+            <SearchableSelect
+              options={assigneeOptions}
+              value={userFilter}
+              onChange={(val) => setUserFilter(val === '' || val == null ? '' : Number(val))}
+              placeholder={`Rechercher un ${meta.assignee.toLocaleLowerCase('fr')}…`}
+              emptyLabel={meta.allAssignees}
+            />
           </label>
           <label>
             Client

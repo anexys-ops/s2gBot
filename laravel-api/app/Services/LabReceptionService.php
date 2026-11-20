@@ -7,6 +7,8 @@ use App\Models\BonCommandeLigne;
 use App\Models\MissionTask;
 use App\Models\OrdreMission;
 use App\Models\Sample;
+use App\Models\TaskTestForm;
+use App\Support\FormSampleCount;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -106,8 +108,9 @@ class LabReceptionService
             ->pluck('cnt', 'task_id');
         $tasksByLine = $tasks
             ->groupBy(fn (MissionTask $task) => $task->ordreMissionLigne?->bon_commande_ligne_id);
+        $formCountByLine = $this->sampleCountsFromForms($lineIds);
 
-        return $lignes->map(function (BonCommandeLigne $ligne) use ($counts, $tasksByLine, $pendingByTask) {
+        return $lignes->map(function (BonCommandeLigne $ligne) use ($counts, $tasksByLine, $pendingByTask, $formCountByLine) {
             $bc = $ligne->bonCommande;
             $dossier = $bc?->dossier;
             $c = $counts[$ligne->id] ?? ['en_transit' => 0, 'recu' => 0, 'total' => 0];
@@ -121,6 +124,8 @@ class LabReceptionService
                 'quantite_recue' => $c['recu'],
                 'quantite_manquante' => max(0, $attendu - $c['total']),
                 'reception_complete' => $attendu > 0 && $c['recu'] >= $attendu,
+                // « Nombre d'échantillons » saisi dans le formulaire de la mission terrain : préremplit le nombre d'étiquettes.
+                'nombre_echantillons_formulaire' => $formCountByLine[$ligne->id] ?? null,
                 'tasks' => $tasksByLine->get($ligne->id, collect())->map(fn (MissionTask $task) => [
                     'id' => $task->id,
                     'unique_number' => $task->unique_number,
@@ -165,6 +170,39 @@ class LabReceptionService
                 ] : null,
             ];
         })->values();
+    }
+
+    /**
+     * Nombre d'échantillons saisi dans le dernier formulaire d'essai des missions terrain de chaque ligne.
+     *
+     * @param  list<int>  $lineIds
+     * @return array<int, int>
+     */
+    private function sampleCountsFromForms(array $lineIds): array
+    {
+        if ($lineIds === []) {
+            return [];
+        }
+        $forms = TaskTestForm::query()
+            ->whereHas('missionTask.ordreMissionLigne', fn (Builder $q) => $q
+                ->whereIn('bon_commande_ligne_id', $lineIds)
+                ->whereHas('ordreMission', fn (Builder $om) => $om->where('type', OrdreMission::TYPE_TECHNICIEN)))
+            ->with('missionTask.ordreMissionLigne:id,bon_commande_ligne_id')
+            ->orderByDesc('id')
+            ->get(['id', 'mission_task_id', 'answers']);
+
+        $byLine = [];
+        foreach ($forms as $form) {
+            $lineId = $form->missionTask?->ordreMissionLigne?->bon_commande_ligne_id;
+            if ($lineId === null || isset($byLine[$lineId])) {
+                continue;
+            }
+            if (($count = FormSampleCount::fromAnswers($form->answers)) !== null) {
+                $byLine[$lineId] = $count;
+            }
+        }
+
+        return $byLine;
     }
 
     /**

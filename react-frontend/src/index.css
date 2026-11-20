@@ -12603,3 +12603,18 @@ a.catalogue-tree__link-article:hover {
     border-radius: 12px;
   }
 }
+
+/* Ordres de mission — colonne Réception */
+.om-reception-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 9rem;
+}
+.om-reception-cell__line {
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16rem;
+}

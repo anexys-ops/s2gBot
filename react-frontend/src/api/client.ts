@@ -1948,6 +1948,8 @@ export type LabReceptionAttendu = {
   quantite_recue: number
   quantite_manquante: number
   reception_complete: boolean
+  /** « Nombre d'échantillons » saisi dans le formulaire de la mission terrain (préremplit le nombre d'étiquettes). */
+  nombre_echantillons_formulaire?: number | null
   tasks: Array<{
     id: number
     unique_number?: string | null
@@ -3618,6 +3620,8 @@ export interface OrdreMissionLigne {
 export interface OrdreMission {
   id: number
   numero: string
+  /** Suivi de réception (liste) : tâches dont l'échantillon est arrivé au labo, PV, n° de réception. */
+  reception?: { taches: number; taches_receptionnees: number; pv_numbers: string[]; numeros_reception: string[] }
   unique_number?: string
   bon_commande_id: number
   dossier_id?: number | null

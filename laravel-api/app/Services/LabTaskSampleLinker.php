@@ -23,10 +23,31 @@ class LabTaskSampleLinker
         private readonly DevisJalonResolver $jalonResolver,
     ) {}
 
+    /**
+     * Mission terrain d'origine d'un échantillon réceptionné directement depuis la ligne de BC
+     * (écran Réception) : la mission de prélèvement de cette ligne qui a un n° de PV, en
+     * répartissant les échantillons sur les missions qui en ont le moins. Null si aucune.
+     */
+    public function inferTerrainTaskId(int $bonCommandeLigneId): ?int
+    {
+        $tasks = MissionTask::query()
+            ->whereNotIn('statut', [MissionTask::STATUT_REJECTED])
+            ->whereNotNull('pv_numbers')
+            ->whereHas('ordreMissionLigne', fn ($q) => $q
+                ->where('bon_commande_ligne_id', $bonCommandeLigneId)
+                ->whereHas('ordreMission', fn ($om) => $om->where('type', OrdreMission::TYPE_TECHNICIEN)))
+            ->withCount(['ownSamples as samples_count'])
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (MissionTask $t) => ! empty($t->pv_numbers));
+
+        return $tasks->sortBy('samples_count')->first()?->id;
+    }
+
     /** @return int nombre de tâches labo rattachées */
     public function linkSample(Sample $sample): int
     {
-        if (! $sample->task_id || ! $sample->bon_commande_ligne_id
+        if (! $sample->bon_commande_ligne_id
             || in_array($sample->status, self::DEAD_STATUSES, true)
             || $sample->labTasks()->exists()) {
             return 0;

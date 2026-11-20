@@ -105,6 +105,8 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
     })
   }
 
+  // Cocher un jalon ou une ligne n'affecte qu'une unité par défaut (retour client V4) :
+  // la quantité se saisit ensuite, plafonnée au reste à générer du BC.
   const updateQuantite = (ligneId: number, qty: number) => {
     const ligne = lignesById.get(ligneId)
     if (!ligne) return
@@ -197,7 +199,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                     <input
                       type="checkbox"
                       checked={isLineSelected}
-                      onChange={(e) => updateQuantite(ligne.id, e.target.checked ? Math.max(0, ligne.quantite_restante) : 0)}
+                      onChange={(e) => updateQuantite(ligne.id, e.target.checked ? Math.min(1, ligne.quantite_restante) : 0)}
                       style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer', flexShrink: 0, accentColor: '#10b981' }}
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -272,7 +274,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                     <input
                       type="checkbox"
                       checked={jalonSelected}
-                      onChange={(e) => applyJalonQty(row.childIds, e.target.checked ? jalonQtyReste : 0)}
+                      onChange={(e) => applyJalonQty(row.childIds, e.target.checked ? Math.min(1, jalonQtyReste) : 0)}
                       style={{
                         width: '1.2rem',
                         height: '1.2rem',
@@ -381,7 +383,7 @@ export default function OdmGenerationModal({ bcId, onClose, onSuccess }: Props) 
                               type="checkbox"
                               checked={isLineSelected}
                               onChange={(e) => {
-                                updateQuantite(ligne.id, e.target.checked ? Math.max(0, ligne.quantite_restante) : 0)
+                                updateQuantite(ligne.id, e.target.checked ? Math.min(1, ligne.quantite_restante) : 0)
                               }}
                               style={{
                                 width: '1.1rem',

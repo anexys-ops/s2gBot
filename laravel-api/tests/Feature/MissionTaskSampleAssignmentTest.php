@@ -158,6 +158,45 @@ class MissionTaskSampleAssignmentTest extends TestCase
         $this->assertSame(['0152820'], $row['samples'][0]['task']['pv_numbers']);
     }
 
+    public function test_reception_from_bc_line_finds_terrain_mission_pv_and_links_labo_task(): void
+    {
+        [$terrainTask, $laboTask, $lab, $bc] = $this->seedJalonWithTerrainAndLaboTasks();
+        $this->orderItemId();
+        $terrainTask->update(['pv_numbers' => ['1233ID']]);
+        $ligneTerrain = $terrainTask->ordreMissionLigne->bonCommandeLigne;
+        $ligneTerrain->update(['technicien_id' => $lab->id]);
+        \App\Models\TaskTestForm::query()->create([
+            'mission_task_id' => $terrainTask->id,
+            'test_type_id' => TestType::query()->create(['name' => 'Prélèvement'])->id,
+            'status' => 'validated',
+            'form_snapshot' => [],
+            'answers' => ['nombre_d_echantillons' => '2'],
+        ]);
+        $attendu = collect($this->actingAs($lab, 'sanctum')->getJson('/api/v1/lab/reception/attendus')->assertOk()->json('data'))
+            ->firstWhere('id', $ligneTerrain->id);
+        $this->assertSame(2, $attendu['nombre_echantillons_formulaire']);
+
+        $sampleId = (int) $this->actingAs($lab, 'sanctum')->postJson('/api/v1/lab/reception/receive-from-line', [
+            'bon_commande_ligne_id' => $ligneTerrain->id,
+            'condition_state' => 'bon',
+        ])->assertCreated()->json('id');
+
+        $sample = Sample::query()->findOrFail($sampleId);
+        $this->assertSame($terrainTask->id, $sample->task_id);
+        $this->assertNotEmpty($sample->transco_number);
+        $this->assertSame([$sampleId], $laboTask->fresh()->samples()->pluck('samples.id')->all());
+
+        $jalons = $this->actingAs($lab, 'sanctum')->getJson('/api/v1/lab/reception/jalons-recus')->assertOk();
+        $this->assertSame(['1233ID'], $jalons->json('data.0.pv_numbers'));
+
+        // Vue Ordres de mission : même suivi de réception sur l'OdM labo.
+        $om = collect($this->actingAs($lab, 'sanctum')->getJson('/api/ordres-mission?type=labo')->assertOk()->json())
+            ->firstWhere('id', $laboTask->ordreMissionLigne->ordre_mission_id);
+        $this->assertSame(1, $om['reception']['taches_receptionnees']);
+        $this->assertSame(['1233ID'], $om['reception']['pv_numbers']);
+        $this->assertSame([$sample->transco_number], $om['reception']['numeros_reception']);
+    }
+
     public function test_labo_task_lists_only_same_jalon_samples_by_default(): void
     {
         [$terrainTask, $laboTask, $lab, $bc] = $this->seedJalonWithTerrainAndLaboTasks();

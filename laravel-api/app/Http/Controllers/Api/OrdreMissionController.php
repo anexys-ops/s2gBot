@@ -14,6 +14,7 @@ use App\Models\OrdreMission;
 use App\Models\OrdreMissionLigne;
 use App\Models\PlanningEquipment;
 use App\Models\PlanningHuman;
+use App\Models\Sample;
 use App\Services\ExpenseReportService;
 use App\Services\MissionTaskStatusService;
 use App\Services\OrdreMissionFromBonCommandeService;
@@ -86,7 +87,66 @@ class OrdreMissionController extends Controller
             'statut' => 'ordres_mission.statut',
         ]);
 
-        return response()->json($q->get());
+        $orders = $q->get();
+        $this->attachReceptionSummaries($orders);
+
+        return response()->json($orders);
+    }
+
+    /** Statuts d'échantillon « arrivé au labo ». */
+    private const RECEIVED_SAMPLE_STATUSES = [
+        Sample::STATUS_RECEPTIONNE, Sample::STATUS_IMPRIME, Sample::STATUS_EN_ESSAI,
+        Sample::STATUS_TERMINE, Sample::STATUS_STOCKE, Sample::STATUS_ARCHIVE,
+    ];
+
+    /**
+     * Suivi de réception par OdM (même information que « Jalons réceptionnés ») :
+     * tâches dont l'échantillon est arrivé au labo, n° de PV, n° de réception (transco).
+     * OdM labo : FOLD rattachés aux tâches ; OdM terrain/ingénieur : FOLD produits par les missions.
+     *
+     * @param  \Illuminate\Support\Collection<int, OrdreMission>  $orders
+     */
+    private function attachReceptionSummaries($orders): void
+    {
+        if ($orders->isEmpty()) {
+            return;
+        }
+        $tasks = MissionTask::query()
+            ->whereHas('ordreMissionLigne', fn ($q) => $q->whereIn('ordre_mission_id', $orders->pluck('id')))
+            ->with([
+                'ordreMissionLigne:id,ordre_mission_id',
+                'samples:id,transco_number,status,task_id',
+                'samples.task:id,pv_numbers',
+                'ownSamples:id,transco_number,status,task_id',
+            ])
+            ->get(['id', 'ordre_mission_ligne_id', 'statut', 'pv_numbers'])
+            ->groupBy(fn (MissionTask $t) => $t->ordreMissionLigne?->ordre_mission_id);
+
+        foreach ($orders as $order) {
+            $orderTasks = ($tasks->get($order->id) ?? collect())
+                ->reject(fn (MissionTask $t) => $t->statut === MissionTask::STATUT_REJECTED);
+            $received = 0;
+            $pv = [];
+            $transco = [];
+            foreach ($orderTasks as $task) {
+                $samples = $order->type === OrdreMission::TYPE_LABO ? $task->samples : $task->ownSamples;
+                $arrived = $samples->filter(fn (Sample $s) => in_array($s->status, self::RECEIVED_SAMPLE_STATUSES, true));
+                if ($arrived->isNotEmpty()) {
+                    $received++;
+                }
+                array_push($transco, ...$arrived->pluck('transco_number')->filter()->all());
+                array_push($pv, ...($task->pv_numbers ?? []));
+                foreach ($samples as $sample) {
+                    array_push($pv, ...($sample->task?->pv_numbers ?? []));
+                }
+            }
+            $order->setAttribute('reception', [
+                'taches' => $orderTasks->count(),
+                'taches_receptionnees' => $received,
+                'pv_numbers' => array_values(array_unique(array_map('strval', $pv))),
+                'numeros_reception' => array_values(array_unique($transco)),
+            ]);
+        }
     }
 
     public function show(OrdreMission $ordreMission): JsonResponse

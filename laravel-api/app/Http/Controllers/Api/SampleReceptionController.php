@@ -525,6 +525,8 @@ class SampleReceptionController extends Controller
         $bc = $ligne->bonCommande;
         $createData = [
             'bon_commande_ligne_id' => $ligne->id,
+            // Mission terrain d'origine (PV, rattachement aux tâches labo) même sans passer par le FOLD en transit.
+            'task_id' => app(LabTaskSampleLinker::class)->inferTerrainTaskId($ligne->id),
             'dossier_id' => $bc?->dossier_id,
             'product_id' => $ligne->ref_article_id,
             'description' => $data['description'] ?? $ligne->libelle,

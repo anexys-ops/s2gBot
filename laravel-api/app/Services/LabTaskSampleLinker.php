@@ -16,6 +16,12 @@ use Carbon\Carbon;
  */
 class LabTaskSampleLinker
 {
+    /** Échantillons arrivés au labo. */
+    private const RECEIVED_STATUSES = [
+        Sample::STATUS_RECEPTIONNE, Sample::STATUS_IMPRIME, Sample::STATUS_EN_ESSAI,
+        Sample::STATUS_TERMINE, Sample::STATUS_STOCKE, Sample::STATUS_ARCHIVE,
+    ];
+
     /** Échantillons qui ne doivent plus être rattachés. */
     private const DEAD_STATUSES = [Sample::STATUS_ANNULE, Sample::STATUS_PERDU, Sample::STATUS_REJETE];
 
@@ -69,16 +75,21 @@ class LabTaskSampleLinker
             ->pluck('id')
             ->all();
 
+        $isReceived = in_array($sample->status, self::RECEIVED_STATUSES, true);
         $candidates = MissionTask::query()
             ->where('no_fold_required', false)
             ->whereNotIn('statut', [MissionTask::STATUT_VALIDATED, MissionTask::STATUT_REJECTED])
-            ->whereDoesntHave('samples')
+            // Tâche libre, ou — pour un échantillon réellement arrivé au labo — tâche qui ne porte
+            // qu'un FOLD resté en transit (jamais réceptionné, ex. réception refaite depuis la ligne de BC).
+            ->where(fn ($q) => $isReceived
+                ? $q->whereDoesntHave('samples', fn ($sq) => $sq->whereIn('samples.status', self::RECEIVED_STATUSES))
+                : $q->whereDoesntHave('samples'))
             ->whereHas('ordreMissionLigne', fn ($q) => $q
                 ->whereIn('bon_commande_ligne_id', $siblingLineIds)
                 ->whereHas('ordreMission', fn ($om) => $om
                     ->where('type', OrdreMission::TYPE_LABO)
                     ->where('bon_commande_id', $bc->id)))
-            ->with('ordreMissionLigne:id,bon_commande_ligne_id,article_action_id')
+            ->with(['ordreMissionLigne:id,bon_commande_ligne_id,article_action_id', 'samples:id,status'])
             ->orderBy('id')
             ->lockForUpdate()
             ->get();
@@ -86,8 +97,13 @@ class LabTaskSampleLinker
         $linked = 0;
         $byProduct = $candidates->groupBy(fn (MissionTask $t) => $t->ordreMissionLigne?->bon_commande_ligne_id.'|'.$t->ordreMissionLigne?->article_action_id);
         foreach ($byProduct as $tasks) {
+            // Une tâche vraiment libre d'abord, sinon celle dont le FOLD n'est jamais arrivé.
             /** @var MissionTask $task */
-            $task = $tasks->first();
+            $task = $tasks->first(fn (MissionTask $t) => $t->samples->isEmpty()) ?? $tasks->first();
+            $stale = $task->samples->pluck('id')->all();
+            if ($stale !== []) {
+                $task->samples()->detach($stale);
+            }
             $task->samples()->syncWithoutDetaching([$sample->id => ['forced' => false]]);
             $this->planAfterReception($task, $sample);
             $linked++;

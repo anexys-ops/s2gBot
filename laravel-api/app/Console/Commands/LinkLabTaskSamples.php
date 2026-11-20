@@ -34,6 +34,8 @@ class LinkLabTaskSamples extends Command
             ->whereNotNull('bon_commande_ligne_id')
             ->whereDoesntHave('labTasks')
             ->whereNotIn('status', [Sample::STATUS_ANNULE, Sample::STATUS_PERDU, Sample::STATUS_REJETE])
+            // Les échantillons arrivés au labo d'abord : ils priment sur un FOLD resté en transit.
+            ->orderByRaw('CASE WHEN received_at IS NULL THEN 1 ELSE 0 END')
             ->orderBy('id')
             ->each(function (Sample $sample) use ($linker, &$links) {
                 $links += DB::transaction(fn () => $linker->linkSample($sample));

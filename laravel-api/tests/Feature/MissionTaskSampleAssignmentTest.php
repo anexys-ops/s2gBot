@@ -197,6 +197,29 @@ class MissionTaskSampleAssignmentTest extends TestCase
         $this->assertSame([$sample->transco_number], $om['reception']['numeros_reception']);
     }
 
+    public function test_received_sample_replaces_a_fold_left_in_transit_on_the_labo_task(): void
+    {
+        [$terrainTask, $laboTask, $lab] = $this->seedJalonWithTerrainAndLaboTasks();
+        $this->orderItemId();
+        // Fin de mission : FOLD créé en transit et rattaché à la tâche labo…
+        $this->actingAs($lab, 'sanctum')->postJson("/api/mission-tasks/{$terrainTask->id}/close-reception", [
+            'pv_numbers' => ['1233ID'], 'quantity_unit' => 'U', 'quantity_count' => 1,
+        ])->assertOk();
+        $transit = Sample::query()->where('task_id', $terrainTask->id)->firstOrFail();
+        $this->assertSame([$transit->id], $laboTask->fresh()->samples()->pluck('samples.id')->all());
+
+        // …puis le labo réceptionne depuis la ligne de BC au lieu de ce FOLD.
+        $ligneTerrain = $terrainTask->ordreMissionLigne->bonCommandeLigne;
+        $ligneTerrain->update(['technicien_id' => $lab->id]);
+        $receivedId = (int) $this->actingAs($lab, 'sanctum')->postJson('/api/v1/lab/reception/receive-from-line', [
+            'bon_commande_ligne_id' => $ligneTerrain->id,
+            'condition_state' => 'bon',
+        ])->assertCreated()->json('id');
+
+        $this->assertSame([$receivedId], $laboTask->fresh()->samples()->pluck('samples.id')->all());
+        $this->assertNotEmpty(Sample::query()->findOrFail($receivedId)->transco_number);
+    }
+
     public function test_labo_task_lists_only_same_jalon_samples_by_default(): void
     {
         [$terrainTask, $laboTask, $lab, $bc] = $this->seedJalonWithTerrainAndLaboTasks();
